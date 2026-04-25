@@ -65,13 +65,17 @@ capture_with_portal() {
 
   handle="$(
     printf '%s\n' "$reply" \
-      | sed -n "s/^(objectpath '\(.*\)')$/\1/p" \
+      | sed -n "s/^(objectpath '\(.*\)'[,]*)$/\1/p" \
       | head -n 1
   )"
 
   if [[ -z "$handle" ]]; then
     screenshot_status="portal_call_failed"
-    record_capture_attempt "portal:call_failed"
+    if [[ -n "$reply" ]]; then
+      record_capture_attempt "portal:call_failed:reply=$(printf '%s' "$reply" | tr ' ' '_' | tr -d '\n')"
+    else
+      record_capture_attempt "portal:call_failed:no_reply"
+    fi
     [[ -n "$monitor_pid" ]] && kill "$monitor_pid" >/dev/null 2>&1 || true
     return 1
   fi
