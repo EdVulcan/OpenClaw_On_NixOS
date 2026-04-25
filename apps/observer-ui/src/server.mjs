@@ -178,7 +178,7 @@ function observerHtml() {
             <button id="pause-button" class="secondary">Pause Current Task</button>
             <button id="stop-button" class="secondary">Stop Current Task</button>
           </div>
-          <pre id="control-result">No actions yet.</pre>
+          <pre id="control-result">Controls ready.</pre>
         </section>
         <section class="panel">
           <h2>AI Work View</h2>
@@ -298,6 +298,45 @@ function setHealthPill(target, ok, text) {
   target.className = ok ? "status-pill" : "status-pill warn";
 }
 
+function formatTimestamp(value) {
+  if (!value) {
+    return "-";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleString();
+}
+
+function formatError(error) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return String(error);
+}
+
+function setControlMessage(message) {
+  controlResult.textContent = message;
+}
+
+async function fetchJson(url, options) {
+  const response = await fetch(url, options);
+  const contentType = response.headers.get("content-type") ?? "";
+  const payload = contentType.includes("application/json")
+    ? await response.json()
+    : { ok: false, error: await response.text() };
+
+  if (!response.ok) {
+    throw new Error(payload?.error ?? \`Request failed with status \${response.status}\`);
+  }
+
+  return payload;
+}
+
 function addEventItem(event) {
   const item = document.createElement("li");
   item.textContent = \`[\${event.timestamp}] \${event.type} from \${event.source}\`;
@@ -305,11 +344,6 @@ function addEventItem(event) {
   while (eventsList.children.length > 30) {
     eventsList.removeChild(eventsList.lastChild);
   }
-}
-
-async function fetchJson(url, options) {
-  const response = await fetch(url, options);
-  return response.json();
 }
 
 async function refreshHealth() {
@@ -351,7 +385,15 @@ async function refreshRuntime() {
     runtimePaused.textContent = String(data.runtime.paused);
     runtimeCount.textContent = String(data.taskCount);
     runtimeUpdated.textContent = data.runtime.lastUpdatedAt;
-    taskJson.textContent = JSON.stringify(currentTask ?? {}, null, 2);
+    taskJson.textContent = currentTask
+      ? [
+          \`Goal: \${currentTask.goal}\`,
+          \`Type: \${currentTask.type}\`,
+          \`Status: \${currentTask.status}\`,
+          \`Created: \${formatTimestamp(currentTask.createdAt)}\`,
+          \`Updated: \${formatTimestamp(currentTask.updatedAt)}\`,
+        ].join("\\n")
+      : "No active task.";
   } catch {
     runtimeStatus.textContent = "offline";
     taskJson.textContent = "Unable to read runtime state.";
@@ -367,7 +409,15 @@ async function refreshWorkView() {
     workViewMode.textContent = workView.mode ?? "unknown";
     workViewHelper.textContent = workView.helperStatus ?? "unknown";
     workViewCapture.textContent = workView.captureStrategy ?? "unknown";
-    workViewJson.textContent = JSON.stringify({ session: data.session, workView }, null, 2);
+    workViewJson.textContent = [
+      \`Session: \${data.session?.status ?? "unknown"}\`,
+      \`Session ID: \${data.session?.sessionId ?? "none"}\`,
+      \`Display: \${workView.displayTarget ?? "unknown"}\`,
+      \`Prepared: \${formatTimestamp(workView.preparedAt)}\`,
+      \`Revealed: \${formatTimestamp(workView.lastRevealedAt)}\`,
+      \`Hidden: \${formatTimestamp(workView.lastHiddenAt)}\`,
+      \`Updated: \${formatTimestamp(workView.updatedAt)}\`,
+    ].join("\\n");
   } catch {
     workViewStatus.textContent = "offline";
     workViewVisibility.textContent = "offline";
@@ -405,7 +455,14 @@ async function refreshActionState() {
     actionKind.textContent = state.lastAction?.kind ?? "none";
     actionCount.textContent = String(state.actionCount ?? 0);
     actionDegraded.textContent = String(state.lastAction?.degraded ?? false);
-    actionJson.textContent = JSON.stringify(state.lastAction ?? {}, null, 2);
+    actionJson.textContent = state.lastAction
+      ? [
+          \`Result: \${state.lastAction.result}\`,
+          \`Executed: \${formatTimestamp(state.lastAction.executedAt)}\`,
+          \`Window: \${state.lastAction.screenContext?.focusedWindow?.title ?? "none"}\`,
+          \`Session: \${state.lastAction.screenContext?.sessionId ?? "none"}\`,
+        ].join("\\n")
+      : "No action executed yet.";
   } catch {
     actionKind.textContent = "offline";
     actionCount.textContent = "0";
@@ -421,14 +478,12 @@ async function refreshSystemState() {
     const onlineCount = Object.values(system.services).filter((service) => service.ok).length;
     systemServicesOnline.textContent = String(onlineCount);
     systemAlertCount.textContent = String(system.alerts.length);
-    systemSummary.textContent = JSON.stringify(
-      {
-        resources: system.resources,
-        alerts: system.alerts,
-      },
-      null,
-      2,
-    );
+    systemSummary.textContent = [
+      \`CPU: \${system.resources?.cpuPercent ?? 0}%\`,
+      \`Memory: \${system.resources?.memoryPercent ?? 0}%\`,
+      \`Disk: \${system.resources?.diskPercent ?? 0}%\`,
+      \`Alerts: \${system.alerts?.length ?? 0}\`,
+    ].join("\\n");
   } catch {
     systemServicesOnline.textContent = "0";
     systemAlertCount.textContent = "0";
@@ -440,7 +495,15 @@ async function refreshHealState() {
   try {
     const data = await fetchJson(\`\${observerConfig.systemHealUrl}/heal/history\`);
     healCount.textContent = String(data.count ?? 0);
-    healSummary.textContent = JSON.stringify(data.items?.[0] ?? {}, null, 2);
+    const latest = data.items?.[0] ?? null;
+    healSummary.textContent = latest
+      ? [
+          \`Action: \${latest.action}\`,
+          \`Service: \${latest.service}\`,
+          \`Status: \${latest.status}\`,
+          \`Completed: \${formatTimestamp(latest.completedAt)}\`,
+        ].join("\\n")
+      : "No heal actions yet.";
   } catch {
     healCount.textContent = "0";
     healSummary.textContent = "Unable to read heal history.";
@@ -468,7 +531,7 @@ async function createDemoTask() {
       type: "browser_task",
     }),
   });
-  controlResult.textContent = JSON.stringify(result, null, 2);
+  setControlMessage(\`Created task \${result.task?.id ?? "unknown"}\`);
   await refreshRuntime();
 }
 
@@ -478,15 +541,16 @@ async function postWorkView(path, payload = {}) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify(payload),
   });
-  controlResult.textContent = JSON.stringify(result, null, 2);
+  setControlMessage(\`Work view \${result.workView?.status ?? "updated"} / \${result.workView?.visibility ?? "unknown"}\`);
   await refreshWorkView();
+  await refreshScreen();
 }
 
 async function postControl(path) {
   const result = await fetchJson(\`\${observerConfig.coreUrl}\${path}\`, {
     method: "POST",
   });
-  controlResult.textContent = JSON.stringify(result, null, 2);
+  setControlMessage(\`Control request completed: \${path}\`);
   await refreshRuntime();
 }
 
@@ -494,7 +558,7 @@ async function refreshScreenNow() {
   const result = await fetchJson(\`\${observerConfig.screenSenseUrl}/screen/refresh\`, {
     method: "POST",
   });
-  controlResult.textContent = JSON.stringify(result, null, 2);
+  setControlMessage(\`Screen refreshed: \${result.screen?.readiness ?? "unknown"}\`);
   await refreshScreen();
 }
 
@@ -504,7 +568,7 @@ async function runAction(path, payload) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify(payload),
   });
-  controlResult.textContent = JSON.stringify(result, null, 2);
+  setControlMessage(\`Action \${result.action?.kind ?? "unknown"} completed (\${result.action?.result ?? "unknown"})\`);
   await refreshActionState();
 }
 
@@ -514,7 +578,7 @@ async function runHeal(service) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ service }),
   });
-  controlResult.textContent = JSON.stringify(result, null, 2);
+  setControlMessage(\`Heal completed for \${result.entry?.service ?? service}\`);
   await refreshHealState();
 }
 
@@ -566,7 +630,7 @@ function subscribeEvents() {
 
 createTaskButton.addEventListener("click", () => {
   createDemoTask().catch((error) => {
-    controlResult.textContent = String(error);
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
   });
 });
 
@@ -574,25 +638,25 @@ prepareWorkViewButton.addEventListener("click", () => {
   postWorkView("/work-view/prepare", {
     displayTarget: "workspace-2",
   }).catch((error) => {
-    controlResult.textContent = String(error);
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
   });
 });
 
 revealWorkViewButton.addEventListener("click", () => {
   postWorkView("/work-view/reveal").catch((error) => {
-    controlResult.textContent = String(error);
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
   });
 });
 
 hideWorkViewButton.addEventListener("click", () => {
   postWorkView("/work-view/hide").catch((error) => {
-    controlResult.textContent = String(error);
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
   });
 });
 
 refreshScreenButton.addEventListener("click", () => {
   refreshScreenNow().catch((error) => {
-    controlResult.textContent = String(error);
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
   });
 });
 
@@ -602,7 +666,7 @@ clickActionButton.addEventListener("click", () => {
     y: 360,
     button: "left",
   }).catch((error) => {
-    controlResult.textContent = String(error);
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
   });
 });
 
@@ -610,25 +674,25 @@ typeActionButton.addEventListener("click", () => {
   runAction("/act/keyboard/type", {
     text: "hello from openclaw-screen-act",
   }).catch((error) => {
-    controlResult.textContent = String(error);
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
   });
 });
 
 healBrowserButton.addEventListener("click", () => {
   runHeal("openclaw-browser-runtime").catch((error) => {
-    controlResult.textContent = String(error);
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
   });
 });
 
 pauseButton.addEventListener("click", () => {
   postControl("/control/pause").catch((error) => {
-    controlResult.textContent = String(error);
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
   });
 });
 
 stopButton.addEventListener("click", () => {
   postControl("/control/stop").catch((error) => {
-    controlResult.textContent = String(error);
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
   });
 });
 
@@ -640,6 +704,7 @@ await refreshActionState();
 await refreshSystemState();
 await refreshHealState();
 await loadRecentEvents();
+setControlMessage("Controls ready.");
 subscribeEvents();
 setInterval(refreshHealth, 5000);
 setInterval(refreshRuntime, 5000);
