@@ -22,6 +22,12 @@ focused_window_pid="$WINDOW_PID_OVERRIDE"
 window_list_json="[]"
 screenshot_status="not_attempted"
 gnome_eval_status="not_attempted"
+capture_attempts=()
+gnome_focused_title_result=""
+
+record_capture_attempt() {
+  capture_attempts+=("$1")
+}
 
 has_file_payload() {
   local path="$1"
@@ -47,13 +53,16 @@ capture_with_gnome_shell_dbus() {
   if has_file_payload "$SCREENSHOT_PATH"; then
     capture_source="linux-gnome-shell-dbus"
     screenshot_status="captured"
+    record_capture_attempt "gnome_shell_dbus:captured"
     return 0
   fi
 
   if [[ -n "$reply" ]]; then
     screenshot_status="dbus_no_file"
+    record_capture_attempt "gnome_shell_dbus:dbus_no_file"
   else
     screenshot_status="dbus_unavailable"
+    record_capture_attempt "gnome_shell_dbus:dbus_unavailable"
   fi
 
   return 1
@@ -70,9 +79,11 @@ capture_with_tool() {
     if has_file_payload "$SCREENSHOT_PATH"; then
       capture_source="linux-grim"
       screenshot_status="captured"
+      record_capture_attempt "grim:captured"
       return
     fi
     screenshot_status="grim_failed"
+    record_capture_attempt "grim:failed"
   fi
 
   if command -v gnome-screenshot >/dev/null 2>&1; then
@@ -81,9 +92,11 @@ capture_with_tool() {
     if has_file_payload "$SCREENSHOT_PATH"; then
       capture_source="linux-gnome-screenshot"
       screenshot_status="captured"
+      record_capture_attempt "gnome_screenshot:captured"
       return
     fi
     screenshot_status="gnome_screenshot_failed"
+    record_capture_attempt "gnome_screenshot:failed"
   fi
 
   if command -v import >/dev/null 2>&1; then
@@ -92,16 +105,22 @@ capture_with_tool() {
     if has_file_payload "$SCREENSHOT_PATH"; then
       capture_source="linux-imagemagick"
       screenshot_status="captured"
+      record_capture_attempt "import:captured"
       return
     fi
     screenshot_status="imagemagick_failed"
+    record_capture_attempt "import:failed"
   fi
 
   screenshot_status="no_capture_tool_succeeded"
+  if [[ ${#capture_attempts[@]} -gt 0 ]]; then
+    screenshot_status="${screenshot_status} ($(IFS=', '; echo "${capture_attempts[*]}"))"
+  fi
 }
 
 read_gnome_focused_title() {
   if ! command -v gdbus >/dev/null 2>&1; then
+    gnome_eval_status="gdbus_missing"
     return 1
   fi
 
@@ -120,9 +139,17 @@ read_gnome_focused_title() {
     gnome_eval_status="eval_disabled_or_unavailable"
   fi
 
-  printf '%s\n' "$reply" \
-    | sed -n "s/^(true, '\(.*\)')$/\1/p" \
-    | head -n 1
+  gnome_focused_title_result="$(
+    printf '%s\n' "$reply" \
+      | sed -n "s/^(true, '\(.*\)')$/\1/p" \
+      | head -n 1
+  )"
+
+  if [[ -n "$gnome_focused_title_result" ]]; then
+    return 0
+  fi
+
+  return 1
 }
 
 read_gnome_window_list() {
@@ -185,7 +212,9 @@ capture_with_tool
 if [[ -n "$WINDOW_TITLE_OVERRIDE" ]]; then
   focused_window_title="$WINDOW_TITLE_OVERRIDE"
 elif [[ "$DESKTOP_ENV" == *GNOME* ]]; then
-  focused_window_title="$(read_gnome_focused_title | trim || true)"
+  if read_gnome_focused_title; then
+    focused_window_title="$(printf '%s' "$gnome_focused_title_result" | trim)"
+  fi
 else
   focused_window_title="$(read_x11_focused_title | trim || true)"
 fi
