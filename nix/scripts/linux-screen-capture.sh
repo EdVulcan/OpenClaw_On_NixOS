@@ -20,24 +20,84 @@ capture_source="$SOURCE_NAME"
 focused_window_title=""
 focused_window_pid="$WINDOW_PID_OVERRIDE"
 window_list_json="[]"
+screenshot_status="not_attempted"
+gnome_eval_status="not_attempted"
+
+has_file_payload() {
+  local path="$1"
+  [[ -f "$path" && -s "$path" ]]
+}
+
+capture_with_gnome_shell_dbus() {
+  if ! command -v gdbus >/dev/null 2>&1; then
+    return 1
+  fi
+
+  rm -f "$SCREENSHOT_PATH"
+
+  local reply
+  reply="$(
+    gdbus call --session \
+      --dest org.gnome.Shell.Screenshot \
+      --object-path /org/gnome/Shell/Screenshot \
+      --method org.gnome.Shell.Screenshot.Screenshot \
+      false false "$SCREENSHOT_PATH" 2>/dev/null || true
+  )"
+
+  if has_file_payload "$SCREENSHOT_PATH"; then
+    capture_source="linux-gnome-shell-dbus"
+    screenshot_status="captured"
+    return 0
+  fi
+
+  if [[ -n "$reply" ]]; then
+    screenshot_status="dbus_no_file"
+  else
+    screenshot_status="dbus_unavailable"
+  fi
+
+  return 1
+}
 
 capture_with_tool() {
-  if command -v grim >/dev/null 2>&1; then
-    grim "$SCREENSHOT_PATH" >/dev/null 2>&1 || true
-    capture_source="${SOURCE_NAME:-linux-grim}"
+  if [[ "$DESKTOP_ENV" == *GNOME* ]] && capture_with_gnome_shell_dbus; then
     return
+  fi
+
+  if command -v grim >/dev/null 2>&1; then
+    rm -f "$SCREENSHOT_PATH"
+    grim "$SCREENSHOT_PATH" >/dev/null 2>&1 || true
+    if has_file_payload "$SCREENSHOT_PATH"; then
+      capture_source="linux-grim"
+      screenshot_status="captured"
+      return
+    fi
+    screenshot_status="grim_failed"
   fi
 
   if command -v gnome-screenshot >/dev/null 2>&1; then
+    rm -f "$SCREENSHOT_PATH"
     gnome-screenshot -f "$SCREENSHOT_PATH" >/dev/null 2>&1 || true
-    capture_source="${SOURCE_NAME:-linux-gnome-screenshot}"
-    return
+    if has_file_payload "$SCREENSHOT_PATH"; then
+      capture_source="linux-gnome-screenshot"
+      screenshot_status="captured"
+      return
+    fi
+    screenshot_status="gnome_screenshot_failed"
   fi
 
   if command -v import >/dev/null 2>&1; then
+    rm -f "$SCREENSHOT_PATH"
     import -window root "$SCREENSHOT_PATH" >/dev/null 2>&1 || true
-    capture_source="${SOURCE_NAME:-linux-imagemagick}"
+    if has_file_payload "$SCREENSHOT_PATH"; then
+      capture_source="linux-imagemagick"
+      screenshot_status="captured"
+      return
+    fi
+    screenshot_status="imagemagick_failed"
   fi
+
+  screenshot_status="no_capture_tool_succeeded"
 }
 
 read_gnome_focused_title() {
@@ -45,11 +105,22 @@ read_gnome_focused_title() {
     return 1
   fi
 
-  gdbus call --session \
+  local reply
+  reply="$(
+    gdbus call --session \
     --dest org.gnome.Shell \
     --object-path /org/gnome/Shell \
     --method org.gnome.Shell.Eval \
-    "global.display.focus_window ? global.display.focus_window.get_title() : ''" 2>/dev/null \
+    "global.display.focus_window ? global.display.focus_window.get_title() : ''" 2>/dev/null || true
+  )"
+
+  if [[ "$reply" == "(true,"* ]]; then
+    gnome_eval_status="ok"
+  else
+    gnome_eval_status="eval_disabled_or_unavailable"
+  fi
+
+  printf '%s\n' "$reply" \
     | sed -n "s/^(true, '\(.*\)')$/\1/p" \
     | head -n 1
 }
@@ -145,6 +216,8 @@ export OPENCLAW_CAPTURE_WINDOW_PID="$focused_window_pid"
 export OPENCLAW_CAPTURE_SCREENSHOT_PATH="$SCREENSHOT_PATH"
 export OPENCLAW_CAPTURE_OCR_TEXT_PATH="$OCR_TEXT_PATH"
 export OPENCLAW_CAPTURE_WINDOW_LIST_JSON="$window_list_json"
+export OPENCLAW_CAPTURE_SCREENSHOT_STATUS="$screenshot_status"
+export OPENCLAW_CAPTURE_GNOME_EVAL_STATUS="$gnome_eval_status"
 
 python3 - <<'PY'
 import json
@@ -159,6 +232,8 @@ ocr_path = os.environ.get("OPENCLAW_CAPTURE_OCR_TEXT_PATH", "")
 window_list_raw = os.environ.get("OPENCLAW_CAPTURE_WINDOW_LIST_JSON", "[]")
 session_type = os.environ.get("XDG_SESSION_TYPE", "unknown")
 desktop_env = os.environ.get("XDG_CURRENT_DESKTOP", "unknown")
+screenshot_status = os.environ.get("OPENCLAW_CAPTURE_SCREENSHOT_STATUS", "unknown")
+gnome_eval_status = os.environ.get("OPENCLAW_CAPTURE_GNOME_EVAL_STATUS", "unknown")
 
 try:
     pid = int(pid_raw)
@@ -172,7 +247,13 @@ try:
 except json.JSONDecodeError:
     window_list = []
 
-snapshot_text = f"OpenClaw Linux capture adapter\nDesktop: {desktop_env}\nSession: {session_type}"
+snapshot_text = (
+    f"OpenClaw Linux capture adapter\n"
+    f"Desktop: {desktop_env}\n"
+    f"Session: {session_type}\n"
+    f"Screenshot: {screenshot_status}\n"
+    f"GNOME Eval: {gnome_eval_status}"
+)
 ocr_blocks = []
 
 if ocr_path and Path(ocr_path).exists():
@@ -183,6 +264,8 @@ if ocr_path and Path(ocr_path).exists():
             ocr_blocks.append({"text": line, "confidence": 0.9})
 elif snapshot_path and Path(snapshot_path).exists():
     snapshot_text = f"Screenshot captured at {snapshot_path}\nDesktop: {desktop_env}\nSession: {session_type}"
+else:
+    snapshot_path = None
 
 focused_window = {
     "title": title,

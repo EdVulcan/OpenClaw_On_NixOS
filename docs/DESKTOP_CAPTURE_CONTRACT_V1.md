@@ -125,6 +125,7 @@ Current practical providers:
 
 Likely providers:
 
+- `org.gnome.Shell.Screenshot` via `gdbus` for GNOME screenshots
 - `grim` for screenshots
 - `gnome-screenshot` for GNOME-based screenshots
 - `slurp` for region selection when needed
