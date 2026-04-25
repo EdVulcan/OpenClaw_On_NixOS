@@ -34,6 +34,142 @@ has_file_payload() {
   [[ -f "$path" && -s "$path" ]]
 }
 
+capture_with_portal() {
+  if ! command -v gdbus >/dev/null 2>&1; then
+    record_capture_attempt "portal:gdbus_missing"
+    return 1
+  fi
+
+  local monitor_log="$TMP_DIR/portal-monitor.log"
+  local token="openclaw$(date +%s%N)"
+  local monitor_pid=""
+  local reply=""
+  local handle=""
+  local portal_result=""
+
+  rm -f "$SCREENSHOT_PATH" "$monitor_log"
+  : > "$monitor_log"
+
+  gdbus monitor --session --dest org.freedesktop.portal.Desktop >"$monitor_log" 2>&1 &
+  monitor_pid=$!
+  sleep 0.2
+
+  reply="$(
+    gdbus call --session \
+      --dest org.freedesktop.portal.Desktop \
+      --object-path /org/freedesktop/portal/desktop \
+      --method org.freedesktop.portal.Screenshot.Screenshot \
+      "" \
+      "{'handle_token': <'${token}'>, 'interactive': <false>, 'modal': <false>}" 2>/dev/null || true
+  )"
+
+  handle="$(
+    printf '%s\n' "$reply" \
+      | sed -n "s/^(objectpath '\(.*\)')$/\1/p" \
+      | head -n 1
+  )"
+
+  if [[ -z "$handle" ]]; then
+    screenshot_status="portal_call_failed"
+    record_capture_attempt "portal:call_failed"
+    [[ -n "$monitor_pid" ]] && kill "$monitor_pid" >/dev/null 2>&1 || true
+    return 1
+  fi
+
+  local attempts=0
+  while (( attempts < 100 )); do
+    portal_result="$(
+      python3 - "$monitor_log" "$token" "$handle" <<'PY'
+import json
+import re
+import sys
+from pathlib import Path
+
+log_path = Path(sys.argv[1])
+token = sys.argv[2]
+handle = sys.argv[3]
+text = log_path.read_text(encoding="utf-8", errors="ignore")
+
+matches = []
+for line in text.splitlines():
+    if "org.freedesktop.portal.Request.Response" not in line:
+        continue
+    if handle and handle in line:
+        matches.append(line)
+    elif token and token in line:
+        matches.append(line)
+
+if not matches:
+    sys.exit(1)
+
+line = matches[-1]
+response_match = re.search(r"Response\s*\((\d+),", line)
+uri_match = re.search(r"'uri': <'([^']+)'>", line)
+
+payload = {
+    "response": int(response_match.group(1)) if response_match else None,
+    "uri": uri_match.group(1) if uri_match else None,
+    "raw": line,
+}
+print(json.dumps(payload, ensure_ascii=False))
+PY
+    )"
+
+    if [[ -n "$portal_result" ]]; then
+      break
+    fi
+
+    sleep 0.2
+    attempts=$((attempts + 1))
+  done
+
+  [[ -n "$monitor_pid" ]] && kill "$monitor_pid" >/dev/null 2>&1 || true
+
+  if [[ -z "$portal_result" ]]; then
+    screenshot_status="portal_timeout"
+    record_capture_attempt "portal:timeout"
+    return 1
+  fi
+
+  local response_code=""
+  local screenshot_uri=""
+  response_code="$(python3 -c "import json,sys; data=json.loads(sys.argv[1]); print('' if data.get('response') is None else data['response'])" "$portal_result")"
+  screenshot_uri="$(python3 -c "import json,sys; data=json.loads(sys.argv[1]); print(data.get('uri') or '')" "$portal_result")"
+
+  if [[ "$response_code" != "0" ]]; then
+    screenshot_status="portal_response_${response_code}"
+    record_capture_attempt "portal:response_${response_code}"
+    return 1
+  fi
+
+  if [[ -z "$screenshot_uri" ]]; then
+    screenshot_status="portal_missing_uri"
+    record_capture_attempt "portal:missing_uri"
+    return 1
+  fi
+
+  local screenshot_file=""
+  screenshot_file="$(python3 -c "import sys, urllib.parse; uri=sys.argv[1]; print(urllib.parse.unquote(uri[7:]) if uri.startswith('file://') else '')" "$screenshot_uri")"
+
+  if [[ -z "$screenshot_file" || ! -f "$screenshot_file" ]]; then
+    screenshot_status="portal_missing_file"
+    record_capture_attempt "portal:missing_file"
+    return 1
+  fi
+
+  cp "$screenshot_file" "$SCREENSHOT_PATH" >/dev/null 2>&1 || true
+  if has_file_payload "$SCREENSHOT_PATH"; then
+    capture_source="linux-portal"
+    screenshot_status="captured"
+    record_capture_attempt "portal:captured"
+    return 0
+  fi
+
+  screenshot_status="portal_copy_failed"
+  record_capture_attempt "portal:copy_failed"
+  return 1
+}
+
 capture_with_gnome_shell_dbus() {
   if ! command -v gdbus >/dev/null 2>&1; then
     return 1
@@ -69,6 +205,10 @@ capture_with_gnome_shell_dbus() {
 }
 
 capture_with_tool() {
+  if [[ "$SESSION_TYPE" == "wayland" ]] && capture_with_portal; then
+    return
+  fi
+
   if [[ "$DESKTOP_ENV" == *GNOME* ]] && capture_with_gnome_shell_dbus; then
     return
   fi

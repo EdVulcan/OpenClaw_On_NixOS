@@ -264,6 +264,7 @@ external adapters. The intended Linux starting point is:
 The current Linux collector is GNOME-friendly and tries tools in this order:
 
 - screenshots:
+  - `xdg-desktop-portal Screenshot` via `gdbus monitor` + `gdbus call`
   - `org.gnome.Shell.Screenshot` via `gdbus`
   - `grim`
   - `gnome-screenshot`

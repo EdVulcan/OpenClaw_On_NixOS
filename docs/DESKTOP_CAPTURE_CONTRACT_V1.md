@@ -125,6 +125,7 @@ Current practical providers:
 
 Likely providers:
 
+- `xdg-desktop-portal Screenshot` for GNOME/Wayland-friendly screenshots
 - `org.gnome.Shell.Screenshot` via `gdbus` for GNOME screenshots
 - `grim` for screenshots
 - `gnome-screenshot` for GNOME-based screenshots
