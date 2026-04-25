@@ -34,11 +34,23 @@ find_listener_pid() {
     | head -n 1
 }
 
+is_managed_service_pid() {
+  local pid="$1"
+  local cmdline=""
+
+  if [[ -z "$pid" ]] || ! kill -0 "$pid" >/dev/null 2>&1; then
+    return 1
+  fi
+
+  cmdline="$(ps -p "$pid" -o args= 2>/dev/null || true)"
+  [[ "$cmdline" == *"$REPO_ROOT"* ]] && [[ "$cmdline" == *"src/server.mjs"* ]]
+}
+
 kill_listener_on_port() {
   local port="$1"
   local pid=""
   pid="$(find_listener_pid "$port")"
-  if [[ -n "$pid" ]] && kill -0 "$pid" >/dev/null 2>&1; then
+  if is_managed_service_pid "$pid"; then
     kill "$pid" >/dev/null 2>&1 || true
     sleep 0.5
   fi
