@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Experimental GNOME/Wayland whole-desktop capture adapter.
 set -euo pipefail
 
 TMP_DIR="${OPENCLAW_CAPTURE_TMP_DIR:-/tmp/openclaw-capture}"

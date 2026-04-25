@@ -261,7 +261,35 @@ external adapters. The intended Linux starting point is:
 ./nix/scripts/linux-screen-capture.sh
 ```
 
-The current Linux collector is GNOME-friendly and tries tools in this order:
+## Linux Capture Strategy
+
+There are now two separate Linux capture tracks:
+
+1. Mainline track: AI work view capture
+2. Experimental track: whole-desktop GNOME/Wayland capture
+
+The current recommendation for NixOS is:
+
+- treat browser/runtime-backed capture as the stable path
+- treat external file/command capture as the stable extension point
+- treat whole-desktop GNOME/Wayland capture as experimental
+
+This is based on real NixOS VM validation:
+
+- `dev:up:unix` works
+- `dev:check:unix` works
+- `dev:state-check:unix` works
+- `dev:command-capture-check:unix` works
+- direct GNOME/Wayland whole-desktop capture remains inconsistent across:
+  - `org.gnome.Shell.Screenshot`
+  - `grim`
+  - `gnome-screenshot`
+  - `xdg-desktop-portal Screenshot`
+
+So the current Linux collector should be understood as an experiment shell, not
+the core product path.
+
+The experimental Linux collector currently tries tools in this order:
 
 - screenshots:
   - `xdg-desktop-portal Screenshot` via `gdbus monitor` + `gdbus call`
@@ -279,3 +307,4 @@ The current Linux collector is GNOME-friendly and tries tools in this order:
 See:
 
 - [docs/DESKTOP_CAPTURE_CONTRACT_V1.md](D:/OpenclawAndClaudecode/OpenClawOnNixOS/docs/DESKTOP_CAPTURE_CONTRACT_V1.md)
+- [docs/AI_WORK_VIEW_CAPTURE_STRATEGY.md](D:/OpenclawAndClaudecode/OpenClawOnNixOS/docs/AI_WORK_VIEW_CAPTURE_STRATEGY.md)
