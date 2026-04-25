@@ -16,8 +16,15 @@ trap cleanup EXIT
 warming_screen="$(curl --silent http://127.0.0.1:4104/screen/current)"
 node -e "const data=JSON.parse(process.argv[1]); if(data.screen.readiness!=='warming_up'){throw new Error('Expected warming_up screen readiness.');}" "$warming_screen"
 
-browser="$(curl --silent -X POST http://127.0.0.1:4103/browser/open -H 'content-type: application/json' -d '{\"url\":\"https://example.com/state-check\"}')"
-node -e "const data=JSON.parse(process.argv[1]); if(!data.browser.sessionId){throw new Error('Expected browser sessionId.');}" "$browser"
+browser=""
+for attempt in 1 2 3 4 5; do
+  browser="$(curl --silent -X POST http://127.0.0.1:4103/browser/open -H 'content-type: application/json' -d '{\"url\":\"https://example.com/state-check\"}')"
+  if node -e "const data=JSON.parse(process.argv[1]); process.exit(data.ok && data.browser && data.browser.sessionId ? 0 : 1);" "$browser"; then
+    break
+  fi
+  sleep 0.4
+done
+node -e "const data=JSON.parse(process.argv[1]); if(!(data.ok && data.browser && data.browser.sessionId)){throw new Error(\`Expected browser sessionId, got: \${JSON.stringify(data)}\`);}" "$browser"
 
 ready_screen="$(curl --silent http://127.0.0.1:4104/screen/current)"
 node -e "const data=JSON.parse(process.argv[1]); if(data.screen.readiness!=='ready'){throw new Error('Expected ready screen readiness.');} if(!data.screen.sessionId){throw new Error('Expected ready screen sessionId.');}" "$ready_screen"
