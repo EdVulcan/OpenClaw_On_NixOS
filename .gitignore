@@ -1,0 +1,14 @@
+node_modules/
+dist/
+build/
+.turbo/
+.cache/
+.DS_Store
+Thumbs.db
+coverage/
+*.log
+tmp/
+data/
+.artifacts/
+result
+result-*
