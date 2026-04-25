@@ -76,6 +76,15 @@ for entry in "${services[@]}"; do
   kill_listener_on_port "$port"
   (
     cd "$working_dir"
+    export OPENCLAW_CORE_HOST="0.0.0.0"
+    export OPENCLAW_EVENT_HUB_HOST="0.0.0.0"
+    export OPENCLAW_SESSION_MANAGER_HOST="0.0.0.0"
+    export OPENCLAW_BROWSER_RUNTIME_HOST="0.0.0.0"
+    export OPENCLAW_SCREEN_SENSE_HOST="0.0.0.0"
+    export OPENCLAW_SCREEN_ACT_HOST="0.0.0.0"
+    export OPENCLAW_SYSTEM_SENSE_HOST="0.0.0.0"
+    export OPENCLAW_SYSTEM_HEAL_HOST="0.0.0.0"
+    export OBSERVER_UI_HOST="0.0.0.0"
     nohup "$NODE_EXE" src/server.mjs >"$ARTIFACT_DIR/$name.log" 2>&1 &
     echo $! >"$ARTIFACT_DIR/$name.pid"
   )

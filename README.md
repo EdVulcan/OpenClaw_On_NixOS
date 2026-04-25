@@ -54,6 +54,11 @@ On Linux / NixOS:
 npm run dev:up:unix
 ```
 
+The Unix launcher keeps health checks on `127.0.0.1`, but it now binds the services to `0.0.0.0` so the observer UI and backend ports can be reached from the host machine through the VM IP as well.
+
+- Inside the VM, use `http://127.0.0.1:<port>`
+- From the host machine, use `http://<vm-ip>:<port>`
+
 Verify the current health matrix:
 
 ```bash
