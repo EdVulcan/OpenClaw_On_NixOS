@@ -573,6 +573,8 @@ async function runAction(path, payload) {
   });
   setControlMessage(\`Action \${result.action?.kind ?? "unknown"} completed (\${result.action?.result ?? "unknown"})\`);
   await refreshActionState();
+  await refreshScreen();
+  await refreshWorkView();
 }
 
 async function runHeal(service) {
@@ -601,6 +603,8 @@ function subscribeEvents() {
     "task.paused",
     "task.failed",
     "service.started",
+    "browser.started",
+    "browser.updated",
     "screen.updated",
     "action.completed",
     "service.failed",
@@ -612,7 +616,13 @@ function subscribeEvents() {
         addEventItem(JSON.parse(message.data));
         await refreshRuntime();
         await refreshWorkView();
-        if (eventName === "screen.updated" || eventName === "service.started") {
+        if (
+          eventName === "screen.updated"
+          || eventName === "service.started"
+          || eventName === "browser.started"
+          || eventName === "browser.updated"
+          || eventName === "action.completed"
+        ) {
           await refreshScreen();
         }
         if (eventName === "action.completed" || eventName === "service.started") {
