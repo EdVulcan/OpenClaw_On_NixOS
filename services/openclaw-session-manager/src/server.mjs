@@ -4,7 +4,9 @@ import { randomUUID } from "node:crypto";
 const host = process.env.OPENCLAW_SESSION_MANAGER_HOST ?? "127.0.0.1";
 const port = Number.parseInt(process.env.OPENCLAW_SESSION_MANAGER_PORT ?? "4102", 10);
 const eventHubUrl = process.env.OPENCLAW_EVENT_HUB_URL ?? "http://127.0.0.1:4101";
+const browserRuntimeUrl = process.env.OPENCLAW_BROWSER_RUNTIME_URL ?? "http://127.0.0.1:4103";
 const startDelayMs = Number.parseInt(process.env.OPENCLAW_SESSION_START_DELAY_MS ?? "0", 10);
+const defaultWorkViewUrl = process.env.OPENCLAW_WORK_VIEW_URL ?? "https://example.com/work-view";
 
 const sessionState = {
   sessionId: null,
@@ -21,8 +23,11 @@ const workViewState = {
   visibility: "hidden",
   captureStrategy: "browser-runtime",
   helperStatus: "idle",
+  browserStatus: "stopped",
   mode: "background",
   displayTarget: "workspace-2",
+  entryUrl: defaultWorkViewUrl,
+  activeUrl: null,
   preparedAt: null,
   lastRevealedAt: null,
   lastHiddenAt: null,
@@ -110,6 +115,45 @@ async function publishEvent(type, payload = {}) {
   }
 }
 
+async function ensureBrowserWorkView(url = workViewState.entryUrl || defaultWorkViewUrl) {
+  try {
+    const response = await fetch(`${browserRuntimeUrl}/browser/open`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ url }),
+    });
+    const data = await response.json();
+
+    if (!response.ok || !data?.ok) {
+      throw new Error(data?.error ?? "browser open failed");
+    }
+
+    updateWorkViewState({
+      helperStatus: "active",
+      browserStatus: data.browser?.running ? "running" : "unknown",
+      entryUrl: url,
+      activeUrl: data.browser?.activeUrl ?? data.tab?.url ?? url,
+    });
+
+    return {
+      ok: true,
+      browser: data.browser ?? null,
+      tab: data.tab ?? null,
+    };
+  } catch (error) {
+    updateWorkViewState({
+      helperStatus: "degraded",
+      browserStatus: "unavailable",
+      entryUrl: url,
+    });
+
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "browser open failed",
+    };
+  }
+}
+
 async function startSession(displayTarget) {
   if (startDelayMs > 0) {
     await sleep(startDelayMs);
@@ -126,13 +170,14 @@ async function startSession(displayTarget) {
     status: "prepared",
     visibility: "hidden",
     helperStatus: "active",
+    browserStatus: "stopped",
     displayTarget,
     preparedAt: workViewState.preparedAt ?? now,
     mode: "background",
   });
 }
 
-async function prepareWorkView(displayTarget) {
+async function prepareWorkView(displayTarget, entryUrl = workViewState.entryUrl || defaultWorkViewUrl) {
   if (sessionState.status !== "running" || !sessionState.sessionId) {
     await startSession(displayTarget);
   } else {
@@ -141,20 +186,26 @@ async function prepareWorkView(displayTarget) {
       visibility: "hidden",
       helperStatus: "active",
       displayTarget,
+      entryUrl,
       preparedAt: workViewState.preparedAt ?? new Date().toISOString(),
       mode: "background",
     });
   }
+
+  return ensureBrowserWorkView(entryUrl);
 }
 
-function revealWorkView() {
+async function revealWorkView() {
+  const browser = await ensureBrowserWorkView(workViewState.entryUrl || defaultWorkViewUrl);
   updateWorkViewState({
     visibility: "visible",
     status: "ready",
-    helperStatus: "active",
+    helperStatus: browser.ok ? "active" : "degraded",
     lastRevealedAt: new Date().toISOString(),
     mode: "foreground-observable",
   });
+
+  return browser;
 }
 
 function hideWorkView() {
@@ -183,7 +234,9 @@ const server = http.createServer(async (req, res) => {
       host,
       port,
       eventHubUrl,
+      browserRuntimeUrl,
       startDelayMs,
+      defaultWorkViewUrl,
     });
     return;
   }
@@ -272,8 +325,12 @@ const server = http.createServer(async (req, res) => {
         typeof body.displayTarget === "string" && body.displayTarget.trim()
           ? body.displayTarget.trim()
           : workViewState.displayTarget;
+      const entryUrl =
+        typeof body.entryUrl === "string" && body.entryUrl.trim()
+          ? body.entryUrl.trim()
+          : workViewState.entryUrl;
 
-      await prepareWorkView(displayTarget);
+      const browser = await prepareWorkView(displayTarget, entryUrl);
       const session = serialiseSessionState();
       const workView = serialiseWorkViewState();
       await publishEvent("service.started", {
@@ -281,8 +338,9 @@ const server = http.createServer(async (req, res) => {
         action: "work-view-prepared",
         session,
         workView,
+        browser,
       });
-      sendJson(res, 200, { ok: true, session, workView });
+      sendJson(res, 200, { ok: true, session, workView, browser });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       sendJson(res, 400, { ok: false, error: message });
@@ -296,7 +354,7 @@ const server = http.createServer(async (req, res) => {
         await prepareWorkView(workViewState.displayTarget);
       }
 
-      revealWorkView();
+      const browser = await revealWorkView();
       const session = serialiseSessionState();
       const workView = serialiseWorkViewState();
       await publishEvent("service.started", {
@@ -304,8 +362,9 @@ const server = http.createServer(async (req, res) => {
         action: "work-view-revealed",
         session,
         workView,
+        browser,
       });
-      sendJson(res, 200, { ok: true, session, workView });
+      sendJson(res, 200, { ok: true, session, workView, browser });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       sendJson(res, 400, { ok: false, error: message });
