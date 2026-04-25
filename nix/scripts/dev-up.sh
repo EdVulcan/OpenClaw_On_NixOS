@@ -37,12 +37,20 @@ find_listener_pid() {
 is_managed_service_pid() {
   local pid="$1"
   local cmdline=""
+  local cwd=""
 
   if [[ -z "$pid" ]] || ! kill -0 "$pid" >/dev/null 2>&1; then
     return 1
   fi
 
   cmdline="$(ps -p "$pid" -o args= 2>/dev/null || true)"
+  cwd="$(readlink -f "/proc/$pid/cwd" 2>/dev/null || true)"
+
+  if [[ "$cwd" == "$REPO_ROOT"/services/* ]] || [[ "$cwd" == "$REPO_ROOT"/apps/* ]]; then
+    [[ "$cmdline" == *"src/server.mjs"* ]]
+    return $?
+  fi
+
   [[ "$cmdline" == *"$REPO_ROOT"* ]] && [[ "$cmdline" == *"src/server.mjs"* ]]
 }
 
