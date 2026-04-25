@@ -27,23 +27,41 @@ wait_health() {
   return 1
 }
 
+find_listener_pid() {
+  local port="$1"
+  ss -ltnpH "( sport = :$port )" 2>/dev/null \
+    | sed -n 's/.*pid=\([0-9]\+\).*/\1/p' \
+    | head -n 1
+}
+
+kill_listener_on_port() {
+  local port="$1"
+  local pid=""
+  pid="$(find_listener_pid "$port")"
+  if [[ -n "$pid" ]] && kill -0 "$pid" >/dev/null 2>&1; then
+    kill "$pid" >/dev/null 2>&1 || true
+    sleep 0.5
+  fi
+}
+
 services=(
-  "openclaw-event-hub|$REPO_ROOT/services/openclaw-event-hub|http://127.0.0.1:4101/health"
-  "openclaw-core|$REPO_ROOT/services/openclaw-core|http://127.0.0.1:4100/health"
-  "openclaw-session-manager|$REPO_ROOT/services/openclaw-session-manager|http://127.0.0.1:4102/health"
-  "openclaw-browser-runtime|$REPO_ROOT/services/openclaw-browser-runtime|http://127.0.0.1:4103/health"
-  "openclaw-screen-sense|$REPO_ROOT/services/openclaw-screen-sense|http://127.0.0.1:4104/health"
-  "openclaw-screen-act|$REPO_ROOT/services/openclaw-screen-act|http://127.0.0.1:4105/health"
-  "openclaw-system-sense|$REPO_ROOT/services/openclaw-system-sense|http://127.0.0.1:4106/health"
-  "openclaw-system-heal|$REPO_ROOT/services/openclaw-system-heal|http://127.0.0.1:4107/health"
-  "observer-ui|$REPO_ROOT/apps/observer-ui|http://127.0.0.1:4170/health"
+  "openclaw-event-hub|$REPO_ROOT/services/openclaw-event-hub|http://127.0.0.1:4101/health|4101"
+  "openclaw-core|$REPO_ROOT/services/openclaw-core|http://127.0.0.1:4100/health|4100"
+  "openclaw-session-manager|$REPO_ROOT/services/openclaw-session-manager|http://127.0.0.1:4102/health|4102"
+  "openclaw-browser-runtime|$REPO_ROOT/services/openclaw-browser-runtime|http://127.0.0.1:4103/health|4103"
+  "openclaw-screen-sense|$REPO_ROOT/services/openclaw-screen-sense|http://127.0.0.1:4104/health|4104"
+  "openclaw-screen-act|$REPO_ROOT/services/openclaw-screen-act|http://127.0.0.1:4105/health|4105"
+  "openclaw-system-sense|$REPO_ROOT/services/openclaw-system-sense|http://127.0.0.1:4106/health|4106"
+  "openclaw-system-heal|$REPO_ROOT/services/openclaw-system-heal|http://127.0.0.1:4107/health|4107"
+  "observer-ui|$REPO_ROOT/apps/observer-ui|http://127.0.0.1:4170/health|4170"
 )
 
 : >"$STATE_FILE"
 
 for entry in "${services[@]}"; do
-  IFS="|" read -r name working_dir health_url <<<"$entry"
+  IFS="|" read -r name working_dir health_url port <<<"$entry"
   echo "Starting $name ..."
+  kill_listener_on_port "$port"
   (
     cd "$working_dir"
     nohup "$NODE_EXE" src/server.mjs >"$ARTIFACT_DIR/$name.log" 2>&1 &
