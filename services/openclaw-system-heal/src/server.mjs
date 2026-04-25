@@ -7,8 +7,17 @@ const eventHubUrl = process.env.OPENCLAW_EVENT_HUB_URL ?? "http://127.0.0.1:4101
 
 const healHistory = [];
 
+function corsHeaders(extraHeaders = {}) {
+  return {
+    "access-control-allow-origin": "*",
+    "access-control-allow-methods": "GET, POST, OPTIONS",
+    "access-control-allow-headers": "content-type",
+    ...extraHeaders,
+  };
+}
+
 function sendJson(res, statusCode, payload) {
-  res.writeHead(statusCode, { "content-type": "application/json; charset=utf-8" });
+  res.writeHead(statusCode, corsHeaders({ "content-type": "application/json; charset=utf-8" }));
   res.end(JSON.stringify(payload, null, 2));
 }
 
@@ -56,6 +65,12 @@ function addHistory(entry) {
 
 const server = http.createServer(async (req, res) => {
   const requestUrl = new URL(req.url ?? "/", `http://${req.headers.host ?? `${host}:${port}`}`);
+
+  if (req.method === "OPTIONS") {
+    res.writeHead(204, corsHeaders());
+    res.end();
+    return;
+  }
 
   if (req.method === "GET" && requestUrl.pathname === "/health") {
     sendJson(res, 200, {
