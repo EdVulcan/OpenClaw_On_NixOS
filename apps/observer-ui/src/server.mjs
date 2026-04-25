@@ -235,14 +235,15 @@ function observerHtml() {
 }
 
 function clientScript() {
-  return `const observerConfig = {
-    coreUrl: ${JSON.stringify(coreUrl)},
-    eventHubUrl: ${JSON.stringify(eventHubUrl)},
-    sessionManagerUrl: ${JSON.stringify(sessionManagerUrl)},
-    screenSenseUrl: ${JSON.stringify(screenSenseUrl)},
-  screenActUrl: ${JSON.stringify(screenActUrl)},
-  systemSenseUrl: ${JSON.stringify(systemSenseUrl)},
-  systemHealUrl: ${JSON.stringify(systemHealUrl)},
+  return `const observerBase = \`\${window.location.protocol}//\${window.location.hostname}\`;
+const observerConfig = {
+  coreUrl: \`\${observerBase}:4100\`,
+  eventHubUrl: \`\${observerBase}:4101\`,
+  sessionManagerUrl: \`\${observerBase}:4102\`,
+  screenSenseUrl: \`\${observerBase}:4104\`,
+  screenActUrl: \`\${observerBase}:4105\`,
+  systemSenseUrl: \`\${observerBase}:4106\`,
+  systemHealUrl: \`\${observerBase}:4107\`,
 };
 
 const runtimeStatus = document.querySelector("#runtime-status");
