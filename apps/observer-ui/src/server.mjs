@@ -4,6 +4,7 @@ const host = process.env.OBSERVER_UI_HOST ?? "127.0.0.1";
 const port = Number.parseInt(process.env.OBSERVER_UI_PORT ?? "4170", 10);
 const coreUrl = process.env.OPENCLAW_CORE_URL ?? "http://127.0.0.1:4100";
 const eventHubUrl = process.env.OPENCLAW_EVENT_HUB_URL ?? "http://127.0.0.1:4101";
+const sessionManagerUrl = process.env.OPENCLAW_SESSION_MANAGER_URL ?? "http://127.0.0.1:4102";
 const screenSenseUrl = process.env.OPENCLAW_SCREEN_SENSE_URL ?? "http://127.0.0.1:4104";
 const screenActUrl = process.env.OPENCLAW_SCREEN_ACT_URL ?? "http://127.0.0.1:4105";
 const systemSenseUrl = process.env.OPENCLAW_SYSTEM_SENSE_URL ?? "http://127.0.0.1:4106";
@@ -156,6 +157,7 @@ function observerHtml() {
           <h2>Service Health</h2>
           <div class="metric"><span>Core</span><span id="core-health" class="status-pill warn">checking</span></div>
           <div class="metric"><span>Event Hub</span><span id="eventhub-health" class="status-pill warn">checking</span></div>
+          <div class="metric"><span>Session Manager</span><span id="session-manager-health" class="status-pill warn">checking</span></div>
           <div class="metric"><span>Screen Sense</span><span id="screen-health" class="status-pill warn">checking</span></div>
           <div class="metric"><span>Screen Act</span><span id="screen-act-health" class="status-pill warn">checking</span></div>
           <div class="metric"><span>System Sense</span><span id="system-health-pill" class="status-pill warn">checking</span></div>
@@ -166,6 +168,9 @@ function observerHtml() {
           <h2>Controls</h2>
           <div class="actions">
             <button id="create-task-button">Create Demo Task</button>
+            <button id="prepare-work-view-button" class="secondary">Prepare Work View</button>
+            <button id="reveal-work-view-button" class="secondary">Reveal Work View</button>
+            <button id="hide-work-view-button" class="secondary">Hide Work View</button>
             <button id="refresh-screen-button" class="secondary">Refresh Screen State</button>
             <button id="click-action-button" class="secondary">Simulate Click</button>
             <button id="type-action-button" class="secondary">Simulate Type</button>
@@ -174,6 +179,15 @@ function observerHtml() {
             <button id="stop-button" class="secondary">Stop Current Task</button>
           </div>
           <pre id="control-result">No actions yet.</pre>
+        </section>
+        <section class="panel">
+          <h2>AI Work View</h2>
+          <div class="metric"><span>Status</span><span id="work-view-status">idle</span></div>
+          <div class="metric"><span>Visibility</span><span id="work-view-visibility">hidden</span></div>
+          <div class="metric"><span>Mode</span><span id="work-view-mode">background</span></div>
+          <div class="metric"><span>Helper</span><span id="work-view-helper">idle</span></div>
+          <div class="metric"><span>Capture</span><span id="work-view-capture">browser-runtime</span></div>
+          <pre id="work-view-json">Loading work view state...</pre>
         </section>
         <section class="panel">
           <h2>Current Task</h2>
@@ -222,9 +236,10 @@ function observerHtml() {
 
 function clientScript() {
   return `const observerConfig = {
-  coreUrl: ${JSON.stringify(coreUrl)},
-  eventHubUrl: ${JSON.stringify(eventHubUrl)},
-  screenSenseUrl: ${JSON.stringify(screenSenseUrl)},
+    coreUrl: ${JSON.stringify(coreUrl)},
+    eventHubUrl: ${JSON.stringify(eventHubUrl)},
+    sessionManagerUrl: ${JSON.stringify(sessionManagerUrl)},
+    screenSenseUrl: ${JSON.stringify(screenSenseUrl)},
   screenActUrl: ${JSON.stringify(screenActUrl)},
   systemSenseUrl: ${JSON.stringify(systemSenseUrl)},
   systemHealUrl: ${JSON.stringify(systemHealUrl)},
@@ -236,10 +251,17 @@ const runtimePaused = document.querySelector("#runtime-paused");
 const runtimeCount = document.querySelector("#runtime-count");
 const runtimeUpdated = document.querySelector("#runtime-updated");
 const taskJson = document.querySelector("#task-json");
+const workViewStatus = document.querySelector("#work-view-status");
+const workViewVisibility = document.querySelector("#work-view-visibility");
+const workViewMode = document.querySelector("#work-view-mode");
+const workViewHelper = document.querySelector("#work-view-helper");
+const workViewCapture = document.querySelector("#work-view-capture");
+const workViewJson = document.querySelector("#work-view-json");
 const controlResult = document.querySelector("#control-result");
 const eventsList = document.querySelector("#events-list");
 const coreHealth = document.querySelector("#core-health");
 const eventhubHealth = document.querySelector("#eventhub-health");
+const sessionManagerHealth = document.querySelector("#session-manager-health");
 const screenHealth = document.querySelector("#screen-health");
 const screenActHealth = document.querySelector("#screen-act-health");
 const systemHealthPill = document.querySelector("#system-health-pill");
@@ -260,6 +282,9 @@ const systemSummary = document.querySelector("#system-summary");
 const healCount = document.querySelector("#heal-count");
 const healSummary = document.querySelector("#heal-summary");
 const createTaskButton = document.querySelector("#create-task-button");
+const prepareWorkViewButton = document.querySelector("#prepare-work-view-button");
+const revealWorkViewButton = document.querySelector("#reveal-work-view-button");
+const hideWorkViewButton = document.querySelector("#hide-work-view-button");
 const refreshScreenButton = document.querySelector("#refresh-screen-button");
 const clickActionButton = document.querySelector("#click-action-button");
 const typeActionButton = document.querySelector("#type-action-button");
@@ -288,9 +313,10 @@ async function fetchJson(url, options) {
 
 async function refreshHealth() {
   try {
-    const [core, hub, screen, screenAct, systemSense, systemHeal] = await Promise.all([
+    const [core, hub, sessionManager, screen, screenAct, systemSense, systemHeal] = await Promise.all([
       fetchJson(\`\${observerConfig.coreUrl}/health\`),
       fetchJson(\`\${observerConfig.eventHubUrl}/health\`),
+      fetchJson(\`\${observerConfig.sessionManagerUrl}/health\`),
       fetchJson(\`\${observerConfig.screenSenseUrl}/health\`),
       fetchJson(\`\${observerConfig.screenActUrl}/health\`),
       fetchJson(\`\${observerConfig.systemSenseUrl}/health\`),
@@ -299,6 +325,7 @@ async function refreshHealth() {
 
     setHealthPill(coreHealth, !!core.ok, core.ok ? "healthy" : "unhealthy");
     setHealthPill(eventhubHealth, !!hub.ok, hub.ok ? "healthy" : "unhealthy");
+    setHealthPill(sessionManagerHealth, !!sessionManager.ok, sessionManager.ok ? "healthy" : "unhealthy");
     setHealthPill(screenHealth, !!screen.ok, screen.ok ? "healthy" : "unhealthy");
     setHealthPill(screenActHealth, !!screenAct.ok, screenAct.ok ? "healthy" : "unhealthy");
     setHealthPill(systemHealthPill, !!systemSense.ok, systemSense.ok ? "healthy" : "unhealthy");
@@ -306,6 +333,7 @@ async function refreshHealth() {
   } catch (error) {
     setHealthPill(coreHealth, false, "offline");
     setHealthPill(eventhubHealth, false, "offline");
+    setHealthPill(sessionManagerHealth, false, "offline");
     setHealthPill(screenHealth, false, "offline");
     setHealthPill(screenActHealth, false, "offline");
     setHealthPill(systemHealthPill, false, "offline");
@@ -326,6 +354,26 @@ async function refreshRuntime() {
   } catch {
     runtimeStatus.textContent = "offline";
     taskJson.textContent = "Unable to read runtime state.";
+  }
+}
+
+async function refreshWorkView() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.sessionManagerUrl}/work-view/state\`);
+    const workView = data.workView ?? {};
+    workViewStatus.textContent = workView.status ?? "unknown";
+    workViewVisibility.textContent = workView.visibility ?? "unknown";
+    workViewMode.textContent = workView.mode ?? "unknown";
+    workViewHelper.textContent = workView.helperStatus ?? "unknown";
+    workViewCapture.textContent = workView.captureStrategy ?? "unknown";
+    workViewJson.textContent = JSON.stringify({ session: data.session, workView }, null, 2);
+  } catch {
+    workViewStatus.textContent = "offline";
+    workViewVisibility.textContent = "offline";
+    workViewMode.textContent = "offline";
+    workViewHelper.textContent = "offline";
+    workViewCapture.textContent = "offline";
+    workViewJson.textContent = "Unable to read work view state.";
   }
 }
 
@@ -423,6 +471,16 @@ async function createDemoTask() {
   await refreshRuntime();
 }
 
+async function postWorkView(path, payload = {}) {
+  const result = await fetchJson(\`\${observerConfig.sessionManagerUrl}\${path}\`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  controlResult.textContent = JSON.stringify(result, null, 2);
+  await refreshWorkView();
+}
+
 async function postControl(path) {
   const result = await fetchJson(\`\${observerConfig.coreUrl}\${path}\`, {
     method: "POST",
@@ -485,6 +543,7 @@ function subscribeEvents() {
       try {
         addEventItem(JSON.parse(message.data));
         await refreshRuntime();
+        await refreshWorkView();
         if (eventName === "screen.updated" || eventName === "service.started") {
           await refreshScreen();
         }
@@ -506,6 +565,26 @@ function subscribeEvents() {
 
 createTaskButton.addEventListener("click", () => {
   createDemoTask().catch((error) => {
+    controlResult.textContent = String(error);
+  });
+});
+
+prepareWorkViewButton.addEventListener("click", () => {
+  postWorkView("/work-view/prepare", {
+    displayTarget: "workspace-2",
+  }).catch((error) => {
+    controlResult.textContent = String(error);
+  });
+});
+
+revealWorkViewButton.addEventListener("click", () => {
+  postWorkView("/work-view/reveal").catch((error) => {
+    controlResult.textContent = String(error);
+  });
+});
+
+hideWorkViewButton.addEventListener("click", () => {
+  postWorkView("/work-view/hide").catch((error) => {
     controlResult.textContent = String(error);
   });
 });
@@ -554,6 +633,7 @@ stopButton.addEventListener("click", () => {
 
 await refreshHealth();
 await refreshRuntime();
+await refreshWorkView();
 await refreshScreen();
 await refreshActionState();
 await refreshSystemState();
@@ -562,6 +642,7 @@ await loadRecentEvents();
 subscribeEvents();
 setInterval(refreshHealth, 5000);
 setInterval(refreshRuntime, 5000);
+setInterval(refreshWorkView, 5000);
 setInterval(refreshScreen, 5000);
 setInterval(refreshActionState, 5000);
 setInterval(refreshSystemState, 5000);
@@ -578,6 +659,7 @@ const server = http.createServer((req, res) => {
       stage: "active",
       coreUrl,
       eventHubUrl,
+      sessionManagerUrl,
       screenSenseUrl,
       screenActUrl,
       systemSenseUrl,

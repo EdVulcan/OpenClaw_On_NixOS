@@ -10,7 +10,22 @@ const sessionState = {
   sessionId: null,
   status: "stopped",
   displayTarget: "workspace-2",
+  role: "ai-work-view",
   createdAt: null,
+  updatedAt: new Date().toISOString(),
+};
+
+const workViewState = {
+  workViewId: "work-view-primary",
+  status: "idle",
+  visibility: "hidden",
+  captureStrategy: "browser-runtime",
+  helperStatus: "idle",
+  mode: "background",
+  displayTarget: "workspace-2",
+  preparedAt: null,
+  lastRevealedAt: null,
+  lastHiddenAt: null,
   updatedAt: new Date().toISOString(),
 };
 
@@ -54,6 +69,16 @@ function updateSessionState(patch) {
   });
 }
 
+function serialiseWorkViewState() {
+  return { ...workViewState };
+}
+
+function updateWorkViewState(patch) {
+  Object.assign(workViewState, patch, {
+    updatedAt: new Date().toISOString(),
+  });
+}
+
 function sleep(ms) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
@@ -88,6 +113,48 @@ async function startSession(displayTarget) {
     displayTarget,
     createdAt: now,
   });
+  updateWorkViewState({
+    status: "prepared",
+    visibility: "hidden",
+    helperStatus: "active",
+    displayTarget,
+    preparedAt: workViewState.preparedAt ?? now,
+    mode: "background",
+  });
+}
+
+async function prepareWorkView(displayTarget) {
+  if (sessionState.status !== "running" || !sessionState.sessionId) {
+    await startSession(displayTarget);
+  } else {
+    updateWorkViewState({
+      status: "prepared",
+      visibility: "hidden",
+      helperStatus: "active",
+      displayTarget,
+      preparedAt: workViewState.preparedAt ?? new Date().toISOString(),
+      mode: "background",
+    });
+  }
+}
+
+function revealWorkView() {
+  updateWorkViewState({
+    visibility: "visible",
+    status: "ready",
+    helperStatus: "active",
+    lastRevealedAt: new Date().toISOString(),
+    mode: "foreground-observable",
+  });
+}
+
+function hideWorkView() {
+  updateWorkViewState({
+    visibility: "hidden",
+    helperStatus: "active",
+    lastHiddenAt: new Date().toISOString(),
+    mode: "background",
+  });
 }
 
 const server = http.createServer(async (req, res) => {
@@ -110,6 +177,16 @@ const server = http.createServer(async (req, res) => {
     sendJson(res, 200, {
       ok: true,
       session: serialiseSessionState(),
+      workView: serialiseWorkViewState(),
+    });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/work-view/state") {
+    sendJson(res, 200, {
+      ok: true,
+      session: serialiseSessionState(),
+      workView: serialiseWorkViewState(),
     });
     return;
   }
@@ -127,17 +204,20 @@ const server = http.createServer(async (req, res) => {
           ok: true,
           reused: true,
           session: serialiseSessionState(),
+          workView: serialiseWorkViewState(),
         });
         return;
       }
 
       await startSession(displayTarget);
       const session = serialiseSessionState();
+      const workView = serialiseWorkViewState();
       await publishEvent("service.started", {
         service: "openclaw-session-manager",
         session,
+        workView,
       });
-      sendJson(res, 201, { ok: true, reused: false, session });
+      sendJson(res, 201, { ok: true, reused: false, session, workView });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       sendJson(res, 400, { ok: false, error: message });
@@ -155,12 +235,81 @@ const server = http.createServer(async (req, res) => {
 
       await startSession(displayTarget);
       const session = serialiseSessionState();
+      const workView = serialiseWorkViewState();
       await publishEvent("service.started", {
         service: "openclaw-session-manager",
         restarted: true,
         session,
+        workView,
       });
-      sendJson(res, 200, { ok: true, restarted: true, session });
+      sendJson(res, 200, { ok: true, restarted: true, session, workView });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/work-view/prepare") {
+    try {
+      const body = await readJsonBody(req);
+      const displayTarget =
+        typeof body.displayTarget === "string" && body.displayTarget.trim()
+          ? body.displayTarget.trim()
+          : workViewState.displayTarget;
+
+      await prepareWorkView(displayTarget);
+      const session = serialiseSessionState();
+      const workView = serialiseWorkViewState();
+      await publishEvent("service.started", {
+        service: "openclaw-session-manager",
+        action: "work-view-prepared",
+        session,
+        workView,
+      });
+      sendJson(res, 200, { ok: true, session, workView });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/work-view/reveal") {
+    try {
+      if (sessionState.status !== "running" || !sessionState.sessionId) {
+        await prepareWorkView(workViewState.displayTarget);
+      }
+
+      revealWorkView();
+      const session = serialiseSessionState();
+      const workView = serialiseWorkViewState();
+      await publishEvent("service.started", {
+        service: "openclaw-session-manager",
+        action: "work-view-revealed",
+        session,
+        workView,
+      });
+      sendJson(res, 200, { ok: true, session, workView });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/work-view/hide") {
+    try {
+      hideWorkView();
+      const session = serialiseSessionState();
+      const workView = serialiseWorkViewState();
+      await publishEvent("service.started", {
+        service: "openclaw-session-manager",
+        action: "work-view-hidden",
+        session,
+        workView,
+      });
+      sendJson(res, 200, { ok: true, session, workView });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       sendJson(res, 400, { ok: false, error: message });
