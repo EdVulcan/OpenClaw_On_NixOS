@@ -126,9 +126,11 @@ Current practical providers:
 Likely providers:
 
 - `grim` for screenshots
+- `gnome-screenshot` for GNOME-based screenshots
 - `slurp` for region selection when needed
 - `tesseract` for OCR
-- `swaymsg`, `hyprctl`, or compositor-specific tools for focused window / window list
+- `gdbus` against `org.gnome.Shell` for focused window / window list on GNOME
+- `swaymsg`, `hyprctl`, `wmctrl`, or compositor-specific tools for focused window / window list
 
 As long as the Linux collector emits the JSON shape above, the rest of the
 OpenClaw control plane should not need major changes.

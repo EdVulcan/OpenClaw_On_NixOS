@@ -261,6 +261,19 @@ external adapters. The intended Linux starting point is:
 ./nix/scripts/linux-screen-capture.sh
 ```
 
+The current Linux collector is GNOME-friendly and tries tools in this order:
+
+- screenshots:
+  - `grim`
+  - `gnome-screenshot`
+  - `import`
+- focused window / window list:
+  - `gdbus` with `org.gnome.Shell`
+  - `xdotool`
+  - `wmctrl`
+- OCR:
+  - `tesseract`
+
 See:
 
 - [docs/DESKTOP_CAPTURE_CONTRACT_V1.md](D:/OpenclawAndClaudecode/OpenClawOnNixOS/docs/DESKTOP_CAPTURE_CONTRACT_V1.md)
