@@ -32,7 +32,7 @@ node -e "const data=JSON.parse(process.argv[1]); if(data.screen.readiness!=='rea
 ready_action="$(curl --silent -X POST http://127.0.0.1:4105/act/mouse/click -H 'content-type: application/json' -d '{"x":320,"y":240,"button":"left"}')"
 node -e "const data=JSON.parse(process.argv[1]); if(data.action.degraded!==false){throw new Error('Expected ready action degraded=false.');}" "$ready_action"
 
-session_pid="$(awk -F $'\t' '$1==\"openclaw-session-manager\" { print $2 }' "$REPO_ROOT/.artifacts/dev-services-unix.tsv")"
+session_pid="$(awk -F $'\t' '$1=="openclaw-session-manager" { print $2 }' "$REPO_ROOT/.artifacts/dev-services-unix.tsv")"
 kill "$session_pid"
 sleep 0.3
 
