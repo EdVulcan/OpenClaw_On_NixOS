@@ -456,15 +456,15 @@ function formatError(error) {
 
 function formatTaskFocusLabel(focus, task = null) {
   if (focus === "current-task") {
-    return task?.id ? `Viewing current task ${task.id}.` : "Viewing current task.";
+    return task?.id ? \`Viewing current task \${task.id}.\` : "Viewing current task.";
   }
   if (focus === "latest-failed") {
-    return task?.id ? `Viewing latest failed task ${task.id}.` : "Viewing latest failed task.";
+    return task?.id ? \`Viewing latest failed task \${task.id}.\` : "Viewing latest failed task.";
   }
   if (focus === "selected-task") {
-    return task?.id ? `Viewing selected task ${task.id}.` : "Viewing selected task.";
+    return task?.id ? \`Viewing selected task \${task.id}.\` : "Viewing selected task.";
   }
-  return task?.id ? `Viewing latest finished task ${task.id}.` : "Viewing latest finished task.";
+  return task?.id ? \`Viewing latest finished task \${task.id}.\` : "Viewing latest finished task.";
 }
 
 function setControlMessage(message) {
