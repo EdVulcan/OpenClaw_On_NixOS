@@ -195,12 +195,13 @@ async function prepareWorkView(displayTarget, entryUrl = workViewState.entryUrl 
   return ensureBrowserWorkView(entryUrl);
 }
 
-async function revealWorkView() {
-  const browser = await ensureBrowserWorkView(workViewState.entryUrl || defaultWorkViewUrl);
+async function revealWorkView(entryUrl = workViewState.entryUrl || defaultWorkViewUrl) {
+  const browser = await ensureBrowserWorkView(entryUrl);
   updateWorkViewState({
     visibility: "visible",
     status: "ready",
     helperStatus: browser.ok ? "active" : "degraded",
+    entryUrl,
     lastRevealedAt: new Date().toISOString(),
     mode: "foreground-observable",
   });
@@ -350,11 +351,17 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === "POST" && requestUrl.pathname === "/work-view/reveal") {
     try {
+      const body = await readJsonBody(req);
+      const entryUrl =
+        typeof body.entryUrl === "string" && body.entryUrl.trim()
+          ? body.entryUrl.trim()
+          : workViewState.entryUrl;
+
       if (sessionState.status !== "running" || !sessionState.sessionId) {
-        await prepareWorkView(workViewState.displayTarget);
+        await prepareWorkView(workViewState.displayTarget, entryUrl);
       }
 
-      const browser = await revealWorkView();
+      const browser = await revealWorkView(entryUrl);
       const session = serialiseSessionState();
       const workView = serialiseWorkViewState();
       await publishEvent("service.started", {
