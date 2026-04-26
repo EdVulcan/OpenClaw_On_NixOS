@@ -191,6 +191,17 @@ function attachTaskToWorkView(task, body) {
   return task;
 }
 
+function completeTask(task, details = null) {
+  task.status = "completed";
+  appendTaskPhase(task, "completed", details);
+  updateRuntimeState({
+    status: "idle",
+    currentTaskId: null,
+    paused: false,
+  });
+  return task;
+}
+
 const server = http.createServer(async (req, res) => {
   const requestUrl = new URL(req.url ?? "/", `http://${req.headers.host ?? `${host}:${port}`}`);
 
@@ -318,6 +329,34 @@ const server = http.createServer(async (req, res) => {
       const body = await readJsonBody(req);
       const updatedTask = attachTaskToWorkView(task, body);
       await publishEvent("task.running", { task: serialiseTask(updatedTask) });
+      sendJson(res, 200, {
+        ok: true,
+        task: serialiseTask(updatedTask),
+        runtime: runtimeState,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (
+    req.method === "POST"
+    && requestUrl.pathname.startsWith("/tasks/")
+    && requestUrl.pathname.endsWith("/complete")
+  ) {
+    const taskId = requestUrl.pathname.slice("/tasks/".length, -"/complete".length);
+    const task = getTaskById(taskId);
+    if (!task) {
+      sendJson(res, 404, { ok: false, error: "Task not found." });
+      return;
+    }
+
+    try {
+      const body = await readJsonBody(req);
+      const updatedTask = completeTask(task, body.details ?? null);
+      await publishEvent("task.completed", { task: serialiseTask(updatedTask) });
       sendJson(res, 200, {
         ok: true,
         task: serialiseTask(updatedTask),

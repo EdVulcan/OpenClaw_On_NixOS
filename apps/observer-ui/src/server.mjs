@@ -11,17 +11,26 @@ const systemSenseUrl = process.env.OPENCLAW_SYSTEM_SENSE_URL ?? "http://127.0.0.
 const systemHealUrl = process.env.OPENCLAW_SYSTEM_HEAL_URL ?? "http://127.0.0.1:4107";
 
 function sendHtml(res, html) {
-  res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+  res.writeHead(200, {
+    "content-type": "text/html; charset=utf-8",
+    "cache-control": "no-store, no-cache, must-revalidate",
+  });
   res.end(html);
 }
 
 function sendJavaScript(res, script) {
-  res.writeHead(200, { "content-type": "text/javascript; charset=utf-8" });
+  res.writeHead(200, {
+    "content-type": "text/javascript; charset=utf-8",
+    "cache-control": "no-store, no-cache, must-revalidate",
+  });
   res.end(script);
 }
 
 function sendJson(res, statusCode, payload) {
-  res.writeHead(statusCode, { "content-type": "application/json; charset=utf-8" });
+  res.writeHead(statusCode, {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "no-store, no-cache, must-revalidate",
+  });
   res.end(JSON.stringify(payload, null, 2));
 }
 
@@ -202,6 +211,7 @@ function observerHtml() {
               <button id="click-action-button" class="secondary">Simulate Click</button>
               <button id="type-action-button" class="secondary">Simulate Type</button>
               <button id="heal-browser-button" class="secondary">Simulate Browser Restart</button>
+              <button id="complete-task-button" class="secondary">Complete Current Task</button>
               <button id="pause-button" class="secondary">Pause Current Task</button>
               <button id="stop-button" class="secondary">Stop Current Task</button>
             </div>
@@ -257,7 +267,7 @@ function observerHtml() {
         </section>
       </div>
     </main>
-    <script type="module" src="/client.js"></script>
+    <script type="module" src="/client.js?v=2"></script>
   </body>
 </html>`;
 }
@@ -318,10 +328,12 @@ const refreshScreenButton = document.querySelector("#refresh-screen-button");
 const clickActionButton = document.querySelector("#click-action-button");
 const typeActionButton = document.querySelector("#type-action-button");
 const healBrowserButton = document.querySelector("#heal-browser-button");
+const completeTaskButton = document.querySelector("#complete-task-button");
 const pauseButton = document.querySelector("#pause-button");
 const stopButton = document.querySelector("#stop-button");
 const openWorkViewUrlButton = document.querySelector("#open-work-view-url-button");
 const workViewUrlInput = document.querySelector("#work-view-url-input");
+let currentTaskState = null;
 
 function setHealthPill(target, ok, text) {
   target.textContent = text;
@@ -415,6 +427,7 @@ async function refreshRuntime() {
   try {
     const data = await fetchJson(\`\${observerConfig.coreUrl}/state/runtime\`);
     const currentTask = data.currentTask ?? null;
+    currentTaskState = currentTask;
     runtimeStatus.textContent = data.runtime.status;
     runtimeTask.textContent = currentTask ? currentTask.goal : "none";
     runtimePaused.textContent = String(data.runtime.paused);
@@ -441,6 +454,7 @@ async function refreshRuntime() {
         ].join("\\n")
       : "No active task.";
   } catch {
+    currentTaskState = null;
     runtimeStatus.textContent = "offline";
     taskJson.textContent = "Unable to read runtime state.";
   }
@@ -604,7 +618,24 @@ async function postWorkView(path, payload = {}) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify(payload),
   });
+  if (currentTaskState?.id) {
+    const phase =
+      path === "/work-view/prepare"
+        ? "preparing_work_view"
+        : path === "/work-view/reveal"
+          ? "visible"
+          : path === "/work-view/hide"
+            ? "backgrounded"
+            : null;
+    if (phase) {
+      await updateTaskPhase(currentTaskState.id, phase, {
+        visibility: result.workView?.visibility ?? null,
+        mode: result.workView?.mode ?? null,
+      });
+    }
+  }
   setControlMessage(\`Work view \${result.workView?.status ?? "updated"} / \${result.workView?.visibility ?? "unknown"}\`);
+  await refreshRuntime();
   await refreshWorkView();
   await refreshScreen();
 }
@@ -695,7 +726,14 @@ async function runAction(path, payload) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify(payload),
   });
+  if (currentTaskState?.id) {
+    await updateTaskPhase(currentTaskState.id, "acting_on_target", {
+      actionKind: result.action?.kind ?? null,
+      degraded: result.action?.degraded ?? false,
+    });
+  }
   setControlMessage(\`Action \${result.action?.kind ?? "unknown"} completed (\${result.action?.result ?? "unknown"})\`);
+  await refreshRuntime();
   await refreshActionState();
   await refreshScreen();
   await refreshWorkView();
@@ -709,6 +747,27 @@ async function runHeal(service) {
   });
   setControlMessage(\`Heal completed for \${result.entry?.service ?? service}\`);
   await refreshHealState();
+}
+
+async function completeCurrentTask() {
+  if (!currentTaskState?.id) {
+    throw new Error("No active task to complete.");
+  }
+
+  const result = await fetchJson(\`\${observerConfig.coreUrl}/tasks/\${currentTaskState.id}/complete\`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      details: {
+        targetUrl: currentTaskState.targetUrl ?? null,
+        workViewUrl: currentTaskState.workView?.activeUrl ?? null,
+      },
+    }),
+  });
+
+  setControlMessage(\`Completed task \${result.task?.id ?? currentTaskState.id}\`);
+  await refreshRuntime();
+  await refreshWorkView();
 }
 
 function subscribeEvents() {
@@ -726,6 +785,7 @@ function subscribeEvents() {
     "task.created",
     "task.phase_changed",
     "task.running",
+    "task.completed",
     "task.paused",
     "task.failed",
     "service.started",
@@ -822,6 +882,12 @@ typeActionButton.addEventListener("click", () => {
 
 healBrowserButton.addEventListener("click", () => {
   runHeal("openclaw-browser-runtime").catch((error) => {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  });
+});
+
+completeTaskButton.addEventListener("click", () => {
+  completeCurrentTask().catch((error) => {
     setControlMessage(\`Request failed: \${formatError(error)}\`);
   });
 });
