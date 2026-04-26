@@ -203,6 +203,8 @@ function observerHtml() {
             </div>
             <div class="actions">
               <button id="create-task-button">Create Demo Task</button>
+              <button id="recover-latest-task-button" class="secondary">Recover Latest Finished Task</button>
+              <button id="load-history-button" class="secondary">Load Latest Task History</button>
               <button id="open-work-view-url-button">Open Work View URL</button>
               <button id="prepare-work-view-button" class="secondary">Prepare Work View</button>
               <button id="reveal-work-view-button" class="secondary">Reveal Work View</button>
@@ -235,6 +237,10 @@ function observerHtml() {
           <h2>Recent Tasks</h2>
           <div class="metric"><span>Entries</span><span id="task-list-count">0</span></div>
           <pre id="task-list-summary">Loading recent tasks...</pre>
+        </section>
+        <section class="panel">
+          <h2>Task History Detail</h2>
+          <pre id="task-history-json">Loading task history detail...</pre>
         </section>
         <section class="panel">
           <h2>Screen State</h2>
@@ -297,6 +303,7 @@ const runtimeUpdated = document.querySelector("#runtime-updated");
 const taskJson = document.querySelector("#task-json");
 const taskListCount = document.querySelector("#task-list-count");
 const taskListSummary = document.querySelector("#task-list-summary");
+const taskHistoryJson = document.querySelector("#task-history-json");
 const workViewStatus = document.querySelector("#work-view-status");
 const workViewVisibility = document.querySelector("#work-view-visibility");
 const workViewMode = document.querySelector("#work-view-mode");
@@ -328,6 +335,8 @@ const systemSummary = document.querySelector("#system-summary");
 const healCount = document.querySelector("#heal-count");
 const healSummary = document.querySelector("#heal-summary");
 const createTaskButton = document.querySelector("#create-task-button");
+const recoverLatestTaskButton = document.querySelector("#recover-latest-task-button");
+const loadHistoryButton = document.querySelector("#load-history-button");
 const prepareWorkViewButton = document.querySelector("#prepare-work-view-button");
 const revealWorkViewButton = document.querySelector("#reveal-work-view-button");
 const hideWorkViewButton = document.querySelector("#hide-work-view-button");
@@ -342,6 +351,7 @@ const openWorkViewUrlButton = document.querySelector("#open-work-view-url-button
 const workViewUrlInput = document.querySelector("#work-view-url-input");
 let currentTaskState = null;
 let latestActionState = null;
+let latestHistoryTask = null;
 
 function setHealthPill(target, ok, text) {
   target.textContent = text;
@@ -396,6 +406,42 @@ function deriveTaskLastAction(task) {
   }
 
   return null;
+}
+
+function renderTaskSummary(task, { includeRecovery = true, includeOutcome = true } = {}) {
+  if (!task) {
+    return "No task selected.";
+  }
+
+  const taskLastAction = deriveTaskLastAction(task);
+  const lines = [
+    \`ID: \${task.id}\`,
+    \`Goal: \${task.goal}\`,
+    \`Type: \${task.type}\`,
+    \`Status: \${task.status}\`,
+    \`Phase: \${task.executionPhase ?? "queued"}\`,
+    \`Target URL: \${task.targetUrl ?? "none"}\`,
+    \`Work View Strategy: \${task.workViewStrategy ?? "none"}\`,
+    \`Work View Session: \${task.workView?.sessionId ?? "none"}\`,
+    \`Work View URL: \${task.workView?.activeUrl ?? "none"}\`,
+    \`Work View: \${task.workView?.status ?? "none"} / \${task.workView?.visibility ?? "none"}\`,
+  ];
+
+  if (includeOutcome) {
+    lines.push(\`Outcome: \${task.outcome?.kind ?? "open"}\${task.outcome?.summary ? \` - \${task.outcome.summary}\` : ""}\`);
+  }
+
+  if (includeRecovery) {
+    lines.push(\`Recovery: \${task.recovery?.recoveredFromTaskId ? \`attempt \${task.recovery?.attempt ?? 1} from \${task.recovery.recoveredFromTaskId}\` : "original task"}\`);
+    lines.push(\`Recovered By: \${task.recoveredByTaskId ?? "none"}\`);
+  }
+
+  lines.push(\`Last Action: \${taskLastAction?.kind ?? "none"}\${taskLastAction ? \` (degraded: \${taskLastAction.degraded})\` : ""}\`);
+  lines.push(\`Recent Phases: \${(task.phaseHistory ?? []).slice(-4).map((entry) => entry.phase).join(" -> ") || "none"}\`);
+  lines.push(\`Created: \${formatTimestamp(task.createdAt)}\`);
+  lines.push(\`Updated: \${formatTimestamp(task.updatedAt)}\`);
+  lines.push(\`Closed: \${formatTimestamp(task.closedAt)}\`);
+  return lines.join("\\n");
 }
 
 function getDesiredWorkViewUrl() {
@@ -468,25 +514,7 @@ async function refreshRuntime() {
     runtimeUpdated.textContent = data.runtime.lastUpdatedAt;
     const taskLastAction = deriveTaskLastAction(currentTask);
     taskJson.textContent = currentTask
-      ? [
-          \`ID: \${currentTask.id}\`,
-          \`Goal: \${currentTask.goal}\`,
-          \`Type: \${currentTask.type}\`,
-          \`Status: \${currentTask.status}\`,
-          \`Phase: \${currentTask.executionPhase ?? "queued"}\`,
-          \`Target URL: \${currentTask.targetUrl ?? "none"}\`,
-          \`Work View Strategy: \${currentTask.workViewStrategy ?? "none"}\`,
-          \`Work View Session: \${currentTask.workView?.sessionId ?? "none"}\`,
-          \`Work View Status: \${currentTask.workView?.status ?? "none"} / \${currentTask.workView?.visibility ?? "none"}\`,
-          \`Work View URL: \${currentTask.workView?.activeUrl ?? "none"}\`,
-          \`Last Action: \${taskLastAction?.kind ?? "none"}\${taskLastAction ? \` (degraded: \${taskLastAction.degraded})\` : ""}\`,
-          \`Recent Phases: \${(currentTask.phaseHistory ?? [])
-            .slice(-4)
-            .map((entry) => entry.phase)
-            .join(" -> ") || "none"}\`,
-          \`Created: \${formatTimestamp(currentTask.createdAt)}\`,
-          \`Updated: \${formatTimestamp(currentTask.updatedAt)}\`,
-        ].join("\\n")
+      ? renderTaskSummary(currentTask, { includeRecovery: false, includeOutcome: false })
       : "No active task.";
   } catch {
     currentTaskState = null;
@@ -501,27 +529,31 @@ async function refreshTaskList() {
     const items = data.items ?? [];
     const activeCount = items.filter((task) => ["queued", "running", "paused"].includes(task.status)).length;
     taskListCount.textContent = \`\${items.length} visible / \${activeCount} active\`;
+    latestHistoryTask = items.find((task) => task.status !== "running" && task.status !== "queued" && task.status !== "paused")
+      ?? items[0]
+      ?? null;
     taskListSummary.textContent = items.length > 0
-      ? items.map((task) => {
-          const taskLastAction = deriveTaskLastAction(task);
-          return [
-          \`ID: \${task.id}\`,
-          \`Goal: \${task.goal}\`,
-          \`Status: \${task.status}\`,
-          \`Phase: \${task.executionPhase ?? "queued"}\`,
-          \`Target URL: \${task.targetUrl ?? "none"}\`,
-          \`Work View URL: \${task.workView?.activeUrl ?? "none"}\`,
-          \`Work View: \${task.workView?.status ?? "none"} / \${task.workView?.visibility ?? "none"}\`,
-          \`Outcome: \${task.outcome?.kind ?? "open"}\${task.outcome?.summary ? \` - \${task.outcome.summary}\` : ""}\`,
-          \`Last Action: \${taskLastAction?.kind ?? "none"}\${taskLastAction ? \` (degraded: \${taskLastAction.degraded})\` : ""}\`,
-          \`Recent Phases: \${(task.phaseHistory ?? []).slice(-3).map((entry) => entry.phase).join(" -> ") || "none"}\`,
-          \`Updated: \${formatTimestamp(task.updatedAt)}\`,
-        ].join("\\n");
-        }).join("\\n\\n---\\n\\n")
+      ? items.map((task) => renderTaskSummary(task)).join("\\n\\n---\\n\\n")
       : "No tasks recorded yet.";
   } catch {
+    latestHistoryTask = null;
     taskListCount.textContent = "0";
     taskListSummary.textContent = "Unable to read recent tasks.";
+  }
+}
+
+async function refreshTaskHistoryDetail() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/tasks/latest-finished\`);
+    const historyTask = data.task ?? latestHistoryTask ?? null;
+    latestHistoryTask = historyTask;
+    taskHistoryJson.textContent = historyTask
+      ? renderTaskSummary(historyTask)
+      : "No finished task recorded yet.";
+  } catch {
+    taskHistoryJson.textContent = latestHistoryTask
+      ? renderTaskSummary(latestHistoryTask)
+      : "Unable to read task history detail.";
   }
 }
 
@@ -667,15 +699,46 @@ async function createDemoTask() {
       workViewStrategy: "ai-work-view",
     }),
   });
-  await updateTaskPhase(result.task?.id, "preparing_work_view", {
-    targetUrl,
-    displayTarget: "workspace-2",
-  });
-  const workViewResult = await openWorkViewUrl(result.task?.id);
-  await attachTaskToWorkView(result.task?.id, workViewResult);
+  await launchTaskIntoWorkView(result.task?.id, targetUrl);
   setControlMessage(\`Created task \${result.task?.id ?? "unknown"} for \${targetUrl}\`);
   await refreshRuntime();
   await refreshTaskList();
+  await refreshTaskHistoryDetail();
+  await refreshWorkView();
+  await refreshScreen();
+}
+
+async function launchTaskIntoWorkView(taskId, targetUrl) {
+  if (!taskId) {
+    return;
+  }
+
+  await updateTaskPhase(taskId, "preparing_work_view", {
+    targetUrl,
+    displayTarget: "workspace-2",
+  });
+  const workViewResult = await openWorkViewUrl(taskId, targetUrl);
+  await attachTaskToWorkView(taskId, workViewResult);
+}
+
+async function recoverLatestFinishedTask() {
+  const latest = await fetchJson(\`\${observerConfig.coreUrl}/tasks/latest-finished\`);
+  const sourceTask = latest.task ?? null;
+  if (!sourceTask?.id) {
+    throw new Error("No finished task available to recover.");
+  }
+
+  const targetUrl = sourceTask.targetUrl ?? sourceTask.workView?.activeUrl ?? getDesiredWorkViewUrl();
+  workViewUrlInput.value = targetUrl;
+
+  const result = await fetchJson(\`\${observerConfig.coreUrl}/tasks/\${sourceTask.id}/recover\`, {
+    method: "POST",
+  });
+  await launchTaskIntoWorkView(result.task?.id, targetUrl);
+  setControlMessage(\`Recovered task \${result.task?.id ?? "unknown"} from \${sourceTask.id}\`);
+  await refreshRuntime();
+  await refreshTaskList();
+  await refreshTaskHistoryDetail();
   await refreshWorkView();
   await refreshScreen();
 }
@@ -705,6 +768,7 @@ async function postWorkView(path, payload = {}) {
   setControlMessage(\`Work view \${result.workView?.status ?? "updated"} / \${result.workView?.visibility ?? "unknown"}\`);
   await refreshRuntime();
   await refreshTaskList();
+  await refreshTaskHistoryDetail();
   await refreshWorkView();
   await refreshScreen();
 }
@@ -787,6 +851,7 @@ async function postControl(path) {
   setControlMessage(\`Control request completed: \${path}\`);
   await refreshRuntime();
   await refreshTaskList();
+  await refreshTaskHistoryDetail();
 }
 
 async function refreshScreenNow() {
@@ -812,6 +877,7 @@ async function runAction(path, payload) {
   setControlMessage(\`Action \${result.action?.kind ?? "unknown"} completed (\${result.action?.result ?? "unknown"})\`);
   await refreshRuntime();
   await refreshTaskList();
+  await refreshTaskHistoryDetail();
   await refreshActionState();
   await refreshScreen();
   await refreshWorkView();
@@ -874,6 +940,7 @@ async function completeCurrentTask() {
   setControlMessage(\`Completed task \${result.task?.id ?? currentTaskState.id}\`);
   await refreshRuntime();
   await refreshTaskList();
+  await refreshTaskHistoryDetail();
   await refreshActionState();
   await refreshWorkView();
   await refreshScreen();
@@ -895,6 +962,7 @@ function subscribeEvents() {
     "task.phase_changed",
     "task.running",
     "task.completed",
+    "task.recovered",
     "task.paused",
     "task.failed",
     "service.started",
@@ -911,6 +979,7 @@ function subscribeEvents() {
         addEventItem(JSON.parse(message.data));
         await refreshRuntime();
         await refreshTaskList();
+        await refreshTaskHistoryDetail();
         await refreshWorkView();
         if (
           eventName === "screen.updated"
@@ -1020,9 +1089,22 @@ openWorkViewUrlButton.addEventListener("click", () => {
   });
 });
 
+recoverLatestTaskButton.addEventListener("click", () => {
+  recoverLatestFinishedTask().catch((error) => {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  });
+});
+
+loadHistoryButton.addEventListener("click", () => {
+  refreshTaskHistoryDetail().catch((error) => {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  });
+});
+
 await refreshHealth();
 await refreshRuntime();
 await refreshTaskList();
+await refreshTaskHistoryDetail();
 await refreshWorkView();
 await refreshScreen();
 await refreshActionState();
@@ -1034,6 +1116,7 @@ subscribeEvents();
 setInterval(refreshHealth, 5000);
 setInterval(refreshRuntime, 5000);
 setInterval(refreshTaskList, 5000);
+setInterval(refreshTaskHistoryDetail, 5000);
 setInterval(refreshWorkView, 5000);
 setInterval(refreshScreen, 5000);
 setInterval(refreshActionState, 5000);

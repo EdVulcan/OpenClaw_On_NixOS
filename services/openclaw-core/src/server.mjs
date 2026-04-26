@@ -97,6 +97,9 @@ function serialiseTask(task) {
     workView: task.workView ?? null,
     lastAction: task.lastAction ?? null,
     outcome: task.outcome ?? null,
+    recovery: task.recovery ?? null,
+    recoveredByTaskId: task.recoveredByTaskId ?? null,
+    restorable: isRecoverableTask(task),
     executionPhase: task.executionPhase ?? "queued",
     phaseHistory: task.phaseHistory ?? [],
     createdAt: task.createdAt,
@@ -107,6 +110,12 @@ function serialiseTask(task) {
 
 function isActiveTask(task) {
   return ACTIVE_TASK_STATUSES.has(task.status);
+}
+
+function isRecoverableTask(task) {
+  return ["completed", "failed", "superseded"].includes(task.status)
+    && typeof task.targetUrl === "string"
+    && task.targetUrl.trim().length > 0;
 }
 
 function compareTasksForDisplay(left, right) {
@@ -123,6 +132,12 @@ function listTasks() {
   return [...tasks.values()]
     .sort(compareTasksForDisplay)
     .map((task) => serialiseTask(task));
+}
+
+function getLatestFinishedTask() {
+  return [...tasks.values()]
+    .filter((task) => !isActiveTask(task))
+    .sort(compareTasksForDisplay)[0] ?? null;
 }
 
 function createTask(body) {
@@ -149,6 +164,24 @@ function createTask(body) {
     workView: null,
     lastAction: null,
     outcome: null,
+    recovery:
+      body.recovery && typeof body.recovery === "object"
+        ? {
+            recoveredFromTaskId:
+              typeof body.recovery.recoveredFromTaskId === "string" && body.recovery.recoveredFromTaskId.trim()
+                ? body.recovery.recoveredFromTaskId.trim()
+                : null,
+            recoveredFromOutcome:
+              typeof body.recovery.recoveredFromOutcome === "string" && body.recovery.recoveredFromOutcome.trim()
+                ? body.recovery.recoveredFromOutcome.trim()
+                : null,
+            attempt:
+              Number.isInteger(body.recovery.attempt) && body.recovery.attempt > 0
+                ? body.recovery.attempt
+                : 1,
+          }
+        : null,
+    recoveredByTaskId: null,
     executionPhase: "queued",
     phaseHistory: [
       {
@@ -298,6 +331,25 @@ function completeTask(task, details = null) {
   return task;
 }
 
+function recoverTask(sourceTask) {
+  const recoveryAttempt = (sourceTask.recovery?.attempt ?? 0) + 1;
+  const recoveredTask = createTask({
+    goal: sourceTask.goal,
+    type: sourceTask.type,
+    targetUrl: sourceTask.targetUrl,
+    workViewStrategy: sourceTask.workViewStrategy,
+    recovery: {
+      recoveredFromTaskId: sourceTask.id,
+      recoveredFromOutcome: sourceTask.outcome?.kind ?? sourceTask.status,
+      attempt: recoveryAttempt,
+    },
+  });
+
+  sourceTask.recoveredByTaskId = recoveredTask.id;
+  sourceTask.updatedAt = new Date().toISOString();
+  return recoveredTask;
+}
+
 const server = http.createServer(async (req, res) => {
   const requestUrl = new URL(req.url ?? "/", `http://${req.headers.host ?? `${host}:${port}`}`);
 
@@ -340,6 +392,15 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === "GET" && requestUrl.pathname === "/tasks/latest-finished") {
+    const task = getLatestFinishedTask();
+    sendJson(res, 200, {
+      ok: true,
+      task: task ? serialiseTask(task) : null,
+    });
+    return;
+  }
+
   if (req.method === "POST" && requestUrl.pathname === "/tasks") {
     try {
       const body = await readJsonBody(req);
@@ -352,6 +413,48 @@ const server = http.createServer(async (req, res) => {
         task: serialiseTask(reclaimedTask),
       })));
       sendJson(res, 201, { ok: true, task: serialiseTask(task) });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (
+    req.method === "POST"
+    && requestUrl.pathname.startsWith("/tasks/")
+    && requestUrl.pathname.endsWith("/recover")
+  ) {
+    const taskId = requestUrl.pathname.slice("/tasks/".length, -"/recover".length);
+    const sourceTask = getTaskById(taskId);
+    if (!sourceTask) {
+      sendJson(res, 404, { ok: false, error: "Task not found." });
+      return;
+    }
+
+    if (!isRecoverableTask(sourceTask)) {
+      sendJson(res, 409, { ok: false, error: "Task is not recoverable." });
+      return;
+    }
+
+    try {
+      const recoveredTask = recoverTask(sourceTask);
+      const reclaimedTasks = supersedeOtherActiveTasks(recoveredTask.id);
+      reconcileRuntimeState();
+
+      await publishEvent("task.created", { task: serialiseTask(recoveredTask) });
+      await publishEvent("task.recovered", {
+        task: serialiseTask(recoveredTask),
+        recoveredFromTaskId: sourceTask.id,
+      });
+      await Promise.all(reclaimedTasks.map((reclaimedTask) => publishEvent("task.phase_changed", {
+        task: serialiseTask(reclaimedTask),
+      })));
+      sendJson(res, 201, {
+        ok: true,
+        task: serialiseTask(recoveredTask),
+        recoveredFromTask: serialiseTask(sourceTask),
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       sendJson(res, 400, { ok: false, error: message });
