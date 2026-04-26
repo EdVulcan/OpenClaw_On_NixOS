@@ -277,6 +277,12 @@ function attachTaskToWorkView(task, body) {
 }
 
 function completeTask(task, details = null) {
+  if (details?.workView && typeof details.workView === "object") {
+    task.workView = {
+      ...(task.workView ?? {}),
+      ...details.workView,
+    };
+  }
   task.status = "completed";
   appendTaskPhase(task, "completed", details);
   task.outcome = {

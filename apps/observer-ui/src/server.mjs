@@ -801,6 +801,18 @@ async function completeCurrentTask() {
   }
 
   const completedWorkViewUrl = currentTaskState.workView?.activeUrl ?? currentTaskState.targetUrl ?? null;
+  let hiddenWorkView = null;
+
+  try {
+    const hiddenResult = await fetchJson(\`\${observerConfig.sessionManagerUrl}/work-view/hide\`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    hiddenWorkView = hiddenResult.workView ?? null;
+  } catch {
+  }
+
   const result = await fetchJson(\`\${observerConfig.coreUrl}/tasks/\${currentTaskState.id}/complete\`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -811,18 +823,19 @@ async function completeCurrentTask() {
         summary: completedWorkViewUrl
           ? \`Completed task at \${completedWorkViewUrl}\`
           : "Completed task.",
+        workView: hiddenWorkView
+          ? {
+            status: hiddenWorkView.status ?? null,
+            visibility: hiddenWorkView.visibility ?? null,
+            mode: hiddenWorkView.mode ?? null,
+            helperStatus: hiddenWorkView.helperStatus ?? null,
+            displayTarget: hiddenWorkView.displayTarget ?? null,
+            activeUrl: hiddenWorkView.activeUrl ?? completedWorkViewUrl,
+          }
+          : null,
       },
     }),
   });
-
-  try {
-    await fetchJson(\`\${observerConfig.sessionManagerUrl}/work-view/hide\`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({}),
-    });
-  } catch {
-  }
 
   setControlMessage(\`Completed task \${result.task?.id ?? currentTaskState.id}\`);
   await refreshRuntime();
