@@ -140,6 +140,12 @@ function getLatestFinishedTask() {
     .sort(compareTasksForDisplay)[0] ?? null;
 }
 
+function getLatestFailedTask() {
+  return [...tasks.values()]
+    .filter((task) => task.status === "failed")
+    .sort(compareTasksForDisplay)[0] ?? null;
+}
+
 function createTask(body) {
   const goal = typeof body.goal === "string" ? body.goal.trim() : "";
   if (!goal) {
@@ -394,6 +400,15 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === "GET" && requestUrl.pathname === "/tasks/latest-finished") {
     const task = getLatestFinishedTask();
+    sendJson(res, 200, {
+      ok: true,
+      task: task ? serialiseTask(task) : null,
+    });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/tasks/latest-failed") {
+    const task = getLatestFailedTask();
     sendJson(res, 200, {
       ok: true,
       task: task ? serialiseTask(task) : null,

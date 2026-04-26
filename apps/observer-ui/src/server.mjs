@@ -104,6 +104,9 @@ function observerHtml() {
         gap: 12px;
         flex-wrap: wrap;
       }
+      .actions.tight {
+        gap: 8px;
+      }
       .control-stack {
         display: grid;
         gap: 12px;
@@ -168,6 +171,41 @@ function observerHtml() {
         background: rgba(255, 204, 102, 0.14);
         color: var(--warn);
       }
+      .task-list {
+        display: grid;
+        gap: 12px;
+      }
+      .task-card {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 12px;
+        background: rgba(10, 16, 34, 0.66);
+      }
+      .task-card.selected {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 1px rgba(110, 231, 200, 0.35);
+      }
+      .task-card.active {
+        border-color: rgba(110, 231, 200, 0.6);
+      }
+      .task-card h3 {
+        margin: 0 0 8px;
+        font-size: 14px;
+      }
+      .task-card-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 10px;
+      }
+      .task-card-actions button {
+        padding: 8px 12px;
+        font-size: 12px;
+      }
+      .hint {
+        color: var(--muted);
+        font-size: 12px;
+      }
     </style>
   </head>
   <body>
@@ -198,13 +236,16 @@ function observerHtml() {
           <h2>Controls</h2>
           <div class="control-stack">
             <div class="field">
-              <label for="work-view-url-input">Work View URL</label>
+              <label for="work-view-url-input">Desired Work View URL</label>
               <input id="work-view-url-input" type="text" value="https://example.com/work-view" spellcheck="false" />
+              <div class="hint" id="work-view-url-hint">Desired URL for the next open, task, or recovery action.</div>
             </div>
             <div class="actions">
               <button id="create-task-button">Create Demo Task</button>
               <button id="recover-latest-task-button" class="secondary">Recover Latest Finished Task</button>
+              <button id="recover-latest-failed-task-button" class="secondary">Recover Latest Failed Task</button>
               <button id="load-history-button" class="secondary">Load Latest Task History</button>
+              <button id="follow-active-url-button" class="secondary">Follow Active URL</button>
               <button id="open-work-view-url-button">Open Work View URL</button>
               <button id="prepare-work-view-button" class="secondary">Prepare Work View</button>
               <button id="reveal-work-view-button" class="secondary">Reveal Work View</button>
@@ -236,7 +277,7 @@ function observerHtml() {
         <section class="panel">
           <h2>Recent Tasks</h2>
           <div class="metric"><span>Entries</span><span id="task-list-count">0</span></div>
-          <pre id="task-list-summary">Loading recent tasks...</pre>
+          <div id="task-list-items" class="task-list"></div>
         </section>
         <section class="panel">
           <h2>Task History Detail</h2>
@@ -311,9 +352,10 @@ const runtimeCount = document.querySelector("#runtime-count");
 const runtimeUpdated = document.querySelector("#runtime-updated");
 const taskJson = document.querySelector("#task-json");
 const taskListCount = document.querySelector("#task-list-count");
-const taskListSummary = document.querySelector("#task-list-summary");
+const taskListItems = document.querySelector("#task-list-items");
 const taskHistoryJson = document.querySelector("#task-history-json");
 const taskDetailIdInput = document.querySelector("#task-detail-id-input");
+const workViewUrlHint = document.querySelector("#work-view-url-hint");
 const workViewStatus = document.querySelector("#work-view-status");
 const workViewVisibility = document.querySelector("#work-view-visibility");
 const workViewMode = document.querySelector("#work-view-mode");
@@ -346,7 +388,9 @@ const healCount = document.querySelector("#heal-count");
 const healSummary = document.querySelector("#heal-summary");
 const createTaskButton = document.querySelector("#create-task-button");
 const recoverLatestTaskButton = document.querySelector("#recover-latest-task-button");
+const recoverLatestFailedTaskButton = document.querySelector("#recover-latest-failed-task-button");
 const loadHistoryButton = document.querySelector("#load-history-button");
+const followActiveUrlButton = document.querySelector("#follow-active-url-button");
 const loadSelectedTaskButton = document.querySelector("#load-selected-task-button");
 const recoverSelectedTaskButton = document.querySelector("#recover-selected-task-button");
 const useDetailUrlButton = document.querySelector("#use-detail-url-button");
@@ -366,6 +410,10 @@ let currentTaskState = null;
 let latestActionState = null;
 let latestHistoryTask = null;
 let selectedHistoryTaskId = null;
+let recentTasksState = [];
+let desiredWorkViewUrl = workViewUrlInput.value.trim() || "https://example.com/work-view";
+let desiredWorkViewUrlPinned = false;
+let latestWorkViewState = null;
 
 function setHealthPill(target, ok, text) {
   target.textContent = text;
@@ -395,6 +443,27 @@ function formatError(error) {
 
 function setControlMessage(message) {
   controlResult.textContent = message;
+}
+
+function updateDesiredUrlHint(activeUrl = null) {
+  const hintTail = activeUrl ? \`Current active URL: \${activeUrl}\` : "Current active URL: none";
+  workViewUrlHint.textContent = desiredWorkViewUrlPinned
+    ? \`Pinned desired URL for the next action. \${hintTail}\`
+    : \`Desired URL follows the active work view until you pin a new one. \${hintTail}\`;
+}
+
+function setDesiredWorkViewUrl(url, { pinned = true } = {}) {
+  const nextUrl = typeof url === "string" && url.trim() ? url.trim() : "https://example.com/work-view";
+  desiredWorkViewUrl = nextUrl;
+  desiredWorkViewUrlPinned = pinned;
+  workViewUrlInput.value = nextUrl;
+}
+
+function followActiveWorkViewUrl() {
+  const nextUrl = latestWorkViewState?.activeUrl ?? latestWorkViewState?.entryUrl ?? "https://example.com/work-view";
+  setDesiredWorkViewUrl(nextUrl, { pinned: false });
+  updateDesiredUrlHint(latestWorkViewState?.activeUrl ?? latestWorkViewState?.entryUrl ?? null);
+  setControlMessage(\`Following active work view URL: \${nextUrl}\`);
 }
 
 function deriveTaskLastAction(task) {
@@ -459,8 +528,7 @@ function renderTaskSummary(task, { includeRecovery = true, includeOutcome = true
 }
 
 function getDesiredWorkViewUrl() {
-  const value = workViewUrlInput.value.trim();
-  return value || "https://example.com/work-view";
+  return desiredWorkViewUrl || "https://example.com/work-view";
 }
 
 function getSelectedHistoryTaskId() {
@@ -546,6 +614,7 @@ async function refreshTaskList() {
   try {
     const data = await fetchJson(\`\${observerConfig.coreUrl}/tasks?limit=8\`);
     const items = data.items ?? [];
+    recentTasksState = items;
     const activeCount = items.filter((task) => ["queued", "running", "paused"].includes(task.status)).length;
     taskListCount.textContent = \`\${items.length} visible / \${activeCount} active\`;
     latestHistoryTask = items.find((task) => task.status !== "running" && task.status !== "queued" && task.status !== "paused")
@@ -554,13 +623,14 @@ async function refreshTaskList() {
     if (!selectedHistoryTaskId && latestHistoryTask?.id) {
       taskDetailIdInput.value = latestHistoryTask.id;
     }
-    taskListSummary.textContent = items.length > 0
-      ? items.map((task) => renderTaskSummary(task)).join("\\n\\n---\\n\\n")
-      : "No tasks recorded yet.";
+    taskListItems.innerHTML = items.length > 0
+      ? items.map((task) => renderTaskCard(task)).join("")
+      : "<pre>No tasks recorded yet.</pre>";
   } catch {
+    recentTasksState = [];
     latestHistoryTask = null;
     taskListCount.textContent = "0";
-    taskListSummary.textContent = "Unable to read recent tasks.";
+    taskListItems.innerHTML = "<pre>Unable to read recent tasks.</pre>";
   }
 }
 
@@ -592,14 +662,18 @@ async function refreshWorkView() {
   try {
     const data = await fetchJson(\`\${observerConfig.sessionManagerUrl}/work-view/state\`);
     const workView = data.workView ?? {};
+    latestWorkViewState = workView;
     workViewStatus.textContent = workView.status ?? "unknown";
     workViewVisibility.textContent = workView.visibility ?? "unknown";
     workViewMode.textContent = workView.mode ?? "unknown";
     workViewHelper.textContent = workView.helperStatus ?? "unknown";
     workViewCapture.textContent = workView.captureStrategy ?? "unknown";
-    if (document.activeElement !== workViewUrlInput) {
-      workViewUrlInput.value = workView.activeUrl ?? workView.entryUrl ?? "https://example.com/work-view";
+    if (!desiredWorkViewUrlPinned && document.activeElement !== workViewUrlInput) {
+      setDesiredWorkViewUrl(workView.activeUrl ?? workView.entryUrl ?? "https://example.com/work-view", {
+        pinned: false,
+      });
     }
+    updateDesiredUrlHint(workView.activeUrl ?? workView.entryUrl ?? null);
     workViewJson.textContent = [
       \`Session: \${data.session?.status ?? "unknown"}\`,
       \`Session ID: \${data.session?.sessionId ?? "none"}\`,
@@ -613,12 +687,14 @@ async function refreshWorkView() {
       \`Updated: \${formatTimestamp(workView.updatedAt)}\`,
     ].join("\\n");
   } catch {
+    latestWorkViewState = null;
     workViewStatus.textContent = "offline";
     workViewVisibility.textContent = "offline";
     workViewMode.textContent = "offline";
     workViewHelper.textContent = "offline";
     workViewCapture.textContent = "offline";
     workViewJson.textContent = "Unable to read work view state.";
+    updateDesiredUrlHint(null);
   }
 }
 
@@ -760,7 +836,7 @@ async function recoverLatestFinishedTask() {
   }
 
   const targetUrl = sourceTask.targetUrl ?? sourceTask.workView?.activeUrl ?? getDesiredWorkViewUrl();
-  workViewUrlInput.value = targetUrl;
+  setDesiredWorkViewUrl(targetUrl);
 
   const result = await fetchJson(\`\${observerConfig.coreUrl}/tasks/\${sourceTask.id}/recover\`, {
     method: "POST",
@@ -793,7 +869,7 @@ async function recoverSelectedTask() {
   }
 
   const targetUrl = sourceTask.targetUrl ?? sourceTask.workView?.activeUrl ?? getDesiredWorkViewUrl();
-  workViewUrlInput.value = targetUrl;
+  setDesiredWorkViewUrl(targetUrl);
   const result = await fetchJson(\`\${observerConfig.coreUrl}/tasks/\${sourceTask.id}/recover\`, {
     method: "POST",
   });
@@ -825,8 +901,47 @@ function useSelectedTaskUrl() {
     throw new Error("Selected task does not have a recoverable URL.");
   }
 
-  workViewUrlInput.value = taskUrl;
+  setDesiredWorkViewUrl(taskUrl);
   setControlMessage(\`Loaded task URL into work view input: \${taskUrl}\`);
+}
+
+async function recoverLatestFailedTask() {
+  const latest = await fetchJson(\`\${observerConfig.coreUrl}/tasks/latest-failed\`);
+  const failedTask = latest.task ?? recentTasksState.find((task) => task.status === "failed" && task.restorable) ?? null;
+  if (!failedTask?.id) {
+    throw new Error("No failed task available to recover.");
+  }
+
+  selectedHistoryTaskId = failedTask.id;
+  taskDetailIdInput.value = failedTask.id;
+  await refreshTaskHistoryDetail();
+  await recoverSelectedTask();
+}
+
+function renderTaskCard(task) {
+  const selectedClass = selectedHistoryTaskId === task.id ? " selected" : "";
+  const activeClass = task.id === currentTaskState?.id ? " active" : "";
+  const lastAction = deriveTaskLastAction(task);
+  const taskUrl = task.targetUrl ?? task.workView?.activeUrl ?? "";
+  const escapedUrl = escapeHtml(taskUrl);
+  return \`<article class="task-card\${selectedClass}\${activeClass}" data-task-id="\${task.id}">
+    <h3>\${escapeHtml(task.goal)}</h3>
+    <pre>\${escapeHtml(renderTaskSummary(task))}</pre>
+    <div class="task-card-actions">
+      <button class="secondary" data-task-action="inspect" data-task-id="\${task.id}">Inspect</button>
+      <button class="secondary" data-task-action="use-url" data-task-id="\${task.id}" data-task-url="\${escapedUrl}" \${taskUrl ? "" : "disabled"}>Use URL</button>
+      <button class="secondary" data-task-action="recover" data-task-id="\${task.id}" \${task.restorable ? "" : "disabled"}>Recover</button>
+    </div>
+  </article>\`;
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
 async function postWorkView(path, payload = {}) {
@@ -1181,11 +1296,25 @@ recoverLatestTaskButton.addEventListener("click", () => {
   });
 });
 
+recoverLatestFailedTaskButton.addEventListener("click", () => {
+  recoverLatestFailedTask().catch((error) => {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  });
+});
+
 loadHistoryButton.addEventListener("click", () => {
   selectedHistoryTaskId = null;
   refreshTaskHistoryDetail().catch((error) => {
     setControlMessage(\`Request failed: \${formatError(error)}\`);
   });
+});
+
+followActiveUrlButton.addEventListener("click", () => {
+  try {
+    followActiveWorkViewUrl();
+  } catch (error) {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  }
 });
 
 loadSelectedTaskButton.addEventListener("click", () => {
@@ -1205,6 +1334,61 @@ useDetailUrlButton.addEventListener("click", () => {
     useSelectedTaskUrl();
   } catch (error) {
     setControlMessage(\`Request failed: \${formatError(error)}\`);
+  }
+});
+
+workViewUrlInput.addEventListener("input", () => {
+  desiredWorkViewUrl = workViewUrlInput.value.trim() || "https://example.com/work-view";
+  desiredWorkViewUrlPinned = true;
+  updateDesiredUrlHint(currentTaskState?.workView?.activeUrl ?? null);
+});
+
+taskListItems.addEventListener("click", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+
+  const action = target.dataset.taskAction;
+  const taskId = target.dataset.taskId;
+  const taskUrl = target.dataset.taskUrl;
+
+  if (!action || !taskId) {
+    return;
+  }
+
+  if (action === "inspect") {
+    selectedHistoryTaskId = taskId;
+    taskDetailIdInput.value = taskId;
+    refreshTaskHistoryDetail().then(() => {
+      setControlMessage(\`Loaded task history detail for \${taskId}\`);
+    }).catch((error) => {
+      setControlMessage(\`Request failed: \${formatError(error)}\`);
+    });
+    return;
+  }
+
+  if (action === "use-url") {
+    try {
+      if (!taskUrl) {
+        throw new Error("Selected task does not have a recoverable URL.");
+      }
+      selectedHistoryTaskId = taskId;
+      taskDetailIdInput.value = taskId;
+      setDesiredWorkViewUrl(taskUrl);
+      setControlMessage(\`Loaded task URL into work view input: \${taskUrl}\`);
+    } catch (error) {
+      setControlMessage(\`Request failed: \${formatError(error)}\`);
+    }
+    return;
+  }
+
+  if (action === "recover") {
+    selectedHistoryTaskId = taskId;
+    taskDetailIdInput.value = taskId;
+    recoverSelectedTask().catch((error) => {
+      setControlMessage(\`Request failed: \${formatError(error)}\`);
+    });
   }
 });
 
