@@ -422,9 +422,15 @@ async function refreshRuntime() {
     runtimeUpdated.textContent = data.runtime.lastUpdatedAt;
     taskJson.textContent = currentTask
       ? [
+          \`ID: \${currentTask.id}\`,
           \`Goal: \${currentTask.goal}\`,
           \`Type: \${currentTask.type}\`,
           \`Status: \${currentTask.status}\`,
+          \`Target URL: \${currentTask.targetUrl ?? "none"}\`,
+          \`Work View Strategy: \${currentTask.workViewStrategy ?? "none"}\`,
+          \`Work View Session: \${currentTask.workView?.sessionId ?? "none"}\`,
+          \`Work View Status: \${currentTask.workView?.status ?? "none"} / \${currentTask.workView?.visibility ?? "none"}\`,
+          \`Work View URL: \${currentTask.workView?.activeUrl ?? "none"}\`,
           \`Created: \${formatTimestamp(currentTask.createdAt)}\`,
           \`Updated: \${formatTimestamp(currentTask.updatedAt)}\`,
         ].join("\\n")
@@ -575,7 +581,8 @@ async function createDemoTask() {
       workViewStrategy: "ai-work-view",
     }),
   });
-  await openWorkViewUrl();
+  const workViewResult = await openWorkViewUrl();
+  await attachTaskToWorkView(result.task?.id, workViewResult);
   setControlMessage(\`Created task \${result.task?.id ?? "unknown"} for \${targetUrl}\`);
   await refreshRuntime();
   await refreshWorkView();
@@ -613,6 +620,27 @@ async function openWorkViewUrl() {
   setControlMessage(\`Opened work view URL: \${revealResult.workView?.activeUrl ?? prepareResult.workView?.activeUrl ?? entryUrl}\`);
   await refreshWorkView();
   await refreshScreen();
+  return revealResult;
+}
+
+async function attachTaskToWorkView(taskId, workViewResult) {
+  if (!taskId || !workViewResult?.workView) {
+    return;
+  }
+
+  await fetchJson(\`\${observerConfig.coreUrl}/tasks/\${taskId}/attach-work-view\`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      sessionId: workViewResult.session?.sessionId ?? null,
+      status: workViewResult.workView?.status ?? "ready",
+      visibility: workViewResult.workView?.visibility ?? "visible",
+      mode: workViewResult.workView?.mode ?? "foreground-observable",
+      helperStatus: workViewResult.workView?.helperStatus ?? "active",
+      displayTarget: workViewResult.workView?.displayTarget ?? "workspace-2",
+      activeUrl: workViewResult.workView?.activeUrl ?? getDesiredWorkViewUrl(),
+    }),
+  });
 }
 
 async function postControl(path) {
@@ -666,6 +694,7 @@ function subscribeEvents() {
 
   for (const eventName of [
     "task.created",
+    "task.running",
     "task.paused",
     "task.failed",
     "service.started",

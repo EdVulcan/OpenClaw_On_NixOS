@@ -84,6 +84,7 @@ function serialiseTask(task) {
     status: task.status,
     targetUrl: task.targetUrl ?? null,
     workViewStrategy: task.workViewStrategy ?? null,
+    workView: task.workView ?? null,
     createdAt: task.createdAt,
     updatedAt: task.updatedAt,
   };
@@ -110,6 +111,7 @@ function createTask(body) {
       typeof body.workViewStrategy === "string" && body.workViewStrategy.trim()
         ? body.workViewStrategy.trim()
         : "ai-work-view",
+    workView: null,
     createdAt: now,
     updatedAt: now,
   };
@@ -120,6 +122,53 @@ function createTask(body) {
 
 function getTaskById(taskId) {
   return tasks.get(taskId) ?? null;
+}
+
+function attachTaskToWorkView(task, body) {
+  const now = new Date().toISOString();
+  const activeUrl =
+    typeof body.activeUrl === "string" && body.activeUrl.trim()
+      ? body.activeUrl.trim()
+      : task.targetUrl;
+
+  task.status = "running";
+  task.updatedAt = now;
+  task.workView = {
+    sessionId:
+      typeof body.sessionId === "string" && body.sessionId.trim()
+        ? body.sessionId.trim()
+        : null,
+    status:
+      typeof body.status === "string" && body.status.trim()
+        ? body.status.trim()
+        : "ready",
+    visibility:
+      typeof body.visibility === "string" && body.visibility.trim()
+        ? body.visibility.trim()
+        : "visible",
+    mode:
+      typeof body.mode === "string" && body.mode.trim()
+        ? body.mode.trim()
+        : "foreground-observable",
+    helperStatus:
+      typeof body.helperStatus === "string" && body.helperStatus.trim()
+        ? body.helperStatus.trim()
+        : "active",
+    displayTarget:
+      typeof body.displayTarget === "string" && body.displayTarget.trim()
+        ? body.displayTarget.trim()
+        : null,
+    activeUrl,
+    attachedAt: now,
+  };
+
+  updateRuntimeState({
+    status: "running",
+    currentTaskId: task.id,
+    paused: false,
+  });
+
+  return task;
 }
 
 const server = http.createServer(async (req, res) => {
@@ -173,7 +222,8 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === "GET" && requestUrl.pathname.startsWith("/tasks/")) {
-    const taskId = requestUrl.pathname.slice("/tasks/".length);
+    const taskPath = requestUrl.pathname.slice("/tasks/".length);
+    const [taskId] = taskPath.split("/");
     const task = getTaskById(taskId);
     if (!task) {
       sendJson(res, 404, { ok: false, error: "Task not found." });
@@ -181,6 +231,35 @@ const server = http.createServer(async (req, res) => {
     }
 
     sendJson(res, 200, { ok: true, task: serialiseTask(task) });
+    return;
+  }
+
+  if (
+    req.method === "POST"
+    && requestUrl.pathname.startsWith("/tasks/")
+    && requestUrl.pathname.endsWith("/attach-work-view")
+  ) {
+    const taskId = requestUrl.pathname
+      .slice("/tasks/".length, -"/attach-work-view".length);
+    const task = getTaskById(taskId);
+    if (!task) {
+      sendJson(res, 404, { ok: false, error: "Task not found." });
+      return;
+    }
+
+    try {
+      const body = await readJsonBody(req);
+      const updatedTask = attachTaskToWorkView(task, body);
+      await publishEvent("task.running", { task: serialiseTask(updatedTask) });
+      sendJson(res, 200, {
+        ok: true,
+        task: serialiseTask(updatedTask),
+        runtime: runtimeState,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
     return;
   }
 
