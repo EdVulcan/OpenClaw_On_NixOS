@@ -240,6 +240,15 @@ function observerHtml() {
         </section>
         <section class="panel">
           <h2>Task History Detail</h2>
+          <div class="field">
+            <label for="task-detail-id-input">Task Detail ID</label>
+            <input id="task-detail-id-input" type="text" value="" spellcheck="false" placeholder="Task ID to inspect or recover" />
+          </div>
+          <div class="actions" style="margin-top: 12px;">
+            <button id="load-selected-task-button" class="secondary">Load Selected Task</button>
+            <button id="recover-selected-task-button" class="secondary">Recover Selected Task</button>
+            <button id="use-detail-url-button" class="secondary">Use Detail URL</button>
+          </div>
           <pre id="task-history-json">Loading task history detail...</pre>
         </section>
         <section class="panel">
@@ -304,6 +313,7 @@ const taskJson = document.querySelector("#task-json");
 const taskListCount = document.querySelector("#task-list-count");
 const taskListSummary = document.querySelector("#task-list-summary");
 const taskHistoryJson = document.querySelector("#task-history-json");
+const taskDetailIdInput = document.querySelector("#task-detail-id-input");
 const workViewStatus = document.querySelector("#work-view-status");
 const workViewVisibility = document.querySelector("#work-view-visibility");
 const workViewMode = document.querySelector("#work-view-mode");
@@ -337,6 +347,9 @@ const healSummary = document.querySelector("#heal-summary");
 const createTaskButton = document.querySelector("#create-task-button");
 const recoverLatestTaskButton = document.querySelector("#recover-latest-task-button");
 const loadHistoryButton = document.querySelector("#load-history-button");
+const loadSelectedTaskButton = document.querySelector("#load-selected-task-button");
+const recoverSelectedTaskButton = document.querySelector("#recover-selected-task-button");
+const useDetailUrlButton = document.querySelector("#use-detail-url-button");
 const prepareWorkViewButton = document.querySelector("#prepare-work-view-button");
 const revealWorkViewButton = document.querySelector("#reveal-work-view-button");
 const hideWorkViewButton = document.querySelector("#hide-work-view-button");
@@ -352,6 +365,7 @@ const workViewUrlInput = document.querySelector("#work-view-url-input");
 let currentTaskState = null;
 let latestActionState = null;
 let latestHistoryTask = null;
+let selectedHistoryTaskId = null;
 
 function setHealthPill(target, ok, text) {
   target.textContent = text;
@@ -449,6 +463,11 @@ function getDesiredWorkViewUrl() {
   return value || "https://example.com/work-view";
 }
 
+function getSelectedHistoryTaskId() {
+  const value = taskDetailIdInput.value.trim();
+  return value || null;
+}
+
 async function fetchJson(url, options) {
   const response = await fetch(url, options);
   const contentType = response.headers.get("content-type") ?? "";
@@ -532,6 +551,9 @@ async function refreshTaskList() {
     latestHistoryTask = items.find((task) => task.status !== "running" && task.status !== "queued" && task.status !== "paused")
       ?? items[0]
       ?? null;
+    if (!selectedHistoryTaskId && latestHistoryTask?.id) {
+      taskDetailIdInput.value = latestHistoryTask.id;
+    }
     taskListSummary.textContent = items.length > 0
       ? items.map((task) => renderTaskSummary(task)).join("\\n\\n---\\n\\n")
       : "No tasks recorded yet.";
@@ -544,9 +566,18 @@ async function refreshTaskList() {
 
 async function refreshTaskHistoryDetail() {
   try {
-    const data = await fetchJson(\`\${observerConfig.coreUrl}/tasks/latest-finished\`);
-    const historyTask = data.task ?? latestHistoryTask ?? null;
+    const explicitTaskId = selectedHistoryTaskId ?? getSelectedHistoryTaskId();
+    const data = explicitTaskId
+      ? await fetchJson(\`\${observerConfig.coreUrl}/tasks/\${explicitTaskId}\`)
+      : await fetchJson(\`\${observerConfig.coreUrl}/tasks/latest-finished\`);
+    const historyTask = explicitTaskId
+      ? data.task ?? latestHistoryTask ?? null
+      : data.task ?? latestHistoryTask ?? null;
     latestHistoryTask = historyTask;
+    selectedHistoryTaskId = historyTask?.id ?? explicitTaskId ?? null;
+    if (historyTask?.id) {
+      taskDetailIdInput.value = historyTask.id;
+    }
     taskHistoryJson.textContent = historyTask
       ? renderTaskSummary(historyTask)
       : "No finished task recorded yet.";
@@ -735,12 +766,67 @@ async function recoverLatestFinishedTask() {
     method: "POST",
   });
   await launchTaskIntoWorkView(result.task?.id, targetUrl);
+  selectedHistoryTaskId = sourceTask.id;
+  taskDetailIdInput.value = sourceTask.id;
   setControlMessage(\`Recovered task \${result.task?.id ?? "unknown"} from \${sourceTask.id}\`);
   await refreshRuntime();
   await refreshTaskList();
   await refreshTaskHistoryDetail();
   await refreshWorkView();
   await refreshScreen();
+}
+
+async function recoverSelectedTask() {
+  const sourceTaskId = getSelectedHistoryTaskId();
+  if (!sourceTaskId) {
+    throw new Error("Enter or load a task ID first.");
+  }
+
+  const taskResponse = await fetchJson(\`\${observerConfig.coreUrl}/tasks/\${sourceTaskId}\`);
+  const sourceTask = taskResponse.task ?? null;
+  if (!sourceTask?.id) {
+    throw new Error("Selected task could not be loaded.");
+  }
+
+  if (!sourceTask.restorable) {
+    throw new Error("Selected task is not recoverable.");
+  }
+
+  const targetUrl = sourceTask.targetUrl ?? sourceTask.workView?.activeUrl ?? getDesiredWorkViewUrl();
+  workViewUrlInput.value = targetUrl;
+  const result = await fetchJson(\`\${observerConfig.coreUrl}/tasks/\${sourceTask.id}/recover\`, {
+    method: "POST",
+  });
+  await launchTaskIntoWorkView(result.task?.id, targetUrl);
+  selectedHistoryTaskId = sourceTask.id;
+  taskDetailIdInput.value = sourceTask.id;
+  setControlMessage(\`Recovered task \${result.task?.id ?? "unknown"} from selected task \${sourceTask.id}\`);
+  await refreshRuntime();
+  await refreshTaskList();
+  await refreshTaskHistoryDetail();
+  await refreshWorkView();
+  await refreshScreen();
+}
+
+async function loadSelectedTaskDetail() {
+  selectedHistoryTaskId = getSelectedHistoryTaskId();
+  if (!selectedHistoryTaskId) {
+    throw new Error("Enter a task ID first.");
+  }
+
+  await refreshTaskHistoryDetail();
+  setControlMessage(\`Loaded task history detail for \${selectedHistoryTaskId}\`);
+}
+
+function useSelectedTaskUrl() {
+  const selectedTask = latestHistoryTask ?? null;
+  const taskUrl = selectedTask?.targetUrl ?? selectedTask?.workView?.activeUrl ?? null;
+  if (!taskUrl) {
+    throw new Error("Selected task does not have a recoverable URL.");
+  }
+
+  workViewUrlInput.value = taskUrl;
+  setControlMessage(\`Loaded task URL into work view input: \${taskUrl}\`);
 }
 
 async function postWorkView(path, payload = {}) {
@@ -1096,9 +1182,30 @@ recoverLatestTaskButton.addEventListener("click", () => {
 });
 
 loadHistoryButton.addEventListener("click", () => {
+  selectedHistoryTaskId = null;
   refreshTaskHistoryDetail().catch((error) => {
     setControlMessage(\`Request failed: \${formatError(error)}\`);
   });
+});
+
+loadSelectedTaskButton.addEventListener("click", () => {
+  loadSelectedTaskDetail().catch((error) => {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  });
+});
+
+recoverSelectedTaskButton.addEventListener("click", () => {
+  recoverSelectedTask().catch((error) => {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  });
+});
+
+useDetailUrlButton.addEventListener("click", () => {
+  try {
+    useSelectedTaskUrl();
+  } catch (error) {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  }
 });
 
 await refreshHealth();
