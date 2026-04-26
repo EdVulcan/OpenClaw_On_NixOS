@@ -232,6 +232,11 @@ function observerHtml() {
           <pre id="task-json">Loading task state...</pre>
         </section>
         <section class="panel">
+          <h2>Recent Tasks</h2>
+          <div class="metric"><span>Entries</span><span id="task-list-count">0</span></div>
+          <pre id="task-list-summary">Loading recent tasks...</pre>
+        </section>
+        <section class="panel">
           <h2>Screen State</h2>
           <div class="metric"><span>Focused Window</span><span id="screen-window">loading</span></div>
           <div class="metric"><span>Session</span><span id="screen-session">unknown</span></div>
@@ -290,6 +295,8 @@ const runtimePaused = document.querySelector("#runtime-paused");
 const runtimeCount = document.querySelector("#runtime-count");
 const runtimeUpdated = document.querySelector("#runtime-updated");
 const taskJson = document.querySelector("#task-json");
+const taskListCount = document.querySelector("#task-list-count");
+const taskListSummary = document.querySelector("#task-list-summary");
 const workViewStatus = document.querySelector("#work-view-status");
 const workViewVisibility = document.querySelector("#work-view-visibility");
 const workViewMode = document.querySelector("#work-view-mode");
@@ -460,6 +467,28 @@ async function refreshRuntime() {
   }
 }
 
+async function refreshTaskList() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/tasks?limit=8\`);
+    const items = data.items ?? [];
+    taskListCount.textContent = String(items.length);
+    taskListSummary.textContent = items.length > 0
+      ? items.map((task) => [
+          \`ID: \${task.id}\`,
+          \`Goal: \${task.goal}\`,
+          \`Status: \${task.status}\`,
+          \`Phase: \${task.executionPhase ?? "queued"}\`,
+          \`Target URL: \${task.targetUrl ?? "none"}\`,
+          \`Work View URL: \${task.workView?.activeUrl ?? "none"}\`,
+          \`Updated: \${formatTimestamp(task.updatedAt)}\`,
+        ].join("\\n")).join("\\n\\n---\\n\\n")
+      : "No tasks recorded yet.";
+  } catch {
+    taskListCount.textContent = "0";
+    taskListSummary.textContent = "Unable to read recent tasks.";
+  }
+}
+
 async function refreshWorkView() {
   try {
     const data = await fetchJson(\`\${observerConfig.sessionManagerUrl}/work-view/state\`);
@@ -608,6 +637,7 @@ async function createDemoTask() {
   await attachTaskToWorkView(result.task?.id, workViewResult);
   setControlMessage(\`Created task \${result.task?.id ?? "unknown"} for \${targetUrl}\`);
   await refreshRuntime();
+  await refreshTaskList();
   await refreshWorkView();
   await refreshScreen();
 }
@@ -636,6 +666,7 @@ async function postWorkView(path, payload = {}) {
   }
   setControlMessage(\`Work view \${result.workView?.status ?? "updated"} / \${result.workView?.visibility ?? "unknown"}\`);
   await refreshRuntime();
+  await refreshTaskList();
   await refreshWorkView();
   await refreshScreen();
 }
@@ -689,6 +720,13 @@ async function attachTaskToWorkView(taskId, workViewResult) {
     return;
   }
 
+  const activeUrl =
+    workViewResult.workView?.activeUrl
+    ?? workViewResult.browser?.activeUrl
+    ?? workViewResult.tab?.url
+    ?? currentTaskState?.targetUrl
+    ?? getDesiredWorkViewUrl();
+
   await fetchJson(\`\${observerConfig.coreUrl}/tasks/\${taskId}/attach-work-view\`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -699,7 +737,7 @@ async function attachTaskToWorkView(taskId, workViewResult) {
       mode: workViewResult.workView?.mode ?? "foreground-observable",
       helperStatus: workViewResult.workView?.helperStatus ?? "active",
       displayTarget: workViewResult.workView?.displayTarget ?? "workspace-2",
-      activeUrl: workViewResult.workView?.activeUrl ?? getDesiredWorkViewUrl(),
+      activeUrl,
     }),
   });
 }
@@ -710,6 +748,7 @@ async function postControl(path) {
   });
   setControlMessage(\`Control request completed: \${path}\`);
   await refreshRuntime();
+  await refreshTaskList();
 }
 
 async function refreshScreenNow() {
@@ -734,6 +773,7 @@ async function runAction(path, payload) {
   }
   setControlMessage(\`Action \${result.action?.kind ?? "unknown"} completed (\${result.action?.result ?? "unknown"})\`);
   await refreshRuntime();
+  await refreshTaskList();
   await refreshActionState();
   await refreshScreen();
   await refreshWorkView();
@@ -767,6 +807,7 @@ async function completeCurrentTask() {
 
   setControlMessage(\`Completed task \${result.task?.id ?? currentTaskState.id}\`);
   await refreshRuntime();
+  await refreshTaskList();
   await refreshWorkView();
 }
 
@@ -801,6 +842,7 @@ function subscribeEvents() {
       try {
         addEventItem(JSON.parse(message.data));
         await refreshRuntime();
+        await refreshTaskList();
         await refreshWorkView();
         if (
           eventName === "screen.updated"
@@ -912,6 +954,7 @@ openWorkViewUrlButton.addEventListener("click", () => {
 
 await refreshHealth();
 await refreshRuntime();
+await refreshTaskList();
 await refreshWorkView();
 await refreshScreen();
 await refreshActionState();
@@ -922,6 +965,7 @@ setControlMessage("Controls ready.");
 subscribeEvents();
 setInterval(refreshHealth, 5000);
 setInterval(refreshRuntime, 5000);
+setInterval(refreshTaskList, 5000);
 setInterval(refreshWorkView, 5000);
 setInterval(refreshScreen, 5000);
 setInterval(refreshActionState, 5000);

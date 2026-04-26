@@ -201,7 +201,9 @@ async function revealWorkView(entryUrl = workViewState.entryUrl || defaultWorkVi
     visibility: "visible",
     status: "ready",
     helperStatus: browser.ok ? "active" : "degraded",
+    browserStatus: browser.browser?.running ? "running" : workViewState.browserStatus,
     entryUrl,
+    activeUrl: browser.browser?.activeUrl ?? browser.tab?.url ?? entryUrl,
     lastRevealedAt: new Date().toISOString(),
     mode: "foreground-observable",
   });

@@ -92,6 +92,12 @@ function serialiseTask(task) {
   };
 }
 
+function listTasks() {
+  return [...tasks.values()]
+    .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))
+    .map((task) => serialiseTask(task));
+}
+
 function createTask(body) {
   const goal = typeof body.goal === "string" ? body.goal.trim() : "";
   if (!goal) {
@@ -228,6 +234,17 @@ const server = http.createServer(async (req, res) => {
       runtime: runtimeState,
       taskCount: tasks.size,
       currentTask: runtimeState.currentTaskId ? serialiseTask(getTaskById(runtimeState.currentTaskId)) : null,
+    });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/tasks") {
+    const limit = Number.parseInt(requestUrl.searchParams.get("limit") ?? "10", 10);
+    const safeLimit = Number.isNaN(limit) ? 10 : Math.max(1, Math.min(limit, 50));
+    sendJson(res, 200, {
+      ok: true,
+      count: tasks.size,
+      items: listTasks().slice(0, safeLimit),
     });
     return;
   }
