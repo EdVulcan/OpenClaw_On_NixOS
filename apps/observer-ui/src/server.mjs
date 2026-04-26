@@ -272,7 +272,7 @@ function observerHtml() {
         </section>
       </div>
     </main>
-    <script type="module" src="/client.js?v=4"></script>
+    <script type="module" src="/client-v5.js"></script>
   </body>
 </html>`;
 }
@@ -341,6 +341,7 @@ const stopButton = document.querySelector("#stop-button");
 const openWorkViewUrlButton = document.querySelector("#open-work-view-url-button");
 const workViewUrlInput = document.querySelector("#work-view-url-input");
 let currentTaskState = null;
+let latestActionState = null;
 
 function setHealthPill(target, ok, text) {
   target.textContent = text;
@@ -370,6 +371,31 @@ function formatError(error) {
 
 function setControlMessage(message) {
   controlResult.textContent = message;
+}
+
+function deriveTaskLastAction(task) {
+  if (task?.lastAction) {
+    return task.lastAction;
+  }
+
+  const fallback = latestActionState?.lastAction ?? null;
+  if (!fallback) {
+    return null;
+  }
+
+  const taskSessionId = task?.workView?.sessionId ?? null;
+  const actionSessionId = fallback.screenContext?.sessionId ?? null;
+
+  if (taskSessionId && actionSessionId && taskSessionId === actionSessionId) {
+    return {
+      kind: fallback.kind ?? "unknown",
+      degraded: Boolean(fallback.degraded),
+      at: fallback.executedAt ?? null,
+      result: fallback.result ?? null,
+    };
+  }
+
+  return null;
 }
 
 function getDesiredWorkViewUrl() {
@@ -440,6 +466,7 @@ async function refreshRuntime() {
     runtimePaused.textContent = String(data.runtime.paused);
     runtimeCount.textContent = String(data.taskCount);
     runtimeUpdated.textContent = data.runtime.lastUpdatedAt;
+    const taskLastAction = deriveTaskLastAction(currentTask);
     taskJson.textContent = currentTask
       ? [
           \`ID: \${currentTask.id}\`,
@@ -452,7 +479,7 @@ async function refreshRuntime() {
           \`Work View Session: \${currentTask.workView?.sessionId ?? "none"}\`,
           \`Work View Status: \${currentTask.workView?.status ?? "none"} / \${currentTask.workView?.visibility ?? "none"}\`,
           \`Work View URL: \${currentTask.workView?.activeUrl ?? "none"}\`,
-          \`Last Action: \${currentTask.lastAction?.kind ?? "none"}\${currentTask.lastAction ? \` (degraded: \${currentTask.lastAction.degraded})\` : ""}\`,
+          \`Last Action: \${taskLastAction?.kind ?? "none"}\${taskLastAction ? \` (degraded: \${taskLastAction.degraded})\` : ""}\`,
           \`Recent Phases: \${(currentTask.phaseHistory ?? [])
             .slice(-4)
             .map((entry) => entry.phase)
@@ -475,7 +502,9 @@ async function refreshTaskList() {
     const activeCount = items.filter((task) => ["queued", "running", "paused"].includes(task.status)).length;
     taskListCount.textContent = \`\${items.length} visible / \${activeCount} active\`;
     taskListSummary.textContent = items.length > 0
-      ? items.map((task) => [
+      ? items.map((task) => {
+          const taskLastAction = deriveTaskLastAction(task);
+          return [
           \`ID: \${task.id}\`,
           \`Goal: \${task.goal}\`,
           \`Status: \${task.status}\`,
@@ -484,10 +513,11 @@ async function refreshTaskList() {
           \`Work View URL: \${task.workView?.activeUrl ?? "none"}\`,
           \`Work View: \${task.workView?.status ?? "none"} / \${task.workView?.visibility ?? "none"}\`,
           \`Outcome: \${task.outcome?.kind ?? "open"}\${task.outcome?.summary ? \` - \${task.outcome.summary}\` : ""}\`,
-          \`Last Action: \${task.lastAction?.kind ?? "none"}\${task.lastAction ? \` (degraded: \${task.lastAction.degraded})\` : ""}\`,
+          \`Last Action: \${taskLastAction?.kind ?? "none"}\${taskLastAction ? \` (degraded: \${taskLastAction.degraded})\` : ""}\`,
           \`Recent Phases: \${(task.phaseHistory ?? []).slice(-3).map((entry) => entry.phase).join(" -> ") || "none"}\`,
           \`Updated: \${formatTimestamp(task.updatedAt)}\`,
-        ].join("\\n")).join("\\n\\n---\\n\\n")
+        ].join("\\n");
+        }).join("\\n\\n---\\n\\n")
       : "No tasks recorded yet.";
   } catch {
     taskListCount.textContent = "0";
@@ -553,6 +583,7 @@ async function refreshActionState() {
   try {
     const data = await fetchJson(\`\${observerConfig.screenActUrl}/act/state\`);
     const state = data.state;
+    latestActionState = state;
     actionKind.textContent = state.lastAction?.kind ?? "none";
     actionCount.textContent = String(state.actionCount ?? 0);
     actionDegraded.textContent = String(state.lastAction?.degraded ?? false);
@@ -565,6 +596,7 @@ async function refreshActionState() {
         ].join("\\n")
       : "No action executed yet.";
   } catch {
+    latestActionState = null;
     actionKind.textContent = "offline";
     actionCount.textContent = "0";
     actionDegraded.textContent = "unknown";
@@ -1028,7 +1060,7 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (req.method === "GET" && requestUrl.pathname === "/client.js") {
+  if (req.method === "GET" && (requestUrl.pathname === "/client.js" || requestUrl.pathname === "/client-v5.js")) {
     sendJavaScript(res, clientScript());
     return;
   }
