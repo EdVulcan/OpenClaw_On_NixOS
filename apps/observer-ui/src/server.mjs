@@ -206,6 +206,12 @@ function observerHtml() {
         color: var(--muted);
         font-size: 12px;
       }
+      .detail-meta {
+        margin-top: 12px;
+        margin-bottom: 12px;
+        color: var(--muted);
+        font-size: 12px;
+      }
     </style>
   </head>
   <body>
@@ -286,10 +292,13 @@ function observerHtml() {
             <input id="task-detail-id-input" type="text" value="" spellcheck="false" placeholder="Task ID to inspect or recover" />
           </div>
           <div class="actions" style="margin-top: 12px;">
+            <button id="load-current-task-button" class="secondary">Load Current Task</button>
+            <button id="load-latest-failed-task-button" class="secondary">Load Latest Failed Task</button>
             <button id="load-selected-task-button" class="secondary">Load Selected Task</button>
             <button id="recover-selected-task-button" class="secondary">Recover Selected Task</button>
             <button id="use-detail-url-button" class="secondary">Use Detail URL</button>
           </div>
+          <div class="detail-meta" id="task-history-meta">Viewing latest finished task.</div>
           <pre id="task-history-json">Loading task history detail...</pre>
         </section>
         <section class="panel">
@@ -354,6 +363,7 @@ const taskJson = document.querySelector("#task-json");
 const taskListCount = document.querySelector("#task-list-count");
 const taskListItems = document.querySelector("#task-list-items");
 const taskHistoryJson = document.querySelector("#task-history-json");
+const taskHistoryMeta = document.querySelector("#task-history-meta");
 const taskDetailIdInput = document.querySelector("#task-detail-id-input");
 const workViewUrlHint = document.querySelector("#work-view-url-hint");
 const workViewStatus = document.querySelector("#work-view-status");
@@ -391,6 +401,8 @@ const recoverLatestTaskButton = document.querySelector("#recover-latest-task-but
 const recoverLatestFailedTaskButton = document.querySelector("#recover-latest-failed-task-button");
 const loadHistoryButton = document.querySelector("#load-history-button");
 const followActiveUrlButton = document.querySelector("#follow-active-url-button");
+const loadCurrentTaskButton = document.querySelector("#load-current-task-button");
+const loadLatestFailedTaskButton = document.querySelector("#load-latest-failed-task-button");
 const loadSelectedTaskButton = document.querySelector("#load-selected-task-button");
 const recoverSelectedTaskButton = document.querySelector("#recover-selected-task-button");
 const useDetailUrlButton = document.querySelector("#use-detail-url-button");
@@ -414,6 +426,7 @@ let recentTasksState = [];
 let desiredWorkViewUrl = workViewUrlInput.value.trim() || "https://example.com/work-view";
 let desiredWorkViewUrlPinned = false;
 let latestWorkViewState = null;
+let taskHistoryFocus = "latest-finished";
 
 function setHealthPill(target, ok, text) {
   target.textContent = text;
@@ -439,6 +452,19 @@ function formatError(error) {
   }
 
   return String(error);
+}
+
+function formatTaskFocusLabel(focus, task = null) {
+  if (focus === "current-task") {
+    return task?.id ? `Viewing current task ${task.id}.` : "Viewing current task.";
+  }
+  if (focus === "latest-failed") {
+    return task?.id ? `Viewing latest failed task ${task.id}.` : "Viewing latest failed task.";
+  }
+  if (focus === "selected-task") {
+    return task?.id ? `Viewing selected task ${task.id}.` : "Viewing selected task.";
+  }
+  return task?.id ? `Viewing latest finished task ${task.id}.` : "Viewing latest finished task.";
 }
 
 function setControlMessage(message) {
@@ -512,11 +538,15 @@ function renderTaskSummary(task, { includeRecovery = true, includeOutcome = true
 
   if (includeOutcome) {
     lines.push(\`Outcome: \${task.outcome?.kind ?? "open"}\${task.outcome?.summary ? \` - \${task.outcome.summary}\` : ""}\`);
+    if (task.outcome?.reason) {
+      lines.push(\`Failure Reason: \${task.outcome.reason}\`);
+    }
   }
 
   if (includeRecovery) {
     lines.push(\`Recovery: \${task.recovery?.recoveredFromTaskId ? \`attempt \${task.recovery?.attempt ?? 1} from \${task.recovery.recoveredFromTaskId}\` : "original task"}\`);
     lines.push(\`Recovered By: \${task.recoveredByTaskId ?? "none"}\`);
+    lines.push(\`Recoverable: \${task.restorable ? "yes" : "no"}\`);
   }
 
   lines.push(\`Last Action: \${taskLastAction?.kind ?? "none"}\${taskLastAction ? \` (degraded: \${taskLastAction.degraded})\` : ""}\`);
@@ -637,21 +667,38 @@ async function refreshTaskList() {
 async function refreshTaskHistoryDetail() {
   try {
     const explicitTaskId = selectedHistoryTaskId ?? getSelectedHistoryTaskId();
-    const data = explicitTaskId
-      ? await fetchJson(\`\${observerConfig.coreUrl}/tasks/\${explicitTaskId}\`)
-      : await fetchJson(\`\${observerConfig.coreUrl}/tasks/latest-finished\`);
-    const historyTask = explicitTaskId
-      ? data.task ?? latestHistoryTask ?? null
-      : data.task ?? latestHistoryTask ?? null;
+    let historyTask = null;
+
+    if (taskHistoryFocus === "current-task") {
+      historyTask = currentTaskState;
+    } else if (taskHistoryFocus === "latest-failed") {
+      const data = await fetchJson(\`\${observerConfig.coreUrl}/tasks/latest-failed\`);
+      historyTask = data.task ?? null;
+    } else if (taskHistoryFocus === "selected-task" || explicitTaskId) {
+      const data = await fetchJson(\`\${observerConfig.coreUrl}/tasks/\${explicitTaskId}\`);
+      historyTask = data.task ?? latestHistoryTask ?? null;
+    } else {
+      const data = await fetchJson(\`\${observerConfig.coreUrl}/tasks/latest-finished\`);
+      historyTask = data.task ?? latestHistoryTask ?? null;
+    }
+
     latestHistoryTask = historyTask;
-    selectedHistoryTaskId = historyTask?.id ?? explicitTaskId ?? null;
-    if (historyTask?.id) {
+    selectedHistoryTaskId = taskHistoryFocus === "selected-task" || taskHistoryFocus === "latest-failed"
+      ? historyTask?.id ?? explicitTaskId ?? null
+      : historyTask?.id ?? selectedHistoryTaskId ?? explicitTaskId ?? null;
+    if (historyTask?.id && taskHistoryFocus !== "current-task") {
       taskDetailIdInput.value = historyTask.id;
     }
+    taskHistoryMeta.textContent = formatTaskFocusLabel(taskHistoryFocus, historyTask);
     taskHistoryJson.textContent = historyTask
       ? renderTaskSummary(historyTask)
-      : "No finished task recorded yet.";
+      : taskHistoryFocus === "latest-failed"
+        ? "No failed task recorded yet."
+        : taskHistoryFocus === "current-task"
+          ? "No active task selected."
+          : "No finished task recorded yet.";
   } catch {
+    taskHistoryMeta.textContent = formatTaskFocusLabel(taskHistoryFocus, latestHistoryTask);
     taskHistoryJson.textContent = latestHistoryTask
       ? renderTaskSummary(latestHistoryTask)
       : "Unable to read task history detail.";
@@ -842,6 +889,7 @@ async function recoverLatestFinishedTask() {
     method: "POST",
   });
   await launchTaskIntoWorkView(result.task?.id, targetUrl);
+  taskHistoryFocus = "selected-task";
   selectedHistoryTaskId = sourceTask.id;
   taskDetailIdInput.value = sourceTask.id;
   setControlMessage(\`Recovered task \${result.task?.id ?? "unknown"} from \${sourceTask.id}\`);
@@ -874,6 +922,7 @@ async function recoverSelectedTask() {
     method: "POST",
   });
   await launchTaskIntoWorkView(result.task?.id, targetUrl);
+  taskHistoryFocus = "selected-task";
   selectedHistoryTaskId = sourceTask.id;
   taskDetailIdInput.value = sourceTask.id;
   setControlMessage(\`Recovered task \${result.task?.id ?? "unknown"} from selected task \${sourceTask.id}\`);
@@ -890,6 +939,7 @@ async function loadSelectedTaskDetail() {
     throw new Error("Enter a task ID first.");
   }
 
+  taskHistoryFocus = "selected-task";
   await refreshTaskHistoryDetail();
   setControlMessage(\`Loaded task history detail for \${selectedHistoryTaskId}\`);
 }
@@ -912,6 +962,7 @@ async function recoverLatestFailedTask() {
     throw new Error("No failed task available to recover.");
   }
 
+  taskHistoryFocus = "latest-failed";
   selectedHistoryTaskId = failedTask.id;
   taskDetailIdInput.value = failedTask.id;
   await refreshTaskHistoryDetail();
@@ -1303,6 +1354,7 @@ recoverLatestFailedTaskButton.addEventListener("click", () => {
 });
 
 loadHistoryButton.addEventListener("click", () => {
+  taskHistoryFocus = "latest-finished";
   selectedHistoryTaskId = null;
   refreshTaskHistoryDetail().catch((error) => {
     setControlMessage(\`Request failed: \${formatError(error)}\`);
@@ -1319,6 +1371,30 @@ followActiveUrlButton.addEventListener("click", () => {
 
 loadSelectedTaskButton.addEventListener("click", () => {
   loadSelectedTaskDetail().catch((error) => {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  });
+});
+
+loadCurrentTaskButton.addEventListener("click", () => {
+  if (!currentTaskState?.id) {
+    setControlMessage("Request failed: No active task selected.");
+    return;
+  }
+  taskHistoryFocus = "current-task";
+  selectedHistoryTaskId = currentTaskState.id;
+  taskDetailIdInput.value = currentTaskState.id;
+  refreshTaskHistoryDetail().then(() => {
+    setControlMessage(\`Viewing current task \${currentTaskState.id}\`);
+  }).catch((error) => {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  });
+});
+
+loadLatestFailedTaskButton.addEventListener("click", () => {
+  taskHistoryFocus = "latest-failed";
+  refreshTaskHistoryDetail().then(() => {
+    setControlMessage("Loaded latest failed task.");
+  }).catch((error) => {
     setControlMessage(\`Request failed: \${formatError(error)}\`);
   });
 });
@@ -1358,6 +1434,7 @@ taskListItems.addEventListener("click", (event) => {
   }
 
   if (action === "inspect") {
+    taskHistoryFocus = "selected-task";
     selectedHistoryTaskId = taskId;
     taskDetailIdInput.value = taskId;
     refreshTaskHistoryDetail().then(() => {
@@ -1373,6 +1450,7 @@ taskListItems.addEventListener("click", (event) => {
       if (!taskUrl) {
         throw new Error("Selected task does not have a recoverable URL.");
       }
+      taskHistoryFocus = "selected-task";
       selectedHistoryTaskId = taskId;
       taskDetailIdInput.value = taskId;
       setDesiredWorkViewUrl(taskUrl);
@@ -1384,9 +1462,20 @@ taskListItems.addEventListener("click", (event) => {
   }
 
   if (action === "recover") {
+    taskHistoryFocus = "selected-task";
     selectedHistoryTaskId = taskId;
     taskDetailIdInput.value = taskId;
     recoverSelectedTask().catch((error) => {
+      setControlMessage(\`Request failed: \${formatError(error)}\`);
+    });
+    return;
+  }
+
+  if (target.closest(".task-card")) {
+    taskHistoryFocus = "selected-task";
+    selectedHistoryTaskId = taskId;
+    taskDetailIdInput.value = taskId;
+    refreshTaskHistoryDetail().catch((error) => {
       setControlMessage(\`Request failed: \${formatError(error)}\`);
     });
   }

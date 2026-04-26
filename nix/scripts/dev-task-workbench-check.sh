@@ -105,10 +105,10 @@ recovered_latest_id="$(json_value "$recovered_latest" 'const data=JSON.parse(pro
 launch_task_into_work_view "$recovered_latest_id" "$TARGET_ONE"
 
 stop_result="$(post_json "http://127.0.0.1:4100/control/stop" '{}')"
-assert_json "$stop_result" 'const data=JSON.parse(process.argv[1]); if(!data.ok || data.task?.status!=="failed"){throw new Error("stop did not create failed task");}'
+assert_json "$stop_result" 'const data=JSON.parse(process.argv[1]); if(!data.ok || data.task?.status!=="failed" || data.task?.outcome?.reason!=="Stopped by operator.") {throw new Error("stop did not create failed task with reason");}'
 
 latest_failed="$(curl --silent http://127.0.0.1:4100/tasks/latest-failed)"
-assert_json "$latest_failed" 'const data=JSON.parse(process.argv[1]); const task=data.task; if(!task || task.status!=="failed" || !task.restorable){throw new Error("latest failed task missing or not recoverable");}'
+assert_json "$latest_failed" 'const data=JSON.parse(process.argv[1]); const task=data.task; if(!task || task.status!=="failed" || !task.restorable || task.outcome?.reason!=="Stopped by operator.") {throw new Error("latest failed task missing, not recoverable, or missing failure reason");}'
 failed_task_id="$(json_value "$latest_failed" 'const data=JSON.parse(process.argv[1]); process.stdout.write(data.task.id);')"
 
 recovered_failed="$(post_json "http://127.0.0.1:4100/tasks/$failed_task_id/recover" '{}')"
