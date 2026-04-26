@@ -85,6 +85,8 @@ function serialiseTask(task) {
     targetUrl: task.targetUrl ?? null,
     workViewStrategy: task.workViewStrategy ?? null,
     workView: task.workView ?? null,
+    executionPhase: task.executionPhase ?? "queued",
+    phaseHistory: task.phaseHistory ?? [],
     createdAt: task.createdAt,
     updatedAt: task.updatedAt,
   };
@@ -112,6 +114,13 @@ function createTask(body) {
         ? body.workViewStrategy.trim()
         : "ai-work-view",
     workView: null,
+    executionPhase: "queued",
+    phaseHistory: [
+      {
+        phase: "queued",
+        at: now,
+      },
+    ],
     createdAt: now,
     updatedAt: now,
   };
@@ -124,6 +133,14 @@ function getTaskById(taskId) {
   return tasks.get(taskId) ?? null;
 }
 
+function appendTaskPhase(task, phase, details = null) {
+  const now = new Date().toISOString();
+  task.executionPhase = phase;
+  task.updatedAt = now;
+  task.phaseHistory = [...(task.phaseHistory ?? []), { phase, at: now, details }];
+  return task;
+}
+
 function attachTaskToWorkView(task, body) {
   const now = new Date().toISOString();
   const activeUrl =
@@ -132,7 +149,6 @@ function attachTaskToWorkView(task, body) {
       : task.targetUrl;
 
   task.status = "running";
-  task.updatedAt = now;
   task.workView = {
     sessionId:
       typeof body.sessionId === "string" && body.sessionId.trim()
@@ -161,6 +177,10 @@ function attachTaskToWorkView(task, body) {
     activeUrl,
     attachedAt: now,
   };
+  appendTaskPhase(task, "ready_for_action", {
+    sessionId: task.workView.sessionId,
+    activeUrl,
+  });
 
   updateRuntimeState({
     status: "running",
@@ -231,6 +251,53 @@ const server = http.createServer(async (req, res) => {
     }
 
     sendJson(res, 200, { ok: true, task: serialiseTask(task) });
+    return;
+  }
+
+  if (
+    req.method === "POST"
+    && requestUrl.pathname.startsWith("/tasks/")
+    && requestUrl.pathname.endsWith("/phase")
+  ) {
+    const taskId = requestUrl.pathname.slice("/tasks/".length, -"/phase".length);
+    const task = getTaskById(taskId);
+    if (!task) {
+      sendJson(res, 404, { ok: false, error: "Task not found." });
+      return;
+    }
+
+    try {
+      const body = await readJsonBody(req);
+      const phase = typeof body.phase === "string" ? body.phase.trim() : "";
+      if (!phase) {
+        sendJson(res, 400, { ok: false, error: "Task phase is required." });
+        return;
+      }
+
+      if (typeof body.status === "string" && body.status.trim()) {
+        task.status = body.status.trim();
+      }
+
+      const updatedTask = appendTaskPhase(task, phase, body.details ?? null);
+
+      if (task.status === "running") {
+        updateRuntimeState({
+          status: "running",
+          currentTaskId: task.id,
+          paused: false,
+        });
+      }
+
+      await publishEvent("task.phase_changed", { task: serialiseTask(updatedTask) });
+      sendJson(res, 200, {
+        ok: true,
+        task: serialiseTask(updatedTask),
+        runtime: runtimeState,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
     return;
   }
 

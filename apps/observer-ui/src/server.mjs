@@ -426,11 +426,16 @@ async function refreshRuntime() {
           \`Goal: \${currentTask.goal}\`,
           \`Type: \${currentTask.type}\`,
           \`Status: \${currentTask.status}\`,
+          \`Phase: \${currentTask.executionPhase ?? "queued"}\`,
           \`Target URL: \${currentTask.targetUrl ?? "none"}\`,
           \`Work View Strategy: \${currentTask.workViewStrategy ?? "none"}\`,
           \`Work View Session: \${currentTask.workView?.sessionId ?? "none"}\`,
           \`Work View Status: \${currentTask.workView?.status ?? "none"} / \${currentTask.workView?.visibility ?? "none"}\`,
           \`Work View URL: \${currentTask.workView?.activeUrl ?? "none"}\`,
+          \`Recent Phases: \${(currentTask.phaseHistory ?? [])
+            .slice(-4)
+            .map((entry) => entry.phase)
+            .join(" -> ") || "none"}\`,
           \`Created: \${formatTimestamp(currentTask.createdAt)}\`,
           \`Updated: \${formatTimestamp(currentTask.updatedAt)}\`,
         ].join("\\n")
@@ -581,7 +586,11 @@ async function createDemoTask() {
       workViewStrategy: "ai-work-view",
     }),
   });
-  const workViewResult = await openWorkViewUrl();
+  await updateTaskPhase(result.task?.id, "preparing_work_view", {
+    targetUrl,
+    displayTarget: "workspace-2",
+  });
+  const workViewResult = await openWorkViewUrl(result.task?.id);
   await attachTaskToWorkView(result.task?.id, workViewResult);
   setControlMessage(\`Created task \${result.task?.id ?? "unknown"} for \${targetUrl}\`);
   await refreshRuntime();
@@ -600,8 +609,13 @@ async function postWorkView(path, payload = {}) {
   await refreshScreen();
 }
 
-async function openWorkViewUrl() {
+async function openWorkViewUrl(taskId = null) {
   const entryUrl = getDesiredWorkViewUrl();
+  if (taskId) {
+    await updateTaskPhase(taskId, "opening_target", {
+      targetUrl: entryUrl,
+    });
+  }
   const prepareResult = await fetchJson(\`\${observerConfig.sessionManagerUrl}/work-view/prepare\`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -621,6 +635,22 @@ async function openWorkViewUrl() {
   await refreshWorkView();
   await refreshScreen();
   return revealResult;
+}
+
+async function updateTaskPhase(taskId, phase, details = null) {
+  if (!taskId || !phase) {
+    return null;
+  }
+
+  return fetchJson(\`\${observerConfig.coreUrl}/tasks/\${taskId}/phase\`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      phase,
+      status: "running",
+      details,
+    }),
+  });
 }
 
 async function attachTaskToWorkView(taskId, workViewResult) {
@@ -694,6 +724,7 @@ function subscribeEvents() {
 
   for (const eventName of [
     "task.created",
+    "task.phase_changed",
     "task.running",
     "task.paused",
     "task.failed",
