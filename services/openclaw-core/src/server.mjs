@@ -95,9 +95,12 @@ function serialiseTask(task) {
     targetUrl: task.targetUrl ?? null,
     workViewStrategy: task.workViewStrategy ?? null,
     workView: task.workView ?? null,
+    lastAction: task.lastAction ?? null,
+    outcome: task.outcome ?? null,
     executionPhase: task.executionPhase ?? "queued",
     phaseHistory: task.phaseHistory ?? [],
     createdAt: task.createdAt,
+    closedAt: task.closedAt ?? null,
     updatedAt: task.updatedAt,
   };
 }
@@ -144,6 +147,8 @@ function createTask(body) {
         ? body.workViewStrategy.trim()
         : "ai-work-view",
     workView: null,
+    lastAction: null,
+    outcome: null,
     executionPhase: "queued",
     phaseHistory: [
       {
@@ -152,6 +157,7 @@ function createTask(body) {
       },
     ],
     createdAt: now,
+    closedAt: null,
     updatedAt: now,
   };
 
@@ -167,6 +173,13 @@ function appendTaskPhase(task, phase, details = null) {
   const now = new Date().toISOString();
   task.executionPhase = phase;
   task.updatedAt = now;
+  if (phase === "acting_on_target" && details?.actionKind) {
+    task.lastAction = {
+      kind: details.actionKind,
+      degraded: Boolean(details.degraded),
+      at: now,
+    };
+  }
   task.phaseHistory = [...(task.phaseHistory ?? []), { phase, at: now, details }];
   return task;
 }
@@ -206,6 +219,12 @@ function supersedeOtherActiveTasks(exceptTaskId) {
     appendTaskPhase(task, "superseded", {
       replacedByTaskId: exceptTaskId,
     });
+    task.outcome = {
+      kind: "superseded",
+      summary: `Superseded by task ${exceptTaskId}`,
+      at: task.updatedAt,
+    };
+    task.closedAt = task.updatedAt;
     reclaimed.push(task);
   }
 
@@ -260,6 +279,15 @@ function attachTaskToWorkView(task, body) {
 function completeTask(task, details = null) {
   task.status = "completed";
   appendTaskPhase(task, "completed", details);
+  task.outcome = {
+    kind: "completed",
+    summary: typeof details?.summary === "string" && details.summary.trim()
+      ? details.summary.trim()
+      : `Completed work view task for ${task.targetUrl ?? "current target"}`,
+    details,
+    at: task.updatedAt,
+  };
+  task.closedAt = task.updatedAt;
   reconcileRuntimeState();
   return task;
 }
@@ -470,6 +498,13 @@ const server = http.createServer(async (req, res) => {
 
     task.status = "failed";
     appendTaskPhase(task, "failed", { reason: "Stopped by operator." });
+    task.outcome = {
+      kind: "failed",
+      summary: "Stopped by operator.",
+      reason: "Stopped by operator.",
+      at: task.updatedAt,
+    };
+    task.closedAt = task.updatedAt;
     const stoppedTask = serialiseTask(task);
     reconcileRuntimeState();
 

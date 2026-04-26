@@ -452,6 +452,7 @@ async function refreshRuntime() {
           \`Work View Session: \${currentTask.workView?.sessionId ?? "none"}\`,
           \`Work View Status: \${currentTask.workView?.status ?? "none"} / \${currentTask.workView?.visibility ?? "none"}\`,
           \`Work View URL: \${currentTask.workView?.activeUrl ?? "none"}\`,
+          \`Last Action: \${currentTask.lastAction?.kind ?? "none"}\${currentTask.lastAction ? \` (degraded: \${currentTask.lastAction.degraded})\` : ""}\`,
           \`Recent Phases: \${(currentTask.phaseHistory ?? [])
             .slice(-4)
             .map((entry) => entry.phase)
@@ -482,6 +483,8 @@ async function refreshTaskList() {
           \`Target URL: \${task.targetUrl ?? "none"}\`,
           \`Work View URL: \${task.workView?.activeUrl ?? "none"}\`,
           \`Work View: \${task.workView?.status ?? "none"} / \${task.workView?.visibility ?? "none"}\`,
+          \`Outcome: \${task.outcome?.kind ?? "open"}\${task.outcome?.summary ? \` - \${task.outcome.summary}\` : ""}\`,
+          \`Last Action: \${task.lastAction?.kind ?? "none"}\${task.lastAction ? \` (degraded: \${task.lastAction.degraded})\` : ""}\`,
           \`Recent Phases: \${(task.phaseHistory ?? []).slice(-3).map((entry) => entry.phase).join(" -> ") || "none"}\`,
           \`Updated: \${formatTimestamp(task.updatedAt)}\`,
         ].join("\\n")).join("\\n\\n---\\n\\n")
@@ -797,21 +800,35 @@ async function completeCurrentTask() {
     throw new Error("No active task to complete.");
   }
 
+  const completedWorkViewUrl = currentTaskState.workView?.activeUrl ?? currentTaskState.targetUrl ?? null;
   const result = await fetchJson(\`\${observerConfig.coreUrl}/tasks/\${currentTaskState.id}/complete\`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       details: {
         targetUrl: currentTaskState.targetUrl ?? null,
-        workViewUrl: currentTaskState.workView?.activeUrl ?? null,
+        workViewUrl: completedWorkViewUrl,
+        summary: completedWorkViewUrl
+          ? \`Completed task at \${completedWorkViewUrl}\`
+          : "Completed task.",
       },
     }),
   });
+
+  try {
+    await fetchJson(\`\${observerConfig.sessionManagerUrl}/work-view/hide\`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({}),
+    });
+  } catch {
+  }
 
   setControlMessage(\`Completed task \${result.task?.id ?? currentTaskState.id}\`);
   await refreshRuntime();
   await refreshTaskList();
   await refreshWorkView();
+  await refreshScreen();
 }
 
 function subscribeEvents() {
