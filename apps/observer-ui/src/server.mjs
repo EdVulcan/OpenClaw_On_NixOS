@@ -95,6 +95,27 @@ function observerHtml() {
         gap: 12px;
         flex-wrap: wrap;
       }
+      .control-stack {
+        display: grid;
+        gap: 12px;
+      }
+      .field {
+        display: grid;
+        gap: 6px;
+      }
+      .field label {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .field input {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: rgba(10, 16, 34, 0.9);
+        color: var(--text);
+        padding: 10px 12px;
+        font: inherit;
+      }
       button {
         border: 0;
         border-radius: 999px;
@@ -166,17 +187,24 @@ function observerHtml() {
         </section>
         <section class="panel">
           <h2>Controls</h2>
-          <div class="actions">
-            <button id="create-task-button">Create Demo Task</button>
-            <button id="prepare-work-view-button" class="secondary">Prepare Work View</button>
-            <button id="reveal-work-view-button" class="secondary">Reveal Work View</button>
-            <button id="hide-work-view-button" class="secondary">Hide Work View</button>
-            <button id="refresh-screen-button" class="secondary">Refresh Screen State</button>
-            <button id="click-action-button" class="secondary">Simulate Click</button>
-            <button id="type-action-button" class="secondary">Simulate Type</button>
-            <button id="heal-browser-button" class="secondary">Simulate Browser Restart</button>
-            <button id="pause-button" class="secondary">Pause Current Task</button>
-            <button id="stop-button" class="secondary">Stop Current Task</button>
+          <div class="control-stack">
+            <div class="field">
+              <label for="work-view-url-input">Work View URL</label>
+              <input id="work-view-url-input" type="text" value="https://example.com/work-view" spellcheck="false" />
+            </div>
+            <div class="actions">
+              <button id="create-task-button">Create Demo Task</button>
+              <button id="open-work-view-url-button">Open Work View URL</button>
+              <button id="prepare-work-view-button" class="secondary">Prepare Work View</button>
+              <button id="reveal-work-view-button" class="secondary">Reveal Work View</button>
+              <button id="hide-work-view-button" class="secondary">Hide Work View</button>
+              <button id="refresh-screen-button" class="secondary">Refresh Screen State</button>
+              <button id="click-action-button" class="secondary">Simulate Click</button>
+              <button id="type-action-button" class="secondary">Simulate Type</button>
+              <button id="heal-browser-button" class="secondary">Simulate Browser Restart</button>
+              <button id="pause-button" class="secondary">Pause Current Task</button>
+              <button id="stop-button" class="secondary">Stop Current Task</button>
+            </div>
           </div>
           <pre id="control-result">Controls ready.</pre>
         </section>
@@ -292,6 +320,8 @@ const typeActionButton = document.querySelector("#type-action-button");
 const healBrowserButton = document.querySelector("#heal-browser-button");
 const pauseButton = document.querySelector("#pause-button");
 const stopButton = document.querySelector("#stop-button");
+const openWorkViewUrlButton = document.querySelector("#open-work-view-url-button");
+const workViewUrlInput = document.querySelector("#work-view-url-input");
 
 function setHealthPill(target, ok, text) {
   target.textContent = text;
@@ -321,6 +351,11 @@ function formatError(error) {
 
 function setControlMessage(message) {
   controlResult.textContent = message;
+}
+
+function getDesiredWorkViewUrl() {
+  const value = workViewUrlInput.value.trim();
+  return value || "https://example.com/work-view";
 }
 
 async function fetchJson(url, options) {
@@ -409,6 +444,9 @@ async function refreshWorkView() {
     workViewMode.textContent = workView.mode ?? "unknown";
     workViewHelper.textContent = workView.helperStatus ?? "unknown";
     workViewCapture.textContent = workView.captureStrategy ?? "unknown";
+    if (document.activeElement !== workViewUrlInput) {
+      workViewUrlInput.value = workView.activeUrl ?? workView.entryUrl ?? "https://example.com/work-view";
+    }
     workViewJson.textContent = [
       \`Session: \${data.session?.status ?? "unknown"}\`,
       \`Session ID: \${data.session?.sessionId ?? "none"}\`,
@@ -549,6 +587,28 @@ async function postWorkView(path, payload = {}) {
   await refreshScreen();
 }
 
+async function openWorkViewUrl() {
+  const entryUrl = getDesiredWorkViewUrl();
+  const prepareResult = await fetchJson(\`\${observerConfig.sessionManagerUrl}/work-view/prepare\`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      displayTarget: "workspace-2",
+      entryUrl,
+    }),
+  });
+
+  const revealResult = await fetchJson(\`\${observerConfig.sessionManagerUrl}/work-view/reveal\`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ entryUrl }),
+  });
+
+  setControlMessage(\`Opened work view URL: \${revealResult.workView?.activeUrl ?? prepareResult.workView?.activeUrl ?? entryUrl}\`);
+  await refreshWorkView();
+  await refreshScreen();
+}
+
 async function postControl(path) {
   const result = await fetchJson(\`\${observerConfig.coreUrl}\${path}\`, {
     method: "POST",
@@ -650,13 +710,16 @@ createTaskButton.addEventListener("click", () => {
 prepareWorkViewButton.addEventListener("click", () => {
   postWorkView("/work-view/prepare", {
     displayTarget: "workspace-2",
+    entryUrl: getDesiredWorkViewUrl(),
   }).catch((error) => {
     setControlMessage(\`Request failed: \${formatError(error)}\`);
   });
 });
 
 revealWorkViewButton.addEventListener("click", () => {
-  postWorkView("/work-view/reveal").catch((error) => {
+  postWorkView("/work-view/reveal", {
+    entryUrl: getDesiredWorkViewUrl(),
+  }).catch((error) => {
     setControlMessage(\`Request failed: \${formatError(error)}\`);
   });
 });
@@ -705,6 +768,12 @@ pauseButton.addEventListener("click", () => {
 
 stopButton.addEventListener("click", () => {
   postControl("/control/stop").catch((error) => {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  });
+});
+
+openWorkViewUrlButton.addEventListener("click", () => {
+  openWorkViewUrl().catch((error) => {
     setControlMessage(\`Request failed: \${formatError(error)}\`);
   });
 });
