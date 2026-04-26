@@ -471,7 +471,8 @@ async function refreshTaskList() {
   try {
     const data = await fetchJson(\`\${observerConfig.coreUrl}/tasks?limit=8\`);
     const items = data.items ?? [];
-    taskListCount.textContent = String(items.length);
+    const activeCount = items.filter((task) => ["queued", "running", "paused"].includes(task.status)).length;
+    taskListCount.textContent = \`\${items.length} visible / \${activeCount} active\`;
     taskListSummary.textContent = items.length > 0
       ? items.map((task) => [
           \`ID: \${task.id}\`,
@@ -480,6 +481,8 @@ async function refreshTaskList() {
           \`Phase: \${task.executionPhase ?? "queued"}\`,
           \`Target URL: \${task.targetUrl ?? "none"}\`,
           \`Work View URL: \${task.workView?.activeUrl ?? "none"}\`,
+          \`Work View: \${task.workView?.status ?? "none"} / \${task.workView?.visibility ?? "none"}\`,
+          \`Recent Phases: \${(task.phaseHistory ?? []).slice(-3).map((entry) => entry.phase).join(" -> ") || "none"}\`,
           \`Updated: \${formatTimestamp(task.updatedAt)}\`,
         ].join("\\n")).join("\\n\\n---\\n\\n")
       : "No tasks recorded yet.";

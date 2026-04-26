@@ -13,6 +13,16 @@ const runtimeState = {
   lastUpdatedAt: new Date().toISOString(),
 };
 
+const ACTIVE_TASK_STATUSES = new Set(["queued", "running", "paused"]);
+const STATUS_PRIORITY = {
+  running: 0,
+  paused: 1,
+  queued: 2,
+  failed: 3,
+  completed: 4,
+  superseded: 5,
+};
+
 function corsHeaders(extraHeaders = {}) {
   return {
     "access-control-allow-origin": "*",
@@ -92,9 +102,23 @@ function serialiseTask(task) {
   };
 }
 
+function isActiveTask(task) {
+  return ACTIVE_TASK_STATUSES.has(task.status);
+}
+
+function compareTasksForDisplay(left, right) {
+  const leftPriority = STATUS_PRIORITY[left.status] ?? 99;
+  const rightPriority = STATUS_PRIORITY[right.status] ?? 99;
+  if (leftPriority !== rightPriority) {
+    return leftPriority - rightPriority;
+  }
+
+  return Date.parse(right.updatedAt) - Date.parse(left.updatedAt);
+}
+
 function listTasks() {
   return [...tasks.values()]
-    .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))
+    .sort(compareTasksForDisplay)
     .map((task) => serialiseTask(task));
 }
 
@@ -147,6 +171,47 @@ function appendTaskPhase(task, phase, details = null) {
   return task;
 }
 
+function reconcileRuntimeState() {
+  const activeTasks = [...tasks.values()]
+    .filter((task) => isActiveTask(task))
+    .sort(compareTasksForDisplay);
+  const currentTask = activeTasks[0] ?? null;
+
+  if (!currentTask) {
+    updateRuntimeState({
+      status: "idle",
+      currentTaskId: null,
+      paused: false,
+    });
+    return null;
+  }
+
+  updateRuntimeState({
+    status: currentTask.status === "paused" ? "paused" : currentTask.status,
+    currentTaskId: currentTask.id,
+    paused: currentTask.status === "paused",
+  });
+  return currentTask;
+}
+
+function supersedeOtherActiveTasks(exceptTaskId) {
+  const reclaimed = [];
+
+  for (const task of tasks.values()) {
+    if (task.id === exceptTaskId || !isActiveTask(task)) {
+      continue;
+    }
+
+    task.status = "superseded";
+    appendTaskPhase(task, "superseded", {
+      replacedByTaskId: exceptTaskId,
+    });
+    reclaimed.push(task);
+  }
+
+  return reclaimed;
+}
+
 function attachTaskToWorkView(task, body) {
   const now = new Date().toISOString();
   const activeUrl =
@@ -187,12 +252,7 @@ function attachTaskToWorkView(task, body) {
     sessionId: task.workView.sessionId,
     activeUrl,
   });
-
-  updateRuntimeState({
-    status: "running",
-    currentTaskId: task.id,
-    paused: false,
-  });
+  reconcileRuntimeState();
 
   return task;
 }
@@ -200,11 +260,7 @@ function attachTaskToWorkView(task, body) {
 function completeTask(task, details = null) {
   task.status = "completed";
   appendTaskPhase(task, "completed", details);
-  updateRuntimeState({
-    status: "idle",
-    currentTaskId: null,
-    paused: false,
-  });
+  reconcileRuntimeState();
   return task;
 }
 
@@ -230,6 +286,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === "GET" && requestUrl.pathname === "/state/runtime") {
+    reconcileRuntimeState();
     sendJson(res, 200, {
       runtime: runtimeState,
       taskCount: tasks.size,
@@ -253,14 +310,13 @@ const server = http.createServer(async (req, res) => {
     try {
       const body = await readJsonBody(req);
       const task = createTask(body);
-
-      updateRuntimeState({
-        status: "queued",
-        currentTaskId: task.id,
-        paused: false,
-      });
+      const reclaimedTasks = supersedeOtherActiveTasks(task.id);
+      reconcileRuntimeState();
 
       await publishEvent("task.created", { task: serialiseTask(task) });
+      await Promise.all(reclaimedTasks.map((reclaimedTask) => publishEvent("task.phase_changed", {
+        task: serialiseTask(reclaimedTask),
+      })));
       sendJson(res, 201, { ok: true, task: serialiseTask(task) });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
@@ -307,14 +363,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       const updatedTask = appendTaskPhase(task, phase, body.details ?? null);
-
-      if (task.status === "running") {
-        updateRuntimeState({
-          status: "running",
-          currentTaskId: task.id,
-          paused: false,
-        });
-      }
+      reconcileRuntimeState();
 
       await publishEvent("task.phase_changed", { task: serialiseTask(updatedTask) });
       sendJson(res, 200, {
@@ -399,8 +448,8 @@ const server = http.createServer(async (req, res) => {
     }
 
     task.status = "paused";
-    task.updatedAt = new Date().toISOString();
-    updateRuntimeState({ status: "paused", paused: true });
+    appendTaskPhase(task, "paused", { reason: "Paused by operator." });
+    reconcileRuntimeState();
 
     await publishEvent("task.paused", { task: serialiseTask(task) });
     sendJson(res, 200, { ok: true, task: serialiseTask(task), runtime: runtimeState });
@@ -420,9 +469,9 @@ const server = http.createServer(async (req, res) => {
     }
 
     task.status = "failed";
-    task.updatedAt = new Date().toISOString();
+    appendTaskPhase(task, "failed", { reason: "Stopped by operator." });
     const stoppedTask = serialiseTask(task);
-    updateRuntimeState({ status: "idle", paused: false, currentTaskId: null });
+    reconcileRuntimeState();
 
     await publishEvent("task.failed", { task: stoppedTask, reason: "Stopped by operator." });
     sendJson(res, 200, { ok: true, task: stoppedTask, runtime: runtimeState });
