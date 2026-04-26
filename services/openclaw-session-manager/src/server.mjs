@@ -213,6 +213,7 @@ async function revealWorkView(entryUrl = workViewState.entryUrl || defaultWorkVi
 
 function hideWorkView() {
   updateWorkViewState({
+    status: "prepared",
     visibility: "hidden",
     helperStatus: "active",
     lastHiddenAt: new Date().toISOString(),

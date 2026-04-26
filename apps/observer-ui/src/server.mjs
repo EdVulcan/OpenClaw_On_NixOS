@@ -272,7 +272,7 @@ function observerHtml() {
         </section>
       </div>
     </main>
-    <script type="module" src="/client.js?v=2"></script>
+    <script type="module" src="/client.js?v=4"></script>
   </body>
 </html>`;
 }
@@ -801,16 +801,16 @@ async function completeCurrentTask() {
   }
 
   const completedWorkViewUrl = currentTaskState.workView?.activeUrl ?? currentTaskState.targetUrl ?? null;
-  let hiddenWorkView = null;
+  const hiddenResult = await fetchJson(\`\${observerConfig.sessionManagerUrl}/work-view/hide\`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({}),
+  });
+  const hiddenState = await fetchJson(\`\${observerConfig.sessionManagerUrl}/work-view/state\`);
+  const hiddenWorkView = hiddenState.workView ?? hiddenResult.workView ?? null;
 
-  try {
-    const hiddenResult = await fetchJson(\`\${observerConfig.sessionManagerUrl}/work-view/hide\`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({}),
-    });
-    hiddenWorkView = hiddenResult.workView ?? null;
-  } catch {
+  if (!hiddenWorkView || hiddenWorkView.visibility !== "hidden") {
+    throw new Error("Work view did not transition to hidden state.");
   }
 
   const result = await fetchJson(\`\${observerConfig.coreUrl}/tasks/\${currentTaskState.id}/complete\`, {
@@ -829,6 +829,8 @@ async function completeCurrentTask() {
             visibility: hiddenWorkView.visibility ?? null,
             mode: hiddenWorkView.mode ?? null,
             helperStatus: hiddenWorkView.helperStatus ?? null,
+            browserStatus: hiddenWorkView.browserStatus ?? null,
+            entryUrl: hiddenWorkView.entryUrl ?? completedWorkViewUrl,
             displayTarget: hiddenWorkView.displayTarget ?? null,
             activeUrl: hiddenWorkView.activeUrl ?? completedWorkViewUrl,
           }
@@ -840,6 +842,7 @@ async function completeCurrentTask() {
   setControlMessage(\`Completed task \${result.task?.id ?? currentTaskState.id}\`);
   await refreshRuntime();
   await refreshTaskList();
+  await refreshActionState();
   await refreshWorkView();
   await refreshScreen();
 }
