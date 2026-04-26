@@ -564,16 +564,22 @@ async function loadRecentEvents() {
 }
 
 async function createDemoTask() {
+  const targetUrl = getDesiredWorkViewUrl();
   const result = await fetchJson(\`\${observerConfig.coreUrl}/tasks\`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
-      goal: "Open the browser work view",
+      goal: \`Open the AI work view at \${targetUrl}\`,
       type: "browser_task",
+      targetUrl,
+      workViewStrategy: "ai-work-view",
     }),
   });
-  setControlMessage(\`Created task \${result.task?.id ?? "unknown"}\`);
+  await openWorkViewUrl();
+  setControlMessage(\`Created task \${result.task?.id ?? "unknown"} for \${targetUrl}\`);
   await refreshRuntime();
+  await refreshWorkView();
+  await refreshScreen();
 }
 
 async function postWorkView(path, payload = {}) {

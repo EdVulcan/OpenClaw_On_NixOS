@@ -82,6 +82,8 @@ function serialiseTask(task) {
     type: task.type,
     goal: task.goal,
     status: task.status,
+    targetUrl: task.targetUrl ?? null,
+    workViewStrategy: task.workViewStrategy ?? null,
     createdAt: task.createdAt,
     updatedAt: task.updatedAt,
   };
@@ -100,6 +102,14 @@ function createTask(body) {
     type,
     goal,
     status: "queued",
+    targetUrl:
+      typeof body.targetUrl === "string" && body.targetUrl.trim()
+        ? body.targetUrl.trim()
+        : null,
+    workViewStrategy:
+      typeof body.workViewStrategy === "string" && body.workViewStrategy.trim()
+        ? body.workViewStrategy.trim()
+        : "ai-work-view",
     createdAt: now,
     updatedAt: now,
   };
