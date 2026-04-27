@@ -7,6 +7,20 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 TARGET_ONE="https://www.baidu.com"
 TARGET_TWO="https://www.deepseek.com"
 
+export OPENCLAW_CORE_PORT="${OPENCLAW_CORE_PORT:-5100}"
+export OPENCLAW_EVENT_HUB_PORT="${OPENCLAW_EVENT_HUB_PORT:-5101}"
+export OPENCLAW_SESSION_MANAGER_PORT="${OPENCLAW_SESSION_MANAGER_PORT:-5102}"
+export OPENCLAW_BROWSER_RUNTIME_PORT="${OPENCLAW_BROWSER_RUNTIME_PORT:-5103}"
+export OPENCLAW_SCREEN_SENSE_PORT="${OPENCLAW_SCREEN_SENSE_PORT:-5104}"
+export OPENCLAW_SCREEN_ACT_PORT="${OPENCLAW_SCREEN_ACT_PORT:-5105}"
+export OPENCLAW_SYSTEM_SENSE_PORT="${OPENCLAW_SYSTEM_SENSE_PORT:-5106}"
+export OPENCLAW_SYSTEM_HEAL_PORT="${OPENCLAW_SYSTEM_HEAL_PORT:-5107}"
+export OBSERVER_UI_PORT="${OBSERVER_UI_PORT:-5170}"
+
+CORE_URL="http://127.0.0.1:$OPENCLAW_CORE_PORT"
+SESSION_MANAGER_URL="http://127.0.0.1:$OPENCLAW_SESSION_MANAGER_PORT"
+SCREEN_ACT_URL="http://127.0.0.1:$OPENCLAW_SCREEN_ACT_PORT"
+
 "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 
 cleanup() {
@@ -36,100 +50,100 @@ launch_task_into_work_view() {
   local task_id="$1"
   local target_url="$2"
 
-  post_json "http://127.0.0.1:4100/tasks/$task_id/phase" "{\"phase\":\"preparing_work_view\",\"status\":\"running\",\"details\":{\"targetUrl\":\"$target_url\",\"displayTarget\":\"workspace-2\"}}" >/dev/null
+  post_json "$CORE_URL/tasks/$task_id/phase" "{\"phase\":\"preparing_work_view\",\"status\":\"running\",\"details\":{\"targetUrl\":\"$target_url\",\"displayTarget\":\"workspace-2\"}}" >/dev/null
   local prepare_result
-  prepare_result="$(post_json "http://127.0.0.1:4102/work-view/prepare" "{\"displayTarget\":\"workspace-2\",\"entryUrl\":\"$target_url\"}")"
+  prepare_result="$(post_json "$SESSION_MANAGER_URL/work-view/prepare" "{\"displayTarget\":\"workspace-2\",\"entryUrl\":\"$target_url\"}")"
   assert_json "$prepare_result" 'const data=JSON.parse(process.argv[1]); if(!data.ok){throw new Error("prepare failed");}'
 
-  post_json "http://127.0.0.1:4100/tasks/$task_id/phase" "{\"phase\":\"opening_target\",\"status\":\"running\",\"details\":{\"targetUrl\":\"$target_url\"}}" >/dev/null
+  post_json "$CORE_URL/tasks/$task_id/phase" "{\"phase\":\"opening_target\",\"status\":\"running\",\"details\":{\"targetUrl\":\"$target_url\"}}" >/dev/null
   local reveal_result
-  reveal_result="$(post_json "http://127.0.0.1:4102/work-view/reveal" "{\"entryUrl\":\"$target_url\"}")"
+  reveal_result="$(post_json "$SESSION_MANAGER_URL/work-view/reveal" "{\"entryUrl\":\"$target_url\"}")"
   assert_json "$reveal_result" 'const data=JSON.parse(process.argv[1]); if(!data.ok || data.workView?.visibility!=="visible"){throw new Error("reveal failed");}'
 
   local attach_body
   attach_body="$(node -e 'const data=JSON.parse(process.argv[1]); const payload={sessionId:data.session?.sessionId??null,status:data.workView?.status??"ready",visibility:data.workView?.visibility??"visible",mode:data.workView?.mode??"foreground-observable",helperStatus:data.workView?.helperStatus??"active",displayTarget:data.workView?.displayTarget??"workspace-2",activeUrl:data.workView?.activeUrl??data.browser?.activeUrl??data.tab?.url??null}; process.stdout.write(JSON.stringify(payload));' "$reveal_result")"
   local attach_result
-  attach_result="$(post_json "http://127.0.0.1:4100/tasks/$task_id/attach-work-view" "$attach_body")"
+  attach_result="$(post_json "$CORE_URL/tasks/$task_id/attach-work-view" "$attach_body")"
   assert_json "$attach_result" 'const data=JSON.parse(process.argv[1]); if(!data.ok || data.task?.executionPhase!=="ready_for_action"){throw new Error("attach failed");}'
 }
 
 record_action_phase() {
   local task_id="$1"
   local kind="$2"
-  post_json "http://127.0.0.1:4100/tasks/$task_id/phase" "{\"phase\":\"acting_on_target\",\"status\":\"running\",\"details\":{\"actionKind\":\"$kind\",\"degraded\":false}}" >/dev/null
+  post_json "$CORE_URL/tasks/$task_id/phase" "{\"phase\":\"acting_on_target\",\"status\":\"running\",\"details\":{\"actionKind\":\"$kind\",\"degraded\":false}}" >/dev/null
 }
 
 complete_task() {
   local task_id="$1"
   local target_url="$2"
 
-  post_json "http://127.0.0.1:4102/work-view/hide" '{}' >/dev/null
+  post_json "$SESSION_MANAGER_URL/work-view/hide" '{}' >/dev/null
   local hidden_state
-  hidden_state="$(curl --silent http://127.0.0.1:4102/work-view/state)"
+  hidden_state="$(curl --silent "$SESSION_MANAGER_URL/work-view/state")"
   assert_json "$hidden_state" 'const data=JSON.parse(process.argv[1]); if(data.workView?.visibility!=="hidden"){throw new Error("expected hidden work view");}'
 
   local complete_body
   complete_body="$(node -e 'const hidden=JSON.parse(process.argv[1]); const targetUrl=process.argv[2]; const workView=hidden.workView??{}; process.stdout.write(JSON.stringify({details:{targetUrl,workViewUrl:targetUrl,summary:`Completed task at ${targetUrl}`,workView:{status:workView.status??null,visibility:workView.visibility??null,mode:workView.mode??null,helperStatus:workView.helperStatus??null,browserStatus:workView.browserStatus??null,entryUrl:workView.entryUrl??targetUrl,displayTarget:workView.displayTarget??null,activeUrl:workView.activeUrl??targetUrl}}}));' "$hidden_state" "$target_url")"
   local complete_result
-  complete_result="$(post_json "http://127.0.0.1:4100/tasks/$task_id/complete" "$complete_body")"
+  complete_result="$(post_json "$CORE_URL/tasks/$task_id/complete" "$complete_body")"
   assert_json "$complete_result" 'const data=JSON.parse(process.argv[1]); if(!data.ok || data.task?.status!=="completed"){throw new Error("complete failed");}'
 }
 
 "$SCRIPT_DIR/dev-up.sh"
 
-task_one_create="$(post_json "http://127.0.0.1:4100/tasks" "{\"goal\":\"Open the AI work view at $TARGET_ONE\",\"type\":\"browser_task\",\"targetUrl\":\"$TARGET_ONE\",\"workViewStrategy\":\"ai-work-view\"}")"
+task_one_create="$(post_json "$CORE_URL/tasks" "{\"goal\":\"Open the AI work view at $TARGET_ONE\",\"type\":\"browser_task\",\"targetUrl\":\"$TARGET_ONE\",\"workViewStrategy\":\"ai-work-view\"}")"
 assert_json "$task_one_create" 'const data=JSON.parse(process.argv[1]); if(!data.ok || !data.task?.id){throw new Error("task one create failed");}'
 task_one_id="$(json_value "$task_one_create" 'const data=JSON.parse(process.argv[1]); process.stdout.write(data.task.id);')"
 launch_task_into_work_view "$task_one_id" "$TARGET_ONE"
 
-type_action="$(post_json "http://127.0.0.1:4105/act/keyboard/type" '{"text":"hello from openclaw-screen-act"}')"
+type_action="$(post_json "$SCREEN_ACT_URL/act/keyboard/type" '{"text":"hello from openclaw-screen-act"}')"
 assert_json "$type_action" 'const data=JSON.parse(process.argv[1]); if(data.action?.degraded!==false){throw new Error("expected type action degraded=false");}'
 record_action_phase "$task_one_id" "keyboard.type"
 
-click_action="$(post_json "http://127.0.0.1:4105/act/mouse/click" '{"x":640,"y":360,"button":"left"}')"
+click_action="$(post_json "$SCREEN_ACT_URL/act/mouse/click" '{"x":640,"y":360,"button":"left"}')"
 assert_json "$click_action" 'const data=JSON.parse(process.argv[1]); if(data.action?.degraded!==false){throw new Error("expected click action degraded=false");}'
 record_action_phase "$task_one_id" "mouse.click"
 
 complete_task "$task_one_id" "$TARGET_ONE"
 
-runtime_idle="$(curl --silent http://127.0.0.1:4100/state/runtime)"
+runtime_idle="$(curl --silent "$CORE_URL/state/runtime")"
 assert_json "$runtime_idle" 'const data=JSON.parse(process.argv[1]); if(data.runtime?.status!=="idle" || data.currentTask){throw new Error("runtime did not return to idle after completion");}'
 
-latest_finished="$(curl --silent http://127.0.0.1:4100/tasks/latest-finished)"
+latest_finished="$(curl --silent "$CORE_URL/tasks/latest-finished")"
 assert_json "$latest_finished" 'const data=JSON.parse(process.argv[1]); const task=data.task; if(!task || task.status!=="completed" || task.workView?.visibility!=="hidden"){throw new Error("latest finished task not completed/hidden");}'
 finished_task_id="$(json_value "$latest_finished" 'const data=JSON.parse(process.argv[1]); process.stdout.write(data.task.id);')"
-latest_finished_focus="$(curl --silent http://127.0.0.1:4100/tasks/focus/latest-finished)"
+latest_finished_focus="$(curl --silent "$CORE_URL/tasks/focus/latest-finished")"
 node -e 'const focus=JSON.parse(process.argv[1]); const latest=JSON.parse(process.argv[2]); if(focus.focus!=="latest-finished" || focus.task?.id!==latest.task?.id){throw new Error("latest finished focus mismatch");}' "$latest_finished_focus" "$latest_finished"
 
-recovered_latest="$(post_json "http://127.0.0.1:4100/tasks/$finished_task_id/recover" '{}')"
+recovered_latest="$(post_json "$CORE_URL/tasks/$finished_task_id/recover" '{}')"
 assert_json "$recovered_latest" 'const data=JSON.parse(process.argv[1]); const task=data.task; if(!task || task.recovery?.recoveredFromTaskId!==data.recoveredFromTask?.id){throw new Error("latest finished recovery failed");}'
 recovered_latest_id="$(json_value "$recovered_latest" 'const data=JSON.parse(process.argv[1]); process.stdout.write(data.task.id);')"
 launch_task_into_work_view "$recovered_latest_id" "$TARGET_ONE"
 
-stop_result="$(post_json "http://127.0.0.1:4100/control/stop" '{}')"
+stop_result="$(post_json "$CORE_URL/control/stop" '{}')"
 assert_json "$stop_result" 'const data=JSON.parse(process.argv[1]); if(!data.ok || data.task?.status!=="failed" || data.task?.outcome?.reason!=="Stopped by operator.") {throw new Error("stop did not create failed task with reason");}'
 
-latest_failed="$(curl --silent http://127.0.0.1:4100/tasks/latest-failed)"
+latest_failed="$(curl --silent "$CORE_URL/tasks/latest-failed")"
 assert_json "$latest_failed" 'const data=JSON.parse(process.argv[1]); const task=data.task; if(!task || task.status!=="failed" || !task.restorable || task.outcome?.reason!=="Stopped by operator.") {throw new Error("latest failed task missing, not recoverable, or missing failure reason");}'
 failed_task_id="$(json_value "$latest_failed" 'const data=JSON.parse(process.argv[1]); process.stdout.write(data.task.id);')"
-latest_failed_focus="$(curl --silent http://127.0.0.1:4100/tasks/focus/latest-failed)"
+latest_failed_focus="$(curl --silent "$CORE_URL/tasks/focus/latest-failed")"
 assert_json "$latest_failed_focus" 'const data=JSON.parse(process.argv[1]); if(data.focus!=="latest-failed" || data.task?.outcome?.reason!=="Stopped by operator.") {throw new Error("latest failed focus mismatch");}'
 
-recovered_failed="$(post_json "http://127.0.0.1:4100/tasks/$failed_task_id/recover" '{}')"
+recovered_failed="$(post_json "$CORE_URL/tasks/$failed_task_id/recover" '{}')"
 assert_json "$recovered_failed" 'const data=JSON.parse(process.argv[1]); const task=data.task; if(!task || task.recovery?.recoveredFromTaskId!==data.recoveredFromTask?.id){throw new Error("failed task recovery failed");}'
 recovered_failed_id="$(json_value "$recovered_failed" 'const data=JSON.parse(process.argv[1]); process.stdout.write(data.task.id);')"
 launch_task_into_work_view "$recovered_failed_id" "$TARGET_ONE"
 
-task_two_create="$(post_json "http://127.0.0.1:4100/tasks" "{\"goal\":\"Open the AI work view at $TARGET_TWO\",\"type\":\"browser_task\",\"targetUrl\":\"$TARGET_TWO\",\"workViewStrategy\":\"ai-work-view\"}")"
+task_two_create="$(post_json "$CORE_URL/tasks" "{\"goal\":\"Open the AI work view at $TARGET_TWO\",\"type\":\"browser_task\",\"targetUrl\":\"$TARGET_TWO\",\"workViewStrategy\":\"ai-work-view\"}")"
 assert_json "$task_two_create" 'const data=JSON.parse(process.argv[1]); if(!data.ok || !data.task?.id){throw new Error("task two create failed");}'
 task_two_id="$(json_value "$task_two_create" 'const data=JSON.parse(process.argv[1]); process.stdout.write(data.task.id);')"
 launch_task_into_work_view "$task_two_id" "$TARGET_TWO"
 
-tasks_list="$(curl --silent "http://127.0.0.1:4100/tasks?limit=8")"
-runtime_running="$(curl --silent http://127.0.0.1:4100/state/runtime)"
-work_view_state="$(curl --silent http://127.0.0.1:4102/work-view/state)"
-task_summary="$(curl --silent http://127.0.0.1:4100/tasks/summary)"
-current_focus="$(curl --silent http://127.0.0.1:4100/tasks/focus/current)"
+tasks_list="$(curl --silent "$CORE_URL/tasks?limit=8")"
+runtime_running="$(curl --silent "$CORE_URL/state/runtime")"
+work_view_state="$(curl --silent "$SESSION_MANAGER_URL/work-view/state")"
+task_summary="$(curl --silent "$CORE_URL/tasks/summary")"
+current_focus="$(curl --silent "$CORE_URL/tasks/focus/current")"
 
 node - <<'EOF' "$runtime_idle" "$latest_finished" "$recovered_latest" "$latest_failed" "$recovered_failed" "$tasks_list" "$runtime_running" "$work_view_state" "$task_one_id" "$recovered_latest_id" "$failed_task_id" "$recovered_failed_id" "$task_two_id" "$task_summary" "$current_focus"
 const runtimeIdle = JSON.parse(process.argv[2]);
