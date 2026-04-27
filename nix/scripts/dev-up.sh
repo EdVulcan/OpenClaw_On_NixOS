@@ -16,7 +16,7 @@ fi
 
 wait_health() {
   local url="$1"
-  local timeout="${2:-20}"
+  local timeout="${2:-30}"
   local deadline=$((SECONDS + timeout))
   while (( SECONDS < deadline )); do
     if curl --silent --fail "$url" >/dev/null 2>&1; then
@@ -64,6 +64,62 @@ kill_listener_on_port() {
   fi
 }
 
+print_health_failure_debug() {
+  local name="$1"
+  local port="$2"
+  local health_url="$3"
+  local log_file="$ARTIFACT_DIR/$name.log"
+  local pid_file="$ARTIFACT_DIR/$name.pid"
+  local pid=""
+
+  if [[ -f "$pid_file" ]]; then
+    pid="$(cat "$pid_file" 2>/dev/null || true)"
+  fi
+
+  echo "Health check failed for $name at $health_url" >&2
+  if [[ -n "$pid" ]]; then
+    if kill -0 "$pid" >/dev/null 2>&1; then
+      echo "Process $pid is still running." >&2
+      ps -p "$pid" -o pid=,ppid=,etime=,%cpu=,%mem=,args= >&2 || true
+    else
+      echo "Process $pid is not running." >&2
+    fi
+  fi
+
+  echo "Listener status for port $port:" >&2
+  ss -ltnp "( sport = :$port )" >&2 || true
+
+  if [[ -f "$log_file" ]]; then
+    echo "Last log lines from $log_file:" >&2
+    tail -n 40 "$log_file" >&2 || true
+  else
+    echo "No log file found at $log_file" >&2
+  fi
+}
+
+start_service_process() {
+  local name="$1"
+  local working_dir="$2"
+  local pid_file="$ARTIFACT_DIR/$name.pid"
+  local log_file="$ARTIFACT_DIR/$name.log"
+
+  rm -f "$pid_file" "$log_file"
+  (
+    cd "$working_dir"
+    export OPENCLAW_CORE_HOST="0.0.0.0"
+    export OPENCLAW_EVENT_HUB_HOST="0.0.0.0"
+    export OPENCLAW_SESSION_MANAGER_HOST="0.0.0.0"
+    export OPENCLAW_BROWSER_RUNTIME_HOST="0.0.0.0"
+    export OPENCLAW_SCREEN_SENSE_HOST="0.0.0.0"
+    export OPENCLAW_SCREEN_ACT_HOST="0.0.0.0"
+    export OPENCLAW_SYSTEM_SENSE_HOST="0.0.0.0"
+    export OPENCLAW_SYSTEM_HEAL_HOST="0.0.0.0"
+    export OBSERVER_UI_HOST="0.0.0.0"
+    nohup "$NODE_EXE" src/server.mjs >"$log_file" 2>&1 &
+    echo $! >"$pid_file"
+  )
+}
+
 services=(
   "openclaw-event-hub|$REPO_ROOT/services/openclaw-event-hub|http://127.0.0.1:4101/health|4101"
   "openclaw-core|$REPO_ROOT/services/openclaw-core|http://127.0.0.1:4100/health|4100"
@@ -81,25 +137,28 @@ services=(
 for entry in "${services[@]}"; do
   IFS="|" read -r name working_dir health_url port <<<"$entry"
   echo "Starting $name ..."
-  kill_listener_on_port "$port"
-  (
-    cd "$working_dir"
-    export OPENCLAW_CORE_HOST="0.0.0.0"
-    export OPENCLAW_EVENT_HUB_HOST="0.0.0.0"
-    export OPENCLAW_SESSION_MANAGER_HOST="0.0.0.0"
-    export OPENCLAW_BROWSER_RUNTIME_HOST="0.0.0.0"
-    export OPENCLAW_SCREEN_SENSE_HOST="0.0.0.0"
-    export OPENCLAW_SCREEN_ACT_HOST="0.0.0.0"
-    export OPENCLAW_SYSTEM_SENSE_HOST="0.0.0.0"
-    export OPENCLAW_SYSTEM_HEAL_HOST="0.0.0.0"
-    export OBSERVER_UI_HOST="0.0.0.0"
-    nohup "$NODE_EXE" src/server.mjs >"$ARTIFACT_DIR/$name.log" 2>&1 &
-    echo $! >"$ARTIFACT_DIR/$name.pid"
-  )
-  pid="$(cat "$ARTIFACT_DIR/$name.pid")"
+  success=0
+  for attempt in 1 2; do
+    kill_listener_on_port "$port"
+    start_service_process "$name" "$working_dir"
+    pid="$(cat "$ARTIFACT_DIR/$name.pid")"
 
-  if ! wait_health "$health_url"; then
-    echo "Health check failed for $name at $health_url" >&2
+    if wait_health "$health_url"; then
+      success=1
+      break
+    fi
+
+    print_health_failure_debug "$name" "$port" "$health_url"
+    if [[ "$attempt" -lt 2 ]]; then
+      echo "Retrying $name startup..." >&2
+      if is_managed_service_pid "$pid"; then
+        kill "$pid" >/dev/null 2>&1 || true
+        sleep 0.5
+      fi
+    fi
+  done
+
+  if [[ "$success" -ne 1 ]]; then
     exit 1
   fi
 
