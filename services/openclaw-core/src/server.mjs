@@ -68,6 +68,10 @@ function updateRuntimeState(patch) {
   });
 }
 
+function getCurrentTask() {
+  return runtimeState.currentTaskId ? getTaskById(runtimeState.currentTaskId) : null;
+}
+
 async function publishEvent(type, payload = {}) {
   try {
     await fetch(`${eventHubUrl}/events`, {
@@ -87,6 +91,7 @@ async function publishEvent(type, payload = {}) {
 }
 
 function serialiseTask(task) {
+  const currentTask = getCurrentTask();
   return {
     id: task.id,
     type: task.type,
@@ -105,6 +110,8 @@ function serialiseTask(task) {
     createdAt: task.createdAt,
     closedAt: task.closedAt ?? null,
     updatedAt: task.updatedAt,
+    isCurrentTask: currentTask?.id === task.id,
+    isActive: isActiveTask(task),
   };
 }
 
@@ -134,6 +141,12 @@ function listTasks() {
     .map((task) => serialiseTask(task));
 }
 
+function getActiveTasks() {
+  return [...tasks.values()]
+    .filter((task) => isActiveTask(task))
+    .sort(compareTasksForDisplay);
+}
+
 function getLatestFinishedTask() {
   return [...tasks.values()]
     .filter((task) => !isActiveTask(task))
@@ -144,6 +157,39 @@ function getLatestFailedTask() {
   return [...tasks.values()]
     .filter((task) => task.status === "failed")
     .sort(compareTasksForDisplay)[0] ?? null;
+}
+
+function buildTaskSummary() {
+  const items = [...tasks.values()];
+  const counts = {
+    total: items.length,
+    active: 0,
+    queued: 0,
+    running: 0,
+    paused: 0,
+    failed: 0,
+    completed: 0,
+    superseded: 0,
+    recoverable: 0,
+  };
+
+  for (const task of items) {
+    if (counts[task.status] !== undefined) {
+      counts[task.status] += 1;
+    }
+    if (isActiveTask(task)) {
+      counts.active += 1;
+    }
+    if (isRecoverableTask(task)) {
+      counts.recoverable += 1;
+    }
+  }
+
+  return {
+    counts,
+    currentTaskId: runtimeState.currentTaskId ?? null,
+    currentTaskStatus: getCurrentTask()?.status ?? null,
+  };
 }
 
 function createTask(body) {
@@ -387,6 +433,63 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === "GET" && requestUrl.pathname === "/tasks/summary") {
+    reconcileRuntimeState();
+    sendJson(res, 200, {
+      ok: true,
+      summary: buildTaskSummary(),
+    });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/tasks/active") {
+    reconcileRuntimeState();
+    const activeTasks = getActiveTasks();
+    sendJson(res, 200, {
+      ok: true,
+      count: activeTasks.length,
+      items: activeTasks.map((task) => serialiseTask(task)),
+      summary: buildTaskSummary(),
+    });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/tasks/focus/current") {
+    reconcileRuntimeState();
+    const task = getCurrentTask();
+    sendJson(res, 200, {
+      ok: true,
+      task: task ? serialiseTask(task) : null,
+      summary: buildTaskSummary(),
+      focus: "current-task",
+    });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/tasks/focus/latest-finished") {
+    reconcileRuntimeState();
+    const task = getLatestFinishedTask();
+    sendJson(res, 200, {
+      ok: true,
+      task: task ? serialiseTask(task) : null,
+      summary: buildTaskSummary(),
+      focus: "latest-finished",
+    });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/tasks/focus/latest-failed") {
+    reconcileRuntimeState();
+    const task = getLatestFailedTask();
+    sendJson(res, 200, {
+      ok: true,
+      task: task ? serialiseTask(task) : null,
+      summary: buildTaskSummary(),
+      focus: "latest-failed",
+    });
+    return;
+  }
+
   if (req.method === "GET" && requestUrl.pathname === "/tasks") {
     const limit = Number.parseInt(requestUrl.searchParams.get("limit") ?? "10", 10);
     const safeLimit = Number.isNaN(limit) ? 10 : Math.max(1, Math.min(limit, 50));
@@ -394,6 +497,7 @@ const server = http.createServer(async (req, res) => {
       ok: true,
       count: tasks.size,
       items: listTasks().slice(0, safeLimit),
+      summary: buildTaskSummary(),
     });
     return;
   }
@@ -403,6 +507,7 @@ const server = http.createServer(async (req, res) => {
     sendJson(res, 200, {
       ok: true,
       task: task ? serialiseTask(task) : null,
+      summary: buildTaskSummary(),
     });
     return;
   }
@@ -412,6 +517,7 @@ const server = http.createServer(async (req, res) => {
     sendJson(res, 200, {
       ok: true,
       task: task ? serialiseTask(task) : null,
+      summary: buildTaskSummary(),
     });
     return;
   }

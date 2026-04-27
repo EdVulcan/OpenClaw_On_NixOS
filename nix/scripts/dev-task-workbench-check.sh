@@ -98,6 +98,8 @@ assert_json "$runtime_idle" 'const data=JSON.parse(process.argv[1]); if(data.run
 latest_finished="$(curl --silent http://127.0.0.1:4100/tasks/latest-finished)"
 assert_json "$latest_finished" 'const data=JSON.parse(process.argv[1]); const task=data.task; if(!task || task.status!=="completed" || task.workView?.visibility!=="hidden"){throw new Error("latest finished task not completed/hidden");}'
 finished_task_id="$(json_value "$latest_finished" 'const data=JSON.parse(process.argv[1]); process.stdout.write(data.task.id);')"
+latest_finished_focus="$(curl --silent http://127.0.0.1:4100/tasks/focus/latest-finished)"
+node -e 'const focus=JSON.parse(process.argv[1]); const latest=JSON.parse(process.argv[2]); if(focus.focus!=="latest-finished" || focus.task?.id!==latest.task?.id){throw new Error("latest finished focus mismatch");}' "$latest_finished_focus" "$latest_finished"
 
 recovered_latest="$(post_json "http://127.0.0.1:4100/tasks/$finished_task_id/recover" '{}')"
 assert_json "$recovered_latest" 'const data=JSON.parse(process.argv[1]); const task=data.task; if(!task || task.recovery?.recoveredFromTaskId!==data.recoveredFromTask?.id){throw new Error("latest finished recovery failed");}'
@@ -110,6 +112,8 @@ assert_json "$stop_result" 'const data=JSON.parse(process.argv[1]); if(!data.ok 
 latest_failed="$(curl --silent http://127.0.0.1:4100/tasks/latest-failed)"
 assert_json "$latest_failed" 'const data=JSON.parse(process.argv[1]); const task=data.task; if(!task || task.status!=="failed" || !task.restorable || task.outcome?.reason!=="Stopped by operator.") {throw new Error("latest failed task missing, not recoverable, or missing failure reason");}'
 failed_task_id="$(json_value "$latest_failed" 'const data=JSON.parse(process.argv[1]); process.stdout.write(data.task.id);')"
+latest_failed_focus="$(curl --silent http://127.0.0.1:4100/tasks/focus/latest-failed)"
+assert_json "$latest_failed_focus" 'const data=JSON.parse(process.argv[1]); if(data.focus!=="latest-failed" || data.task?.outcome?.reason!=="Stopped by operator.") {throw new Error("latest failed focus mismatch");}'
 
 recovered_failed="$(post_json "http://127.0.0.1:4100/tasks/$failed_task_id/recover" '{}')"
 assert_json "$recovered_failed" 'const data=JSON.parse(process.argv[1]); const task=data.task; if(!task || task.recovery?.recoveredFromTaskId!==data.recoveredFromTask?.id){throw new Error("failed task recovery failed");}'
@@ -124,8 +128,10 @@ launch_task_into_work_view "$task_two_id" "$TARGET_TWO"
 tasks_list="$(curl --silent "http://127.0.0.1:4100/tasks?limit=8")"
 runtime_running="$(curl --silent http://127.0.0.1:4100/state/runtime)"
 work_view_state="$(curl --silent http://127.0.0.1:4102/work-view/state)"
+task_summary="$(curl --silent http://127.0.0.1:4100/tasks/summary)"
+current_focus="$(curl --silent http://127.0.0.1:4100/tasks/focus/current)"
 
-node - <<'EOF' "$runtime_idle" "$latest_finished" "$recovered_latest" "$latest_failed" "$recovered_failed" "$tasks_list" "$runtime_running" "$work_view_state" "$task_one_id" "$recovered_latest_id" "$failed_task_id" "$recovered_failed_id" "$task_two_id"
+node - <<'EOF' "$runtime_idle" "$latest_finished" "$recovered_latest" "$latest_failed" "$recovered_failed" "$tasks_list" "$runtime_running" "$work_view_state" "$task_one_id" "$recovered_latest_id" "$failed_task_id" "$recovered_failed_id" "$task_two_id" "$task_summary" "$current_focus"
 const runtimeIdle = JSON.parse(process.argv[2]);
 const latestFinished = JSON.parse(process.argv[3]);
 const recoveredLatest = JSON.parse(process.argv[4]);
@@ -139,6 +145,8 @@ const recoveredLatestId = process.argv[11];
 const failedTaskId = process.argv[12];
 const recoveredFailedId = process.argv[13];
 const taskTwoId = process.argv[14];
+const taskSummary = JSON.parse(process.argv[15]);
+const currentFocus = JSON.parse(process.argv[16]);
 
 const items = tasksList.items ?? [];
 const taskTwo = items.find((task) => task.id === taskTwoId);
@@ -154,6 +162,12 @@ if (runtimeRunning.runtime?.status !== "running" || runtimeRunning.currentTask?.
 }
 if (workViewState.workView?.activeUrl !== "https://www.deepseek.com" || workViewState.workView?.visibility !== "visible") {
   throw new Error("Expected work view to follow final active task URL.");
+}
+if (taskSummary.summary?.counts?.active !== 1 || taskSummary.summary?.counts?.recoverable < 3) {
+  throw new Error("Expected task summary counts to expose one active and multiple recoverable tasks.");
+}
+if (currentFocus.focus !== "current-task" || currentFocus.task?.id !== taskTwoId || currentFocus.task?.isCurrentTask !== true) {
+  throw new Error("Expected current focus endpoint to track the final active task.");
 }
 
 console.log(JSON.stringify({
@@ -173,6 +187,7 @@ console.log(JSON.stringify({
     currentTaskId: runtimeRunning.currentTask?.id ?? null,
     currentTargetUrl: runtimeRunning.currentTask?.targetUrl ?? null,
   },
+  taskSummary: taskSummary.summary?.counts ?? null,
   finalWorkView: {
     activeUrl: workViewState.workView?.activeUrl ?? null,
     visibility: workViewState.workView?.visibility ?? null,

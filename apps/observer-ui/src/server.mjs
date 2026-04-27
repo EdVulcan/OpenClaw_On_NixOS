@@ -202,6 +202,41 @@ function observerHtml() {
         padding: 8px 12px;
         font-size: 12px;
       }
+      .task-card-top {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: flex-start;
+      }
+      .task-card-top h3 {
+        flex: 1;
+      }
+      .task-status-group {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+      .task-section {
+        display: grid;
+        gap: 12px;
+      }
+      .task-section h3 {
+        margin: 0;
+        font-size: 13px;
+        color: var(--muted);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .task-summary-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px 14px;
+        margin-bottom: 14px;
+      }
+      .task-summary-grid .metric {
+        margin: 0;
+      }
       .hint {
         color: var(--muted);
         font-size: 12px;
@@ -283,6 +318,14 @@ function observerHtml() {
         <section class="panel">
           <h2>Recent Tasks</h2>
           <div class="metric"><span>Entries</span><span id="task-list-count">0</span></div>
+          <div class="task-summary-grid">
+            <div class="metric"><span>Active</span><span id="task-active-count">0</span></div>
+            <div class="metric"><span>Recoverable</span><span id="task-recoverable-count">0</span></div>
+            <div class="metric"><span>Failed</span><span id="task-failed-count">0</span></div>
+            <div class="metric"><span>Completed</span><span id="task-completed-count">0</span></div>
+            <div class="metric"><span>Superseded</span><span id="task-superseded-count">0</span></div>
+            <div class="metric"><span>Queued</span><span id="task-queued-count">0</span></div>
+          </div>
           <div id="task-list-items" class="task-list"></div>
         </section>
         <section class="panel">
@@ -361,6 +404,12 @@ const runtimeCount = document.querySelector("#runtime-count");
 const runtimeUpdated = document.querySelector("#runtime-updated");
 const taskJson = document.querySelector("#task-json");
 const taskListCount = document.querySelector("#task-list-count");
+const taskActiveCount = document.querySelector("#task-active-count");
+const taskRecoverableCount = document.querySelector("#task-recoverable-count");
+const taskFailedCount = document.querySelector("#task-failed-count");
+const taskCompletedCount = document.querySelector("#task-completed-count");
+const taskSupersededCount = document.querySelector("#task-superseded-count");
+const taskQueuedCount = document.querySelector("#task-queued-count");
 const taskListItems = document.querySelector("#task-list-items");
 const taskHistoryJson = document.querySelector("#task-history-json");
 const taskHistoryMeta = document.querySelector("#task-history-meta");
@@ -423,6 +472,7 @@ let latestActionState = null;
 let latestHistoryTask = null;
 let selectedHistoryTaskId = null;
 let recentTasksState = [];
+let latestTaskSummary = null;
 let desiredWorkViewUrl = workViewUrlInput.value.trim() || "https://example.com/work-view";
 let desiredWorkViewUrlPinned = false;
 let latestWorkViewState = null;
@@ -534,6 +584,7 @@ function renderTaskSummary(task, { includeRecovery = true, includeOutcome = true
     \`Work View Session: \${task.workView?.sessionId ?? "none"}\`,
     \`Work View URL: \${task.workView?.activeUrl ?? "none"}\`,
     \`Work View: \${task.workView?.status ?? "none"} / \${task.workView?.visibility ?? "none"}\`,
+    \`Task Lens: \${describeTaskRelationship(task)}\`,
   ];
 
   if (includeOutcome) {
@@ -555,6 +606,45 @@ function renderTaskSummary(task, { includeRecovery = true, includeOutcome = true
   lines.push(\`Updated: \${formatTimestamp(task.updatedAt)}\`);
   lines.push(\`Closed: \${formatTimestamp(task.closedAt)}\`);
   return lines.join("\\n");
+}
+
+function describeTaskRelationship(task) {
+  if (!task) {
+    return "none";
+  }
+
+  if (task.isCurrentTask) {
+    return "current active task";
+  }
+
+  if (currentTaskState?.recovery?.recoveredFromTaskId === task.id) {
+    return "ancestor of current recovered task";
+  }
+
+  if (task.recoveredByTaskId && task.recoveredByTaskId === currentTaskState?.id) {
+    return "recovered into current active task";
+  }
+
+  if (task.isActive) {
+    return "active task";
+  }
+
+  if (currentTaskState?.workView?.sessionId && task.workView?.sessionId === currentTaskState.workView.sessionId) {
+    return "shares work view session with current task";
+  }
+
+  return "historical task";
+}
+
+function renderTaskSection(title, tasks) {
+  if (!tasks.length) {
+    return "";
+  }
+
+  return \`<section class="task-section">
+    <h3>\${escapeHtml(title)}</h3>
+    \${tasks.map((task) => renderTaskCard(task)).join("")}
+  </section>\`;
 }
 
 function getDesiredWorkViewUrl() {
@@ -644,9 +734,19 @@ async function refreshTaskList() {
   try {
     const data = await fetchJson(\`\${observerConfig.coreUrl}/tasks?limit=8\`);
     const items = data.items ?? [];
+    latestTaskSummary = data.summary ?? null;
     recentTasksState = items;
-    const activeCount = items.filter((task) => ["queued", "running", "paused"].includes(task.status)).length;
+    const activeTasks = items.filter((task) => task.isActive);
+    const historyTasks = items.filter((task) => !task.isActive);
+    const summaryCounts = data.summary?.counts ?? {};
+    const activeCount = summaryCounts.active ?? activeTasks.length;
     taskListCount.textContent = \`\${items.length} visible / \${activeCount} active\`;
+    taskActiveCount.textContent = String(summaryCounts.active ?? activeTasks.length);
+    taskRecoverableCount.textContent = String(summaryCounts.recoverable ?? items.filter((task) => task.restorable).length);
+    taskFailedCount.textContent = String(summaryCounts.failed ?? items.filter((task) => task.status === "failed").length);
+    taskCompletedCount.textContent = String(summaryCounts.completed ?? items.filter((task) => task.status === "completed").length);
+    taskSupersededCount.textContent = String(summaryCounts.superseded ?? items.filter((task) => task.status === "superseded").length);
+    taskQueuedCount.textContent = String(summaryCounts.queued ?? items.filter((task) => task.status === "queued").length);
     latestHistoryTask = items.find((task) => task.status !== "running" && task.status !== "queued" && task.status !== "paused")
       ?? items[0]
       ?? null;
@@ -654,12 +754,22 @@ async function refreshTaskList() {
       taskDetailIdInput.value = latestHistoryTask.id;
     }
     taskListItems.innerHTML = items.length > 0
-      ? items.map((task) => renderTaskCard(task)).join("")
+      ? [
+          renderTaskSection("Active Tasks", activeTasks),
+          renderTaskSection("Task History", historyTasks),
+        ].filter(Boolean).join("")
       : "<pre>No tasks recorded yet.</pre>";
   } catch {
     recentTasksState = [];
     latestHistoryTask = null;
+    latestTaskSummary = null;
     taskListCount.textContent = "0";
+    taskActiveCount.textContent = "0";
+    taskRecoverableCount.textContent = "0";
+    taskFailedCount.textContent = "0";
+    taskCompletedCount.textContent = "0";
+    taskSupersededCount.textContent = "0";
+    taskQueuedCount.textContent = "0";
     taskListItems.innerHTML = "<pre>Unable to read recent tasks.</pre>";
   }
 }
@@ -670,16 +780,20 @@ async function refreshTaskHistoryDetail() {
     let historyTask = null;
 
     if (taskHistoryFocus === "current-task") {
-      historyTask = currentTaskState;
-    } else if (taskHistoryFocus === "latest-failed") {
-      const data = await fetchJson(\`\${observerConfig.coreUrl}/tasks/latest-failed\`);
+      const data = await fetchJson(\`\${observerConfig.coreUrl}/tasks/focus/current\`);
       historyTask = data.task ?? null;
+      latestTaskSummary = data.summary ?? latestTaskSummary;
+    } else if (taskHistoryFocus === "latest-failed") {
+      const data = await fetchJson(\`\${observerConfig.coreUrl}/tasks/focus/latest-failed\`);
+      historyTask = data.task ?? null;
+      latestTaskSummary = data.summary ?? latestTaskSummary;
     } else if (taskHistoryFocus === "selected-task" || explicitTaskId) {
       const data = await fetchJson(\`\${observerConfig.coreUrl}/tasks/\${explicitTaskId}\`);
       historyTask = data.task ?? latestHistoryTask ?? null;
     } else {
-      const data = await fetchJson(\`\${observerConfig.coreUrl}/tasks/latest-finished\`);
+      const data = await fetchJson(\`\${observerConfig.coreUrl}/tasks/focus/latest-finished\`);
       historyTask = data.task ?? latestHistoryTask ?? null;
+      latestTaskSummary = data.summary ?? latestTaskSummary;
     }
 
     latestHistoryTask = historyTask;
@@ -854,6 +968,9 @@ async function createDemoTask() {
     }),
   });
   await launchTaskIntoWorkView(result.task?.id, targetUrl);
+  taskHistoryFocus = "current-task";
+  selectedHistoryTaskId = result.task?.id ?? null;
+  taskDetailIdInput.value = result.task?.id ?? "";
   setControlMessage(\`Created task \${result.task?.id ?? "unknown"} for \${targetUrl}\`);
   await refreshRuntime();
   await refreshTaskList();
@@ -889,9 +1006,9 @@ async function recoverLatestFinishedTask() {
     method: "POST",
   });
   await launchTaskIntoWorkView(result.task?.id, targetUrl);
-  taskHistoryFocus = "selected-task";
-  selectedHistoryTaskId = sourceTask.id;
-  taskDetailIdInput.value = sourceTask.id;
+  taskHistoryFocus = "current-task";
+  selectedHistoryTaskId = result.task?.id ?? null;
+  taskDetailIdInput.value = result.task?.id ?? "";
   setControlMessage(\`Recovered task \${result.task?.id ?? "unknown"} from \${sourceTask.id}\`);
   await refreshRuntime();
   await refreshTaskList();
@@ -922,9 +1039,9 @@ async function recoverSelectedTask() {
     method: "POST",
   });
   await launchTaskIntoWorkView(result.task?.id, targetUrl);
-  taskHistoryFocus = "selected-task";
-  selectedHistoryTaskId = sourceTask.id;
-  taskDetailIdInput.value = sourceTask.id;
+  taskHistoryFocus = "current-task";
+  selectedHistoryTaskId = result.task?.id ?? null;
+  taskDetailIdInput.value = result.task?.id ?? "";
   setControlMessage(\`Recovered task \${result.task?.id ?? "unknown"} from selected task \${sourceTask.id}\`);
   await refreshRuntime();
   await refreshTaskList();
@@ -972,12 +1089,21 @@ async function recoverLatestFailedTask() {
 function renderTaskCard(task) {
   const selectedClass = selectedHistoryTaskId === task.id ? " selected" : "";
   const activeClass = task.id === currentTaskState?.id ? " active" : "";
-  const lastAction = deriveTaskLastAction(task);
   const taskUrl = task.targetUrl ?? task.workView?.activeUrl ?? "";
   const escapedUrl = escapeHtml(taskUrl);
+  const statusClass = task.status === "failed" ? "status-pill warn" : "status-pill";
+  const relationLabel = describeTaskRelationship(task);
   return \`<article class="task-card\${selectedClass}\${activeClass}" data-task-id="\${task.id}">
-    <h3>\${escapeHtml(task.goal)}</h3>
+    <div class="task-card-top">
+      <h3>\${escapeHtml(task.goal)}</h3>
+      <div class="task-status-group">
+        <span class="\${statusClass}">\${escapeHtml(task.status)}</span>
+        \${task.isCurrentTask ? '<span class="status-pill">current</span>' : ""}
+        \${task.restorable ? '<span class="status-pill">recoverable</span>' : ""}
+      </div>
+    </div>
     <pre>\${escapeHtml(renderTaskSummary(task))}</pre>
+    <div class="hint">\${escapeHtml(relationLabel)}</div>
     <div class="task-card-actions">
       <button class="secondary" data-task-action="inspect" data-task-id="\${task.id}">Inspect</button>
       <button class="secondary" data-task-action="use-url" data-task-id="\${task.id}" data-task-url="\${escapedUrl}" \${taskUrl ? "" : "disabled"}>Use URL</button>
@@ -1189,7 +1315,26 @@ async function completeCurrentTask() {
     }),
   });
 
+  taskHistoryFocus = "latest-finished";
+  selectedHistoryTaskId = result.task?.id ?? currentTaskState.id;
+  taskDetailIdInput.value = selectedHistoryTaskId ?? "";
   setControlMessage(\`Completed task \${result.task?.id ?? currentTaskState.id}\`);
+  await refreshRuntime();
+  await refreshTaskList();
+  await refreshTaskHistoryDetail();
+  await refreshActionState();
+  await refreshWorkView();
+  await refreshScreen();
+}
+
+async function stopCurrentTask() {
+  const result = await fetchJson(\`\${observerConfig.coreUrl}/control/stop\`, {
+    method: "POST",
+  });
+  taskHistoryFocus = "latest-failed";
+  selectedHistoryTaskId = result.task?.id ?? null;
+  taskDetailIdInput.value = result.task?.id ?? "";
+  setControlMessage(\`Stopped task \${result.task?.id ?? "unknown"}\`);
   await refreshRuntime();
   await refreshTaskList();
   await refreshTaskHistoryDetail();
@@ -1330,7 +1475,7 @@ pauseButton.addEventListener("click", () => {
 });
 
 stopButton.addEventListener("click", () => {
-  postControl("/control/stop").catch((error) => {
+  stopCurrentTask().catch((error) => {
     setControlMessage(\`Request failed: \${formatError(error)}\`);
   });
 });
