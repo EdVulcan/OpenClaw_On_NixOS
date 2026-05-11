@@ -694,6 +694,115 @@ function recoverTask(sourceTask) {
   return recoveredTask;
 }
 
+function buildRecoveryExecuteOptions(options, attempt) {
+  const recoveryOptions = options.recovery && typeof options.recovery === "object" ? options.recovery : {};
+  return {
+    ...options,
+    ...recoveryOptions,
+    autoRecover: false,
+    expectedUrl:
+      typeof recoveryOptions.expectedUrl === "string" && recoveryOptions.expectedUrl.trim()
+        ? recoveryOptions.expectedUrl.trim()
+        : typeof options.recoveryExpectedUrl === "string" && options.recoveryExpectedUrl.trim()
+          ? options.recoveryExpectedUrl.trim()
+          : options.targetUrl,
+    actions: Array.isArray(recoveryOptions.actions) ? recoveryOptions.actions : options.actions,
+    recoveryAttempt: attempt,
+  };
+}
+
+function serialiseExecutionResult(executionResult) {
+  const finalExecution = executionResult.finalExecution ?? executionResult;
+  return {
+    executor: executionResult.recovery?.attempted ? "core-v3" : finalExecution.verification ? "core-v2" : "core-v1",
+    actions: finalExecution.actions.map((action) => ({
+      kind: action?.kind ?? null,
+      degraded: Boolean(action?.degraded),
+      result: action?.result ?? null,
+    })),
+    verification: finalExecution.verification ?? null,
+    finalReadiness: finalExecution.verifiedScreen?.screen?.readiness ?? null,
+    finalWorkView: finalExecution.finalWorkViewState?.workView ?? null,
+    recovery: executionResult.recovery ?? null,
+    attempts: (executionResult.attempts ?? [finalExecution]).map((attempt) => ({
+      taskId: attempt.task?.id ?? null,
+      status: attempt.task?.status ?? null,
+      phase: attempt.task?.executionPhase ?? null,
+      verification: attempt.verification?.ok ?? null,
+      failedChecks: attempt.verification?.failedChecks?.map((check) => check.name) ?? [],
+    })),
+  };
+}
+
+async function executeTaskWithRecovery(task, options = {}) {
+  const firstExecution = await executeTask(task, options);
+  const maxRecoveryAttempts =
+    Number.isInteger(options.maxRecoveryAttempts) && options.maxRecoveryAttempts > 0
+      ? options.maxRecoveryAttempts
+      : Number.isInteger(options.retryBudget) && options.retryBudget > 0
+        ? options.retryBudget
+        : 0;
+
+  if (firstExecution.task.status !== "failed" || options.autoRecover !== true || maxRecoveryAttempts < 1) {
+    return {
+      finalExecution: firstExecution,
+      attempts: [firstExecution],
+      recovery: {
+        attempted: false,
+        maxAttempts: maxRecoveryAttempts,
+      },
+    };
+  }
+
+  let sourceTask = firstExecution.task;
+  const attempts = [firstExecution];
+  const recoveredTaskIds = [];
+
+  for (let attempt = 1; attempt <= maxRecoveryAttempts; attempt += 1) {
+    const recoveredTask = recoverTask(sourceTask);
+    recoveredTaskIds.push(recoveredTask.id);
+    reconcileRuntimeState();
+    await publishEvent("task.created", { task: serialiseTask(recoveredTask), executor: "core-v3" });
+    await publishEvent("task.recovered", {
+      task: serialiseTask(recoveredTask),
+      recoveredFromTaskId: sourceTask.id,
+      autoRecovered: true,
+      attempt,
+      executor: "core-v3",
+    });
+
+    const recoveryExecution = await executeTask(recoveredTask, buildRecoveryExecuteOptions(options, attempt));
+    attempts.push(recoveryExecution);
+    sourceTask = recoveryExecution.task;
+
+    if (recoveryExecution.task.status !== "failed") {
+      return {
+        finalExecution: recoveryExecution,
+        attempts,
+        recovery: {
+          attempted: true,
+          succeeded: true,
+          attempts: attempt,
+          recoveredTaskIds,
+          recoveredFromTaskId: firstExecution.task.id,
+        },
+      };
+    }
+  }
+
+  return {
+    finalExecution: attempts.at(-1),
+    attempts,
+    recovery: {
+      attempted: true,
+      succeeded: false,
+      attempts: maxRecoveryAttempts,
+      recoveredTaskIds,
+      recoveredFromTaskId: firstExecution.task.id,
+    },
+  };
+}
+
 const server = http.createServer(async (req, res) => {
   const requestUrl = new URL(req.url ?? "/", `http://${req.headers.host ?? `${host}:${port}`}`);
 
@@ -859,22 +968,13 @@ const server = http.createServer(async (req, res) => {
         task: serialiseTask(reclaimedTask),
       })));
 
-      const execution = await executeTask(task, body);
+      const executionResult = await executeTaskWithRecovery(task, body);
+      const execution = executionResult.finalExecution;
       sendJson(res, 201, {
         ok: true,
         task: serialiseTask(execution.task),
         runtime: runtimeState,
-        execution: {
-          executor: execution.verification ? "core-v2" : "core-v1",
-          actions: execution.actions.map((action) => ({
-            kind: action?.kind ?? null,
-            degraded: Boolean(action?.degraded),
-            result: action?.result ?? null,
-          })),
-          verification: execution.verification ?? null,
-          finalReadiness: execution.verifiedScreen?.screen?.readiness ?? null,
-          finalWorkView: execution.finalWorkViewState?.workView ?? null,
-        },
+        execution: serialiseExecutionResult(executionResult),
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
@@ -939,22 +1039,13 @@ const server = http.createServer(async (req, res) => {
 
     try {
       const body = await readJsonBody(req);
-      const execution = await executeTask(task, body);
+      const executionResult = await executeTaskWithRecovery(task, body);
+      const execution = executionResult.finalExecution;
       sendJson(res, 200, {
         ok: true,
         task: serialiseTask(execution.task),
         runtime: runtimeState,
-        execution: {
-          executor: execution.verification ? "core-v2" : "core-v1",
-          actions: execution.actions.map((action) => ({
-            kind: action?.kind ?? null,
-            degraded: Boolean(action?.degraded),
-            result: action?.result ?? null,
-          })),
-          verification: execution.verification ?? null,
-          finalReadiness: execution.verifiedScreen?.screen?.readiness ?? null,
-          finalWorkView: execution.finalWorkViewState?.workView ?? null,
-        },
+        execution: serialiseExecutionResult(executionResult),
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
