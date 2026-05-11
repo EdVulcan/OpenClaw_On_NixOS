@@ -83,7 +83,7 @@ const latestFailed = JSON.parse(process.argv[9]);
 const workViewState = JSON.parse(process.argv[10]);
 const actionState = JSON.parse(process.argv[11]);
 
-const requiredPhases = [
+const completedPhases = [
   "queued",
   "preparing_work_view",
   "opening_target",
@@ -93,8 +93,18 @@ const requiredPhases = [
   "verifying_result",
   "completed",
 ];
+const failedPhases = [
+  "queued",
+  "preparing_work_view",
+  "opening_target",
+  "ready_for_action",
+  "observing_screen",
+  "acting_on_target",
+  "verifying_result",
+  "failed",
+];
 
-function assertTaskPhases(task, label) {
+function assertTaskPhases(task, label, requiredPhases) {
   const phases = new Set((task.phaseHistory ?? []).map((entry) => entry.phase));
   for (const phase of requiredPhases) {
     if (!phases.has(phase)) {
@@ -103,9 +113,9 @@ function assertTaskPhases(task, label) {
   }
 }
 
-assertTaskPhases(queuedExecution.task, "queued execution");
-assertTaskPhases(directExecution.task, "direct execution");
-assertTaskPhases(failedExecution.task, "failed execution");
+assertTaskPhases(queuedExecution.task, "queued execution", completedPhases);
+assertTaskPhases(directExecution.task, "direct execution", completedPhases);
+assertTaskPhases(failedExecution.task, "failed execution", failedPhases);
 
 if (queuedExecution.execution?.verification?.ok !== true || directExecution.execution?.verification?.ok !== true) {
   throw new Error("Expected successful executor runs to include verification ok=true.");
