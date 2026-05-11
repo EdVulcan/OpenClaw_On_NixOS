@@ -1,5 +1,7 @@
 import http from "node:http";
 import { randomUUID } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import path from "node:path";
 
 const host = process.env.OPENCLAW_CORE_HOST ?? "127.0.0.1";
 const port = Number.parseInt(process.env.OPENCLAW_CORE_PORT ?? "4100", 10);
@@ -7,6 +9,8 @@ const eventHubUrl = process.env.OPENCLAW_EVENT_HUB_URL ?? "http://127.0.0.1:4101
 const sessionManagerUrl = process.env.OPENCLAW_SESSION_MANAGER_URL ?? "http://127.0.0.1:4102";
 const screenSenseUrl = process.env.OPENCLAW_SCREEN_SENSE_URL ?? "http://127.0.0.1:4104";
 const screenActUrl = process.env.OPENCLAW_SCREEN_ACT_URL ?? "http://127.0.0.1:4105";
+const stateFilePath = process.env.OPENCLAW_CORE_STATE_FILE
+  ?? path.resolve(process.cwd(), "../../.artifacts/openclaw-core-state.json");
 
 const tasks = new Map();
 const runtimeState = {
@@ -69,6 +73,46 @@ function updateRuntimeState(patch) {
   Object.assign(runtimeState, patch, {
     lastUpdatedAt: new Date().toISOString(),
   });
+}
+
+function persistState() {
+  try {
+    mkdirSync(path.dirname(stateFilePath), { recursive: true });
+    const payload = {
+      version: 1,
+      savedAt: new Date().toISOString(),
+      runtime: runtimeState,
+      tasks: [...tasks.values()],
+    };
+    const tempPath = `${stateFilePath}.tmp`;
+    writeFileSync(tempPath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+    renameSync(tempPath, stateFilePath);
+  } catch (error) {
+    console.error("Failed to persist core state:", error);
+  }
+}
+
+function loadPersistentState() {
+  if (!existsSync(stateFilePath)) {
+    return;
+  }
+
+  try {
+    const data = JSON.parse(readFileSync(stateFilePath, "utf8"));
+    if (data?.runtime && typeof data.runtime === "object") {
+      Object.assign(runtimeState, data.runtime);
+    }
+    if (Array.isArray(data?.tasks)) {
+      tasks.clear();
+      for (const task of data.tasks) {
+        if (task?.id) {
+          tasks.set(task.id, task);
+        }
+      }
+    }
+  } catch (error) {
+    console.error("Failed to load persisted core state:", error);
+  }
 }
 
 function getCurrentTask() {
@@ -267,6 +311,7 @@ function createTask(body) {
   };
 
   tasks.set(task.id, task);
+  persistState();
   return task;
 }
 
@@ -286,6 +331,7 @@ function appendTaskPhase(task, phase, details = null) {
     };
   }
   task.phaseHistory = [...(task.phaseHistory ?? []), { phase, at: now, details }];
+  persistState();
   return task;
 }
 
@@ -309,6 +355,7 @@ function reconcileRuntimeState() {
       currentTaskId: null,
       paused: false,
     });
+    persistState();
     return null;
   }
 
@@ -317,6 +364,7 @@ function reconcileRuntimeState() {
     currentTaskId: currentTask.id,
     paused: currentTask.status === "paused",
   });
+  persistState();
   return currentTask;
 }
 
@@ -341,6 +389,9 @@ function supersedeOtherActiveTasks(exceptTaskId) {
     reclaimed.push(task);
   }
 
+  if (reclaimed.length > 0) {
+    persistState();
+  }
   return reclaimed;
 }
 
@@ -408,6 +459,7 @@ function completeTask(task, details = null) {
   };
   task.closedAt = task.updatedAt;
   reconcileRuntimeState();
+  persistState();
   return task;
 }
 
@@ -423,6 +475,7 @@ function failTask(task, reason, details = null) {
   };
   task.closedAt = task.updatedAt;
   reconcileRuntimeState();
+  persistState();
   return task;
 }
 
@@ -691,6 +744,7 @@ function recoverTask(sourceTask) {
 
   sourceTask.recoveredByTaskId = recoveredTask.id;
   sourceTask.updatedAt = new Date().toISOString();
+  persistState();
   return recoveredTask;
 }
 
@@ -823,6 +877,7 @@ const server = http.createServer(async (req, res) => {
       sessionManagerUrl,
       screenSenseUrl,
       screenActUrl,
+      stateFilePath,
     });
     return;
   }
@@ -1216,6 +1271,9 @@ const server = http.createServer(async (req, res) => {
 
   sendJson(res, 404, { ok: false, error: "Route not found." });
 });
+
+loadPersistentState();
+reconcileRuntimeState();
 
 server.listen(port, host, async () => {
   console.log(`openclaw-core listening on http://${host}:${port}`);

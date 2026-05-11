@@ -22,6 +22,7 @@
     "dev:command-capture-check": "powershell -ExecutionPolicy Bypass -File .\\nix\\scripts\\dev-command-capture-check.ps1",
     "dev:command-capture-check:unix": "bash ./nix/scripts/dev-command-capture-check.sh",
     "dev:task-workbench-check:unix": "bash ./nix/scripts/dev-task-workbench-check.sh",
-    "dev:task-executor-check:unix": "bash ./nix/scripts/dev-task-executor-check.sh"
+    "dev:task-executor-check:unix": "bash ./nix/scripts/dev-task-executor-check.sh",
+    "dev:persistence-check:unix": "bash ./nix/scripts/dev-persistence-check.sh"
   }
 }
