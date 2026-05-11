@@ -323,6 +323,12 @@ function getActiveTasks() {
     .sort(compareTasksForDisplay);
 }
 
+function getNextQueuedTask() {
+  return [...tasks.values()]
+    .filter((task) => task.status === "queued")
+    .sort(compareTasksForDisplay)[0] ?? null;
+}
+
 function getLatestFinishedTask() {
   return [...tasks.values()]
     .filter((task) => task.status === "completed")
@@ -983,6 +989,58 @@ async function executeTaskWithRecovery(task, options = {}) {
   };
 }
 
+function buildOperatorOptions(task, body = {}) {
+  const planActions = task.plan?.steps
+    ?.filter((step) => step.phase === "acting_on_target")
+    .map((step) => ({ kind: step.kind, params: step.params ?? {} }));
+  return {
+    ...body,
+    targetUrl: body.targetUrl ?? task.targetUrl,
+    actions: Array.isArray(body.actions) ? body.actions : planActions,
+    operator: "loop-v1",
+  };
+}
+
+async function runOperatorStep(body = {}) {
+  reconcileRuntimeState();
+  const task = getNextQueuedTask();
+  if (!task) {
+    return {
+      ran: false,
+      task: null,
+      execution: null,
+      summary: buildTaskSummary(),
+    };
+  }
+
+  const executionResult = await executeTaskWithRecovery(task, buildOperatorOptions(task, body));
+  return {
+    ran: true,
+    task: executionResult.finalExecution.task,
+    execution: executionResult,
+    summary: buildTaskSummary(),
+  };
+}
+
+async function runOperatorLoop(body = {}) {
+  const maxSteps = Number.isInteger(body.maxSteps) && body.maxSteps > 0 ? Math.min(body.maxSteps, 20) : 5;
+  const steps = [];
+
+  for (let index = 0; index < maxSteps; index += 1) {
+    const step = await runOperatorStep(body);
+    if (!step.ran) {
+      break;
+    }
+    steps.push(step);
+  }
+
+  return {
+    ran: steps.length > 0,
+    steps,
+    summary: buildTaskSummary(),
+  };
+}
+
 const server = http.createServer(async (req, res) => {
   const requestUrl = new URL(req.url ?? "/", `http://${req.headers.host ?? `${host}:${port}`}`);
 
@@ -1119,6 +1177,45 @@ const server = http.createServer(async (req, res) => {
         task: serialiseTask(reclaimedTask),
       })));
       sendJson(res, 201, { ok: true, task: serialiseTask(task) });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/operator/step") {
+    try {
+      const body = await readJsonBody(req);
+      const step = await runOperatorStep(body);
+      sendJson(res, 200, {
+        ok: true,
+        ran: step.ran,
+        task: step.task ? serialiseTask(step.task) : null,
+        execution: step.execution ? serialiseExecutionResult(step.execution) : null,
+        summary: step.summary,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/operator/run") {
+    try {
+      const body = await readJsonBody(req);
+      const result = await runOperatorLoop(body);
+      sendJson(res, 200, {
+        ok: true,
+        ran: result.ran,
+        count: result.steps.length,
+        steps: result.steps.map((step) => ({
+          task: step.task ? serialiseTask(step.task) : null,
+          execution: step.execution ? serialiseExecutionResult(step.execution) : null,
+        })),
+        summary: result.summary,
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       sendJson(res, 400, { ok: false, error: message });
