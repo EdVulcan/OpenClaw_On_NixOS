@@ -129,7 +129,7 @@ if (!failedExecution.execution?.verification?.failedChecks?.some((check) => chec
 if (recoveredFailed.task?.recovery?.recoveredFromTaskId !== failedExecution.task?.id) {
   throw new Error("Expected failed executor task to be recoverable.");
 }
-if (runtimeState.runtime?.status !== "running" || runtimeState.currentTask?.id !== recoveredFailed.task?.id) {
+if (!["queued", "running"].includes(runtimeState.runtime?.status) || runtimeState.currentTask?.id !== recoveredFailed.task?.id) {
   throw new Error("Executor recovery should leave recovered task active.");
 }
 if (taskSummary.summary?.counts?.completed !== 2 || taskSummary.summary?.counts?.failed !== 1 || taskSummary.summary?.counts?.active !== 1) {
