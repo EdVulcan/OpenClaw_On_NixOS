@@ -300,6 +300,7 @@ function observerHtml() {
               <button id="heal-browser-button" class="secondary">Simulate Browser Restart</button>
               <button id="complete-task-button" class="secondary">Complete Current Task</button>
               <button id="pause-button" class="secondary">Pause Current Task</button>
+              <button id="resume-button" class="secondary">Resume Current Task</button>
               <button id="stop-button" class="secondary">Stop Current Task</button>
             </div>
           </div>
@@ -326,6 +327,9 @@ function observerHtml() {
         </section>
         <section class="panel">
           <h2>Operator Loop</h2>
+          <div class="metric"><span>Status</span><span id="operator-loop-status">idle</span></div>
+          <div class="metric"><span>Blocked</span><span id="operator-loop-blocked">false</span></div>
+          <div class="metric"><span>Next Task</span><span id="operator-loop-next">none</span></div>
           <div class="metric"><span>Last Run</span><span id="operator-loop-ran">none</span></div>
           <div class="metric"><span>Steps</span><span id="operator-loop-count">0</span></div>
           <pre id="operator-loop-json">No operator run yet.</pre>
@@ -482,12 +486,16 @@ const typeActionButton = document.querySelector("#type-action-button");
 const healBrowserButton = document.querySelector("#heal-browser-button");
 const completeTaskButton = document.querySelector("#complete-task-button");
 const pauseButton = document.querySelector("#pause-button");
+const resumeButton = document.querySelector("#resume-button");
 const stopButton = document.querySelector("#stop-button");
 const openWorkViewUrlButton = document.querySelector("#open-work-view-url-button");
 const workViewUrlInput = document.querySelector("#work-view-url-input");
 const taskPlanStatus = document.querySelector("#task-plan-status");
 const taskPlanCount = document.querySelector("#task-plan-count");
 const taskPlanJson = document.querySelector("#task-plan-json");
+const operatorLoopStatus = document.querySelector("#operator-loop-status");
+const operatorLoopBlocked = document.querySelector("#operator-loop-blocked");
+const operatorLoopNext = document.querySelector("#operator-loop-next");
 const operatorLoopRan = document.querySelector("#operator-loop-ran");
 const operatorLoopCount = document.querySelector("#operator-loop-count");
 const operatorLoopJson = document.querySelector("#operator-loop-json");
@@ -621,8 +629,16 @@ function renderPlanPanel(task) {
   taskPlanJson.textContent = renderTaskPlan(plan);
 }
 
+function renderOperatorState(operator) {
+  const nextTask = operator?.nextTask ?? null;
+  operatorLoopStatus.textContent = operator?.status ?? "idle";
+  operatorLoopBlocked.textContent = String(operator?.blocked ?? false);
+  operatorLoopNext.textContent = nextTask?.id ? nextTask.id.slice(0, 8) : "none";
+}
+
 function renderOperatorPanel(result) {
   if (!result) {
+    renderOperatorState(null);
     operatorLoopRan.textContent = "none";
     operatorLoopCount.textContent = "0";
     operatorLoopJson.textContent = "No operator run yet.";
@@ -630,12 +646,22 @@ function renderOperatorPanel(result) {
   }
 
   const steps = Array.isArray(result.steps) ? result.steps : result.task ? [result] : [];
+  const operator = result.operator ?? null;
+  const nextTask = result.nextTask ?? operator?.nextTask ?? null;
+  renderOperatorState({
+    status: operator?.status ?? (result.blocked ? "paused" : result.ran ? "ran" : "idle"),
+    blocked: result.blocked ?? operator?.blocked ?? false,
+    nextTask,
+  });
   operatorLoopRan.textContent = result.ran ? "yes" : "no";
   operatorLoopCount.textContent = String(result.count ?? steps.length);
   operatorLoopJson.textContent = [
     \`Ran: \${Boolean(result.ran)}\`,
+    \`Blocked: \${Boolean(result.blocked ?? operator?.blocked)}\`,
+    \`Reason: \${result.reason ?? operator?.reason ?? "none"}\`,
     \`Steps: \${result.count ?? steps.length}\`,
     \`Runtime: \${result.summary?.runtime?.status ?? result.summary?.status ?? "unknown"}\`,
+    \`Next Task: \${nextTask?.id ?? "none"}\`,
     "",
     ...steps.map((step, index) => {
       const task = step.task ?? null;
@@ -643,6 +669,26 @@ function renderOperatorPanel(result) {
       return \`\${index + 1}. \${task?.id ?? "no-task"} \${task?.status ?? "idle"} \${task?.targetUrl ?? ""} verification=\${verification?.ok ?? "n/a"}\`;
     }),
   ].join("\\n");
+}
+
+async function refreshOperatorState() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/operator/state\`);
+    renderOperatorState(data.operator);
+    if (operatorLoopJson.textContent === "No operator run yet." || operatorLoopJson.textContent === "Unable to read operator state.") {
+      operatorLoopJson.textContent = [
+        \`Status: \${data.operator?.status ?? "idle"}\`,
+        \`Blocked: \${Boolean(data.operator?.blocked)}\`,
+        \`Reason: \${data.operator?.reason ?? "none"}\`,
+        \`Next Task: \${data.operator?.nextTask?.id ?? "none"}\`,
+      ].join("\\n");
+    }
+  } catch {
+    operatorLoopStatus.textContent = "offline";
+    operatorLoopBlocked.textContent = "unknown";
+    operatorLoopNext.textContent = "unknown";
+    operatorLoopJson.textContent = "Unable to read operator state.";
+  }
 }
 
 function renderTaskSummary(task, { includeRecovery = true, includeOutcome = true } = {}) {
@@ -1093,6 +1139,7 @@ async function createPlannedTask() {
   await refreshRuntime();
   await refreshTaskList();
   await refreshTaskHistoryDetail();
+  await refreshOperatorState();
 }
 
 async function runOperatorStepFromUi() {
@@ -1117,6 +1164,7 @@ async function runOperatorStepFromUi() {
   await refreshActionState();
   await refreshWorkView();
   await refreshScreen();
+  await refreshOperatorState();
 }
 
 async function runOperatorLoopFromUi() {
@@ -1142,6 +1190,7 @@ async function runOperatorLoopFromUi() {
   await refreshActionState();
   await refreshWorkView();
   await refreshScreen();
+  await refreshOperatorState();
 }
 
 async function launchTaskIntoWorkView(taskId, targetUrl) {
@@ -1395,6 +1444,7 @@ async function postControl(path) {
   await refreshRuntime();
   await refreshTaskList();
   await refreshTaskHistoryDetail();
+  await refreshOperatorState();
 }
 
 async function refreshScreenNow() {
@@ -1527,6 +1577,7 @@ function subscribeEvents() {
     "task.completed",
     "task.recovered",
     "task.paused",
+    "task.resumed",
     "task.failed",
     "service.started",
     "browser.started",
@@ -1654,6 +1705,12 @@ completeTaskButton.addEventListener("click", () => {
 
 pauseButton.addEventListener("click", () => {
   postControl("/control/pause").catch((error) => {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  });
+});
+
+resumeButton.addEventListener("click", () => {
+  postControl("/control/resume").catch((error) => {
     setControlMessage(\`Request failed: \${formatError(error)}\`);
   });
 });
@@ -1817,6 +1874,7 @@ await refreshTaskHistoryDetail();
 await refreshWorkView();
 await refreshScreen();
 await refreshActionState();
+await refreshOperatorState();
 await refreshSystemState();
 await refreshHealState();
 await loadRecentEvents();
@@ -1829,6 +1887,7 @@ setInterval(refreshTaskHistoryDetail, 5000);
 setInterval(refreshWorkView, 5000);
 setInterval(refreshScreen, 5000);
 setInterval(refreshActionState, 5000);
+setInterval(refreshOperatorState, 5000);
 setInterval(refreshSystemState, 5000);
 setInterval(refreshHealState, 5000);`;
 }

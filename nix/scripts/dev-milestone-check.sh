@@ -14,6 +14,7 @@ checks=(
   "persistence|dev-persistence-check.sh|Core task state persistence and recovery chains"
   "planner|dev-planner-check.sh|Rule planner plan-only and planned execution flows"
   "operator-loop|dev-operator-loop-check.sh|Operator step/run queue consumption and persistence"
+  "operator-control|dev-operator-control-check.sh|Operator state, dry-run, pause gate, and resume control"
   "observer-operator|dev-observer-operator-check.sh|Observer UI planner/operator controls and API wiring"
 )
 

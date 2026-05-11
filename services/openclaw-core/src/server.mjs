@@ -374,6 +374,27 @@ function buildTaskSummary() {
   };
 }
 
+function buildOperatorState() {
+  reconcileRuntimeState();
+  const currentTask = getCurrentTask();
+  const nextTask = getNextQueuedTask();
+  const paused = runtimeState.paused === true;
+  return {
+    status: paused ? "paused" : nextTask ? "ready" : "idle",
+    blocked: paused,
+    reason: paused ? "runtime_paused" : null,
+    currentTask: currentTask ? serialiseTask(currentTask) : null,
+    nextTask: nextTask ? serialiseTask(nextTask) : null,
+    policy: {
+      respectsPause: true,
+      defaultMaxSteps: 5,
+      maxStepsLimit: 20,
+      supportsDryRun: true,
+    },
+    summary: buildTaskSummary(),
+  };
+}
+
 function createTask(body) {
   const goal = typeof body.goal === "string" ? body.goal.trim() : "";
   if (!goal) {
@@ -1003,32 +1024,77 @@ function buildOperatorOptions(task, body = {}) {
 
 async function runOperatorStep(body = {}) {
   reconcileRuntimeState();
+  const ignorePause = body.ignorePause === true;
+  const dryRun = body.dryRun === true || body.peek === true;
+
+  if (runtimeState.paused && !ignorePause) {
+    return {
+      ran: false,
+      blocked: true,
+      reason: "runtime_paused",
+      dryRun,
+      task: null,
+      execution: null,
+      summary: buildTaskSummary(),
+      operator: buildOperatorState(),
+    };
+  }
+
   const task = getNextQueuedTask();
   if (!task) {
     return {
       ran: false,
+      blocked: false,
+      reason: "no_queued_task",
+      dryRun,
       task: null,
       execution: null,
       summary: buildTaskSummary(),
+      operator: buildOperatorState(),
+    };
+  }
+
+  if (dryRun) {
+    return {
+      ran: false,
+      blocked: false,
+      reason: "dry_run",
+      dryRun: true,
+      task,
+      execution: null,
+      summary: buildTaskSummary(),
+      operator: buildOperatorState(),
     };
   }
 
   const executionResult = await executeTaskWithRecovery(task, buildOperatorOptions(task, body));
   return {
     ran: true,
+    blocked: false,
+    reason: null,
+    dryRun: false,
     task: executionResult.finalExecution.task,
     execution: executionResult,
     summary: buildTaskSummary(),
+    operator: buildOperatorState(),
   };
 }
 
 async function runOperatorLoop(body = {}) {
   const maxSteps = Number.isInteger(body.maxSteps) && body.maxSteps > 0 ? Math.min(body.maxSteps, 20) : 5;
   const steps = [];
+  let stopReason = null;
+  let blocked = false;
+  let dryRun = false;
+  let nextTask = null;
 
   for (let index = 0; index < maxSteps; index += 1) {
     const step = await runOperatorStep(body);
     if (!step.ran) {
+      stopReason = step.reason ?? null;
+      blocked = step.blocked === true;
+      dryRun = step.dryRun === true;
+      nextTask = step.task ?? null;
       break;
     }
     steps.push(step);
@@ -1037,7 +1103,12 @@ async function runOperatorLoop(body = {}) {
   return {
     ran: steps.length > 0,
     steps,
+    blocked,
+    reason: stopReason,
+    dryRun,
+    nextTask,
     summary: buildTaskSummary(),
+    operator: buildOperatorState(),
   };
 }
 
@@ -1093,6 +1164,14 @@ const server = http.createServer(async (req, res) => {
       count: activeTasks.length,
       items: activeTasks.map((task) => serialiseTask(task)),
       summary: buildTaskSummary(),
+    });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/operator/state") {
+    sendJson(res, 200, {
+      ok: true,
+      operator: buildOperatorState(),
     });
     return;
   }
@@ -1191,8 +1270,12 @@ const server = http.createServer(async (req, res) => {
       sendJson(res, 200, {
         ok: true,
         ran: step.ran,
+        blocked: step.blocked ?? false,
+        reason: step.reason ?? null,
+        dryRun: step.dryRun ?? false,
         task: step.task ? serialiseTask(step.task) : null,
         execution: step.execution ? serialiseExecutionResult(step.execution) : null,
+        operator: step.operator ?? buildOperatorState(),
         summary: step.summary,
       });
     } catch (error) {
@@ -1210,10 +1293,15 @@ const server = http.createServer(async (req, res) => {
         ok: true,
         ran: result.ran,
         count: result.steps.length,
+        blocked: result.blocked ?? false,
+        reason: result.reason ?? null,
+        dryRun: result.dryRun ?? false,
+        nextTask: result.nextTask ? serialiseTask(result.nextTask) : null,
         steps: result.steps.map((step) => ({
           task: step.task ? serialiseTask(step.task) : null,
           execution: step.execution ? serialiseExecutionResult(step.execution) : null,
         })),
+        operator: result.operator ?? buildOperatorState(),
         summary: result.summary,
       });
     } catch (error) {
@@ -1541,6 +1629,25 @@ const server = http.createServer(async (req, res) => {
     reconcileRuntimeState();
 
     await publishEvent("task.paused", { task: serialiseTask(task) });
+    sendJson(res, 200, { ok: true, task: serialiseTask(task), runtime: runtimeState });
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/control/resume") {
+    const task = getCurrentTask()
+      ?? [...tasks.values()].filter((candidate) => candidate.status === "paused").sort(compareTasksForDisplay)[0]
+      ?? null;
+
+    if (!task || task.status !== "paused") {
+      sendJson(res, 409, { ok: false, error: "No paused task to resume." });
+      return;
+    }
+
+    task.status = "queued";
+    appendTaskPhase(task, "resumed", { reason: "Resumed by operator." });
+    reconcileRuntimeState();
+
+    await publishEvent("task.resumed", { task: serialiseTask(task) });
     sendJson(res, 200, { ok: true, task: serialiseTask(task), runtime: runtimeState });
     return;
   }

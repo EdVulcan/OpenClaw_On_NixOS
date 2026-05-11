@@ -1,4 +1,4 @@
-export type TaskStatus = "queued" | "running" | "completed" | "failed" | "paused";
+export type TaskStatus = "queued" | "running" | "completed" | "failed" | "paused" | "superseded";
 
 export type Task = {
   id: string;
@@ -8,4 +8,3 @@ export type Task = {
   createdAt: string;
   updatedAt: string;
 };
-

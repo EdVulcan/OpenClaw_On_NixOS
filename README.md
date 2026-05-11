@@ -104,7 +104,7 @@ npm run dev:milestone-check:unix
 To run only a subset:
 
 ```bash
-OPENCLAW_MILESTONE_CHECKS=planner,operator-loop npm run dev:milestone-check:unix
+OPENCLAW_MILESTONE_CHECKS=planner,operator-loop,operator-control npm run dev:milestone-check:unix
 ```
 
 Stop everything that `dev:up` started:
@@ -298,6 +298,7 @@ This is based on real NixOS VM validation:
 - `dev:state-check:unix` works
 - `dev:command-capture-check:unix` works
 - `dev:milestone-check:unix` is the preferred mainline regression suite
+- `dev:operator-control-check:unix` covers operator dry-run, pause gating, and resume
 - direct GNOME/Wayland whole-desktop capture remains inconsistent across:
   - `org.gnome.Shell.Screenshot`
   - `grim`
