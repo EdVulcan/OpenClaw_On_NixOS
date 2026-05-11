@@ -394,6 +394,7 @@ function observerHtml() {
           <h2>System Health</h2>
           <div class="metric"><span>Online Services</span><span id="system-services-online">0</span></div>
           <div class="metric"><span>Alerts</span><span id="system-alert-count">0</span></div>
+          <div class="metric"><span>Body Uptime</span><span id="system-body-uptime">0s</span></div>
           <pre id="system-summary">Loading system state...</pre>
         </section>
         <section class="panel">
@@ -469,6 +470,7 @@ const actionDegraded = document.querySelector("#action-degraded");
 const actionJson = document.querySelector("#action-json");
 const systemServicesOnline = document.querySelector("#system-services-online");
 const systemAlertCount = document.querySelector("#system-alert-count");
+const systemBodyUptime = document.querySelector("#system-body-uptime");
 const systemSummary = document.querySelector("#system-summary");
 const healCount = document.querySelector("#heal-count");
 const healSummary = document.querySelector("#heal-summary");
@@ -1091,15 +1093,21 @@ async function refreshSystemState() {
     const onlineCount = Object.values(system.services).filter((service) => service.ok).length;
     systemServicesOnline.textContent = String(onlineCount);
     systemAlertCount.textContent = String(system.alerts.length);
+    systemBodyUptime.textContent = \`\${system.body?.uptimeSeconds ?? 0}s\`;
     systemSummary.textContent = [
+      \`Host: \${system.body?.hostname ?? "unknown"} (\${system.body?.platform ?? "unknown"} \${system.body?.arch ?? "unknown"})\`,
+      \`Node: \${system.body?.node ?? "unknown"} PID: \${system.body?.pid ?? "unknown"}\`,
       \`CPU: \${system.resources?.cpuPercent ?? 0}%\`,
+      \`Load: \${(system.resources?.loadAverage ?? []).join(", ") || "n/a"}\`,
       \`Memory: \${system.resources?.memoryPercent ?? 0}%\`,
       \`Disk: \${system.resources?.diskPercent ?? 0}%\`,
+      \`Network: \${system.network?.online ? "online" : "offline"} (\${system.network?.checkedTargets ?? 0} targets)\`,
       \`Alerts: \${system.alerts?.length ?? 0}\`,
     ].join("\\n");
   } catch {
     systemServicesOnline.textContent = "0";
     systemAlertCount.textContent = "0";
+    systemBodyUptime.textContent = "0s";
     systemSummary.textContent = "Unable to read system state.";
   }
 }
@@ -1632,6 +1640,7 @@ function subscribeEvents() {
     "browser.updated",
     "screen.updated",
     "action.completed",
+    "system.updated",
     "service.failed",
     "heal.started",
     "heal.completed",
@@ -1658,7 +1667,7 @@ function subscribeEvents() {
         if (eventName === "action.completed" || eventName === "service.started") {
           await refreshActionState();
         }
-        if (eventName === "service.failed" || eventName === "service.started") {
+        if (eventName === "system.updated" || eventName === "service.failed" || eventName === "service.started") {
           await refreshSystemState();
         }
         if (eventName === "heal.started" || eventName === "heal.completed" || eventName === "service.started") {

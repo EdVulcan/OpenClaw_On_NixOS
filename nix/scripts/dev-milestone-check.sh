@@ -17,6 +17,7 @@ checks=(
   "operator-loop|dev-operator-loop-check.sh|Operator step/run queue consumption and persistence"
   "operator-control|dev-operator-control-check.sh|Operator state, dry-run, pause gate, and resume control"
   "policy|dev-policy-check.sh|Policy governance, audit, and cross-boundary execution gate"
+  "system-sense|dev-system-sense-check.sh|Real body vitals, service latency, resources, and alerts"
   "observer-operator|dev-observer-operator-check.sh|Observer UI planner/operator controls and API wiring"
 )
 

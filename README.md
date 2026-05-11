@@ -121,6 +121,14 @@ npm run dev:policy-check:unix
 
 This verifies body-internal actions, ordinary user tasks, cross-boundary approval gates, denial boundaries, audit history, and the operator execution gate.
 
+Run the body vitals slice directly:
+
+```bash
+npm run dev:system-sense-check:unix
+```
+
+This verifies host/body identity, uptime, CPU/memory/disk vitals, service latency, network summary, and structured alerts.
+
 Stop everything that `dev:up` started:
 
 ```bash
@@ -315,6 +323,7 @@ This is based on real NixOS VM validation:
 - `dev:milestone-check:unix` is the preferred mainline regression suite
 - `dev:operator-control-check:unix` covers operator dry-run, pause gating, and resume
 - `dev:policy-check:unix` covers the first policy governance and cross-boundary gate
+- `dev:system-sense-check:unix` covers real body vitals and service health telemetry
 - direct GNOME/Wayland whole-desktop capture remains inconsistent across:
   - `org.gnome.Shell.Screenshot`
   - `grim`

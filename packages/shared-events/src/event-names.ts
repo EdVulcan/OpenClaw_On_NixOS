@@ -18,6 +18,7 @@ export const eventNames = [
   "action.failed",
   "browser.started",
   "browser.updated",
+  "system.updated",
   "service.failed",
   "heal.started",
   "heal.completed",
