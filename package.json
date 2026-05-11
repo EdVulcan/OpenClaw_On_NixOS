@@ -25,6 +25,7 @@
     "dev:task-executor-check:unix": "bash ./nix/scripts/dev-task-executor-check.sh",
     "dev:persistence-check:unix": "bash ./nix/scripts/dev-persistence-check.sh",
     "dev:planner-check:unix": "bash ./nix/scripts/dev-planner-check.sh",
-    "dev:operator-loop-check:unix": "bash ./nix/scripts/dev-operator-loop-check.sh"
+    "dev:operator-loop-check:unix": "bash ./nix/scripts/dev-operator-loop-check.sh",
+    "dev:observer-operator-check:unix": "bash ./nix/scripts/dev-observer-operator-check.sh"
   }
 }

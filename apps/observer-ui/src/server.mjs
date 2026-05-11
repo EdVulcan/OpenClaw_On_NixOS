@@ -283,6 +283,9 @@ function observerHtml() {
             </div>
             <div class="actions">
               <button id="create-task-button">Create Demo Task</button>
+              <button id="create-planned-task-button">Create Planned Task</button>
+              <button id="operator-step-button" class="secondary">Operator Step</button>
+              <button id="operator-run-button" class="secondary">Operator Run</button>
               <button id="recover-latest-task-button" class="secondary">Recover Latest Finished Task</button>
               <button id="recover-latest-failed-task-button" class="secondary">Recover Latest Failed Task</button>
               <button id="load-history-button" class="secondary">Load Latest Task History</button>
@@ -314,6 +317,18 @@ function observerHtml() {
         <section class="panel">
           <h2>Current Task</h2>
           <pre id="task-json">Loading task state...</pre>
+        </section>
+        <section class="panel">
+          <h2>Task Plan</h2>
+          <div class="metric"><span>Status</span><span id="task-plan-status">none</span></div>
+          <div class="metric"><span>Steps</span><span id="task-plan-count">0</span></div>
+          <pre id="task-plan-json">No task plan selected.</pre>
+        </section>
+        <section class="panel">
+          <h2>Operator Loop</h2>
+          <div class="metric"><span>Last Run</span><span id="operator-loop-ran">none</span></div>
+          <div class="metric"><span>Steps</span><span id="operator-loop-count">0</span></div>
+          <pre id="operator-loop-json">No operator run yet.</pre>
         </section>
         <section class="panel">
           <h2>Recent Tasks</h2>
@@ -446,6 +461,9 @@ const systemSummary = document.querySelector("#system-summary");
 const healCount = document.querySelector("#heal-count");
 const healSummary = document.querySelector("#heal-summary");
 const createTaskButton = document.querySelector("#create-task-button");
+const createPlannedTaskButton = document.querySelector("#create-planned-task-button");
+const operatorStepButton = document.querySelector("#operator-step-button");
+const operatorRunButton = document.querySelector("#operator-run-button");
 const recoverLatestTaskButton = document.querySelector("#recover-latest-task-button");
 const recoverLatestFailedTaskButton = document.querySelector("#recover-latest-failed-task-button");
 const loadHistoryButton = document.querySelector("#load-history-button");
@@ -467,6 +485,12 @@ const pauseButton = document.querySelector("#pause-button");
 const stopButton = document.querySelector("#stop-button");
 const openWorkViewUrlButton = document.querySelector("#open-work-view-url-button");
 const workViewUrlInput = document.querySelector("#work-view-url-input");
+const taskPlanStatus = document.querySelector("#task-plan-status");
+const taskPlanCount = document.querySelector("#task-plan-count");
+const taskPlanJson = document.querySelector("#task-plan-json");
+const operatorLoopRan = document.querySelector("#operator-loop-ran");
+const operatorLoopCount = document.querySelector("#operator-loop-count");
+const operatorLoopJson = document.querySelector("#operator-loop-json");
 let currentTaskState = null;
 let latestActionState = null;
 let latestHistoryTask = null;
@@ -567,6 +591,60 @@ function deriveTaskLastAction(task) {
   return null;
 }
 
+function renderTaskPlan(plan) {
+  if (!plan) {
+    return "No task plan selected.";
+  }
+
+  const steps = Array.isArray(plan.steps) ? plan.steps : [];
+  return [
+    \`Plan ID: \${plan.planId ?? "none"}\`,
+    \`Strategy: \${plan.strategy ?? "unknown"}\`,
+    \`Status: \${plan.status ?? "unknown"}\`,
+    \`Target URL: \${plan.targetUrl ?? "none"}\`,
+    \`Steps: \${steps.length}\`,
+    "",
+    ...steps.map((step, index) => {
+      const status = step.status ?? "pending";
+      const title = step.title ?? step.kind ?? step.phase ?? \`step \${index + 1}\`;
+      const phase = step.phase ?? "unknown";
+      return \`\${index + 1}. [\${status}] \${phase} - \${title}\`;
+    }),
+  ].join("\\n");
+}
+
+function renderPlanPanel(task) {
+  const plan = task?.plan ?? null;
+  const steps = Array.isArray(plan?.steps) ? plan.steps : [];
+  taskPlanStatus.textContent = plan?.status ?? "none";
+  taskPlanCount.textContent = String(steps.length);
+  taskPlanJson.textContent = renderTaskPlan(plan);
+}
+
+function renderOperatorPanel(result) {
+  if (!result) {
+    operatorLoopRan.textContent = "none";
+    operatorLoopCount.textContent = "0";
+    operatorLoopJson.textContent = "No operator run yet.";
+    return;
+  }
+
+  const steps = Array.isArray(result.steps) ? result.steps : result.task ? [result] : [];
+  operatorLoopRan.textContent = result.ran ? "yes" : "no";
+  operatorLoopCount.textContent = String(result.count ?? steps.length);
+  operatorLoopJson.textContent = [
+    \`Ran: \${Boolean(result.ran)}\`,
+    \`Steps: \${result.count ?? steps.length}\`,
+    \`Runtime: \${result.summary?.runtime?.status ?? result.summary?.status ?? "unknown"}\`,
+    "",
+    ...steps.map((step, index) => {
+      const task = step.task ?? null;
+      const verification = step.execution?.verification ?? null;
+      return \`\${index + 1}. \${task?.id ?? "no-task"} \${task?.status ?? "idle"} \${task?.targetUrl ?? ""} verification=\${verification?.ok ?? "n/a"}\`;
+    }),
+  ].join("\\n");
+}
+
 function renderTaskSummary(task, { includeRecovery = true, includeOutcome = true } = {}) {
   if (!task) {
     return "No task selected.";
@@ -598,6 +676,13 @@ function renderTaskSummary(task, { includeRecovery = true, includeOutcome = true
     lines.push(\`Recovery: \${task.recovery?.recoveredFromTaskId ? \`attempt \${task.recovery?.attempt ?? 1} from \${task.recovery.recoveredFromTaskId}\` : "original task"}\`);
     lines.push(\`Recovered By: \${task.recoveredByTaskId ?? "none"}\`);
     lines.push(\`Recoverable: \${task.restorable ? "yes" : "no"}\`);
+  }
+
+  if (task.plan) {
+    const steps = Array.isArray(task.plan.steps) ? task.plan.steps : [];
+    const completed = steps.filter((step) => step.status === "completed").length;
+    lines.push(\`Plan: \${task.plan.strategy ?? "unknown"} / \${task.plan.status ?? "unknown"}\`);
+    lines.push(\`Plan Steps: \${completed}/\${steps.length} completed\`);
   }
 
   lines.push(\`Last Action: \${taskLastAction?.kind ?? "none"}\${taskLastAction ? \` (degraded: \${taskLastAction.degraded})\` : ""}\`);
@@ -723,10 +808,12 @@ async function refreshRuntime() {
     taskJson.textContent = currentTask
       ? renderTaskSummary(currentTask, { includeRecovery: false, includeOutcome: false })
       : "No active task.";
+    renderPlanPanel(currentTask ?? latestHistoryTask);
   } catch {
     currentTaskState = null;
     runtimeStatus.textContent = "offline";
     taskJson.textContent = "Unable to read runtime state.";
+    renderPlanPanel(latestHistoryTask);
   }
 }
 
@@ -811,11 +898,13 @@ async function refreshTaskHistoryDetail() {
         : taskHistoryFocus === "current-task"
           ? "No active task selected."
           : "No finished task recorded yet.";
+    renderPlanPanel(currentTaskState ?? historyTask);
   } catch {
     taskHistoryMeta.textContent = formatTaskFocusLabel(taskHistoryFocus, latestHistoryTask);
     taskHistoryJson.textContent = latestHistoryTask
       ? renderTaskSummary(latestHistoryTask)
       : "Unable to read task history detail.";
+    renderPlanPanel(currentTaskState ?? latestHistoryTask);
   }
 }
 
@@ -975,6 +1064,82 @@ async function createDemoTask() {
   await refreshRuntime();
   await refreshTaskList();
   await refreshTaskHistoryDetail();
+  await refreshWorkView();
+  await refreshScreen();
+}
+
+async function createPlannedTask() {
+  const targetUrl = getDesiredWorkViewUrl();
+  const result = await fetchJson(\`\${observerConfig.coreUrl}/tasks/plan\`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      goal: \`Plan an AI work view run for \${targetUrl}\`,
+      type: "browser_task",
+      targetUrl,
+      workViewStrategy: "ai-work-view",
+      actions: [
+        { kind: "keyboard.type", params: { text: "hello from openclaw-operator" } },
+        { kind: "mouse.click", params: { x: 640, y: 360, button: "left" } },
+      ],
+    }),
+  });
+
+  taskHistoryFocus = "selected-task";
+  selectedHistoryTaskId = result.task?.id ?? null;
+  taskDetailIdInput.value = result.task?.id ?? "";
+  renderPlanPanel(result.task ?? { plan: result.plan });
+  setControlMessage(\`Planned task \${result.task?.id ?? "unknown"} for \${targetUrl}. Use Operator Step or Run to execute it.\`);
+  await refreshRuntime();
+  await refreshTaskList();
+  await refreshTaskHistoryDetail();
+}
+
+async function runOperatorStepFromUi() {
+  const result = await fetchJson(\`\${observerConfig.coreUrl}/operator/step\`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({}),
+  });
+
+  renderOperatorPanel(result);
+  taskHistoryFocus = result.task?.id ? "selected-task" : taskHistoryFocus;
+  selectedHistoryTaskId = result.task?.id ?? selectedHistoryTaskId;
+  if (result.task?.id) {
+    taskDetailIdInput.value = result.task.id;
+  }
+  setControlMessage(result.ran
+    ? \`Operator completed task \${result.task?.id ?? "unknown"}.\`
+    : "Operator step found no queued task.");
+  await refreshRuntime();
+  await refreshTaskList();
+  await refreshTaskHistoryDetail();
+  await refreshActionState();
+  await refreshWorkView();
+  await refreshScreen();
+}
+
+async function runOperatorLoopFromUi() {
+  const result = await fetchJson(\`\${observerConfig.coreUrl}/operator/run\`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ maxSteps: 5 }),
+  });
+
+  renderOperatorPanel(result);
+  const lastTask = [...(result.steps ?? [])].reverse().find((step) => step.task?.id)?.task ?? null;
+  taskHistoryFocus = lastTask?.id ? "selected-task" : taskHistoryFocus;
+  selectedHistoryTaskId = lastTask?.id ?? selectedHistoryTaskId;
+  if (lastTask?.id) {
+    taskDetailIdInput.value = lastTask.id;
+  }
+  setControlMessage(result.ran
+    ? \`Operator run completed \${result.count ?? result.steps?.length ?? 0} task(s).\`
+    : "Operator run found no queued tasks.");
+  await refreshRuntime();
+  await refreshTaskList();
+  await refreshTaskHistoryDetail();
+  await refreshActionState();
   await refreshWorkView();
   await refreshScreen();
 }
@@ -1356,6 +1521,7 @@ function subscribeEvents() {
 
   for (const eventName of [
     "task.created",
+    "task.planned",
     "task.phase_changed",
     "task.running",
     "task.completed",
@@ -1405,6 +1571,24 @@ function subscribeEvents() {
 
 createTaskButton.addEventListener("click", () => {
   createDemoTask().catch((error) => {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  });
+});
+
+createPlannedTaskButton.addEventListener("click", () => {
+  createPlannedTask().catch((error) => {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  });
+});
+
+operatorStepButton.addEventListener("click", () => {
+  runOperatorStepFromUi().catch((error) => {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  });
+});
+
+operatorRunButton.addEventListener("click", () => {
+  runOperatorLoopFromUi().catch((error) => {
     setControlMessage(\`Request failed: \${formatError(error)}\`);
   });
 });
