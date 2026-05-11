@@ -29,8 +29,10 @@ export OPENCLAW_CAPTURE_WINDOW_PID="4343"
 export OPENCLAW_CAPTURE_SNAPSHOT_TEXT_FILE="$ARTIFACT_DIR/snapshot.txt"
 export OPENCLAW_CAPTURE_OCR_TEXT_FILE="$ARTIFACT_DIR/ocr.txt"
 export OPENCLAW_CAPTURE_SNAPSHOT_PATH="D:/mock/captures/file-backed-frame.txt"
+export OPENCLAW_CORE_STATE_FILE="${OPENCLAW_CORE_STATE_FILE:-$REPO_ROOT/.artifacts/openclaw-core-command-capture-check.json}"
 
 "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
+rm -f "$OPENCLAW_CORE_STATE_FILE" "$OPENCLAW_CORE_STATE_FILE.tmp"
 
 cleanup() {
   "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
