@@ -10,6 +10,7 @@ export const eventNames = [
   "task.recovered",
   "task.completed",
   "task.failed",
+  "policy.evaluated",
   "screen.updated",
   "window.changed",
   "action.started",

@@ -104,8 +104,16 @@ npm run dev:milestone-check:unix
 To run only a subset:
 
 ```bash
-OPENCLAW_MILESTONE_CHECKS=planner,operator-loop,operator-control npm run dev:milestone-check:unix
+OPENCLAW_MILESTONE_CHECKS=planner,operator-loop,operator-control,policy npm run dev:milestone-check:unix
 ```
+
+Run the policy governance slice directly:
+
+```bash
+npm run dev:policy-check:unix
+```
+
+This verifies body-internal actions, ordinary user tasks, cross-boundary approval gates, denial boundaries, audit history, and the operator execution gate.
 
 Stop everything that `dev:up` started:
 
@@ -299,6 +307,7 @@ This is based on real NixOS VM validation:
 - `dev:command-capture-check:unix` works
 - `dev:milestone-check:unix` is the preferred mainline regression suite
 - `dev:operator-control-check:unix` covers operator dry-run, pause gating, and resume
+- `dev:policy-check:unix` covers the first policy governance and cross-boundary gate
 - direct GNOME/Wayland whole-desktop capture remains inconsistent across:
   - `org.gnome.Shell.Screenshot`
   - `grim`

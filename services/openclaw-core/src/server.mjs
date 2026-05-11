@@ -13,6 +13,7 @@ const stateFilePath = process.env.OPENCLAW_CORE_STATE_FILE
   ?? path.resolve(process.cwd(), "../../.artifacts/openclaw-core-state.json");
 
 const tasks = new Map();
+const policyAuditLog = [];
 const runtimeState = {
   status: "idle",
   currentTaskId: null,
@@ -21,6 +22,20 @@ const runtimeState = {
 };
 
 const ACTIVE_TASK_STATUSES = new Set(["queued", "running", "paused"]);
+const MAX_POLICY_AUDIT_ENTRIES = 100;
+const CROSS_BOUNDARY_INTENTS = new Set([
+  "account.login",
+  "data.egress",
+  "data.upload",
+  "external_device.control",
+  "network.publish",
+  "social.post",
+  "transaction.commit",
+]);
+const DENIED_INTENTS = new Set([
+  "body.destroy",
+  "security.disable",
+]);
 const STATUS_PRIORITY = {
   running: 0,
   paused: 1,
@@ -83,6 +98,7 @@ function persistState() {
       savedAt: new Date().toISOString(),
       runtime: runtimeState,
       tasks: [...tasks.values()],
+      policyAuditLog,
     };
     const tempPath = `${stateFilePath}.tmp`;
     writeFileSync(tempPath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
@@ -109,6 +125,9 @@ function loadPersistentState() {
           tasks.set(task.id, task);
         }
       }
+    }
+    if (Array.isArray(data?.policyAuditLog)) {
+      policyAuditLog.splice(0, policyAuditLog.length, ...data.policyAuditLog.slice(-MAX_POLICY_AUDIT_ENTRIES));
     }
   } catch (error) {
     console.error("Failed to load persisted core state:", error);
@@ -164,6 +183,7 @@ function serialiseTask(task) {
     targetUrl: task.targetUrl ?? null,
     workViewStrategy: task.workViewStrategy ?? null,
     plan: task.plan ?? null,
+    policy: task.policy ?? null,
     workView: task.workView ?? null,
     lastAction: task.lastAction ?? null,
     outcome: task.outcome ?? null,
@@ -387,12 +407,223 @@ function buildOperatorState() {
     nextTask: nextTask ? serialiseTask(nextTask) : null,
     policy: {
       respectsPause: true,
+      enforcesTaskPolicy: true,
       defaultMaxSteps: 5,
       maxStepsLimit: 20,
       supportsDryRun: true,
+      decisions: ["allow", "audit_only", "require_approval", "deny"],
     },
     summary: buildTaskSummary(),
   };
+}
+
+function normalisePolicyTags(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((tag) => typeof tag === "string" && tag.trim())
+    .map((tag) => tag.trim());
+}
+
+function inferPolicyIntent(input = {}) {
+  const policy = input.policy && typeof input.policy === "object" ? input.policy : {};
+  const action = input.action && typeof input.action === "object" ? input.action : {};
+  const rawIntent =
+    policy.intent
+    ?? input.intent
+    ?? action.intent
+    ?? action.kind
+    ?? input.actionKind
+    ?? input.kind
+    ?? input.type
+    ?? "task.execute";
+
+  return typeof rawIntent === "string" && rawIntent.trim() ? rawIntent.trim() : "task.execute";
+}
+
+function inferPolicyDomain({ input, intent, tags }) {
+  const policy = input.policy && typeof input.policy === "object" ? input.policy : {};
+  const explicitDomain = typeof policy.domain === "string" && policy.domain.trim()
+    ? policy.domain.trim()
+    : typeof input.domain === "string" && input.domain.trim()
+      ? input.domain.trim()
+      : null;
+
+  if (explicitDomain) {
+    return explicitDomain;
+  }
+
+  if (
+    policy.crossBoundary === true
+    || input.crossBoundary === true
+    || CROSS_BOUNDARY_INTENTS.has(intent)
+    || tags.includes("cross_boundary")
+    || tags.includes("external")
+    || tags.includes("data_egress")
+  ) {
+    return "cross_boundary";
+  }
+
+  if (
+    intent.startsWith("heal.")
+    || intent.startsWith("system.")
+    || intent.startsWith("body.")
+    || input.type === "system_task"
+    || input.type === "heal_task"
+  ) {
+    return "body_internal";
+  }
+
+  return "user_task";
+}
+
+function inferPolicyRisk({ input, intent, domain, tags }) {
+  const policy = input.policy && typeof input.policy === "object" ? input.policy : {};
+  const explicitRisk = typeof policy.risk === "string" && policy.risk.trim()
+    ? policy.risk.trim()
+    : typeof input.risk === "string" && input.risk.trim()
+      ? input.risk.trim()
+      : null;
+
+  if (explicitRisk) {
+    return explicitRisk;
+  }
+
+  if (DENIED_INTENTS.has(intent) || tags.includes("destructive")) {
+    return "critical";
+  }
+
+  if (domain === "cross_boundary") {
+    return "high";
+  }
+
+  if (intent.startsWith("heal.") || intent.startsWith("system.")) {
+    return "medium";
+  }
+
+  return "low";
+}
+
+function evaluatePolicyIntent(input = {}, context = {}) {
+  const policy = input.policy && typeof input.policy === "object" ? input.policy : {};
+  const tags = [...normalisePolicyTags(input.tags), ...normalisePolicyTags(policy.tags)];
+  const intent = inferPolicyIntent(input);
+  const domain = inferPolicyDomain({ input, intent, tags });
+  const risk = inferPolicyRisk({ input, intent, domain, tags });
+  const approved = policy.approved === true || input.approved === true || context.approved === true;
+  const requiresApproval = policy.requiresApproval === true || input.requiresApproval === true;
+  const auditRequired = domain !== "user_task" || risk !== "low" || policy.audit === true || input.audit === true;
+
+  let decision = "allow";
+  let reason = "within_user_task_boundary";
+
+  if (DENIED_INTENTS.has(intent) || policy.deny === true || input.deny === true) {
+    decision = "deny";
+    reason = "absolute_boundary";
+  } else if (domain === "cross_boundary" && !approved) {
+    decision = "require_approval";
+    reason = "cross_boundary_requires_user_approval";
+  } else if (requiresApproval && !approved) {
+    decision = "require_approval";
+    reason = "approval_required";
+  } else if (auditRequired) {
+    decision = "audit_only";
+    reason = approved ? "approved_and_audited" : "body_internal_audit";
+  }
+
+  const now = new Date().toISOString();
+  return {
+    id: randomUUID(),
+    at: now,
+    engine: "policy-v0",
+    stage: context.stage ?? "evaluate",
+    subject: {
+      taskId: input.taskId ?? context.taskId ?? null,
+      type: input.type ?? context.type ?? null,
+      goal: input.goal ?? context.goal ?? null,
+      targetUrl: input.targetUrl ?? context.targetUrl ?? null,
+      intent,
+    },
+    domain,
+    risk,
+    decision,
+    reason,
+    approved,
+    auditRequired,
+    tags,
+  };
+}
+
+function recordPolicyDecision(decision) {
+  policyAuditLog.push(decision);
+  if (policyAuditLog.length > MAX_POLICY_AUDIT_ENTRIES) {
+    policyAuditLog.splice(0, policyAuditLog.length - MAX_POLICY_AUDIT_ENTRIES);
+  }
+  persistState();
+  return decision;
+}
+
+function isPolicyExecutionAllowed(decision) {
+  return decision?.decision === "allow" || decision?.decision === "audit_only";
+}
+
+function buildPolicyState() {
+  return {
+    engine: "policy-v0",
+    mode: "local-rule-governance",
+    rules: {
+      bodyInternalDefault: "allow_with_audit",
+      userTaskDefault: "allow",
+      crossBoundaryDefault: "require_approval",
+      deniedIntents: [...DENIED_INTENTS],
+      crossBoundaryIntents: [...CROSS_BOUNDARY_INTENTS],
+    },
+    decisions: policyAuditLog.slice(-20).reverse(),
+    counts: policyAuditLog.reduce((counts, decision) => {
+      counts.total += 1;
+      counts[decision.decision] = (counts[decision.decision] ?? 0) + 1;
+      counts[decision.domain] = (counts[decision.domain] ?? 0) + 1;
+      return counts;
+    }, {
+      total: 0,
+      allow: 0,
+      audit_only: 0,
+      require_approval: 0,
+      deny: 0,
+      body_internal: 0,
+      user_task: 0,
+      cross_boundary: 0,
+    }),
+  };
+}
+
+function ensureTaskPolicy(task, context = {}) {
+  const existing = task.policy?.decision ? task.policy : null;
+  if (existing && context.force !== true) {
+    return existing;
+  }
+
+  const decision = evaluatePolicyIntent({
+    taskId: task.id,
+    type: task.type,
+    goal: task.goal,
+    targetUrl: task.targetUrl,
+    policy: task.policy?.request ?? task.policy ?? {},
+  }, {
+    stage: context.stage ?? "task",
+    taskId: task.id,
+    type: task.type,
+    goal: task.goal,
+    targetUrl: task.targetUrl,
+  });
+  task.policy = {
+    request: task.policy?.request ?? task.policy ?? {},
+    decision,
+  };
+  recordPolicyDecision(decision);
+  return task.policy;
 }
 
 function createTask(body) {
@@ -428,6 +659,17 @@ function createTask(body) {
       : body.plan && typeof body.plan === "object"
         ? body.plan
         : null,
+    policy:
+      body.policy && typeof body.policy === "object"
+        ? { request: body.policy }
+        : {
+            request: {
+              intent:
+                typeof body.intent === "string" && body.intent.trim()
+                  ? body.intent.trim()
+                  : "task.execute",
+            },
+          },
     workView: null,
     lastAction: null,
     outcome: null,
@@ -462,6 +704,7 @@ function createTask(body) {
   };
 
   tasks.set(task.id, task);
+  ensureTaskPolicy(task, { stage: "task.created" });
   persistState();
   return task;
 }
@@ -727,6 +970,33 @@ async function executeTask(task, options = {}) {
     throw new Error("Task targetUrl is required for execution.");
   }
 
+  const policy = ensureTaskPolicy(task, { stage: "task.execute", targetUrl });
+  await publishEvent("policy.evaluated", { task: serialiseTask(task), policy: policy.decision });
+  if (!isPolicyExecutionAllowed(policy.decision)) {
+    const failedTask = failTask(task, `Policy blocked task execution: ${policy.decision.reason}`, {
+      targetUrl,
+      executor: "core-v2",
+      policy: policy.decision,
+    });
+    await publishEvent("task.failed", {
+      task: serialiseTask(failedTask),
+      reason: "Policy blocked task execution.",
+      policy: policy.decision,
+      executor: "core-v2",
+    });
+    return {
+      task: failedTask,
+      prepare: null,
+      reveal: null,
+      initialScreen: null,
+      verifiedScreen: null,
+      actions: [],
+      finalWorkViewState: null,
+      verification: null,
+      policy: policy.decision,
+    };
+  }
+
   const displayTarget =
     typeof options.displayTarget === "string" && options.displayTarget.trim()
       ? options.displayTarget.trim()
@@ -922,11 +1192,12 @@ function serialiseExecutionResult(executionResult) {
   const finalExecution = executionResult.finalExecution ?? executionResult;
   return {
     executor: executionResult.recovery?.attempted ? "core-v3" : finalExecution.verification ? "core-v2" : "core-v1",
-    actions: finalExecution.actions.map((action) => ({
+    actions: (finalExecution.actions ?? []).map((action) => ({
       kind: action?.kind ?? null,
       degraded: Boolean(action?.degraded),
       result: action?.result ?? null,
     })),
+    policy: finalExecution.policy ?? finalExecution.task?.policy?.decision ?? null,
     verification: finalExecution.verification ?? null,
     finalReadiness: finalExecution.verifiedScreen?.screen?.readiness ?? null,
     finalWorkView: finalExecution.finalWorkViewState?.workView ?? null,
@@ -1067,6 +1338,22 @@ async function runOperatorStep(body = {}) {
     };
   }
 
+  const policy = ensureTaskPolicy(task, { stage: "operator.step" });
+  await publishEvent("policy.evaluated", { task: serialiseTask(task), policy: policy.decision });
+  if (!isPolicyExecutionAllowed(policy.decision)) {
+    return {
+      ran: false,
+      blocked: true,
+      reason: policy.decision.decision === "deny" ? "policy_denied" : "policy_requires_approval",
+      dryRun: false,
+      task,
+      execution: null,
+      policy: policy.decision,
+      summary: buildTaskSummary(),
+      operator: buildOperatorState(),
+    };
+  }
+
   const executionResult = await executeTaskWithRecovery(task, buildOperatorOptions(task, body));
   return {
     ran: true,
@@ -1176,6 +1463,31 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === "GET" && requestUrl.pathname === "/policy/state") {
+    sendJson(res, 200, {
+      ok: true,
+      policy: buildPolicyState(),
+    });
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/policy/evaluate") {
+    try {
+      const body = await readJsonBody(req);
+      const decision = recordPolicyDecision(evaluatePolicyIntent(body, { stage: "policy.evaluate" }));
+      await publishEvent("policy.evaluated", { policy: decision });
+      sendJson(res, 200, {
+        ok: true,
+        policy: decision,
+        state: buildPolicyState(),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
   if (req.method === "GET" && requestUrl.pathname === "/tasks/focus/current") {
     reconcileRuntimeState();
     const task = getCurrentTask();
@@ -1275,6 +1587,7 @@ const server = http.createServer(async (req, res) => {
         dryRun: step.dryRun ?? false,
         task: step.task ? serialiseTask(step.task) : null,
         execution: step.execution ? serialiseExecutionResult(step.execution) : null,
+        policy: step.policy ?? step.task?.policy?.decision ?? null,
         operator: step.operator ?? buildOperatorState(),
         summary: step.summary,
       });
@@ -1300,6 +1613,7 @@ const server = http.createServer(async (req, res) => {
         steps: result.steps.map((step) => ({
           task: step.task ? serialiseTask(step.task) : null,
           execution: step.execution ? serialiseExecutionResult(step.execution) : null,
+          policy: step.policy ?? step.task?.policy?.decision ?? null,
         })),
         operator: result.operator ?? buildOperatorState(),
         summary: result.summary,

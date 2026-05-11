@@ -335,6 +335,14 @@ function observerHtml() {
           <pre id="operator-loop-json">No operator run yet.</pre>
         </section>
         <section class="panel">
+          <h2>Policy Governance</h2>
+          <div class="metric"><span>Engine</span><span id="policy-engine">policy-v0</span></div>
+          <div class="metric"><span>Last Decision</span><span id="policy-decision">none</span></div>
+          <div class="metric"><span>Domain</span><span id="policy-domain">none</span></div>
+          <div class="metric"><span>Audit Entries</span><span id="policy-audit-count">0</span></div>
+          <pre id="policy-json">Loading policy state...</pre>
+        </section>
+        <section class="panel">
           <h2>Recent Tasks</h2>
           <div class="metric"><span>Entries</span><span id="task-list-count">0</span></div>
           <div class="task-summary-grid">
@@ -499,6 +507,11 @@ const operatorLoopNext = document.querySelector("#operator-loop-next");
 const operatorLoopRan = document.querySelector("#operator-loop-ran");
 const operatorLoopCount = document.querySelector("#operator-loop-count");
 const operatorLoopJson = document.querySelector("#operator-loop-json");
+const policyEngine = document.querySelector("#policy-engine");
+const policyDecision = document.querySelector("#policy-decision");
+const policyDomain = document.querySelector("#policy-domain");
+const policyAuditCount = document.querySelector("#policy-audit-count");
+const policyJson = document.querySelector("#policy-json");
 let currentTaskState = null;
 let latestActionState = null;
 let latestHistoryTask = null;
@@ -636,6 +649,25 @@ function renderOperatorState(operator) {
   operatorLoopNext.textContent = nextTask?.id ? nextTask.id.slice(0, 8) : "none";
 }
 
+function renderPolicyState(policy) {
+  const lastDecision = Array.isArray(policy?.decisions) ? policy.decisions[0] : null;
+  policyEngine.textContent = policy?.engine ?? "policy-v0";
+  policyDecision.textContent = lastDecision?.decision ?? "none";
+  policyDomain.textContent = lastDecision?.domain ?? "none";
+  policyAuditCount.textContent = String(policy?.counts?.total ?? 0);
+  policyJson.textContent = [
+    \`Mode: \${policy?.mode ?? "unknown"}\`,
+    \`Body Internal Default: \${policy?.rules?.bodyInternalDefault ?? "unknown"}\`,
+    \`User Task Default: \${policy?.rules?.userTaskDefault ?? "unknown"}\`,
+    \`Cross Boundary Default: \${policy?.rules?.crossBoundaryDefault ?? "unknown"}\`,
+    \`Decisions: \${policy?.counts?.total ?? 0}\`,
+    "",
+    ...(policy?.decisions ?? []).slice(0, 6).map((decision) => {
+      return \`[\${formatTimestamp(decision.at)}] \${decision.decision} \${decision.domain} \${decision.subject?.intent ?? "unknown"} - \${decision.reason}\`;
+    }),
+  ].join("\\n");
+}
+
 function renderOperatorPanel(result) {
   if (!result) {
     renderOperatorState(null);
@@ -691,6 +723,18 @@ async function refreshOperatorState() {
   }
 }
 
+async function refreshPolicyState() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/policy/state\`);
+    renderPolicyState(data.policy);
+  } catch {
+    policyEngine.textContent = "offline";
+    policyDecision.textContent = "unknown";
+    policyDomain.textContent = "unknown";
+    policyJson.textContent = "Unable to read policy state.";
+  }
+}
+
 function renderTaskSummary(task, { includeRecovery = true, includeOutcome = true } = {}) {
   if (!task) {
     return "No task selected.";
@@ -708,6 +752,7 @@ function renderTaskSummary(task, { includeRecovery = true, includeOutcome = true
     \`Work View Session: \${task.workView?.sessionId ?? "none"}\`,
     \`Work View URL: \${task.workView?.activeUrl ?? "none"}\`,
     \`Work View: \${task.workView?.status ?? "none"} / \${task.workView?.visibility ?? "none"}\`,
+    \`Policy: \${task.policy?.decision?.decision ?? "none"} / \${task.policy?.decision?.domain ?? "none"}\`,
     \`Task Lens: \${describeTaskRelationship(task)}\`,
   ];
 
@@ -1165,6 +1210,7 @@ async function runOperatorStepFromUi() {
   await refreshWorkView();
   await refreshScreen();
   await refreshOperatorState();
+  await refreshPolicyState();
 }
 
 async function runOperatorLoopFromUi() {
@@ -1191,6 +1237,7 @@ async function runOperatorLoopFromUi() {
   await refreshWorkView();
   await refreshScreen();
   await refreshOperatorState();
+  await refreshPolicyState();
 }
 
 async function launchTaskIntoWorkView(taskId, targetUrl) {
@@ -1579,6 +1626,7 @@ function subscribeEvents() {
     "task.paused",
     "task.resumed",
     "task.failed",
+    "policy.evaluated",
     "service.started",
     "browser.started",
     "browser.updated",
@@ -1595,6 +1643,9 @@ function subscribeEvents() {
         await refreshTaskList();
         await refreshTaskHistoryDetail();
         await refreshWorkView();
+        if (eventName === "policy.evaluated") {
+          await refreshPolicyState();
+        }
         if (
           eventName === "screen.updated"
           || eventName === "service.started"
@@ -1875,6 +1926,7 @@ await refreshWorkView();
 await refreshScreen();
 await refreshActionState();
 await refreshOperatorState();
+await refreshPolicyState();
 await refreshSystemState();
 await refreshHealState();
 await loadRecentEvents();
@@ -1888,6 +1940,7 @@ setInterval(refreshWorkView, 5000);
 setInterval(refreshScreen, 5000);
 setInterval(refreshActionState, 5000);
 setInterval(refreshOperatorState, 5000);
+setInterval(refreshPolicyState, 5000);
 setInterval(refreshSystemState, 5000);
 setInterval(refreshHealState, 5000);`;
 }

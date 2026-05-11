@@ -15,6 +15,7 @@ checks=(
   "planner|dev-planner-check.sh|Rule planner plan-only and planned execution flows"
   "operator-loop|dev-operator-loop-check.sh|Operator step/run queue consumption and persistence"
   "operator-control|dev-operator-control-check.sh|Operator state, dry-run, pause gate, and resume control"
+  "policy|dev-policy-check.sh|Policy governance, audit, and cross-boundary execution gate"
   "observer-operator|dev-observer-operator-check.sh|Observer UI planner/operator controls and API wiring"
 )
 
