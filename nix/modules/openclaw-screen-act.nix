@@ -1,13 +1,11 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, ... }:
 {
+  imports = [ ./openclaw-body.nix ];
+
   options.services.openclaw-screen-act.enable = lib.mkEnableOption "OpenClaw screen actions";
 
   config = lib.mkIf config.services.openclaw-screen-act.enable {
-    systemd.services.openclaw-screen-act = {
-      description = "OpenClaw Screen Act";
-      wantedBy = [ "multi-user.target" ];
-      serviceConfig.ExecStart = "${pkgs.bash}/bin/bash -lc 'echo openclaw-screen-act placeholder'";
-    };
+    services.openclaw.enable = true;
+    services.openclaw.components = lib.mkAfter [ "screenAct" ];
   };
 }
-

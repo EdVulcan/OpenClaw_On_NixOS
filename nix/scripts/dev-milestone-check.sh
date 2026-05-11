@@ -8,6 +8,7 @@ ARTIFACT_DIR="$REPO_ROOT/.artifacts/milestone-check"
 mkdir -p "$ARTIFACT_DIR"
 
 checks=(
+  "body-config|dev-body-config-check.sh|NixOS body module, profiles, and systemd service skeleton"
   "state-settling|dev-state-settling-check.sh|Session/browser/screen first-frame settling"
   "task-workbench|dev-task-workbench-check.sh|Task lifecycle, recovery, history, and work view coordination"
   "task-executor|dev-task-executor-check.sh|Executor verification, failed checks, manual and auto recovery"

@@ -101,10 +101,16 @@ Run the current mainline milestone suite on Linux / NixOS:
 npm run dev:milestone-check:unix
 ```
 
+Run the NixOS body-config slice directly:
+
+```bash
+npm run dev:body-config-check:unix
+```
+
 To run only a subset:
 
 ```bash
-OPENCLAW_MILESTONE_CHECKS=planner,operator-loop,operator-control,policy npm run dev:milestone-check:unix
+OPENCLAW_MILESTONE_CHECKS=body-config,planner,operator-loop,operator-control,policy npm run dev:milestone-check:unix
 ```
 
 Run the policy governance slice directly:
@@ -304,6 +310,7 @@ This is based on real NixOS VM validation:
 - `dev:up:unix` works
 - `dev:check:unix` works
 - `dev:state-check:unix` works
+- `dev:body-config-check:unix` covers the first NixOS body module and systemd skeleton
 - `dev:command-capture-check:unix` works
 - `dev:milestone-check:unix` is the preferred mainline regression suite
 - `dev:operator-control-check:unix` covers operator dry-run, pause gating, and resume
