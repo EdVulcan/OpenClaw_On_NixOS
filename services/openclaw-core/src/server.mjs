@@ -163,6 +163,7 @@ function serialiseTask(task) {
     status: task.status,
     targetUrl: task.targetUrl ?? null,
     workViewStrategy: task.workViewStrategy ?? null,
+    plan: task.plan ?? null,
     workView: task.workView ?? null,
     lastAction: task.lastAction ?? null,
     outcome: task.outcome ?? null,
@@ -177,6 +178,117 @@ function serialiseTask(task) {
     isCurrentTask: currentTask?.id === task.id,
     isActive: isActiveTask(task),
   };
+}
+
+function normalisePlanActions(actions) {
+  if (!Array.isArray(actions) || actions.length === 0) {
+    return [
+      { kind: "keyboard.type", params: { text: "hello from openclaw-planner" } },
+      { kind: "mouse.click", params: { x: 640, y: 360, button: "left" } },
+    ];
+  }
+
+  return actions
+    .filter((action) => action && typeof action === "object")
+    .map((action) => ({
+      kind: typeof action.kind === "string" && action.kind.trim() ? action.kind.trim() : "mouse.click",
+      params: action.params && typeof action.params === "object" ? action.params : {},
+    }));
+}
+
+function buildRulePlan({ goal, targetUrl, actions }) {
+  const now = new Date().toISOString();
+  const actionSteps = normalisePlanActions(actions).map((action, index) => ({
+    id: `step-action-${index + 1}`,
+    kind: action.kind,
+    phase: "acting_on_target",
+    title: `Perform ${action.kind}`,
+    status: "pending",
+    params: action.params,
+  }));
+
+  return {
+    planId: `plan-${randomUUID()}`,
+    strategy: "rule-v1",
+    status: "planned",
+    goal,
+    targetUrl,
+    createdAt: now,
+    updatedAt: now,
+    steps: [
+      {
+        id: "step-prepare-work-view",
+        kind: "work_view.prepare",
+        phase: "preparing_work_view",
+        title: "Prepare the AI work view",
+        status: "pending",
+      },
+      {
+        id: "step-open-target",
+        kind: "browser.open",
+        phase: "opening_target",
+        title: `Open ${targetUrl ?? "the target URL"}`,
+        status: "pending",
+      },
+      {
+        id: "step-observe-screen",
+        kind: "screen.observe",
+        phase: "observing_screen",
+        title: "Observe the current screen state",
+        status: "pending",
+      },
+      ...actionSteps,
+      {
+        id: "step-verify-result",
+        kind: "result.verify",
+        phase: "verifying_result",
+        title: "Verify the task result",
+        status: "pending",
+      },
+      {
+        id: "step-close-task",
+        kind: "task.complete",
+        phase: "completed",
+        title: "Close the task after verification",
+        status: "pending",
+      },
+    ],
+  };
+}
+
+function shouldBuildPlan(body) {
+  return body.includePlan === true
+    || body.plan === true
+    || body.planStrategy === "rule-v1"
+    || body.executionMode === "planned";
+}
+
+function updatePlanForPhase(task, phase, details = null) {
+  if (!task.plan || !Array.isArray(task.plan.steps)) {
+    return;
+  }
+
+  const now = new Date().toISOString();
+  task.plan.status = phase === "failed" ? "failed" : phase === "completed" ? "completed" : "running";
+  task.plan.updatedAt = now;
+  if (phase === "failed") {
+    task.plan.failure = details ?? null;
+  }
+
+  const step = task.plan.steps.find((candidate) => candidate.phase === phase && candidate.status !== "completed");
+  if (step) {
+    step.status = phase === "failed" ? "failed" : "completed";
+    step.completedAt = now;
+    step.details = details;
+  }
+
+  if (phase === "completed") {
+    for (const candidate of task.plan.steps) {
+      if (candidate.status === "pending") {
+        candidate.status = "skipped";
+      }
+    }
+  }
 }
 
 function isActiveTask(task) {
@@ -277,6 +389,18 @@ function createTask(body) {
       typeof body.workViewStrategy === "string" && body.workViewStrategy.trim()
         ? body.workViewStrategy.trim()
         : "ai-work-view",
+    plan: shouldBuildPlan(body)
+      ? buildRulePlan({
+          goal,
+          targetUrl:
+            typeof body.targetUrl === "string" && body.targetUrl.trim()
+              ? body.targetUrl.trim()
+              : null,
+          actions: body.actions,
+        })
+      : body.plan && typeof body.plan === "object"
+        ? body.plan
+        : null,
     workView: null,
     lastAction: null,
     outcome: null,
@@ -331,6 +455,7 @@ function appendTaskPhase(task, phase, details = null) {
     };
   }
   task.phaseHistory = [...(task.phaseHistory ?? []), { phase, at: now, details }];
+  updatePlanForPhase(task, phase, details);
   persistState();
   return task;
 }
@@ -735,6 +860,7 @@ function recoverTask(sourceTask) {
     type: sourceTask.type,
     targetUrl: sourceTask.targetUrl,
     workViewStrategy: sourceTask.workViewStrategy,
+    includePlan: Boolean(sourceTask.plan),
     recovery: {
       recoveredFromTaskId: sourceTask.id,
       recoveredFromOutcome: sourceTask.outcome?.kind ?? sourceTask.status,
@@ -993,6 +1119,88 @@ const server = http.createServer(async (req, res) => {
         task: serialiseTask(reclaimedTask),
       })));
       sendJson(res, 201, { ok: true, task: serialiseTask(task) });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/tasks/plan") {
+    try {
+      const body = await readJsonBody(req);
+      const task = createTask({
+        ...body,
+        goal:
+          typeof body.goal === "string" && body.goal.trim()
+            ? body.goal
+            : `Plan work for ${body.targetUrl ?? "the target URL"}`,
+        type: typeof body.type === "string" && body.type.trim() ? body.type : "browser_task",
+        workViewStrategy:
+          typeof body.workViewStrategy === "string" && body.workViewStrategy.trim()
+            ? body.workViewStrategy
+            : "ai-work-view",
+        includePlan: true,
+      });
+      const reclaimedTasks = supersedeOtherActiveTasks(task.id);
+      reconcileRuntimeState();
+
+      await publishEvent("task.created", { task: serialiseTask(task), planner: "rule-v1" });
+      await publishEvent("task.planned", { task: serialiseTask(task), plan: task.plan });
+      await Promise.all(reclaimedTasks.map((reclaimedTask) => publishEvent("task.phase_changed", {
+        task: serialiseTask(reclaimedTask),
+      })));
+      sendJson(res, 201, {
+        ok: true,
+        task: serialiseTask(task),
+        plan: task.plan,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/tasks/plan/execute") {
+    try {
+      const body = await readJsonBody(req);
+      const task = createTask({
+        ...body,
+        goal:
+          typeof body.goal === "string" && body.goal.trim()
+            ? body.goal
+            : `Plan and execute work for ${body.targetUrl ?? "the target URL"}`,
+        type: typeof body.type === "string" && body.type.trim() ? body.type : "browser_task",
+        workViewStrategy:
+          typeof body.workViewStrategy === "string" && body.workViewStrategy.trim()
+            ? body.workViewStrategy
+            : "ai-work-view",
+        includePlan: true,
+      });
+      const reclaimedTasks = supersedeOtherActiveTasks(task.id);
+      reconcileRuntimeState();
+
+      await publishEvent("task.created", { task: serialiseTask(task), planner: "rule-v1" });
+      await publishEvent("task.planned", { task: serialiseTask(task), plan: task.plan });
+      await Promise.all(reclaimedTasks.map((reclaimedTask) => publishEvent("task.phase_changed", {
+        task: serialiseTask(reclaimedTask),
+      })));
+
+      const executionResult = await executeTaskWithRecovery(task, {
+        ...body,
+        actions: Array.isArray(body.actions) ? body.actions : task.plan?.steps
+          ?.filter((step) => step.phase === "acting_on_target")
+          .map((step) => ({ kind: step.kind, params: step.params ?? {} })),
+      });
+      const execution = executionResult.finalExecution;
+      sendJson(res, 201, {
+        ok: true,
+        task: serialiseTask(execution.task),
+        plan: execution.task.plan ?? null,
+        runtime: runtimeState,
+        execution: serialiseExecutionResult(executionResult),
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       sendJson(res, 400, { ok: false, error: message });
