@@ -95,6 +95,18 @@ On Linux / NixOS:
 npm run dev:command-capture-check:unix
 ```
 
+Run the current mainline milestone suite on Linux / NixOS:
+
+```bash
+npm run dev:milestone-check:unix
+```
+
+To run only a subset:
+
+```bash
+OPENCLAW_MILESTONE_CHECKS=planner,operator-loop npm run dev:milestone-check:unix
+```
+
 Stop everything that `dev:up` started:
 
 ```bash
@@ -285,6 +297,7 @@ This is based on real NixOS VM validation:
 - `dev:check:unix` works
 - `dev:state-check:unix` works
 - `dev:command-capture-check:unix` works
+- `dev:milestone-check:unix` is the preferred mainline regression suite
 - direct GNOME/Wayland whole-desktop capture remains inconsistent across:
   - `org.gnome.Shell.Screenshot`
   - `grim`
