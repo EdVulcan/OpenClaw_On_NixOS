@@ -4,6 +4,9 @@ import { randomUUID } from "node:crypto";
 const host = process.env.OPENCLAW_CORE_HOST ?? "127.0.0.1";
 const port = Number.parseInt(process.env.OPENCLAW_CORE_PORT ?? "4100", 10);
 const eventHubUrl = process.env.OPENCLAW_EVENT_HUB_URL ?? "http://127.0.0.1:4101";
+const sessionManagerUrl = process.env.OPENCLAW_SESSION_MANAGER_URL ?? "http://127.0.0.1:4102";
+const screenSenseUrl = process.env.OPENCLAW_SCREEN_SENSE_URL ?? "http://127.0.0.1:4104";
+const screenActUrl = process.env.OPENCLAW_SCREEN_ACT_URL ?? "http://127.0.0.1:4105";
 
 const tasks = new Map();
 const runtimeState = {
@@ -88,6 +91,23 @@ async function publishEvent(type, payload = {}) {
   } catch (error) {
     console.error("Failed to publish event to event hub:", error);
   }
+}
+
+async function fetchJson(url, options = {}) {
+  const response = await fetch(url, options);
+  const data = await response.json().catch(() => null);
+  if (!response.ok || data?.ok === false) {
+    throw new Error(data?.error ?? `Request failed: ${url}`);
+  }
+  return data;
+}
+
+async function postJson(url, body = {}) {
+  return fetchJson(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
 }
 
 function serialiseTask(task) {
@@ -269,6 +289,14 @@ function appendTaskPhase(task, phase, details = null) {
   return task;
 }
 
+async function setTaskPhase(task, phase, { status = task.status, details = null } = {}) {
+  task.status = status;
+  const updatedTask = appendTaskPhase(task, phase, details);
+  reconcileRuntimeState();
+  await publishEvent("task.phase_changed", { task: serialiseTask(updatedTask) });
+  return updatedTask;
+}
+
 function reconcileRuntimeState() {
   const activeTasks = [...tasks.values()]
     .filter((task) => isActiveTask(task))
@@ -383,6 +411,179 @@ function completeTask(task, details = null) {
   return task;
 }
 
+function failTask(task, reason, details = null) {
+  task.status = "failed";
+  appendTaskPhase(task, "failed", { reason, details });
+  task.outcome = {
+    kind: "failed",
+    summary: reason,
+    reason,
+    details,
+    at: task.updatedAt,
+  };
+  task.closedAt = task.updatedAt;
+  reconcileRuntimeState();
+  return task;
+}
+
+function buildWorkViewAttachPayload(data, targetUrl) {
+  const workView = data?.workView ?? {};
+  return {
+    sessionId: data?.session?.sessionId ?? null,
+    status: workView.status ?? "ready",
+    visibility: workView.visibility ?? "visible",
+    mode: workView.mode ?? "foreground-observable",
+    helperStatus: workView.helperStatus ?? "active",
+    displayTarget: workView.displayTarget ?? "workspace-2",
+    activeUrl: workView.activeUrl ?? data?.browser?.browser?.activeUrl ?? data?.browser?.tab?.url ?? targetUrl,
+  };
+}
+
+function normaliseExecutorActions(actions) {
+  if (!Array.isArray(actions) || actions.length === 0) {
+    return [
+      { kind: "keyboard.type", params: { text: "hello from openclaw-task-executor" } },
+      { kind: "mouse.click", params: { x: 640, y: 360, button: "left" } },
+    ];
+  }
+
+  return actions
+    .filter((action) => action && typeof action === "object")
+    .map((action) => ({
+      kind: typeof action.kind === "string" && action.kind.trim() ? action.kind.trim() : "mouse.click",
+      params: action.params && typeof action.params === "object" ? action.params : {},
+    }));
+}
+
+async function executeTask(task, options = {}) {
+  if (!isActiveTask(task)) {
+    throw new Error("Task is not active and cannot be executed.");
+  }
+
+  const targetUrl =
+    typeof options.targetUrl === "string" && options.targetUrl.trim()
+      ? options.targetUrl.trim()
+      : task.targetUrl;
+  if (!targetUrl) {
+    throw new Error("Task targetUrl is required for execution.");
+  }
+
+  const displayTarget =
+    typeof options.displayTarget === "string" && options.displayTarget.trim()
+      ? options.displayTarget.trim()
+      : "workspace-2";
+  const actions = normaliseExecutorActions(options.actions);
+  const actionResults = [];
+
+  try {
+    await setTaskPhase(task, "preparing_work_view", {
+      status: "running",
+      details: { targetUrl, displayTarget, executor: "core-v1" },
+    });
+    const prepare = await postJson(`${sessionManagerUrl}/work-view/prepare`, {
+      displayTarget,
+      entryUrl: targetUrl,
+    });
+
+    await setTaskPhase(task, "opening_target", {
+      status: "running",
+      details: { targetUrl, executor: "core-v1" },
+    });
+    const reveal = await postJson(`${sessionManagerUrl}/work-view/reveal`, {
+      entryUrl: targetUrl,
+    });
+    const attachedTask = attachTaskToWorkView(task, buildWorkViewAttachPayload(reveal, targetUrl));
+    await publishEvent("task.running", { task: serialiseTask(attachedTask) });
+
+    await setTaskPhase(task, "observing_screen", {
+      status: "running",
+      details: { targetUrl, executor: "core-v1" },
+    });
+    const initialScreen = await fetchJson(`${screenSenseUrl}/screen/current`);
+
+    for (const action of actions) {
+      const endpoint = action.kind === "keyboard.type"
+        ? "/act/keyboard/type"
+        : action.kind === "keyboard.hotkey"
+          ? "/act/keyboard/hotkey"
+          : "/act/mouse/click";
+      const actionData = await postJson(`${screenActUrl}${endpoint}`, action.params);
+      actionResults.push(actionData.action);
+      await setTaskPhase(task, "acting_on_target", {
+        status: "running",
+        details: {
+          actionKind: action.kind,
+          degraded: Boolean(actionData.action?.degraded),
+          result: actionData.action?.result ?? null,
+          executor: "core-v1",
+        },
+      });
+    }
+
+    await setTaskPhase(task, "verifying_result", {
+      status: "running",
+      details: { targetUrl, executor: "core-v1" },
+    });
+    const verifiedScreen = await fetchJson(`${screenSenseUrl}/screen/current`);
+
+    let finalWorkViewState = reveal;
+    if (options.hideOnComplete !== false) {
+      finalWorkViewState = await postJson(`${sessionManagerUrl}/work-view/hide`, {});
+    }
+
+    const workView = finalWorkViewState?.workView ?? reveal?.workView ?? {};
+    const updatedTask = completeTask(task, {
+      targetUrl,
+      workViewUrl: targetUrl,
+      summary: `Executor completed task at ${targetUrl}`,
+      executor: "core-v1",
+      actionCount: actionResults.length,
+      initialScreen: {
+        readiness: initialScreen.screen?.readiness ?? null,
+        focusedWindow: initialScreen.screen?.focusedWindow ?? null,
+      },
+      verifiedScreen: {
+        readiness: verifiedScreen.screen?.readiness ?? null,
+        focusedWindow: verifiedScreen.screen?.focusedWindow ?? null,
+      },
+      actions: actionResults.map((action) => ({
+        kind: action?.kind ?? null,
+        degraded: Boolean(action?.degraded),
+        result: action?.result ?? null,
+      })),
+      workView: {
+        status: workView.status ?? null,
+        visibility: workView.visibility ?? null,
+        mode: workView.mode ?? null,
+        helperStatus: workView.helperStatus ?? null,
+        browserStatus: workView.browserStatus ?? null,
+        entryUrl: workView.entryUrl ?? targetUrl,
+        activeUrl: workView.activeUrl ?? targetUrl,
+        displayTarget: workView.displayTarget ?? displayTarget,
+      },
+    });
+    await publishEvent("task.completed", { task: serialiseTask(updatedTask), executor: "core-v1" });
+    return {
+      task: updatedTask,
+      prepare,
+      reveal,
+      initialScreen,
+      verifiedScreen,
+      actions: actionResults,
+      finalWorkViewState,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Task execution failed.";
+    const failedTask = failTask(task, message, {
+      targetUrl,
+      executor: "core-v1",
+      actionCount: actionResults.length,
+    });
+    await publishEvent("task.failed", { task: serialiseTask(failedTask), reason: message, executor: "core-v1" });
+    throw error;
+  }
+}
+
 function recoverTask(sourceTask) {
   const recoveryAttempt = (sourceTask.recovery?.attempt ?? 0) + 1;
   const recoveredTask = createTask({
@@ -419,6 +620,9 @@ const server = http.createServer(async (req, res) => {
       host,
       port,
       eventHubUrl,
+      sessionManagerUrl,
+      screenSenseUrl,
+      screenActUrl,
     });
     return;
   }
@@ -541,6 +745,52 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === "POST" && requestUrl.pathname === "/tasks/execute") {
+    try {
+      const body = await readJsonBody(req);
+      const task = createTask({
+        ...body,
+        goal:
+          typeof body.goal === "string" && body.goal.trim()
+            ? body.goal
+            : `Open the AI work view at ${body.targetUrl ?? "the target URL"}`,
+        type: typeof body.type === "string" && body.type.trim() ? body.type : "browser_task",
+        workViewStrategy:
+          typeof body.workViewStrategy === "string" && body.workViewStrategy.trim()
+            ? body.workViewStrategy
+            : "ai-work-view",
+      });
+      const reclaimedTasks = supersedeOtherActiveTasks(task.id);
+      reconcileRuntimeState();
+
+      await publishEvent("task.created", { task: serialiseTask(task), executor: "core-v1" });
+      await Promise.all(reclaimedTasks.map((reclaimedTask) => publishEvent("task.phase_changed", {
+        task: serialiseTask(reclaimedTask),
+      })));
+
+      const execution = await executeTask(task, body);
+      sendJson(res, 201, {
+        ok: true,
+        task: serialiseTask(execution.task),
+        runtime: runtimeState,
+        execution: {
+          executor: "core-v1",
+          actions: execution.actions.map((action) => ({
+            kind: action?.kind ?? null,
+            degraded: Boolean(action?.degraded),
+            result: action?.result ?? null,
+          })),
+          finalReadiness: execution.verifiedScreen?.screen?.readiness ?? null,
+          finalWorkView: execution.finalWorkViewState?.workView ?? null,
+        },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
   if (
     req.method === "POST"
     && requestUrl.pathname.startsWith("/tasks/")
@@ -575,6 +825,43 @@ const server = http.createServer(async (req, res) => {
         ok: true,
         task: serialiseTask(recoveredTask),
         recoveredFromTask: serialiseTask(sourceTask),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (
+    req.method === "POST"
+    && requestUrl.pathname.startsWith("/tasks/")
+    && requestUrl.pathname.endsWith("/execute")
+  ) {
+    const taskId = requestUrl.pathname.slice("/tasks/".length, -"/execute".length);
+    const task = getTaskById(taskId);
+    if (!task) {
+      sendJson(res, 404, { ok: false, error: "Task not found." });
+      return;
+    }
+
+    try {
+      const body = await readJsonBody(req);
+      const execution = await executeTask(task, body);
+      sendJson(res, 200, {
+        ok: true,
+        task: serialiseTask(execution.task),
+        runtime: runtimeState,
+        execution: {
+          executor: "core-v1",
+          actions: execution.actions.map((action) => ({
+            kind: action?.kind ?? null,
+            degraded: Boolean(action?.degraded),
+            result: action?.result ?? null,
+          })),
+          finalReadiness: execution.verifiedScreen?.screen?.readiness ?? null,
+          finalWorkView: execution.finalWorkViewState?.workView ?? null,
+        },
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
