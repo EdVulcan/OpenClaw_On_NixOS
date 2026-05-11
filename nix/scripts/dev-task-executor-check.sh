@@ -57,20 +57,31 @@ assert_json "$queued_execution" 'const data=JSON.parse(process.argv[1]); const t
 direct_execution="$(post_json "$CORE_URL/tasks/execute" "{\"goal\":\"Executor creates and runs task at $TARGET_TWO\",\"type\":\"browser_task\",\"targetUrl\":\"$TARGET_TWO\",\"workViewStrategy\":\"ai-work-view\",\"hideOnComplete\":false,\"actions\":[{\"kind\":\"keyboard.type\",\"params\":{\"text\":\"executor direct task\"}},{\"kind\":\"mouse.click\",\"params\":{\"x\":420,\"y\":240,\"button\":\"left\"}}]}")"
 assert_json "$direct_execution" 'const data=JSON.parse(process.argv[1]); const task=data.task; if(!data.ok || task?.status!=="completed" || task?.targetUrl!=="https://www.deepseek.com"){throw new Error("direct execution did not complete deepseek task");} if(task.workView?.visibility!=="visible"){throw new Error("direct execution should keep work view visible");}'
 
+failed_execution="$(post_json "$CORE_URL/tasks/execute" "{\"goal\":\"Executor should fail verification at $TARGET_ONE\",\"type\":\"browser_task\",\"targetUrl\":\"$TARGET_ONE\",\"expectedUrl\":\"https://expected.invalid/should-fail\",\"workViewStrategy\":\"ai-work-view\",\"actions\":[{\"kind\":\"mouse.click\",\"params\":{\"x\":320,\"y\":180,\"button\":\"left\"}}]}")"
+assert_json "$failed_execution" 'const data=JSON.parse(process.argv[1]); const task=data.task; if(!data.ok || task?.status!=="failed" || task?.outcome?.kind!=="failed"){throw new Error("verification failure task did not fail");} if(data.execution?.verification?.ok!==false){throw new Error("expected verification ok=false");}'
+failed_task_id="$(json_value "$failed_execution" 'const data=JSON.parse(process.argv[1]); process.stdout.write(data.task.id);')"
+
+recovered_failed="$(post_json "$CORE_URL/tasks/$failed_task_id/recover" '{}')"
+assert_json "$recovered_failed" 'const data=JSON.parse(process.argv[1]); if(!data.ok || data.task?.recovery?.recoveredFromTaskId!==data.recoveredFromTask?.id){throw new Error("failed executor task recovery failed");}'
+
 runtime_state="$(curl --silent "$CORE_URL/state/runtime")"
 task_summary="$(curl --silent "$CORE_URL/tasks/summary")"
 latest_finished="$(curl --silent "$CORE_URL/tasks/latest-finished")"
+latest_failed="$(curl --silent "$CORE_URL/tasks/latest-failed")"
 work_view_state="$(curl --silent "$SESSION_MANAGER_URL/work-view/state")"
 action_state="$(curl --silent "$SCREEN_ACT_URL/act/state")"
 
-node - <<'EOF' "$queued_execution" "$direct_execution" "$runtime_state" "$task_summary" "$latest_finished" "$work_view_state" "$action_state"
+node - <<'EOF' "$queued_execution" "$direct_execution" "$failed_execution" "$recovered_failed" "$runtime_state" "$task_summary" "$latest_finished" "$latest_failed" "$work_view_state" "$action_state"
 const queuedExecution = JSON.parse(process.argv[2]);
 const directExecution = JSON.parse(process.argv[3]);
-const runtimeState = JSON.parse(process.argv[4]);
-const taskSummary = JSON.parse(process.argv[5]);
-const latestFinished = JSON.parse(process.argv[6]);
-const workViewState = JSON.parse(process.argv[7]);
-const actionState = JSON.parse(process.argv[8]);
+const failedExecution = JSON.parse(process.argv[4]);
+const recoveredFailed = JSON.parse(process.argv[5]);
+const runtimeState = JSON.parse(process.argv[6]);
+const taskSummary = JSON.parse(process.argv[7]);
+const latestFinished = JSON.parse(process.argv[8]);
+const latestFailed = JSON.parse(process.argv[9]);
+const workViewState = JSON.parse(process.argv[10]);
+const actionState = JSON.parse(process.argv[11]);
 
 const requiredPhases = [
   "queued",
@@ -94,21 +105,37 @@ function assertTaskPhases(task, label) {
 
 assertTaskPhases(queuedExecution.task, "queued execution");
 assertTaskPhases(directExecution.task, "direct execution");
+assertTaskPhases(failedExecution.task, "failed execution");
 
-if (runtimeState.runtime?.status !== "idle" || runtimeState.currentTask !== null) {
-  throw new Error("Executor should leave runtime idle after completed tasks.");
+if (queuedExecution.execution?.verification?.ok !== true || directExecution.execution?.verification?.ok !== true) {
+  throw new Error("Expected successful executor runs to include verification ok=true.");
 }
-if (taskSummary.summary?.counts?.completed !== 2 || taskSummary.summary?.counts?.active !== 0) {
-  throw new Error("Expected executor summary to show two completed tasks and no active tasks.");
+if (failedExecution.execution?.verification?.ok !== false || failedExecution.task?.outcome?.reason !== "Executor verification failed.") {
+  throw new Error("Expected failed executor run to expose verification failure reason.");
+}
+if (!failedExecution.execution?.verification?.failedChecks?.some((check) => check.name === "target_url")) {
+  throw new Error("Expected failed executor run to identify target_url check.");
+}
+if (recoveredFailed.task?.recovery?.recoveredFromTaskId !== failedExecution.task?.id) {
+  throw new Error("Expected failed executor task to be recoverable.");
+}
+if (runtimeState.runtime?.status !== "running" || runtimeState.currentTask?.id !== recoveredFailed.task?.id) {
+  throw new Error("Executor recovery should leave recovered task active.");
+}
+if (taskSummary.summary?.counts?.completed !== 2 || taskSummary.summary?.counts?.failed !== 1 || taskSummary.summary?.counts?.active !== 1) {
+  throw new Error("Expected executor summary to show two completed, one failed, and one active recovered task.");
 }
 if (latestFinished.task?.id !== directExecution.task?.id || latestFinished.task?.workView?.visibility !== "visible") {
   throw new Error("Expected latest finished task to be the visible direct execution.");
 }
-if (workViewState.workView?.activeUrl !== "https://www.deepseek.com" || workViewState.workView?.visibility !== "visible") {
-  throw new Error("Expected work view to remain visible on direct execution target.");
+if (latestFailed.task?.id !== failedExecution.task?.id || latestFailed.task?.restorable !== true) {
+  throw new Error("Expected latest failed task to be the verification failure and restorable.");
 }
-if (actionState.state?.actionCount !== 4 || actionState.state?.lastAction?.degraded !== false) {
-  throw new Error("Expected four non-degraded executor actions.");
+if (workViewState.workView?.activeUrl !== "https://www.baidu.com" || workViewState.workView?.visibility !== "visible") {
+  throw new Error("Expected work view to remain visible on failed verification target for diagnosis.");
+}
+if (actionState.state?.actionCount !== 5 || actionState.state?.lastAction?.degraded !== false) {
+  throw new Error("Expected five non-degraded executor actions.");
 }
 
 console.log(JSON.stringify({
@@ -124,8 +151,17 @@ console.log(JSON.stringify({
     status: directExecution.task?.status ?? null,
     phase: directExecution.task?.executionPhase ?? null,
     finalReadiness: directExecution.execution?.finalReadiness ?? null,
+    verification: directExecution.execution?.verification?.ok ?? null,
     visibility: directExecution.task?.workView?.visibility ?? null,
     activeUrl: directExecution.task?.workView?.activeUrl ?? null,
+  },
+  failedExecution: {
+    id: failedExecution.task?.id ?? null,
+    status: failedExecution.task?.status ?? null,
+    phase: failedExecution.task?.executionPhase ?? null,
+    verification: failedExecution.execution?.verification?.ok ?? null,
+    failedChecks: failedExecution.execution?.verification?.failedChecks?.map((check) => check.name) ?? [],
+    recoveredAs: recoveredFailed.task?.id ?? null,
   },
   runtime: {
     status: runtimeState.runtime?.status ?? null,
@@ -136,6 +172,7 @@ console.log(JSON.stringify({
   workView: {
     activeUrl: workViewState.workView?.activeUrl ?? null,
     visibility: workViewState.workView?.visibility ?? null,
+    reason: "left on failed verification target for diagnosis",
   },
 }, null, 2));
 EOF

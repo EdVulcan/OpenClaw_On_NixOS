@@ -169,7 +169,7 @@ function getActiveTasks() {
 
 function getLatestFinishedTask() {
   return [...tasks.values()]
-    .filter((task) => !isActiveTask(task))
+    .filter((task) => task.status === "completed")
     .sort(compareTasksForDisplay)[0] ?? null;
 }
 
@@ -455,6 +455,60 @@ function normaliseExecutorActions(actions) {
     }));
 }
 
+function buildExecutionVerification({ targetUrl, options, verifiedScreen, actionResults, workView }) {
+  const expectedUrl =
+    typeof options.expectedUrl === "string" && options.expectedUrl.trim()
+      ? options.expectedUrl.trim()
+      : targetUrl;
+  const expectedReadiness =
+    typeof options.expectedReadiness === "string" && options.expectedReadiness.trim()
+      ? options.expectedReadiness.trim()
+      : "ready";
+  const activeUrl = workView?.activeUrl ?? verifiedScreen?.screen?.snapshotText?.match(/^URL: (.+)$/m)?.[1] ?? null;
+  const readiness = verifiedScreen?.screen?.readiness ?? null;
+  const degradedActions = actionResults.filter((action) => action?.degraded);
+  const checks = [
+    {
+      name: "target_url",
+      expected: expectedUrl,
+      actual: activeUrl,
+      passed: activeUrl === expectedUrl,
+    },
+    {
+      name: "screen_readiness",
+      expected: expectedReadiness,
+      actual: readiness,
+      passed: readiness === expectedReadiness,
+    },
+    {
+      name: "actions_not_degraded",
+      expected: 0,
+      actual: degradedActions.length,
+      passed: degradedActions.length === 0,
+    },
+  ];
+
+  if (options.hideOnComplete === false) {
+    checks.push({
+      name: "work_view_visible",
+      expected: "visible",
+      actual: workView?.visibility ?? null,
+      passed: workView?.visibility === "visible",
+    });
+  }
+
+  const failedChecks = checks.filter((check) => !check.passed);
+  return {
+    ok: failedChecks.length === 0,
+    expectedUrl,
+    expectedReadiness,
+    activeUrl,
+    readiness,
+    checks,
+    failedChecks,
+  };
+}
+
 async function executeTask(task, options = {}) {
   if (!isActiveTask(task)) {
     throw new Error("Task is not active and cannot be executed.");
@@ -526,18 +580,54 @@ async function executeTask(task, options = {}) {
     });
     const verifiedScreen = await fetchJson(`${screenSenseUrl}/screen/current`);
 
-    let finalWorkViewState = reveal;
+    const preCompletionWorkViewState = await fetchJson(`${sessionManagerUrl}/work-view/state`);
+    const verificationWorkView = preCompletionWorkViewState?.workView ?? reveal?.workView ?? {};
+    const verification = buildExecutionVerification({
+      targetUrl,
+      options,
+      verifiedScreen,
+      actionResults,
+      workView: verificationWorkView,
+    });
+
+    if (!verification.ok) {
+      const failedTask = failTask(task, "Executor verification failed.", {
+        targetUrl,
+        executor: "core-v2",
+        verification,
+        actionCount: actionResults.length,
+      });
+      await publishEvent("task.failed", {
+        task: serialiseTask(failedTask),
+        reason: "Executor verification failed.",
+        verification,
+        executor: "core-v2",
+      });
+      return {
+        task: failedTask,
+        prepare,
+        reveal,
+        initialScreen,
+        verifiedScreen,
+        actions: actionResults,
+        finalWorkViewState: preCompletionWorkViewState,
+        verification,
+      };
+    }
+
+    let finalWorkViewState = preCompletionWorkViewState;
     if (options.hideOnComplete !== false) {
       finalWorkViewState = await postJson(`${sessionManagerUrl}/work-view/hide`, {});
     }
 
-    const workView = finalWorkViewState?.workView ?? reveal?.workView ?? {};
+    const workView = finalWorkViewState?.workView ?? verificationWorkView;
     const updatedTask = completeTask(task, {
       targetUrl,
       workViewUrl: targetUrl,
       summary: `Executor completed task at ${targetUrl}`,
-      executor: "core-v1",
+      executor: "core-v2",
       actionCount: actionResults.length,
+      verification,
       initialScreen: {
         readiness: initialScreen.screen?.readiness ?? null,
         focusedWindow: initialScreen.screen?.focusedWindow ?? null,
@@ -562,7 +652,7 @@ async function executeTask(task, options = {}) {
         displayTarget: workView.displayTarget ?? displayTarget,
       },
     });
-    await publishEvent("task.completed", { task: serialiseTask(updatedTask), executor: "core-v1" });
+    await publishEvent("task.completed", { task: serialiseTask(updatedTask), executor: "core-v2", verification });
     return {
       task: updatedTask,
       prepare,
@@ -571,6 +661,7 @@ async function executeTask(task, options = {}) {
       verifiedScreen,
       actions: actionResults,
       finalWorkViewState,
+      verification,
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Task execution failed.";
@@ -774,12 +865,13 @@ const server = http.createServer(async (req, res) => {
         task: serialiseTask(execution.task),
         runtime: runtimeState,
         execution: {
-          executor: "core-v1",
+          executor: execution.verification ? "core-v2" : "core-v1",
           actions: execution.actions.map((action) => ({
             kind: action?.kind ?? null,
             degraded: Boolean(action?.degraded),
             result: action?.result ?? null,
           })),
+          verification: execution.verification ?? null,
           finalReadiness: execution.verifiedScreen?.screen?.readiness ?? null,
           finalWorkView: execution.finalWorkViewState?.workView ?? null,
         },
@@ -853,12 +945,13 @@ const server = http.createServer(async (req, res) => {
         task: serialiseTask(execution.task),
         runtime: runtimeState,
         execution: {
-          executor: "core-v1",
+          executor: execution.verification ? "core-v2" : "core-v1",
           actions: execution.actions.map((action) => ({
             kind: action?.kind ?? null,
             degraded: Boolean(action?.degraded),
             result: action?.result ?? null,
           })),
+          verification: execution.verification ?? null,
           finalReadiness: execution.verifiedScreen?.screen?.readiness ?? null,
           finalWorkView: execution.finalWorkViewState?.workView ?? null,
         },
