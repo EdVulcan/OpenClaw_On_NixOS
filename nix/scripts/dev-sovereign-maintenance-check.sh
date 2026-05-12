@@ -217,7 +217,7 @@ if (!step.ok || step.ran !== true || step.task?.status !== "completed") {
   throw new Error(`operator should complete autonomous maintenance task: ${JSON.stringify(step)}`);
 }
 const invocation = step.execution?.capabilityInvocations?.[0];
-if (invocation?.capability?.id !== "act.system.heal" || invocation?.summary?.status !== "repaired") {
+if (invocation?.capabilityId !== "act.system.heal" || invocation?.summary?.status !== "repaired") {
   throw new Error(`operator maintenance invocation should repair conservatively: ${JSON.stringify(invocation)}`);
 }
 if (approvals.summary?.counts?.pending !== 0 || approvals.summary?.counts?.total !== 0) {
