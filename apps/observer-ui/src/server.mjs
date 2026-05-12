@@ -338,6 +338,14 @@ function observerHtml() {
           <pre id="operator-loop-json">No operator run yet.</pre>
         </section>
         <section class="panel">
+          <h2>Command Transcript</h2>
+          <div class="metric"><span>Entries</span><span id="command-transcript-count">0</span></div>
+          <div class="metric"><span>Executed</span><span id="command-transcript-executed">0</span></div>
+          <div class="metric"><span>Skipped</span><span id="command-transcript-skipped">0</span></div>
+          <div class="metric"><span>Failed</span><span id="command-transcript-failed">0</span></div>
+          <pre id="command-transcript-json">No command transcript yet.</pre>
+        </section>
+        <section class="panel">
           <h2>Policy Governance</h2>
           <div class="metric"><span>Engine</span><span id="policy-engine">policy-v0</span></div>
           <div class="metric"><span>Last Decision</span><span id="policy-decision">none</span></div>
@@ -558,6 +566,11 @@ const operatorLoopNext = document.querySelector("#operator-loop-next");
 const operatorLoopRan = document.querySelector("#operator-loop-ran");
 const operatorLoopCount = document.querySelector("#operator-loop-count");
 const operatorLoopJson = document.querySelector("#operator-loop-json");
+const commandTranscriptCount = document.querySelector("#command-transcript-count");
+const commandTranscriptExecuted = document.querySelector("#command-transcript-executed");
+const commandTranscriptSkipped = document.querySelector("#command-transcript-skipped");
+const commandTranscriptFailed = document.querySelector("#command-transcript-failed");
+const commandTranscriptJson = document.querySelector("#command-transcript-json");
 const policyEngine = document.querySelector("#policy-engine");
 const policyDecision = document.querySelector("#policy-decision");
 const policyDomain = document.querySelector("#policy-domain");
@@ -831,6 +844,55 @@ function renderCapabilityHistory(data) {
   ].join("\\n");
 }
 
+function extractTaskCommandTranscript(task) {
+  return Array.isArray(task?.outcome?.details?.commandTranscript)
+    ? task.outcome.details.commandTranscript
+    : [];
+}
+
+function renderCommandTranscript(transcript, { source = "task" } = {}) {
+  const entries = Array.isArray(transcript) ? transcript : [];
+  const skipped = entries.filter((entry) => entry.skipped === true);
+  const executed = entries.filter((entry) => entry.skipped !== true);
+  const failed = executed.filter((entry) => entry.timedOut === true || (Number.isInteger(entry.exitCode) && entry.exitCode !== 0));
+
+  commandTranscriptCount.textContent = String(entries.length);
+  commandTranscriptExecuted.textContent = String(executed.length);
+  commandTranscriptSkipped.textContent = String(skipped.length);
+  commandTranscriptFailed.textContent = String(failed.length);
+
+  if (entries.length === 0) {
+    commandTranscriptJson.textContent = "No command transcript yet.";
+    return;
+  }
+
+  commandTranscriptJson.textContent = [
+    \`Source: \${source}\`,
+    \`Entries: \${entries.length} executed=\${executed.length} skipped=\${skipped.length} failed=\${failed.length}\`,
+    "",
+    ...entries.map((entry, index) => {
+      const state = entry.skipped === true
+        ? \`skipped:\${entry.skipReason ?? "condition"}\`
+        : entry.timedOut === true
+          ? "failed:timeout"
+          : Number.isInteger(entry.exitCode) && entry.exitCode !== 0
+            ? \`failed:exit_\${entry.exitCode}\`
+            : "executed";
+      const stdout = String(entry.stdout ?? "").trim();
+      const stderr = String(entry.stderr ?? "").trim();
+      return [
+        \`\${index + 1}. [\${state}] \${entry.command ?? "unknown"} exit=\${entry.exitCode ?? "n/a"}\`,
+        stdout ? \`   stdout: \${stdout}\` : null,
+        stderr ? \`   stderr: \${stderr}\` : null,
+      ].filter(Boolean).join("\\n");
+    }),
+  ].join("\\n");
+}
+
+function renderCommandTranscriptFromTask(task, { source = "task" } = {}) {
+  renderCommandTranscript(extractTaskCommandTranscript(task), { source });
+}
+
 function renderOperatorPanel(result) {
   if (!result) {
     renderOperatorState(null);
@@ -843,6 +905,9 @@ function renderOperatorPanel(result) {
   const steps = Array.isArray(result.steps) ? result.steps : result.task ? [result] : [];
   const operator = result.operator ?? null;
   const nextTask = result.nextTask ?? operator?.nextTask ?? null;
+  const latestCommandTranscript = steps
+    .map((step) => step.execution?.commandTranscript)
+    .find((transcript) => Array.isArray(transcript) && transcript.length > 0);
   renderOperatorState({
     status: operator?.status ?? (result.blocked ? "paused" : result.ran ? "ran" : "idle"),
     blocked: result.blocked ?? operator?.blocked ?? false,
@@ -864,6 +929,9 @@ function renderOperatorPanel(result) {
       return \`\${index + 1}. \${task?.id ?? "no-task"} \${task?.status ?? "idle"} \${task?.targetUrl ?? ""} verification=\${verification?.ok ?? "n/a"}\`;
     }),
   ].join("\\n");
+  if (latestCommandTranscript) {
+    renderCommandTranscript(latestCommandTranscript, { source: "operator" });
+  }
 }
 
 async function refreshOperatorState() {
@@ -1164,11 +1232,13 @@ async function refreshRuntime() {
       ? renderTaskSummary(currentTask, { includeRecovery: false, includeOutcome: false })
       : "No active task.";
     renderPlanPanel(currentTask ?? latestHistoryTask);
+    renderCommandTranscriptFromTask(currentTask ?? latestHistoryTask, { source: currentTask ? "current-task" : "latest-history" });
   } catch {
     currentTaskState = null;
     runtimeStatus.textContent = "offline";
     taskJson.textContent = "Unable to read runtime state.";
     renderPlanPanel(latestHistoryTask);
+    renderCommandTranscriptFromTask(latestHistoryTask, { source: "latest-history" });
   }
 }
 
@@ -1254,12 +1324,14 @@ async function refreshTaskHistoryDetail() {
           ? "No active task selected."
           : "No finished task recorded yet.";
     renderPlanPanel(currentTaskState ?? historyTask);
+    renderCommandTranscriptFromTask(historyTask ?? currentTaskState, { source: taskHistoryFocus });
   } catch {
     taskHistoryMeta.textContent = formatTaskFocusLabel(taskHistoryFocus, latestHistoryTask);
     taskHistoryJson.textContent = latestHistoryTask
       ? renderTaskSummary(latestHistoryTask)
       : "Unable to read task history detail.";
     renderPlanPanel(currentTaskState ?? latestHistoryTask);
+    renderCommandTranscriptFromTask(latestHistoryTask ?? currentTaskState, { source: "latest-history" });
   }
 }
 
