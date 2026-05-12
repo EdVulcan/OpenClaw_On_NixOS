@@ -70,6 +70,7 @@
     "dev:observer-capability-history-check:unix": "bash ./nix/scripts/dev-observer-capability-history-check.sh",
     "dev:observer-command-transcript-check:unix": "bash ./nix/scripts/dev-observer-command-transcript-check.sh",
     "dev:observer-command-ledger-check:unix": "bash ./nix/scripts/dev-observer-command-ledger-check.sh",
+    "dev:observer-sovereign-maintenance-check:unix": "bash ./nix/scripts/dev-observer-sovereign-maintenance-check.sh",
     "dev:observer-filesystem-ledger-check:unix": "bash ./nix/scripts/dev-observer-filesystem-ledger-check.sh",
     "dev:observer-filesystem-read-ledger-check:unix": "bash ./nix/scripts/dev-observer-filesystem-read-ledger-check.sh",
     "dev:observer-workspace-detect-check:unix": "bash ./nix/scripts/dev-observer-workspace-detect-check.sh",

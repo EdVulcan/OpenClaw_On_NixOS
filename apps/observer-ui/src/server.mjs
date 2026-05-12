@@ -504,6 +504,14 @@ function observerHtml() {
           <pre id="heal-summary">No heal actions yet.</pre>
         </section>
         <section class="panel">
+          <h2>Maintenance</h2>
+          <div class="metric"><span>Policy</span><span id="maintenance-policy-enabled">disabled</span></div>
+          <div class="metric"><span>Next Due</span><span id="maintenance-next-due">-</span></div>
+          <div class="metric"><span>Last Tick</span><span id="maintenance-last-tick">none</span></div>
+          <div class="metric"><span>Runs</span><span id="maintenance-run-count">0</span></div>
+          <pre id="maintenance-summary">Loading maintenance state...</pre>
+        </section>
+        <section class="panel">
           <h2>Audit Ledger</h2>
           <div class="metric"><span>Persisted Events</span><span id="audit-total">0</span></div>
           <div class="metric"><span>Event Types</span><span id="audit-type-count">0</span></div>
@@ -582,6 +590,11 @@ const systemBodyUptime = document.querySelector("#system-body-uptime");
 const systemSummary = document.querySelector("#system-summary");
 const healCount = document.querySelector("#heal-count");
 const healSummary = document.querySelector("#heal-summary");
+const maintenancePolicyEnabled = document.querySelector("#maintenance-policy-enabled");
+const maintenanceNextDue = document.querySelector("#maintenance-next-due");
+const maintenanceLastTick = document.querySelector("#maintenance-last-tick");
+const maintenanceRunCount = document.querySelector("#maintenance-run-count");
+const maintenanceSummary = document.querySelector("#maintenance-summary");
 const auditTotal = document.querySelector("#audit-total");
 const auditTypeCount = document.querySelector("#audit-type-count");
 const auditSourceCount = document.querySelector("#audit-source-count");
@@ -1808,6 +1821,41 @@ async function refreshHealState() {
   }
 }
 
+async function refreshMaintenanceState() {
+  try {
+    const [state, history] = await Promise.all([
+      fetchJson(\`\${observerConfig.systemHealUrl}/maintenance/state\`),
+      fetchJson(\`\${observerConfig.systemHealUrl}/maintenance/history?limit=5\`),
+    ]);
+    const policy = state.policy ?? {};
+    const latestRun = state.latestRun ?? history.latestRun ?? history.items?.[0] ?? null;
+    const lastTick = policy.lastTick ?? null;
+    const intervalMs = Number.isFinite(policy.intervalMs) ? policy.intervalMs : 0;
+    const intervalMinutes = Math.round(intervalMs / 60000);
+
+    maintenancePolicyEnabled.textContent = policy.enabled ? "enabled" : "disabled";
+    maintenanceNextDue.textContent = formatTimestamp(policy.nextDueAt);
+    maintenanceLastTick.textContent = lastTick
+      ? \`\${lastTick.status ?? "unknown"} (\${lastTick.reason ?? "unknown"})\`
+      : "none";
+    maintenanceRunCount.textContent = String(state.runCount ?? history.count ?? 0);
+    maintenanceSummary.textContent = [
+      \`Interval: \${intervalMinutes > 0 ? \`\${intervalMinutes}m\` : \`\${intervalMs}ms\`}\`,
+      \`Autofix: \${policy.autofix === false ? "false" : "true"}\`,
+      \`Last Checked: \${formatTimestamp(policy.lastCheckedAt)}\`,
+      \`Latest Run: \${latestRun?.status ?? "none"}\`,
+      latestRun ? \`Run Completed: \${formatTimestamp(latestRun.completedAt)}\` : "Run Completed: -",
+      latestRun?.autonomy ? \`Governance: \${latestRun.autonomy.governance ?? "unknown"}\` : "Governance: -",
+    ].join("\\n");
+  } catch {
+    maintenancePolicyEnabled.textContent = "unknown";
+    maintenanceNextDue.textContent = "-";
+    maintenanceLastTick.textContent = "unknown";
+    maintenanceRunCount.textContent = "0";
+    maintenanceSummary.textContent = "Unable to read maintenance state.";
+  }
+}
+
 async function refreshAuditState() {
   try {
     const summary = await fetchJson(\`\${observerConfig.eventHubUrl}/events/audit/summary\`);
@@ -2389,6 +2437,10 @@ function subscribeEvents() {
     "heal.diagnosed",
     "heal.started",
     "heal.completed",
+    "maintenance.policy.updated",
+    "maintenance.tick",
+    "maintenance.started",
+    "maintenance.completed",
   ]) {
     stream.addEventListener(eventName, async (message) => {
       try {
@@ -2435,6 +2487,15 @@ function subscribeEvents() {
         }
         if (eventName === "heal.diagnosed" || eventName === "heal.started" || eventName === "heal.completed" || eventName === "service.started") {
           await refreshHealState();
+        }
+        if (
+          eventName === "maintenance.policy.updated"
+          || eventName === "maintenance.tick"
+          || eventName === "maintenance.started"
+          || eventName === "maintenance.completed"
+          || eventName === "service.started"
+        ) {
+          await refreshMaintenanceState();
         }
         await refreshAuditState();
       } catch (error) {
@@ -2753,6 +2814,7 @@ await refreshWorkspaceCommandProposals();
 await refreshWorkspaceCommandPlanDraft();
 await refreshSystemState();
 await refreshHealState();
+await refreshMaintenanceState();
 await refreshAuditState();
 await loadRecentEvents();
 setControlMessage("Controls ready.");
@@ -2777,6 +2839,7 @@ setInterval(refreshWorkspaceCommandProposals, 5000);
 setInterval(refreshWorkspaceCommandPlanDraft, 5000);
 setInterval(refreshSystemState, 5000);
 setInterval(refreshHealState, 5000);
+setInterval(refreshMaintenanceState, 5000);
 setInterval(refreshAuditState, 5000);`;
 }
 

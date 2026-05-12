@@ -58,6 +58,7 @@ checks=(
   "observer-capability-history|dev-observer-capability-history-check.sh|Observer visibility for persistent capability invocation history"
   "observer-command-transcript|dev-observer-command-transcript-check.sh|Observer visibility for sovereign command transcripts"
   "observer-command-ledger|dev-observer-command-ledger-check.sh|Observer visibility for sovereign command transcript ledger"
+  "observer-sovereign-maintenance|dev-observer-sovereign-maintenance-check.sh|Observer visibility for sovereign maintenance policy, ticks, and runs"
   "observer-filesystem-ledger|dev-observer-filesystem-ledger-check.sh|Observer visibility for sovereign filesystem change ledger"
   "observer-filesystem-read-ledger|dev-observer-filesystem-read-ledger-check.sh|Observer visibility for sovereign filesystem read access ledger"
   "observer-workspace-detect|dev-observer-workspace-detect-check.sh|Observer visibility for read-only OpenClaw workspace detection"
