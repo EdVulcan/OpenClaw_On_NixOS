@@ -24,6 +24,7 @@ checks=(
   "system-capability|dev-system-capability-check.sh|Conservative filesystem, process, and command dry-run capabilities"
   "system-sense|dev-system-sense-check.sh|Real body vitals, service latency, resources, and alerts"
   "system-heal|dev-system-heal-check.sh|Conservative diagnosis, repair plan, autofix, and heal history"
+  "observer-capability-plan|dev-observer-capability-plan-check.sh|Observer visibility for capability-aware plan metadata"
   "observer-operator|dev-observer-operator-check.sh|Observer UI planner/operator controls and API wiring"
 )
 

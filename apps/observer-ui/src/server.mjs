@@ -323,6 +323,9 @@ function observerHtml() {
           <h2>Task Plan</h2>
           <div class="metric"><span>Status</span><span id="task-plan-status">none</span></div>
           <div class="metric"><span>Steps</span><span id="task-plan-count">0</span></div>
+          <div class="metric"><span>Planner</span><span id="task-plan-planner">none</span></div>
+          <div class="metric"><span>Capabilities</span><span id="task-plan-capability-count">0</span></div>
+          <div class="metric"><span>Approval Gates</span><span id="task-plan-approval-gates">0</span></div>
           <pre id="task-plan-json">No task plan selected.</pre>
         </section>
         <section class="panel">
@@ -530,6 +533,9 @@ const openWorkViewUrlButton = document.querySelector("#open-work-view-url-button
 const workViewUrlInput = document.querySelector("#work-view-url-input");
 const taskPlanStatus = document.querySelector("#task-plan-status");
 const taskPlanCount = document.querySelector("#task-plan-count");
+const taskPlanPlanner = document.querySelector("#task-plan-planner");
+const taskPlanCapabilityCount = document.querySelector("#task-plan-capability-count");
+const taskPlanApprovalGates = document.querySelector("#task-plan-approval-gates");
 const taskPlanJson = document.querySelector("#task-plan-json");
 const operatorLoopStatus = document.querySelector("#operator-loop-status");
 const operatorLoopBlocked = document.querySelector("#operator-loop-blocked");
@@ -658,18 +664,27 @@ function renderTaskPlan(plan) {
   }
 
   const steps = Array.isArray(plan.steps) ? plan.steps : [];
+  const capabilitySummary = plan.capabilitySummary ?? {};
   return [
     \`Plan ID: \${plan.planId ?? "none"}\`,
     \`Strategy: \${plan.strategy ?? "unknown"}\`,
+    \`Planner: \${plan.planner ?? "unknown"}\`,
     \`Status: \${plan.status ?? "unknown"}\`,
+    \`Intent: \${plan.intent ?? "unknown"}\`,
     \`Target URL: \${plan.targetUrl ?? "none"}\`,
     \`Steps: \${steps.length}\`,
+    \`Capabilities: \${capabilitySummary.total ?? 0} (\${(capabilitySummary.ids ?? []).join(", ") || "none"})\`,
+    \`Approval Gates: \${capabilitySummary.approvalGates ?? 0}\`,
     "",
     ...steps.map((step, index) => {
       const status = step.status ?? "pending";
       const title = step.title ?? step.kind ?? step.phase ?? \`step \${index + 1}\`;
       const phase = step.phase ?? "unknown";
-      return \`\${index + 1}. [\${status}] \${phase} - \${title}\`;
+      const capability = step.capabilityId ?? "unmapped";
+      const risk = step.risk ?? "unknown";
+      const governance = step.governance ?? "unknown";
+      const approval = step.requiresApproval ? " approval-required" : "";
+      return \`\${index + 1}. [\${status}] \${phase} - \${title} :: capability=\${capability} risk=\${risk} governance=\${governance}\${approval}\`;
     }),
   ].join("\\n");
 }
@@ -679,6 +694,9 @@ function renderPlanPanel(task) {
   const steps = Array.isArray(plan?.steps) ? plan.steps : [];
   taskPlanStatus.textContent = plan?.status ?? "none";
   taskPlanCount.textContent = String(steps.length);
+  taskPlanPlanner.textContent = plan?.planner ?? plan?.strategy ?? "none";
+  taskPlanCapabilityCount.textContent = String(plan?.capabilitySummary?.total ?? 0);
+  taskPlanApprovalGates.textContent = String(plan?.capabilitySummary?.approvalGates ?? 0);
   taskPlanJson.textContent = renderTaskPlan(plan);
 }
 
