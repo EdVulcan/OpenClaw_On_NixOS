@@ -425,6 +425,14 @@ npm run dev:openclaw-workspace-command-task-check:unix
 
 This verifies core can materialize a selected workspace command proposal into a queued task with a pending approval, while the operator remains blocked and no command transcript is created before approval.
 
+Run the OpenClaw workspace command execute slice directly:
+
+```bash
+npm run dev:openclaw-workspace-command-execute-check:unix
+```
+
+This verifies core can execute an allowlisted workspace command only after explicit approval, using the configured workspace root and command allowlist, with command transcripts, capability history, and audit events.
+
 Stop everything that `dev:up` started:
 
 ```bash
@@ -649,6 +657,7 @@ This is based on real NixOS VM validation:
 - `dev:openclaw-workspace-command-proposals-check:unix` covers proposal-only command shapes for detected OpenClaw workspaces
 - `dev:openclaw-workspace-command-plan-check:unix` covers plan-only execution drafts for selected OpenClaw workspace commands
 - `dev:openclaw-workspace-command-task-check:unix` covers approval-gated task materialization for selected OpenClaw workspace commands
+- `dev:openclaw-workspace-command-execute-check:unix` covers approved execution of allowlisted OpenClaw workspace commands
 - direct GNOME/Wayland whole-desktop capture remains inconsistent across:
   - `org.gnome.Shell.Screenshot`
   - `grim`
