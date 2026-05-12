@@ -102,8 +102,8 @@ if (
 ) {
   throw new Error("system.command.execute plan should map to high-risk execute capability");
 }
-if (plan.task?.policy?.decision?.decision !== "audit_only" || plan.task?.policy?.decision?.reason !== "body_sovereignty_autonomy") {
-  throw new Error("sovereign body mode should autonomously audit command execution at task policy level");
+if (plan.task?.policy?.decision?.decision !== "audit_only") {
+  throw new Error("system.command.execute task should be body-internal audited before capability execution");
 }
 if (!step.ok || step.ran !== true || step.blocked !== false || step.task?.status !== "completed") {
   throw new Error("operator should complete allowlisted command execution in sovereign body mode");
@@ -125,6 +125,14 @@ if (
 }
 if (history.summary?.total !== 1 || history.summary?.invoked !== 1 || history.summary?.byCapability?.["act.system.command.execute"] !== 1) {
   throw new Error(`command execution should be persisted in capability history: ${JSON.stringify(history.summary)}`);
+}
+const historyItem = history.items?.[0];
+if (
+  historyItem?.policy?.decision !== "audit_only"
+  || historyItem.policy?.reason !== "body_sovereignty_autonomy"
+  || historyItem.policy?.autonomous !== true
+) {
+  throw new Error("capability invocation policy should record sovereign body autonomous audit");
 }
 if (directReject.ok !== false || directReject.code !== "COMMAND_NOT_ALLOWLISTED") {
   throw new Error("system-sense should reject non-allowlisted direct command execution");
@@ -149,7 +157,9 @@ console.log(JSON.stringify({
     },
     task: {
       status: step.task?.status ?? null,
-      policyReason: plan.task?.policy?.decision?.reason ?? null,
+      taskPolicyReason: plan.task?.policy?.decision?.reason ?? null,
+      capabilityPolicyReason: historyItem.policy?.reason ?? null,
+      autonomous: historyItem.policy?.autonomous ?? null,
       executor: step.execution?.executor ?? null,
     },
     command: {
