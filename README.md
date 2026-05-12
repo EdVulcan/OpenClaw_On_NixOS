@@ -441,6 +441,14 @@ npm run dev:openclaw-workspace-command-execute-check:unix
 
 This verifies core can execute an allowlisted workspace command only after explicit approval, using the configured workspace root and command allowlist, with command transcripts, capability history, and audit events.
 
+Run the OpenClaw workspace command failure slice directly:
+
+```bash
+npm run dev:openclaw-workspace-command-failure-check:unix
+```
+
+This verifies an approved workspace command with a non-zero exit code fails the task, preserves stderr and exit code in the command transcript ledger, records capability history, clears pending approvals, and emits failure audit events.
+
 Stop everything that `dev:up` started:
 
 ```bash
@@ -667,6 +675,7 @@ This is based on real NixOS VM validation:
 - `dev:openclaw-workspace-command-plan-check:unix` covers plan-only execution drafts for selected OpenClaw workspace commands
 - `dev:openclaw-workspace-command-task-check:unix` covers approval-gated task materialization for selected OpenClaw workspace commands
 - `dev:openclaw-workspace-command-execute-check:unix` covers approved execution of allowlisted OpenClaw workspace commands
+- `dev:openclaw-workspace-command-failure-check:unix` covers failure capture for approved OpenClaw workspace commands
 - direct GNOME/Wayland whole-desktop capture remains inconsistent across:
   - `org.gnome.Shell.Screenshot`
   - `grim`

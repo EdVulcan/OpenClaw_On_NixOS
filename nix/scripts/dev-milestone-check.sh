@@ -45,6 +45,7 @@ checks=(
   "openclaw-workspace-command-plan|dev-openclaw-workspace-command-plan-check.sh|Plan-only execution drafts for OpenClaw workspace command proposals"
   "openclaw-workspace-command-task|dev-openclaw-workspace-command-task-check.sh|Approval-gated task materialization for OpenClaw workspace commands"
   "openclaw-workspace-command-execute|dev-openclaw-workspace-command-execute-check.sh|Approved execution of allowlisted OpenClaw workspace commands"
+  "openclaw-workspace-command-failure|dev-openclaw-workspace-command-failure-check.sh|Failure capture for approved OpenClaw workspace commands"
   "observer-capability-plan|dev-observer-capability-plan-check.sh|Observer visibility for capability-aware plan metadata"
   "observer-capability-invoke|dev-observer-capability-invoke-check.sh|Observer controls for policy-governed capability invocation"
   "observer-capability-history|dev-observer-capability-history-check.sh|Observer visibility for persistent capability invocation history"
