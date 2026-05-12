@@ -110,7 +110,7 @@ npm run dev:body-config-check:unix
 To run only a subset:
 
 ```bash
-OPENCLAW_MILESTONE_CHECKS=body-config,planner,operator-loop,operator-control,policy npm run dev:milestone-check:unix
+OPENCLAW_MILESTONE_CHECKS=body-config,planner,operator-loop,operator-control,policy,event-audit npm run dev:milestone-check:unix
 ```
 
 Run the policy governance slice directly:
@@ -120,6 +120,14 @@ npm run dev:policy-check:unix
 ```
 
 This verifies body-internal actions, ordinary user tasks, cross-boundary approval gates, denial boundaries, audit history, and the operator execution gate.
+
+Run the durable event audit ledger slice directly:
+
+```bash
+npm run dev:event-audit-check:unix
+```
+
+This verifies JSONL event persistence, filtered audit queries, audit summaries, Observer visibility, and restart recovery for the control-plane black box.
 
 Run the body vitals slice directly:
 

@@ -1,9 +1,16 @@
 import http from "node:http";
 import { randomUUID } from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
 
 const host = process.env.OPENCLAW_EVENT_HUB_HOST ?? "127.0.0.1";
 const port = Number.parseInt(process.env.OPENCLAW_EVENT_HUB_PORT ?? "4101", 10);
 const maxRecentEvents = Number.parseInt(process.env.OPENCLAW_EVENT_HUB_MAX_RECENT ?? "200", 10);
+const bodyStateDir = process.env.OPENCLAW_BODY_STATE_DIR;
+const auditLogFile =
+  process.env.OPENCLAW_EVENT_LOG_FILE
+  ?? (bodyStateDir ? path.join(bodyStateDir, "openclaw-events.jsonl") : path.resolve(".artifacts", "openclaw-events.jsonl"));
+const maxAuditQueryLimit = Number.parseInt(process.env.OPENCLAW_EVENT_AUDIT_MAX_LIMIT ?? "1000", 10);
 
 const recentEvents = [];
 const streamClients = new Map();
@@ -79,7 +86,115 @@ function normaliseEvent(input) {
   };
 }
 
+function ensureAuditLogReady() {
+  fs.mkdirSync(path.dirname(auditLogFile), { recursive: true });
+  if (!fs.existsSync(auditLogFile)) {
+    fs.writeFileSync(auditLogFile, "", "utf8");
+  }
+}
+
+function safeParseAuditLine(line) {
+  if (!line.trim()) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(line);
+    if (!parsed || typeof parsed !== "object" || typeof parsed.type !== "string") {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function readAuditEvents({ type = null, source = null, limit = 100 } = {}) {
+  ensureAuditLogReady();
+  const safeLimit = Math.max(1, Math.min(limit, maxAuditQueryLimit));
+  const text = fs.readFileSync(auditLogFile, "utf8");
+  const items = [];
+
+  for (const line of text.split(/\r?\n/)) {
+    const event = safeParseAuditLine(line);
+    if (!event) {
+      continue;
+    }
+    if (type && event.type !== type) {
+      continue;
+    }
+    if (source && event.source !== source) {
+      continue;
+    }
+    items.push(event);
+  }
+
+  return items.slice(-safeLimit);
+}
+
+function buildAuditSummary() {
+  ensureAuditLogReady();
+  const text = fs.readFileSync(auditLogFile, "utf8");
+  const byType = {};
+  const bySource = {};
+  let total = 0;
+  let malformed = 0;
+  let earliestTimestamp = null;
+  let latestTimestamp = null;
+
+  for (const line of text.split(/\r?\n/)) {
+    if (!line.trim()) {
+      continue;
+    }
+
+    const event = safeParseAuditLine(line);
+    if (!event) {
+      malformed += 1;
+      continue;
+    }
+
+    total += 1;
+    byType[event.type] = (byType[event.type] ?? 0) + 1;
+    bySource[event.source] = (bySource[event.source] ?? 0) + 1;
+
+    if (typeof event.timestamp === "string" && event.timestamp) {
+      earliestTimestamp = earliestTimestamp ?? event.timestamp;
+      latestTimestamp = event.timestamp;
+    }
+  }
+
+  return {
+    logFile: auditLogFile,
+    total,
+    malformed,
+    byType,
+    bySource,
+    earliestTimestamp,
+    latestTimestamp,
+    recentEventCount: recentEvents.length,
+    maxQueryLimit: maxAuditQueryLimit,
+  };
+}
+
+function appendAuditEvent(event) {
+  ensureAuditLogReady();
+  fs.appendFileSync(auditLogFile, `${JSON.stringify(event)}\n`, "utf8");
+}
+
+function hydrateRecentEventsFromAuditLog() {
+  try {
+    for (const event of readAuditEvents({ limit: maxRecentEvents })) {
+      recentEvents.push(event);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    console.warn(`Unable to hydrate recent events from audit log: ${message}`);
+  }
+}
+
 function publishEvent(event) {
+  appendAuditEvent(event);
+
   recentEvents.push(event);
   if (recentEvents.length > maxRecentEvents) {
     recentEvents.splice(0, recentEvents.length - maxRecentEvents);
@@ -126,6 +241,7 @@ const server = http.createServer(async (req, res) => {
       port,
       recentEventCount: recentEvents.length,
       streamClientCount: streamClients.size,
+      auditLogFile,
     });
     return;
   }
@@ -134,6 +250,32 @@ const server = http.createServer(async (req, res) => {
     sendJson(res, 200, {
       items: recentEvents,
       count: recentEvents.length,
+    });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/events/audit") {
+    const limit = Number.parseInt(requestUrl.searchParams.get("limit") ?? "100", 10);
+    const type = requestUrl.searchParams.get("type") || null;
+    const source = requestUrl.searchParams.get("source") || null;
+    const items = readAuditEvents({
+      limit: Number.isFinite(limit) ? limit : 100,
+      type,
+      source,
+    });
+    sendJson(res, 200, {
+      items,
+      count: items.length,
+      filters: { type, source },
+      logFile: auditLogFile,
+    });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/events/audit/summary") {
+    sendJson(res, 200, {
+      ok: true,
+      audit: buildAuditSummary(),
     });
     return;
   }
@@ -159,6 +301,10 @@ const server = http.createServer(async (req, res) => {
   sendJson(res, 404, { ok: false, error: "Route not found." });
 });
 
+ensureAuditLogReady();
+hydrateRecentEventsFromAuditLog();
+
 server.listen(port, host, () => {
   console.log(`openclaw-event-hub listening on http://${host}:${port}`);
+  console.log(`openclaw-event-hub audit log: ${auditLogFile}`);
 });

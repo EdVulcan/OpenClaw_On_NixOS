@@ -3,6 +3,7 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $artifactDir = Join-Path $repoRoot ".artifacts"
 $stateFile = Join-Path $artifactDir "dev-services.json"
+$eventLogFile = if ($env:OPENCLAW_EVENT_LOG_FILE) { $env:OPENCLAW_EVENT_LOG_FILE } else { Join-Path $artifactDir "openclaw-events.jsonl" }
 
 if (-not (Test-Path $artifactDir)) {
   New-Item -ItemType Directory -Path $artifactDir | Out-Null
@@ -45,6 +46,7 @@ function Wait-Health {
 }
 
 $nodeExe = Resolve-NodeExe
+$env:OPENCLAW_EVENT_LOG_FILE = $eventLogFile
 
 $services = @(
   @{

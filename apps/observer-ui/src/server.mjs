@@ -402,6 +402,13 @@ function observerHtml() {
           <div class="metric"><span>Entries</span><span id="heal-count">0</span></div>
           <pre id="heal-summary">No heal actions yet.</pre>
         </section>
+        <section class="panel">
+          <h2>Audit Ledger</h2>
+          <div class="metric"><span>Persisted Events</span><span id="audit-total">0</span></div>
+          <div class="metric"><span>Event Types</span><span id="audit-type-count">0</span></div>
+          <div class="metric"><span>Sources</span><span id="audit-source-count">0</span></div>
+          <pre id="audit-summary">Loading audit ledger...</pre>
+        </section>
         <section class="panel" style="grid-column: 1 / -1;">
           <h2>Recent Events</h2>
           <ul id="events-list"></ul>
@@ -474,6 +481,10 @@ const systemBodyUptime = document.querySelector("#system-body-uptime");
 const systemSummary = document.querySelector("#system-summary");
 const healCount = document.querySelector("#heal-count");
 const healSummary = document.querySelector("#heal-summary");
+const auditTotal = document.querySelector("#audit-total");
+const auditTypeCount = document.querySelector("#audit-type-count");
+const auditSourceCount = document.querySelector("#audit-source-count");
+const auditSummary = document.querySelector("#audit-summary");
 const createTaskButton = document.querySelector("#create-task-button");
 const createPlannedTaskButton = document.querySelector("#create-planned-task-button");
 const operatorStepButton = document.querySelector("#operator-step-button");
@@ -1131,6 +1142,35 @@ async function refreshHealState() {
   }
 }
 
+async function refreshAuditState() {
+  try {
+    const summary = await fetchJson(\`\${observerConfig.eventHubUrl}/events/audit/summary\`);
+    const audit = summary.audit ?? {};
+    const byType = audit.byType ?? {};
+    const bySource = audit.bySource ?? {};
+    const topTypes = Object.entries(byType)
+      .sort((left, right) => right[1] - left[1])
+      .slice(0, 6)
+      .map(([type, count]) => \`\${type}: \${count}\`);
+
+    auditTotal.textContent = String(audit.total ?? 0);
+    auditTypeCount.textContent = String(Object.keys(byType).length);
+    auditSourceCount.textContent = String(Object.keys(bySource).length);
+    auditSummary.textContent = [
+      \`Log: \${audit.logFile ?? "unknown"}\`,
+      \`Earliest: \${formatTimestamp(audit.earliestTimestamp)}\`,
+      \`Latest: \${formatTimestamp(audit.latestTimestamp)}\`,
+      \`Malformed Lines: \${audit.malformed ?? 0}\`,
+      topTypes.length ? \`Top Types: \${topTypes.join(", ")}\` : "Top Types: none",
+    ].join("\\n");
+  } catch {
+    auditTotal.textContent = "0";
+    auditTypeCount.textContent = "0";
+    auditSourceCount.textContent = "0";
+    auditSummary.textContent = "Unable to read audit ledger.";
+  }
+}
+
 async function loadRecentEvents() {
   try {
     const data = await fetchJson(\`\${observerConfig.eventHubUrl}/events/recent\`);
@@ -1674,6 +1714,7 @@ function subscribeEvents() {
         if (eventName === "heal.diagnosed" || eventName === "heal.started" || eventName === "heal.completed" || eventName === "service.started") {
           await refreshHealState();
         }
+        await refreshAuditState();
       } catch (error) {
         console.error("Unable to process named event", error);
       }
@@ -1939,6 +1980,7 @@ await refreshOperatorState();
 await refreshPolicyState();
 await refreshSystemState();
 await refreshHealState();
+await refreshAuditState();
 await loadRecentEvents();
 setControlMessage("Controls ready.");
 subscribeEvents();
@@ -1952,7 +1994,8 @@ setInterval(refreshActionState, 5000);
 setInterval(refreshOperatorState, 5000);
 setInterval(refreshPolicyState, 5000);
 setInterval(refreshSystemState, 5000);
-setInterval(refreshHealState, 5000);`;
+setInterval(refreshHealState, 5000);
+setInterval(refreshAuditState, 5000);`;
 }
 
 const server = http.createServer((req, res) => {

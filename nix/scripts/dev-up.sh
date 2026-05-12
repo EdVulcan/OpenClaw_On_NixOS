@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 ARTIFACT_DIR="$REPO_ROOT/.artifacts"
 STATE_FILE="$ARTIFACT_DIR/dev-services-unix.tsv"
+OPENCLAW_EVENT_LOG_FILE="${OPENCLAW_EVENT_LOG_FILE:-$ARTIFACT_DIR/openclaw-events.jsonl}"
 
 mkdir -p "$ARTIFACT_DIR"
 
@@ -153,6 +154,7 @@ start_service_process() {
     export OPENCLAW_SCREEN_ACT_URL="$SCREEN_ACT_URL"
     export OPENCLAW_SYSTEM_SENSE_URL="$SYSTEM_SENSE_URL"
     export OPENCLAW_SYSTEM_HEAL_URL="$SYSTEM_HEAL_URL"
+    export OPENCLAW_EVENT_LOG_FILE="$OPENCLAW_EVENT_LOG_FILE"
     nohup "$NODE_EXE" src/server.mjs >"$log_file" 2>&1 &
     echo $! >"$pid_file"
   )
