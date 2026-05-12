@@ -26,7 +26,20 @@ OBSERVER_URL="http://127.0.0.1:$OBSERVER_UI_PORT"
 rm -f "$OPENCLAW_CORE_STATE_FILE" "$OPENCLAW_CORE_STATE_FILE.tmp" "$OPENCLAW_EVENT_LOG_FILE"
 
 cleanup() {
-  rm -f "${HTML_FILE:-}" "${CLIENT_FILE:-}"
+  rm -f \
+    "${HTML_FILE:-}" \
+    "${CLIENT_FILE:-}" \
+    "${BLOCKED_TASK_FILE:-}" \
+    "${PENDING_APPROVALS_FILE:-}" \
+    "${BLOCKED_STEP_FILE:-}" \
+    "${APPROVED_FILE:-}" \
+    "${AFTER_APPROVE_FILE:-}" \
+    "${RUN_RESULT_FILE:-}" \
+    "${DENIED_TASK_FILE:-}" \
+    "${DENY_PENDING_FILE:-}" \
+    "${DENIED_FILE:-}" \
+    "${FINAL_APPROVALS_FILE:-}" \
+    "${APPROVAL_EVENTS_FILE:-}"
   "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -61,12 +74,16 @@ for (const token of ["/approvals?limit=10", "approval.created", "approval.approv
 }
 EOF
 
-blocked_task="$(post_json "$CORE_URL/tasks/plan" "{\"goal\":\"Upload requires approval\",\"type\":\"browser_task\",\"targetUrl\":\"$TARGET_URL\",\"policy\":{\"intent\":\"data.upload\"},\"actions\":[{\"kind\":\"keyboard.type\",\"params\":{\"text\":\"approved upload\"}}]}")"
-pending_approvals="$(curl --silent --fail "$CORE_URL/approvals?status=pending&limit=10")"
-blocked_step="$(post_json "$CORE_URL/operator/step" '{}')"
-approval_id="$(node - <<'EOF' "$pending_approvals" "$blocked_step"
-const pending = JSON.parse(process.argv[2]);
-const blocked = JSON.parse(process.argv[3]);
+BLOCKED_TASK_FILE="$(mktemp)"
+PENDING_APPROVALS_FILE="$(mktemp)"
+BLOCKED_STEP_FILE="$(mktemp)"
+post_json "$CORE_URL/tasks/plan" "{\"goal\":\"Upload requires approval\",\"type\":\"browser_task\",\"targetUrl\":\"$TARGET_URL\",\"policy\":{\"intent\":\"data.upload\"},\"actions\":[{\"kind\":\"keyboard.type\",\"params\":{\"text\":\"approved upload\"}}]}" > "$BLOCKED_TASK_FILE"
+curl --silent --fail "$CORE_URL/approvals?status=pending&limit=10" > "$PENDING_APPROVALS_FILE"
+post_json "$CORE_URL/operator/step" '{}' > "$BLOCKED_STEP_FILE"
+approval_id="$(node - <<'EOF' "$PENDING_APPROVALS_FILE" "$BLOCKED_STEP_FILE"
+const fs = require("node:fs");
+const pending = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+const blocked = JSON.parse(fs.readFileSync(process.argv[3], "utf8"));
 if (!pending.ok || pending.count !== 1 || pending.summary?.pendingCount !== 1) {
   throw new Error("expected one pending approval request");
 }
@@ -80,35 +97,56 @@ process.stdout.write(pending.items[0].id);
 EOF
 )"
 
-approved="$(post_json "$CORE_URL/approvals/$approval_id/approve" '{"approvedBy":"dev-approval-check","reason":"test approval"}')"
-after_approve="$(curl --silent --fail "$CORE_URL/approvals/summary")"
-run_result="$(post_json "$CORE_URL/operator/run" '{"maxSteps":2}')"
+APPROVED_FILE="$(mktemp)"
+AFTER_APPROVE_FILE="$(mktemp)"
+RUN_RESULT_FILE="$(mktemp)"
+post_json "$CORE_URL/approvals/$approval_id/approve" '{"approvedBy":"dev-approval-check","reason":"test approval"}' > "$APPROVED_FILE"
+curl --silent --fail "$CORE_URL/approvals/summary" > "$AFTER_APPROVE_FILE"
+post_json "$CORE_URL/operator/run" '{"maxSteps":2}' > "$RUN_RESULT_FILE"
 
-denied_task="$(post_json "$CORE_URL/tasks/plan" "{\"goal\":\"Denied upload stays inside user sovereignty\",\"type\":\"browser_task\",\"targetUrl\":\"$TARGET_URL\",\"policy\":{\"intent\":\"data.upload\"},\"actions\":[{\"kind\":\"keyboard.type\",\"params\":{\"text\":\"denied upload\"}}]}")"
-deny_pending="$(curl --silent --fail "$CORE_URL/approvals?status=pending&limit=10")"
-deny_id="$(node - <<'EOF' "$deny_pending"
-const pending = JSON.parse(process.argv[2]);
+DENIED_TASK_FILE="$(mktemp)"
+DENY_PENDING_FILE="$(mktemp)"
+post_json "$CORE_URL/tasks/plan" "{\"goal\":\"Denied upload stays inside user sovereignty\",\"type\":\"browser_task\",\"targetUrl\":\"$TARGET_URL\",\"policy\":{\"intent\":\"data.upload\"},\"actions\":[{\"kind\":\"keyboard.type\",\"params\":{\"text\":\"denied upload\"}}]}" > "$DENIED_TASK_FILE"
+curl --silent --fail "$CORE_URL/approvals?status=pending&limit=10" > "$DENY_PENDING_FILE"
+deny_id="$(node - <<'EOF' "$DENY_PENDING_FILE"
+const fs = require("node:fs");
+const pending = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
 if (!pending.ok || pending.count !== 1) {
   throw new Error("expected one pending approval request for denial path");
 }
 process.stdout.write(pending.items[0].id);
 EOF
 )"
-denied="$(post_json "$CORE_URL/approvals/$deny_id/deny" '{"deniedBy":"dev-approval-check","reason":"test denial"}')"
-final_approvals="$(curl --silent --fail "$CORE_URL/approvals?limit=10")"
-approval_events="$(curl --silent --fail "$EVENT_HUB_URL/events/audit?source=openclaw-core&limit=50")"
+DENIED_FILE="$(mktemp)"
+FINAL_APPROVALS_FILE="$(mktemp)"
+APPROVAL_EVENTS_FILE="$(mktemp)"
+post_json "$CORE_URL/approvals/$deny_id/deny" '{"deniedBy":"dev-approval-check","reason":"test denial"}' > "$DENIED_FILE"
+curl --silent --fail "$CORE_URL/approvals?limit=10" > "$FINAL_APPROVALS_FILE"
+curl --silent --fail "$EVENT_HUB_URL/events/audit?source=openclaw-core&limit=50" > "$APPROVAL_EVENTS_FILE"
 
-node - <<'EOF' "$blocked_task" "$pending_approvals" "$blocked_step" "$approved" "$after_approve" "$run_result" "$denied_task" "$denied" "$final_approvals" "$approval_events"
-const blockedTask = JSON.parse(process.argv[2]);
-const pendingApprovals = JSON.parse(process.argv[3]);
-const blockedStep = JSON.parse(process.argv[4]);
-const approved = JSON.parse(process.argv[5]);
-const afterApprove = JSON.parse(process.argv[6]);
-const runResult = JSON.parse(process.argv[7]);
-const deniedTask = JSON.parse(process.argv[8]);
-const denied = JSON.parse(process.argv[9]);
-const finalApprovals = JSON.parse(process.argv[10]);
-const approvalEvents = JSON.parse(process.argv[11]);
+node - <<'EOF' \
+  "$BLOCKED_TASK_FILE" \
+  "$PENDING_APPROVALS_FILE" \
+  "$BLOCKED_STEP_FILE" \
+  "$APPROVED_FILE" \
+  "$AFTER_APPROVE_FILE" \
+  "$RUN_RESULT_FILE" \
+  "$DENIED_TASK_FILE" \
+  "$DENIED_FILE" \
+  "$FINAL_APPROVALS_FILE" \
+  "$APPROVAL_EVENTS_FILE"
+const fs = require("node:fs");
+const readJson = (index) => JSON.parse(fs.readFileSync(process.argv[index], "utf8"));
+const blockedTask = readJson(2);
+const pendingApprovals = readJson(3);
+const blockedStep = readJson(4);
+const approved = readJson(5);
+const afterApprove = readJson(6);
+const runResult = readJson(7);
+const deniedTask = readJson(8);
+const denied = readJson(9);
+const finalApprovals = readJson(10);
+const approvalEvents = readJson(11);
 
 if (blockedTask.task?.approval?.required !== true || blockedTask.task?.policy?.decision?.decision !== "require_approval") {
   throw new Error("blocked task should carry a required approval");
