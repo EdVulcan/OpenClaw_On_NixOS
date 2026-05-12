@@ -386,6 +386,15 @@ function observerHtml() {
           <pre id="capability-history-json">Loading capability invocation history...</pre>
         </section>
         <section class="panel">
+          <h2>Command Ledger</h2>
+          <div class="metric"><span>Total</span><span id="command-ledger-total">0</span></div>
+          <div class="metric"><span>Executed</span><span id="command-ledger-executed">0</span></div>
+          <div class="metric"><span>Failed</span><span id="command-ledger-failed">0</span></div>
+          <div class="metric"><span>Skipped</span><span id="command-ledger-skipped">0</span></div>
+          <div class="metric"><span>Tasks</span><span id="command-ledger-tasks">0</span></div>
+          <pre id="command-ledger-json">Loading command transcript ledger...</pre>
+        </section>
+        <section class="panel">
           <h2>Recent Tasks</h2>
           <div class="metric"><span>Entries</span><span id="task-list-count">0</span></div>
           <div class="task-summary-grid">
@@ -595,6 +604,12 @@ const capabilityHistoryInvoked = document.querySelector("#capability-history-inv
 const capabilityHistoryBlocked = document.querySelector("#capability-history-blocked");
 const capabilityHistoryLatest = document.querySelector("#capability-history-latest");
 const capabilityHistoryJson = document.querySelector("#capability-history-json");
+const commandLedgerTotal = document.querySelector("#command-ledger-total");
+const commandLedgerExecuted = document.querySelector("#command-ledger-executed");
+const commandLedgerFailed = document.querySelector("#command-ledger-failed");
+const commandLedgerSkipped = document.querySelector("#command-ledger-skipped");
+const commandLedgerTasks = document.querySelector("#command-ledger-tasks");
+const commandLedgerJson = document.querySelector("#command-ledger-json");
 let currentTaskState = null;
 let latestActionState = null;
 let latestHistoryTask = null;
@@ -893,6 +908,32 @@ function renderCommandTranscriptFromTask(task, { source = "task" } = {}) {
   renderCommandTranscript(extractTaskCommandTranscript(task), { source });
 }
 
+function renderCommandLedger(data) {
+  const summary = data?.summary ?? {};
+  const items = Array.isArray(data?.items) ? data.items : [];
+  commandLedgerTotal.textContent = String(summary.total ?? 0);
+  commandLedgerExecuted.textContent = String(summary.executed ?? 0);
+  commandLedgerFailed.textContent = String(summary.failed ?? 0);
+  commandLedgerSkipped.textContent = String(summary.skipped ?? 0);
+  commandLedgerTasks.textContent = String(summary.taskCount ?? 0);
+
+  commandLedgerJson.textContent = [
+    \`Total: \${summary.total ?? 0}\`,
+    \`Executed: \${summary.executed ?? 0}\`,
+    \`Failed: \${summary.failed ?? 0}\`,
+    \`Skipped: \${summary.skipped ?? 0}\`,
+    \`Tasks: \${summary.taskCount ?? 0}\`,
+    \`By Command: \${Object.entries(summary.byCommand ?? {}).map(([command, count]) => \`\${command}=\${count}\`).join(", ") || "none"}\`,
+    \`By Task Status: \${Object.entries(summary.byTaskStatus ?? {}).map(([status, count]) => \`\${status}=\${count}\`).join(", ") || "none"}\`,
+    "",
+    ...items.slice(0, 8).map((entry) => {
+      const state = entry.state ?? (entry.skipped ? "skipped" : "executed");
+      const stdout = String(entry.stdout ?? "").trim();
+      return \`[\${state}] task=\${entry.taskId ?? "none"} \${entry.command ?? "unknown"} exit=\${entry.exitCode ?? "n/a"} skip=\${entry.skipReason ?? "none"}\${stdout ? \` stdout=\${stdout}\` : ""}\`;
+    }),
+  ].join("\\n");
+}
+
 function renderOperatorPanel(result) {
   if (!result) {
     renderOperatorState(null);
@@ -1000,6 +1041,20 @@ async function refreshCapabilityHistory() {
     capabilityHistoryBlocked.textContent = "0";
     capabilityHistoryLatest.textContent = "unknown";
     capabilityHistoryJson.textContent = "Unable to read capability invocation history.";
+  }
+}
+
+async function refreshCommandLedger() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/commands/transcripts?limit=8\`);
+    renderCommandLedger(data);
+  } catch {
+    commandLedgerTotal.textContent = "0";
+    commandLedgerExecuted.textContent = "0";
+    commandLedgerFailed.textContent = "0";
+    commandLedgerSkipped.textContent = "0";
+    commandLedgerTasks.textContent = "unknown";
+    commandLedgerJson.textContent = "Unable to read command transcript ledger.";
   }
 }
 
@@ -2361,6 +2416,7 @@ await refreshPolicyState();
 await refreshApprovalState();
 await refreshCapabilityState();
 await refreshCapabilityHistory();
+await refreshCommandLedger();
 await refreshSystemState();
 await refreshHealState();
 await refreshAuditState();
@@ -2379,6 +2435,7 @@ setInterval(refreshPolicyState, 5000);
 setInterval(refreshApprovalState, 5000);
 setInterval(refreshCapabilityState, 5000);
 setInterval(refreshCapabilityHistory, 5000);
+setInterval(refreshCommandLedger, 5000);
 setInterval(refreshSystemState, 5000);
 setInterval(refreshHealState, 5000);
 setInterval(refreshAuditState, 5000);`;

@@ -50,6 +50,7 @@
     "dev:observer-capability-invoke-check:unix": "bash ./nix/scripts/dev-observer-capability-invoke-check.sh",
     "dev:observer-capability-history-check:unix": "bash ./nix/scripts/dev-observer-capability-history-check.sh",
     "dev:observer-command-transcript-check:unix": "bash ./nix/scripts/dev-observer-command-transcript-check.sh",
+    "dev:observer-command-ledger-check:unix": "bash ./nix/scripts/dev-observer-command-ledger-check.sh",
     "dev:observer-operator-check:unix": "bash ./nix/scripts/dev-observer-operator-check.sh",
     "dev:milestone-check:unix": "bash ./nix/scripts/dev-milestone-check.sh"
   }
