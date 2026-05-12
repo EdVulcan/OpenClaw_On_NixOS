@@ -62,6 +62,7 @@ checks=(
   "observer-workspace-command-execute|dev-observer-workspace-command-execute-check.sh|Observer controls and visibility for approved OpenClaw workspace command execution"
   "observer-workspace-command-failure|dev-observer-workspace-command-failure-check.sh|Observer visibility for failed OpenClaw workspace command execution"
   "observer-workspace-command-recovery|dev-observer-workspace-command-recovery-check.sh|Observer controls and visibility for recovered OpenClaw workspace commands"
+  "observer-workspace-command-recovery-persistence|dev-observer-workspace-command-recovery-persistence-check.sh|Observer visibility for recovered OpenClaw workspace command chains across restarts"
   "observer-operator|dev-observer-operator-check.sh|Observer UI planner/operator controls and API wiring"
 )
 

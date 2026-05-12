@@ -305,6 +305,14 @@ npm run dev:observer-workspace-command-recovery-check:unix
 
 This verifies Observer exposes controls and refresh hooks for recovering a failed workspace command, while preserving the fresh approval gate before the recovered command can execute.
 
+Run the observer OpenClaw workspace command recovery persistence slice directly:
+
+```bash
+npm run dev:observer-workspace-command-recovery-persistence-check:unix
+```
+
+This verifies Observer recovery controls and task detail views remain valid across restarts while recovered workspace command chains preserve pending approval, command transcript ledger, and capability history.
+
 Run the approval inbox slice directly:
 
 ```bash
@@ -695,6 +703,7 @@ This is based on real NixOS VM validation:
 - `dev:observer-workspace-command-execute-check:unix` covers Observer controls and visibility for approved OpenClaw workspace command execution
 - `dev:observer-workspace-command-failure-check:unix` covers Observer visibility for failed OpenClaw workspace command execution
 - `dev:observer-workspace-command-recovery-check:unix` covers Observer controls and visibility for recovered OpenClaw workspace commands
+- `dev:observer-workspace-command-recovery-persistence-check:unix` covers Observer visibility for recovered OpenClaw workspace command chains across restarts
 - `dev:capability-planner-check:unix` covers capability-aware plan metadata and approval-gated body capabilities
 - `dev:capability-invoke-check:unix` covers policy-governed capability invocation through core
 - `dev:capability-history-check:unix` covers persistent capability invocation history and restart recovery
