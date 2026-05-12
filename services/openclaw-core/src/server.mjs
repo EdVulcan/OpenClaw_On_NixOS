@@ -471,6 +471,101 @@ function buildWorkspaceCommandProposals() {
   };
 }
 
+function findWorkspaceCommandProposal({ proposalId = null, workspaceId = null, scriptName = null } = {}) {
+  const proposals = buildWorkspaceCommandProposals();
+  const match = proposals.items.find((item) => {
+    if (proposalId && item.id === proposalId) {
+      return true;
+    }
+    return workspaceId && scriptName && item.workspaceId === workspaceId && item.scriptName === scriptName;
+  }) ?? null;
+
+  return {
+    proposals,
+    proposal: match,
+  };
+}
+
+function buildWorkspaceCommandPlanDraft({ proposalId = null, workspaceId = null, scriptName = null } = {}) {
+  const { proposals, proposal } = findWorkspaceCommandProposal({ proposalId, workspaceId, scriptName });
+  if (!proposal) {
+    throw new Error("Workspace command proposal was not found.");
+  }
+
+  const now = new Date().toISOString();
+  const goal = `Review execution plan for ${proposal.workspaceName}:${proposal.scriptName}`;
+  const policyRequest = {
+    intent: "system.command.execute",
+    domain: "body_internal",
+    risk: proposal.risk,
+    requiresApproval: true,
+    tags: ["workspace_command", "explicit_approval_required"],
+  };
+  const action = {
+    kind: "system.command.execute",
+    intent: "system.command.execute",
+    params: {
+      command: proposal.command,
+      args: proposal.args,
+      cwd: proposal.cwd,
+      timeoutMs: proposal.risk === "medium" ? 300000 : 120000,
+    },
+  };
+  const plan = buildRulePlan({
+    goal,
+    type: "system_task",
+    intent: "system.command.execute",
+    policy: policyRequest,
+    targetUrl: null,
+    actions: [action],
+  });
+  const policyDecision = {
+    id: randomUUID(),
+    at: now,
+    engine: "workspace-command-plan-v0",
+    stage: "workspace.command.plan",
+    subject: {
+      taskId: null,
+      type: "system_task",
+      goal,
+      targetUrl: null,
+      intent: "system.command.execute",
+    },
+    domain: "body_internal",
+    risk: proposal.risk,
+    decision: "require_approval",
+    reason: "workspace_command_requires_explicit_user_approval",
+    approved: false,
+    autonomyMode,
+    autonomous: false,
+  };
+
+  return {
+    registry: "workspace-command-plan-draft-v0",
+    mode: "plan-only",
+    generatedAt: now,
+    sourceRegistry: proposals.registry,
+    proposal,
+    draft: {
+      goal,
+      type: "system_task",
+      action,
+      plan,
+      policy: {
+        request: policyRequest,
+        decision: policyDecision,
+      },
+      governance: {
+        createsTask: false,
+        createsApproval: false,
+        canExecute: false,
+        requiresExplicitApproval: true,
+        exposesScriptBody: false,
+      },
+    },
+  };
+}
+
 function serialiseTask(task) {
   const currentTask = getCurrentTask();
   return {
@@ -3582,6 +3677,24 @@ const server = http.createServer(async (req, res) => {
       roots: proposals.roots,
       summary: proposals.summary,
     });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/workspaces/command-proposals/plan") {
+    try {
+      const draft = buildWorkspaceCommandPlanDraft({
+        proposalId: requestUrl.searchParams.get("proposalId"),
+        workspaceId: requestUrl.searchParams.get("workspaceId"),
+        scriptName: requestUrl.searchParams.get("scriptName"),
+      });
+      sendJson(res, 200, {
+        ok: true,
+        ...draft,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 404, { ok: false, error: message });
+    }
     return;
   }
 

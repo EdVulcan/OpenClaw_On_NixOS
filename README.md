@@ -393,6 +393,14 @@ npm run dev:openclaw-workspace-command-proposals-check:unix
 
 This verifies core can derive proposal-only `pnpm run <script>` command shapes from detected OpenClaw workspace scripts without exposing script bodies or executing commands.
 
+Run the OpenClaw workspace command plan slice directly:
+
+```bash
+npm run dev:openclaw-workspace-command-plan-check:unix
+```
+
+This verifies core can render a plan-only execution draft for a selected workspace command proposal, including command shape and explicit approval governance, without creating tasks, approvals, or command executions.
+
 Stop everything that `dev:up` started:
 
 ```bash
@@ -613,6 +621,7 @@ This is based on real NixOS VM validation:
 - `dev:system-sense-check:unix` covers real body vitals and service health telemetry
 - `dev:system-heal-check:unix` covers conservative diagnosis, autofix, and heal history
 - `dev:openclaw-workspace-command-proposals-check:unix` covers proposal-only command shapes for detected OpenClaw workspaces
+- `dev:openclaw-workspace-command-plan-check:unix` covers plan-only execution drafts for selected OpenClaw workspace commands
 - direct GNOME/Wayland whole-desktop capture remains inconsistent across:
   - `org.gnome.Shell.Screenshot`
   - `grim`
