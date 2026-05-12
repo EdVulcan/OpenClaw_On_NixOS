@@ -1194,6 +1194,8 @@ function recordCapabilityInvocation({ capability, request, policy, invoked, bloc
       operation: request.operation ?? request.params?.operation ?? null,
       intent: request.intent ?? capability.intents?.[0] ?? null,
       approved: request.approved === true,
+      command: typeof request.params?.command === "string" ? request.params.command : null,
+      cwd: typeof request.params?.cwd === "string" ? request.params.cwd : typeof request.params?.workingDirectory === "string" ? request.params.workingDirectory : null,
     },
     policy: {
       id: policy.id,
@@ -1930,6 +1932,23 @@ function buildCapabilityInvokeBodyFromPlanStep(step, task) {
   };
 }
 
+function buildCommandTranscriptEntry(step, response) {
+  if (response.capability?.id !== "act.system.command.execute") {
+    return null;
+  }
+  return {
+    stepId: step.id ?? null,
+    actionKind: step.kind ?? null,
+    capabilityId: response.capability.id,
+    invocationId: response.invocation?.id ?? null,
+    command: response.invocation?.request?.command ?? step.params?.command ?? null,
+    exitCode: response.summary?.exitCode ?? null,
+    timedOut: response.summary?.timedOut ?? null,
+    stdout: response.summary?.stdout ?? "",
+    stderr: response.summary?.stderr ?? "",
+  };
+}
+
 function isTaskPolicyApproved(task) {
   const approval = task?.approval?.requestId ? approvals.get(task.approval.requestId) : null;
   return task?.policy?.decision?.approved === true
@@ -2292,11 +2311,16 @@ async function executeCapabilityPlanTask(task, options = {}) {
   }
 
   const capabilityInvocations = [];
+  const commandTranscript = [];
   try {
     for (const step of actionSteps) {
       const invocation = await invokeCapability(buildCapabilityInvokeBodyFromPlanStep(step, task));
       const response = invocation.response;
       capabilityInvocations.push(response);
+      const transcriptEntry = buildCommandTranscriptEntry(step, response);
+      if (transcriptEntry) {
+        commandTranscript.push(transcriptEntry);
+      }
       if (response.blocked === true || response.invoked !== true) {
         const failedTask = failTask(task, `Capability invocation blocked: ${response.reason ?? "unknown"}`, {
           executor: "capability-invoke-v1",
@@ -2341,6 +2365,7 @@ async function executeCapabilityPlanTask(task, options = {}) {
         blocked: response.blocked === true,
         summary: response.summary ?? null,
       })),
+      commandTranscript,
     });
     await publishEvent("task.completed", {
       task: serialiseTask(completedTask),
@@ -2428,6 +2453,7 @@ function serialiseExecutionResult(executionResult) {
       reason: response.reason ?? null,
       summary: response.summary ?? null,
     })),
+    commandTranscript: finalExecution.task?.outcome?.details?.commandTranscript ?? [],
     finalReadiness: finalExecution.verifiedScreen?.screen?.readiness ?? null,
     finalWorkView: finalExecution.finalWorkViewState?.workView ?? null,
     recovery: executionResult.recovery ?? null,

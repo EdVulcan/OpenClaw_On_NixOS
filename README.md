@@ -137,6 +137,14 @@ npm run dev:sovereign-command-execute-check:unix
 
 This verifies `act.system.command.execute` can run allowlisted body-internal commands in `sovereign_body` mode with cwd limits, timeout/output capture, audit history, and no shell.
 
+Run the sovereign command chain slice directly:
+
+```bash
+npm run dev:sovereign-command-chain-check:unix
+```
+
+This verifies multi-step body-internal command execution preserves a command transcript across task outcome, execution response, capability history, and audit events.
+
 Run the approval inbox slice directly:
 
 ```bash
@@ -445,6 +453,7 @@ This is based on real NixOS VM validation:
 - `dev:policy-check:unix` covers the first policy governance and cross-boundary gate
 - `dev:sovereign-body-policy-check:unix` covers body-internal autonomy under `OPENCLAW_AUTONOMY_MODE=sovereign_body`
 - `dev:sovereign-command-execute-check:unix` covers allowlisted body-internal command execution under sovereign body autonomy
+- `dev:sovereign-command-chain-check:unix` covers multi-step command execution transcripts under sovereign body autonomy
 - `dev:capability-planner-check:unix` covers capability-aware plan metadata and approval-gated body capabilities
 - `dev:capability-invoke-check:unix` covers policy-governed capability invocation through core
 - `dev:capability-history-check:unix` covers persistent capability invocation history and restart recovery
