@@ -49,6 +49,7 @@ const CAPABILITY_HEALTH_TIMEOUT_MS = Number.parseInt(
   process.env.OPENCLAW_CAPABILITY_HEALTH_TIMEOUT_MS ?? "1200",
   10,
 );
+const APPROVAL_TTL_MS = parseOptionalPositiveInteger(process.env.OPENCLAW_APPROVAL_TTL_MS);
 const STATUS_PRIORITY = {
   running: 0,
   paused: 1,
@@ -64,6 +65,15 @@ function normaliseAutonomyMode(value) {
     return mode;
   }
   return "guardian";
+}
+
+function parseOptionalPositiveInteger(value) {
+  if (typeof value !== "string" || !value.trim()) {
+    return null;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
 function uniqueResolvedPaths(paths) {
@@ -993,20 +1003,24 @@ function serialiseApproval(approval) {
     approvedBy: approval.approvedBy ?? null,
     deniedBy: approval.deniedBy ?? null,
     resolutionReason: approval.resolutionReason ?? null,
+    expiresAt: approval.expiresAt ?? null,
     createdAt: approval.createdAt,
     updatedAt: approval.updatedAt,
     resolvedAt: approval.resolvedAt ?? null,
+    expiredAt: approval.expiredAt ?? null,
     task: approval.taskId && tasks.has(approval.taskId) ? serialiseTask(tasks.get(approval.taskId)) : null,
   };
 }
 
 function listApprovals() {
+  reconcileApprovalExpirations();
   return [...approvals.values()]
     .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))
     .map((approval) => serialiseApproval(approval));
 }
 
 function buildApprovalSummary() {
+  reconcileApprovalExpirations();
   const counts = {
     total: 0,
     pending: 0,
@@ -1029,6 +1043,79 @@ function buildApprovalSummary() {
     pendingCount: pending.length,
     latestPendingId: pending[0]?.id ?? null,
   };
+}
+
+function getApprovalExpiresAt(approval) {
+  if (typeof approval.expiresAt === "string" && approval.expiresAt.trim()) {
+    return approval.expiresAt;
+  }
+
+  if (!APPROVAL_TTL_MS || typeof approval.createdAt !== "string") {
+    return null;
+  }
+
+  const createdAtMs = Date.parse(approval.createdAt);
+  if (Number.isNaN(createdAtMs)) {
+    return null;
+  }
+
+  return new Date(createdAtMs + APPROVAL_TTL_MS).toISOString();
+}
+
+function isApprovalExpired(approval, nowMs = Date.now()) {
+  const expiresAt = getApprovalExpiresAt(approval);
+  if (!expiresAt) {
+    return false;
+  }
+
+  const expiresAtMs = Date.parse(expiresAt);
+  return !Number.isNaN(expiresAtMs) && expiresAtMs <= nowMs;
+}
+
+function markApprovalExpired(approval, { reason = "Approval expired." } = {}) {
+  const now = new Date().toISOString();
+  approval.status = "expired";
+  approval.resolutionReason = reason;
+  approval.resolvedAt = now;
+  approval.expiredAt = now;
+  approval.updatedAt = now;
+
+  const task = approval.taskId ? getTaskById(approval.taskId) : null;
+  if (task) {
+    task.approval = {
+      requestId: approval.id,
+      status: approval.status,
+      required: false,
+      updatedAt: now,
+    };
+    if (isActiveTask(task)) {
+      failTask(task, reason, {
+        approvalId: approval.id,
+        reason,
+      });
+    } else {
+      persistState();
+    }
+  } else {
+    persistState();
+  }
+
+  return { approval, task };
+}
+
+function reconcileApprovalExpirations() {
+  if (!APPROVAL_TTL_MS) {
+    return [];
+  }
+
+  const nowMs = Date.now();
+  const expired = [];
+  for (const approval of approvals.values()) {
+    if (approval.status === "pending" && isApprovalExpired(approval, nowMs)) {
+      expired.push(markApprovalExpired(approval));
+    }
+  }
+  return expired;
 }
 
 function findExistingApprovalForTask(taskId) {
@@ -1061,9 +1148,11 @@ function createApprovalRequestForTask(task, decision) {
     decision: decision.decision,
     reason: decision.reason,
     requestedBy: "openclaw-core",
+    expiresAt: APPROVAL_TTL_MS ? new Date(Date.parse(now) + APPROVAL_TTL_MS).toISOString() : null,
     createdAt: now,
     updatedAt: now,
     resolvedAt: null,
+    expiredAt: null,
   };
   approvals.set(approval.id, approval);
   task.approval = {
@@ -3316,6 +3405,10 @@ async function executeCapabilityPlanTask(task, options = {}) {
 }
 
 function recoverTask(sourceTask) {
+  if (sourceTask.recoveredByTaskId && tasks.has(sourceTask.recoveredByTaskId)) {
+    throw new Error(`Task already has a recovery task: ${sourceTask.recoveredByTaskId}`);
+  }
+
   const recoveryAttempt = (sourceTask.recovery?.attempt ?? 0) + 1;
   const recoverableCapabilityPlan = hasRecoverableCapabilityPlan(sourceTask);
   const recoveryBody = {
@@ -3690,6 +3783,8 @@ const server = http.createServer(async (req, res) => {
     });
     return;
   }
+
+  reconcileApprovalExpirations();
 
   if (req.method === "GET" && requestUrl.pathname === "/state/runtime") {
     reconcileRuntimeState();
@@ -4353,6 +4448,16 @@ const server = http.createServer(async (req, res) => {
 
     if (!isRecoverableTask(sourceTask)) {
       sendJson(res, 409, { ok: false, error: "Task is not recoverable." });
+      return;
+    }
+
+    if (sourceTask.recoveredByTaskId && tasks.has(sourceTask.recoveredByTaskId)) {
+      sendJson(res, 409, {
+        ok: false,
+        error: "Task already has a recovery task.",
+        recoveredByTaskId: sourceTask.recoveredByTaskId,
+        recoveredTask: serialiseTask(tasks.get(sourceTask.recoveredByTaskId)),
+      });
       return;
     }
 
