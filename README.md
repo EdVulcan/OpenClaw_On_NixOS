@@ -473,6 +473,14 @@ npm run dev:openclaw-workspace-command-failure-check:unix
 
 This verifies an approved workspace command with a non-zero exit code fails the task, preserves stderr and exit code in the command transcript ledger, records capability history, clears pending approvals, and emits failure audit events.
 
+Run the OpenClaw workspace command denial slice directly:
+
+```bash
+npm run dev:openclaw-workspace-command-denial-check:unix
+```
+
+This verifies denying a workspace command approval fails the queued task without executing the command, creating command transcripts, or invoking the command capability.
+
 Run the OpenClaw workspace command recovery slice directly:
 
 ```bash
@@ -719,6 +727,7 @@ This is based on real NixOS VM validation:
 - `dev:openclaw-workspace-command-task-check:unix` covers approval-gated task materialization for selected OpenClaw workspace commands
 - `dev:openclaw-workspace-command-execute-check:unix` covers approved execution of allowlisted OpenClaw workspace commands
 - `dev:openclaw-workspace-command-failure-check:unix` covers failure capture for approved OpenClaw workspace commands
+- `dev:openclaw-workspace-command-denial-check:unix` covers denial safety for approval-gated OpenClaw workspace commands
 - `dev:openclaw-workspace-command-recovery-check:unix` covers recovery of failed OpenClaw workspace commands behind a fresh approval gate
 - `dev:openclaw-workspace-command-recovery-persistence-check:unix` covers restart persistence for recovered OpenClaw workspace command chains
 - direct GNOME/Wayland whole-desktop capture remains inconsistent across:
