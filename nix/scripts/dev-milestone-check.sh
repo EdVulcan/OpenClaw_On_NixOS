@@ -19,6 +19,7 @@ checks=(
   "policy|dev-policy-check.sh|Policy governance, audit, and cross-boundary execution gate"
   "approval|dev-approval-check.sh|Approval inbox, user decisions, and operator approval gate"
   "capability|dev-capability-check.sh|Body capability registry, risks, health, and approval boundaries"
+  "capability-planner|dev-capability-planner-check.sh|Capability-aware planning with risk and governance metadata"
   "event-audit|dev-event-audit-check.sh|Durable event audit ledger, filters, summary, and restart recovery"
   "system-capability|dev-system-capability-check.sh|Conservative filesystem, process, and command dry-run capabilities"
   "system-sense|dev-system-sense-check.sh|Real body vitals, service latency, resources, and alerts"

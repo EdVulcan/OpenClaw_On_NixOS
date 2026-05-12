@@ -110,7 +110,7 @@ npm run dev:body-config-check:unix
 To run only a subset:
 
 ```bash
-OPENCLAW_MILESTONE_CHECKS=body-config,planner,operator-loop,operator-control,policy,approval,capability,event-audit,system-capability npm run dev:milestone-check:unix
+OPENCLAW_MILESTONE_CHECKS=body-config,planner,operator-loop,operator-control,policy,approval,capability,capability-planner,event-audit,system-capability npm run dev:milestone-check:unix
 ```
 
 Run the policy governance slice directly:
@@ -136,6 +136,14 @@ npm run dev:capability-check:unix
 ```
 
 This verifies the body capability inventory, service-backed health status, risk/governance metadata, cross-boundary approval boundaries, Observer visibility, and capability refresh events.
+
+Run the capability-aware planner slice directly:
+
+```bash
+npm run dev:capability-planner-check:unix
+```
+
+This verifies planner steps are annotated with body capability IDs, risk, governance, approval requirements, and registry-backed mappings for browser, filesystem, process, and conservative command dry-run plans.
 
 Run the conservative system capability slice directly:
 
@@ -363,6 +371,7 @@ This is based on real NixOS VM validation:
 - `dev:milestone-check:unix` is the preferred mainline regression suite
 - `dev:operator-control-check:unix` covers operator dry-run, pause gating, and resume
 - `dev:policy-check:unix` covers the first policy governance and cross-boundary gate
+- `dev:capability-planner-check:unix` covers capability-aware plan metadata and approval-gated body capabilities
 - `dev:system-sense-check:unix` covers real body vitals and service health telemetry
 - `dev:system-heal-check:unix` covers conservative diagnosis, autofix, and heal history
 - direct GNOME/Wayland whole-desktop capture remains inconsistent across:
