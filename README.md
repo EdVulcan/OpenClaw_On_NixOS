@@ -161,6 +161,14 @@ npm run dev:sovereign-command-recovery-check:unix
 
 This verifies non-zero command exits are persisted in transcripts, can drive explicit recovery branches with `onFailure: "continue"`, and fail the task by default when no recovery policy is declared.
 
+Run the sovereign command ledger slice directly:
+
+```bash
+npm run dev:sovereign-command-ledger-check:unix
+```
+
+This verifies `/commands/transcripts` and `/commands/transcripts/summary` expose recovered, failed, executed, and skipped command transcript entries and survive core restart recovery.
+
 Run the observer command transcript slice directly:
 
 ```bash
@@ -480,6 +488,7 @@ This is based on real NixOS VM validation:
 - `dev:sovereign-command-chain-check:unix` covers multi-step command execution transcripts under sovereign body autonomy
 - `dev:sovereign-command-branch-check:unix` covers branching command execution from previous transcript results
 - `dev:sovereign-command-recovery-check:unix` covers non-zero command exit recovery and default command task failure
+- `dev:sovereign-command-ledger-check:unix` covers queryable command transcript ledger and restart recovery
 - `dev:observer-command-transcript-check:unix` covers Observer visibility for sovereign command transcripts
 - `dev:capability-planner-check:unix` covers capability-aware plan metadata and approval-gated body capabilities
 - `dev:capability-invoke-check:unix` covers policy-governed capability invocation through core

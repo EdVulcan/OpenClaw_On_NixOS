@@ -2010,6 +2010,102 @@ function buildSkippedCommandTranscriptEntry(step, conditionResult) {
   };
 }
 
+function extractTaskCommandTranscript(task) {
+  return Array.isArray(task?.outcome?.details?.commandTranscript)
+    ? task.outcome.details.commandTranscript
+    : [];
+}
+
+function classifyCommandTranscriptEntry(entry) {
+  if (entry?.skipped === true) {
+    return "skipped";
+  }
+  if (entry?.timedOut === true || (Number.isInteger(entry?.exitCode) && entry.exitCode !== 0)) {
+    return "failed";
+  }
+  return "executed";
+}
+
+function buildCommandTranscriptRecords() {
+  return [...tasks.values()]
+    .flatMap((task) => extractTaskCommandTranscript(task).map((entry, index) => ({
+      taskId: task.id,
+      taskGoal: task.goal,
+      taskStatus: task.status,
+      taskClosedAt: task.closedAt ?? null,
+      taskUpdatedAt: task.updatedAt ?? null,
+      taskOutcome: task.outcome?.kind ?? task.status,
+      index,
+      state: classifyCommandTranscriptEntry(entry),
+      stepId: entry.stepId ?? null,
+      actionKind: entry.actionKind ?? null,
+      capabilityId: entry.capabilityId ?? null,
+      invocationId: entry.invocationId ?? null,
+      command: entry.command ?? null,
+      exitCode: entry.exitCode ?? null,
+      timedOut: entry.timedOut === true,
+      skipped: entry.skipped === true,
+      skipReason: entry.skipReason ?? null,
+      stdout: entry.stdout ?? "",
+      stderr: entry.stderr ?? "",
+    })))
+    .sort((left, right) => {
+      const leftTime = Date.parse(left.taskClosedAt ?? left.taskUpdatedAt ?? "");
+      const rightTime = Date.parse(right.taskClosedAt ?? right.taskUpdatedAt ?? "");
+      const safeLeftTime = Number.isFinite(leftTime) ? leftTime : 0;
+      const safeRightTime = Number.isFinite(rightTime) ? rightTime : 0;
+      if (safeLeftTime !== safeRightTime) {
+        return safeRightTime - safeLeftTime;
+      }
+      if (left.taskId !== right.taskId) {
+        return String(right.taskId).localeCompare(String(left.taskId));
+      }
+      return left.index - right.index;
+    });
+}
+
+function listCommandTranscriptRecords({ limit = 20 } = {}) {
+  const safeLimit = Math.max(1, Math.min(Number.isInteger(limit) ? limit : 20, 100));
+  return buildCommandTranscriptRecords().slice(0, safeLimit);
+}
+
+function buildCommandTranscriptSummary() {
+  return buildCommandTranscriptRecords().reduce((summary, record) => {
+    summary.total += 1;
+    summary[record.state] = (summary[record.state] ?? 0) + 1;
+    if (record.taskId) {
+      summary.taskIds.add(record.taskId);
+    }
+    const command = record.command ?? "unknown";
+    summary.byCommand[command] = (summary.byCommand[command] ?? 0) + 1;
+    const status = record.taskStatus ?? "unknown";
+    summary.byTaskStatus[status] = (summary.byTaskStatus[status] ?? 0) + 1;
+    const timestamp = record.taskClosedAt ?? record.taskUpdatedAt ?? null;
+    if (timestamp && (!summary.latestAt || String(timestamp).localeCompare(summary.latestAt) > 0)) {
+      summary.latestAt = timestamp;
+    }
+    return summary;
+  }, {
+    total: 0,
+    executed: 0,
+    skipped: 0,
+    failed: 0,
+    taskIds: new Set(),
+    taskCount: 0,
+    latestAt: null,
+    byCommand: {},
+    byTaskStatus: {},
+  });
+}
+
+function serialiseCommandTranscriptSummary(summary) {
+  return {
+    ...summary,
+    taskIds: [...summary.taskIds],
+    taskCount: summary.taskIds.size,
+  };
+}
+
 function isTaskPolicyApproved(task) {
   const approval = task?.approval?.requestId ? approvals.get(task.approval.requestId) : null;
   return task?.policy?.decision?.approved === true
@@ -2945,6 +3041,27 @@ const server = http.createServer(async (req, res) => {
     sendJson(res, 200, {
       ok: true,
       summary: buildCapabilityInvocationSummary(),
+    });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/commands/transcripts") {
+    const limit = Number.parseInt(requestUrl.searchParams.get("limit") ?? "20", 10);
+    const safeLimit = Number.isNaN(limit) ? 20 : Math.max(1, Math.min(limit, 100));
+    const items = listCommandTranscriptRecords({ limit: safeLimit });
+    sendJson(res, 200, {
+      ok: true,
+      count: items.length,
+      items,
+      summary: serialiseCommandTranscriptSummary(buildCommandTranscriptSummary()),
+    });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/commands/transcripts/summary") {
+    sendJson(res, 200, {
+      ok: true,
+      summary: serialiseCommandTranscriptSummary(buildCommandTranscriptSummary()),
     });
     return;
   }
