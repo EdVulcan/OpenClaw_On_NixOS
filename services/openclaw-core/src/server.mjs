@@ -1,6 +1,6 @@
 import http from "node:http";
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 const host = process.env.OPENCLAW_CORE_HOST ?? "127.0.0.1";
@@ -15,6 +15,7 @@ const systemHealUrl = process.env.OPENCLAW_SYSTEM_HEAL_URL ?? "http://127.0.0.1:
 const stateFilePath = process.env.OPENCLAW_CORE_STATE_FILE
   ?? path.resolve(process.cwd(), "../../.artifacts/openclaw-core-state.json");
 const autonomyMode = normaliseAutonomyMode(process.env.OPENCLAW_AUTONOMY_MODE);
+const workspaceRoots = parseWorkspaceRoots(process.env.OPENCLAW_WORKSPACE_ROOTS);
 
 const tasks = new Map();
 const approvals = new Map();
@@ -63,6 +64,24 @@ function normaliseAutonomyMode(value) {
     return mode;
   }
   return "guardian";
+}
+
+function uniqueResolvedPaths(paths) {
+  return [...new Set(paths.map((item) => path.resolve(item)))];
+}
+
+function parseWorkspaceRoots(value) {
+  if (typeof value === "string" && value.trim()) {
+    return uniqueResolvedPaths(value
+      .split(path.delimiter)
+      .map((item) => item.trim())
+      .filter(Boolean));
+  }
+
+  return uniqueResolvedPaths([
+    path.resolve(process.cwd(), "../openclaw"),
+    path.resolve(process.cwd(), "../../..", "openclaw"),
+  ]);
 }
 
 function corsHeaders(extraHeaders = {}) {
@@ -208,6 +227,129 @@ async function postJson(url, body = {}) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });
+}
+
+function readJsonFileIfPresent(filePath) {
+  if (!existsSync(filePath)) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(readFileSync(filePath, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+function detectWorkspacePackageManager(rootPath) {
+  if (existsSync(path.join(rootPath, "pnpm-lock.yaml")) || existsSync(path.join(rootPath, "pnpm-workspace.yaml"))) {
+    return "pnpm";
+  }
+  if (existsSync(path.join(rootPath, "package-lock.json"))) {
+    return "npm";
+  }
+  if (existsSync(path.join(rootPath, "yarn.lock"))) {
+    return "yarn";
+  }
+  if (existsSync(path.join(rootPath, "bun.lockb")) || existsSync(path.join(rootPath, "bun.lock"))) {
+    return "bun";
+  }
+  return null;
+}
+
+function safeDirectoryEntries(rootPath) {
+  try {
+    return readdirSync(rootPath, { withFileTypes: true })
+      .filter((entry) => !entry.name.startsWith(".") && entry.isDirectory())
+      .map((entry) => entry.name)
+      .sort((left, right) => left.localeCompare(right))
+      .slice(0, 24);
+  } catch {
+    return [];
+  }
+}
+
+function safeStat(rootPath) {
+  try {
+    return statSync(rootPath);
+  } catch {
+    return null;
+  }
+}
+
+function detectWorkspace(rootPath) {
+  const resolvedPath = path.resolve(rootPath);
+  const exists = existsSync(resolvedPath);
+  const stats = exists ? safeStat(resolvedPath) : null;
+  const isDirectory = stats?.isDirectory() === true;
+  const packageJson = isDirectory ? readJsonFileIfPresent(path.join(resolvedPath, "package.json")) : null;
+  const markers = isDirectory
+    ? [
+        "package.json",
+        "pnpm-workspace.yaml",
+        "README.md",
+        "AGENTS.md",
+        "CLAUDE.md",
+        ".git",
+      ].filter((marker) => existsSync(path.join(resolvedPath, marker)))
+    : [];
+  const scripts = packageJson?.scripts && typeof packageJson.scripts === "object"
+    ? Object.keys(packageJson.scripts).sort()
+    : [];
+  const workspaces = Array.isArray(packageJson?.workspaces)
+    ? packageJson.workspaces
+    : Array.isArray(packageJson?.workspaces?.packages)
+      ? packageJson.workspaces.packages
+      : [];
+
+  return {
+    id: path.basename(resolvedPath) || "workspace",
+    name: typeof packageJson?.name === "string" ? packageJson.name : path.basename(resolvedPath),
+    path: resolvedPath,
+    exists,
+    readable: isDirectory,
+    kind: packageJson ? "node_workspace" : isDirectory ? "filesystem_workspace" : "missing",
+    packageManager: isDirectory ? detectWorkspacePackageManager(resolvedPath) : null,
+    private: packageJson?.private === true,
+    version: typeof packageJson?.version === "string" ? packageJson.version : null,
+    scripts,
+    scriptCount: scripts.length,
+    workspaces,
+    workspaceCount: workspaces.length,
+    markers,
+    topLevelDirectories: isDirectory ? safeDirectoryEntries(resolvedPath) : [],
+    governance: {
+      mode: "read_only_detect",
+      canReadMetadata: true,
+      canReadFileContent: false,
+      canMutate: false,
+      canExecute: false,
+    },
+  };
+}
+
+function buildWorkspaceRegistry() {
+  const items = workspaceRoots.map((root) => detectWorkspace(root));
+  const detected = items.filter((item) => item.exists && item.readable);
+  return {
+    registry: "workspace-detect-v0",
+    mode: "read-only",
+    generatedAt: new Date().toISOString(),
+    roots: workspaceRoots,
+    count: items.length,
+    items,
+    summary: {
+      total: items.length,
+      detected: detected.length,
+      missing: items.length - detected.length,
+      nodeWorkspaces: items.filter((item) => item.kind === "node_workspace").length,
+      byPackageManager: items.reduce((accumulator, item) => {
+        const key = item.packageManager ?? "unknown";
+        accumulator[key] = (accumulator[key] ?? 0) + 1;
+        return accumulator;
+      }, {}),
+    },
+  };
 }
 
 function serialiseTask(task) {
@@ -3278,6 +3420,27 @@ const server = http.createServer(async (req, res) => {
     sendJson(res, 200, {
       ok: true,
       policy: buildPolicyState(),
+    });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/workspaces") {
+    sendJson(res, 200, {
+      ok: true,
+      ...buildWorkspaceRegistry(),
+    });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/workspaces/summary") {
+    const registry = buildWorkspaceRegistry();
+    sendJson(res, 200, {
+      ok: true,
+      registry: registry.registry,
+      mode: registry.mode,
+      generatedAt: registry.generatedAt,
+      roots: registry.roots,
+      summary: registry.summary,
     });
     return;
   }

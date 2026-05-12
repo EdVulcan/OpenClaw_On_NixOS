@@ -361,6 +361,14 @@ npm run dev:system-heal-check:unix
 
 This verifies diagnosis, repair-plan generation, simulated restart actions, observe-only handling for high-risk resource alerts, and heal history.
 
+Run the OpenClaw workspace detection slice directly:
+
+```bash
+npm run dev:openclaw-workspace-detect-check:unix
+```
+
+This verifies core can build a read-only profile for configured OpenClaw workspaces, including package metadata, scripts, workspace globs, markers, and governance flags, without reading file contents, mutating files, or executing commands.
+
 Stop everything that `dev:up` started:
 
 ```bash
