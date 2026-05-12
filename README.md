@@ -153,6 +153,14 @@ npm run dev:capability-invoke-check:unix
 
 This verifies core-routed body capability invocation for system vitals, filesystem search/list, process listing, and approval-gated command dry-run without executing system commands.
 
+Run the persistent capability history slice directly:
+
+```bash
+npm run dev:capability-history-check:unix
+```
+
+This verifies capability invocation records, blocked/invoked summaries, audit events, and restart recovery for core-held body capability history.
+
 Run the Observer capability-plan visibility slice directly:
 
 ```bash
@@ -397,6 +405,7 @@ This is based on real NixOS VM validation:
 - `dev:policy-check:unix` covers the first policy governance and cross-boundary gate
 - `dev:capability-planner-check:unix` covers capability-aware plan metadata and approval-gated body capabilities
 - `dev:capability-invoke-check:unix` covers policy-governed capability invocation through core
+- `dev:capability-history-check:unix` covers persistent capability invocation history and restart recovery
 - `dev:observer-capability-plan-check:unix` covers Observer visibility for body capability decisions inside plans
 - `dev:observer-capability-invoke-check:unix` covers Observer controls for policy-governed capability invocation
 - `dev:system-sense-check:unix` covers real body vitals and service health telemetry

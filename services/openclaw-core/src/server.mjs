@@ -18,6 +18,7 @@ const stateFilePath = process.env.OPENCLAW_CORE_STATE_FILE
 const tasks = new Map();
 const approvals = new Map();
 const policyAuditLog = [];
+const capabilityInvocationLog = [];
 const runtimeState = {
   status: "idle",
   currentTaskId: null,
@@ -28,6 +29,7 @@ const runtimeState = {
 const ACTIVE_TASK_STATUSES = new Set(["queued", "running", "paused"]);
 const MAX_POLICY_AUDIT_ENTRIES = 100;
 const MAX_APPROVAL_ITEMS = 200;
+const MAX_CAPABILITY_INVOCATION_ENTRIES = 200;
 const CROSS_BOUNDARY_INTENTS = new Set([
   "account.login",
   "data.egress",
@@ -109,6 +111,7 @@ function persistState() {
       tasks: [...tasks.values()],
       approvals: [...approvals.values()],
       policyAuditLog,
+      capabilityInvocationLog,
     };
     const tempPath = `${stateFilePath}.tmp`;
     writeFileSync(tempPath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
@@ -146,6 +149,13 @@ function loadPersistentState() {
     }
     if (Array.isArray(data?.policyAuditLog)) {
       policyAuditLog.splice(0, policyAuditLog.length, ...data.policyAuditLog.slice(-MAX_POLICY_AUDIT_ENTRIES));
+    }
+    if (Array.isArray(data?.capabilityInvocationLog)) {
+      capabilityInvocationLog.splice(
+        0,
+        capabilityInvocationLog.length,
+        ...data.capabilityInvocationLog.slice(-MAX_CAPABILITY_INVOCATION_ENTRIES),
+      );
     }
   } catch (error) {
     console.error("Failed to load persisted core state:", error);
@@ -1123,6 +1133,80 @@ function summariseCapabilityInvocationResult(capability, result) {
   };
 }
 
+function recordCapabilityInvocation({ capability, request, policy, invoked, blocked, reason = null, summary = null }) {
+  const entry = {
+    id: randomUUID(),
+    at: new Date().toISOString(),
+    capability: {
+      id: capability.id,
+      name: capability.name,
+      kind: capability.kind,
+      service: capability.service,
+      risk: capability.risk,
+      governance: capability.governance,
+    },
+    request: {
+      operation: request.operation ?? request.params?.operation ?? null,
+      intent: request.intent ?? capability.intents?.[0] ?? null,
+      approved: request.approved === true,
+    },
+    policy: {
+      id: policy.id,
+      decision: policy.decision,
+      domain: policy.domain,
+      risk: policy.risk,
+      reason: policy.reason,
+      approved: policy.approved,
+    },
+    invoked: invoked === true,
+    blocked: blocked === true,
+    reason,
+    summary,
+  };
+  capabilityInvocationLog.push(entry);
+  if (capabilityInvocationLog.length > MAX_CAPABILITY_INVOCATION_ENTRIES) {
+    capabilityInvocationLog.splice(0, capabilityInvocationLog.length - MAX_CAPABILITY_INVOCATION_ENTRIES);
+  }
+  persistState();
+  return entry;
+}
+
+function listCapabilityInvocations({ limit = 20, capabilityId = null } = {}) {
+  const safeLimit = Math.max(1, Math.min(Number.isInteger(limit) ? limit : 20, 100));
+  return capabilityInvocationLog
+    .filter((entry) => !capabilityId || entry.capability?.id === capabilityId)
+    .slice()
+    .sort((left, right) => String(right.at).localeCompare(String(left.at)))
+    .slice(0, safeLimit);
+}
+
+function buildCapabilityInvocationSummary() {
+  return capabilityInvocationLog.reduce((summary, entry) => {
+    summary.total += 1;
+    if (entry.invoked) {
+      summary.invoked += 1;
+    }
+    if (entry.blocked) {
+      summary.blocked += 1;
+    }
+    const capabilityId = entry.capability?.id ?? "unknown";
+    summary.byCapability[capabilityId] = (summary.byCapability[capabilityId] ?? 0) + 1;
+    const decision = entry.policy?.decision ?? "unknown";
+    summary.byPolicy[decision] = (summary.byPolicy[decision] ?? 0) + 1;
+    if (!summary.latestAt || String(entry.at).localeCompare(summary.latestAt) > 0) {
+      summary.latestAt = entry.at;
+    }
+    return summary;
+  }, {
+    total: 0,
+    invoked: 0,
+    blocked: 0,
+    latestAt: null,
+    byCapability: {},
+    byPolicy: {},
+  });
+}
+
 async function invokeCapability(body = {}) {
   const request = normaliseCapabilityInvokeRequest(body);
   if (!request.capabilityId) {
@@ -1151,7 +1235,21 @@ async function invokeCapability(body = {}) {
   await publishEvent("policy.evaluated", { capability, policy });
 
   if (!isPolicyExecutionAllowed(policy)) {
+    const reason = policy.decision === "deny" ? "policy_denied" : "policy_requires_approval";
+    const invocation = recordCapabilityInvocation({
+      capability,
+      request,
+      policy,
+      invoked: false,
+      blocked: true,
+      reason,
+      summary: {
+        kind: capability.id,
+        ok: false,
+      },
+    });
     await publishEvent("capability.blocked", {
+      invocation,
       capability,
       policy,
       reason: policy.reason,
@@ -1162,16 +1260,26 @@ async function invokeCapability(body = {}) {
         ok: true,
         invoked: false,
         blocked: true,
-        reason: policy.decision === "deny" ? "policy_denied" : "policy_requires_approval",
+        reason,
         capability,
         policy,
+        invocation,
       },
     };
   }
 
   const result = await callCapabilityBackend(capability, request);
   const summary = summariseCapabilityInvocationResult(capability, result);
+  const invocation = recordCapabilityInvocation({
+    capability,
+    request,
+    policy,
+    invoked: true,
+    blocked: false,
+    summary,
+  });
   await publishEvent("capability.invoked", {
+    invocation,
     capability,
     policy,
     summary,
@@ -1185,6 +1293,7 @@ async function invokeCapability(body = {}) {
       capability,
       policy,
       summary,
+      invocation,
       result,
     },
   };
@@ -2321,6 +2430,29 @@ const server = http.createServer(async (req, res) => {
       ok: true,
       refreshed: true,
       ...registry,
+    });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/capabilities/invocations") {
+    const limit = Number.parseInt(requestUrl.searchParams.get("limit") ?? "20", 10);
+    const capabilityId = requestUrl.searchParams.get("capabilityId") ?? null;
+    sendJson(res, 200, {
+      ok: true,
+      count: capabilityInvocationLog.length,
+      items: listCapabilityInvocations({
+        limit: Number.isNaN(limit) ? 20 : limit,
+        capabilityId,
+      }),
+      summary: buildCapabilityInvocationSummary(),
+    });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/capabilities/invocations/summary") {
+    sendJson(res, 200, {
+      ok: true,
+      summary: buildCapabilityInvocationSummary(),
     });
     return;
   }
