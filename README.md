@@ -249,6 +249,14 @@ npm run dev:observer-filesystem-read-ledger-check:unix
 
 This verifies Observer surfaces the filesystem read access ledger summary and recent metadata/list/search/read-text records without displaying file content.
 
+Run the observer OpenClaw workspace detection slice directly:
+
+```bash
+npm run dev:observer-workspace-detect-check:unix
+```
+
+This verifies Observer surfaces the read-only OpenClaw workspace registry, including package metadata, scripts, markers, shallow directories, and governance flags without exposing file contents or enabling mutation/execution.
+
 Run the approval inbox slice directly:
 
 ```bash
@@ -575,6 +583,8 @@ This is based on real NixOS VM validation:
 - `dev:observer-command-transcript-check:unix` covers Observer visibility for sovereign command transcripts
 - `dev:observer-command-ledger-check:unix` covers Observer visibility for the cross-task command transcript ledger
 - `dev:observer-filesystem-ledger-check:unix` covers Observer visibility for the cross-task filesystem change ledger
+- `dev:observer-filesystem-read-ledger-check:unix` covers Observer visibility for the cross-task filesystem read access ledger
+- `dev:observer-workspace-detect-check:unix` covers Observer visibility for read-only OpenClaw workspace detection
 - `dev:capability-planner-check:unix` covers capability-aware plan metadata and approval-gated body capabilities
 - `dev:capability-invoke-check:unix` covers policy-governed capability invocation through core
 - `dev:capability-history-check:unix` covers persistent capability invocation history and restart recovery

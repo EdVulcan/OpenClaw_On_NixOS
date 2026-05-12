@@ -412,6 +412,15 @@ function observerHtml() {
           <pre id="filesystem-read-ledger-json">Loading filesystem read ledger...</pre>
         </section>
         <section class="panel">
+          <h2>OpenClaw Workspaces</h2>
+          <div class="metric"><span>Registry</span><span id="workspace-registry">workspace-detect-v0</span></div>
+          <div class="metric"><span>Detected</span><span id="workspace-detected">0</span></div>
+          <div class="metric"><span>Missing</span><span id="workspace-missing">0</span></div>
+          <div class="metric"><span>Node Workspaces</span><span id="workspace-node">0</span></div>
+          <div class="metric"><span>Mode</span><span id="workspace-mode">read-only</span></div>
+          <pre id="workspace-json">Loading OpenClaw workspace registry...</pre>
+        </section>
+        <section class="panel">
           <h2>Recent Tasks</h2>
           <div class="metric"><span>Entries</span><span id="task-list-count">0</span></div>
           <div class="task-summary-grid">
@@ -638,6 +647,12 @@ const filesystemReadLedgerQuery = document.querySelector("#filesystem-read-ledge
 const filesystemReadLedgerReadText = document.querySelector("#filesystem-read-ledger-read-text");
 const filesystemReadLedgerTasks = document.querySelector("#filesystem-read-ledger-tasks");
 const filesystemReadLedgerJson = document.querySelector("#filesystem-read-ledger-json");
+const workspaceRegistry = document.querySelector("#workspace-registry");
+const workspaceDetected = document.querySelector("#workspace-detected");
+const workspaceMissing = document.querySelector("#workspace-missing");
+const workspaceNode = document.querySelector("#workspace-node");
+const workspaceMode = document.querySelector("#workspace-mode");
+const workspaceJson = document.querySelector("#workspace-json");
 let currentTaskState = null;
 let latestActionState = null;
 let latestHistoryTask = null;
@@ -1011,6 +1026,34 @@ function renderFilesystemReadLedger(data) {
   ].join("\\n");
 }
 
+function renderWorkspaceRegistry(data) {
+  const summary = data?.summary ?? {};
+  const items = Array.isArray(data?.items) ? data.items : [];
+  workspaceRegistry.textContent = data?.registry ?? "workspace-detect-v0";
+  workspaceDetected.textContent = String(summary.detected ?? 0);
+  workspaceMissing.textContent = String(summary.missing ?? 0);
+  workspaceNode.textContent = String(summary.nodeWorkspaces ?? 0);
+  workspaceMode.textContent = data?.mode ?? "read-only";
+
+  workspaceJson.textContent = [
+    "Read-only detection: no file contents, mutations, or command execution.",
+    \`Registry: \${data?.registry ?? "workspace-detect-v0"}\`,
+    \`Mode: \${data?.mode ?? "read-only"}\`,
+    \`Total: \${summary.total ?? data?.count ?? 0}\`,
+    \`Detected: \${summary.detected ?? 0}\`,
+    \`Missing: \${summary.missing ?? 0}\`,
+    \`Node Workspaces: \${summary.nodeWorkspaces ?? 0}\`,
+    \`By Package Manager: \${Object.entries(summary.byPackageManager ?? {}).map(([manager, count]) => \`\${manager}=\${count}\`).join(", ") || "none"}\`,
+    "",
+    ...items.slice(0, 8).map((entry) => {
+      const scripts = Array.isArray(entry.scripts) ? entry.scripts.join(",") : "none";
+      const markers = Array.isArray(entry.markers) ? entry.markers.join(",") : "none";
+      const governance = entry.governance ?? {};
+      return \`[\${entry.kind ?? "workspace"}] \${entry.name ?? entry.id ?? "unknown"} path=\${entry.path ?? "unknown"} packageManager=\${entry.packageManager ?? "unknown"} scripts=\${scripts} markers=\${markers} readContent=\${Boolean(governance.canReadFileContent)} mutate=\${Boolean(governance.canMutate)} execute=\${Boolean(governance.canExecute)}\`;
+    }),
+  ].join("\\n");
+}
+
 function renderOperatorPanel(result) {
   if (!result) {
     renderOperatorState(null);
@@ -1159,6 +1202,20 @@ async function refreshFilesystemReadLedger() {
     filesystemReadLedgerReadText.textContent = "0";
     filesystemReadLedgerTasks.textContent = "unknown";
     filesystemReadLedgerJson.textContent = "Unable to read filesystem read ledger.";
+  }
+}
+
+async function refreshWorkspaceRegistry() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/workspaces\`);
+    renderWorkspaceRegistry(data);
+  } catch {
+    workspaceRegistry.textContent = "offline";
+    workspaceDetected.textContent = "0";
+    workspaceMissing.textContent = "unknown";
+    workspaceNode.textContent = "0";
+    workspaceMode.textContent = "unknown";
+    workspaceJson.textContent = "Unable to read OpenClaw workspace registry.";
   }
 }
 
@@ -2523,6 +2580,7 @@ await refreshCapabilityHistory();
 await refreshCommandLedger();
 await refreshFilesystemLedger();
 await refreshFilesystemReadLedger();
+await refreshWorkspaceRegistry();
 await refreshSystemState();
 await refreshHealState();
 await refreshAuditState();
@@ -2544,6 +2602,7 @@ setInterval(refreshCapabilityHistory, 5000);
 setInterval(refreshCommandLedger, 5000);
 setInterval(refreshFilesystemLedger, 5000);
 setInterval(refreshFilesystemReadLedger, 5000);
+setInterval(refreshWorkspaceRegistry, 5000);
 setInterval(refreshSystemState, 5000);
 setInterval(refreshHealState, 5000);
 setInterval(refreshAuditState, 5000);`;
