@@ -298,6 +298,7 @@ function observerHtml() {
               <button id="click-action-button" class="secondary">Simulate Click</button>
               <button id="type-action-button" class="secondary">Simulate Type</button>
               <button id="heal-browser-button" class="secondary">Simulate Browser Restart</button>
+              <button id="run-maintenance-button" class="secondary">Run Maintenance Tick</button>
               <button id="complete-task-button" class="secondary">Complete Current Task</button>
               <button id="pause-button" class="secondary">Pause Current Task</button>
               <button id="resume-button" class="secondary">Resume Current Task</button>
@@ -619,6 +620,7 @@ const refreshScreenButton = document.querySelector("#refresh-screen-button");
 const clickActionButton = document.querySelector("#click-action-button");
 const typeActionButton = document.querySelector("#type-action-button");
 const healBrowserButton = document.querySelector("#heal-browser-button");
+const runMaintenanceButton = document.querySelector("#run-maintenance-button");
 const completeTaskButton = document.querySelector("#complete-task-button");
 const pauseButton = document.querySelector("#pause-button");
 const resumeButton = document.querySelector("#resume-button");
@@ -2326,6 +2328,24 @@ async function runHeal(service) {
   await refreshHealState();
 }
 
+async function runMaintenanceTickFromUi() {
+  const result = await fetchJson(\`\${observerConfig.systemHealUrl}/maintenance/tick\`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      force: true,
+      autofix: true,
+      mode: "simulated",
+    }),
+  });
+  const runStatus = result.run?.status ?? "no-run";
+  setControlMessage(\`Maintenance tick \${result.tick?.status ?? "unknown"}: \${result.tick?.reason ?? "unknown"} / \${runStatus}\`);
+  await refreshMaintenanceState();
+  await refreshHealState();
+  await refreshSystemState();
+  await refreshAuditState();
+}
+
 async function completeCurrentTask() {
   if (!currentTaskState?.id) {
     throw new Error("No active task to complete.");
@@ -2620,6 +2640,12 @@ typeActionButton.addEventListener("click", () => {
 
 healBrowserButton.addEventListener("click", () => {
   runHeal("openclaw-browser-runtime").catch((error) => {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  });
+});
+
+runMaintenanceButton.addEventListener("click", () => {
+  runMaintenanceTickFromUi().catch((error) => {
     setControlMessage(\`Request failed: \${formatError(error)}\`);
   });
 });
