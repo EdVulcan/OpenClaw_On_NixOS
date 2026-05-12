@@ -2411,7 +2411,7 @@ function subscribeEvents() {
         if (eventName === "capability.invoked" || eventName === "capability.blocked") {
           await refreshCapabilityHistory();
         }
-        if (eventName === "system.command.executed" || eventName === "task.completed") {
+        if (eventName === "system.command.executed" || eventName === "task.completed" || eventName === "task.failed") {
           await refreshCommandLedger();
         }
         if (

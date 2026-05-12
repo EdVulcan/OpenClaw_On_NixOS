@@ -289,6 +289,14 @@ npm run dev:observer-workspace-command-execute-check:unix
 
 This verifies Observer exposes the controls and live refresh hooks needed to approve, run, and inspect an allowlisted workspace command execution through task detail, command transcript, command ledger, capability history, and audit events.
 
+Run the observer OpenClaw workspace command failure slice directly:
+
+```bash
+npm run dev:observer-workspace-command-failure-check:unix
+```
+
+This verifies Observer exposes failed workspace command execution through task failure state, command transcript failures, command ledger failures, capability history, and audit events after explicit approval.
+
 Run the approval inbox slice directly:
 
 ```bash
@@ -661,6 +669,7 @@ This is based on real NixOS VM validation:
 - `dev:observer-workspace-command-plan-check:unix` covers Observer visibility for OpenClaw workspace command plan drafts
 - `dev:observer-workspace-command-task-check:unix` covers Observer controls for approval-gated OpenClaw workspace command tasks
 - `dev:observer-workspace-command-execute-check:unix` covers Observer controls and visibility for approved OpenClaw workspace command execution
+- `dev:observer-workspace-command-failure-check:unix` covers Observer visibility for failed OpenClaw workspace command execution
 - `dev:capability-planner-check:unix` covers capability-aware plan metadata and approval-gated body capabilities
 - `dev:capability-invoke-check:unix` covers policy-governed capability invocation through core
 - `dev:capability-history-check:unix` covers persistent capability invocation history and restart recovery
