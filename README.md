@@ -193,6 +193,14 @@ npm run dev:sovereign-filesystem-ledger-check:unix
 
 This verifies `/filesystem/changes` and `/filesystem/changes/summary` expose mkdir/write changes and survive core restart recovery.
 
+Run the sovereign filesystem read-text slice directly:
+
+```bash
+npm run dev:sovereign-filesystem-read-text-check:unix
+```
+
+This verifies `sense.filesystem.read` can read bounded UTF-8 text through governed body sense after autonomous mkdir/write chains while rejecting paths outside allowed roots.
+
 Run the observer command transcript slice directly:
 
 ```bash

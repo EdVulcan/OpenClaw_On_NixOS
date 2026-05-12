@@ -798,11 +798,11 @@ function baseCapabilities() {
       kind: "sensor",
       service: "openclaw-system-sense",
       endpoint: `${systemSenseUrl}/system/files/list`,
-      intents: ["filesystem.metadata", "filesystem.list", "filesystem.search"],
+      intents: ["filesystem.metadata", "filesystem.list", "filesystem.search", "filesystem.read_text", "filesystem.read-text"],
       domains: ["body_internal"],
       risk: "medium",
       governance: "audit_only",
-      description: "Read file metadata, list allowed directories, and search filenames inside configured body roots.",
+      description: "Read file metadata, list allowed directories, search filenames, and read bounded UTF-8 text inside configured body roots.",
     },
     {
       id: "act.filesystem.write_text",
@@ -1122,6 +1122,11 @@ async function callCapabilityBackend(capability, request) {
 
   if (capability.id === "sense.filesystem.read") {
     const operation = request.operation ?? request.params.operation ?? "list";
+    if (operation === "read_text" || operation === "read-text") {
+      return fetchJson(buildSystemSenseUrl("/system/files/read-text", {
+        path: request.params.path,
+      }));
+    }
     if (operation === "metadata") {
       return fetchJson(buildSystemSenseUrl("/system/files/metadata", {
         path: request.params.path,
@@ -1188,6 +1193,15 @@ function summariseCapabilityInvocationResult(capability, result) {
     };
   }
   if (capability.id === "sense.filesystem.read") {
+    if (result?.mode === "read_text") {
+      return {
+        kind: "filesystem.read_text",
+        ok: result?.ok === true,
+        path: result?.path ?? null,
+        contentBytes: result?.contentBytes ?? null,
+        encoding: result?.encoding ?? null,
+      };
+    }
     return {
       kind: "filesystem.read",
       ok: result?.ok === true,
@@ -1981,6 +1995,9 @@ function inferCapabilityOperation(step) {
   }
   if (step.kind === "filesystem.metadata") {
     return "metadata";
+  }
+  if (step.kind === "filesystem.read_text" || step.kind === "filesystem.read-text") {
+    return "read_text";
   }
   if (step.kind === "filesystem.search") {
     return "search";

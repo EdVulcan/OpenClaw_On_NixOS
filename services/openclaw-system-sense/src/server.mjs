@@ -1,7 +1,7 @@
 import http from "node:http";
 import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, statfsSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, statfsSync, statSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -22,6 +22,7 @@ const serviceTimeoutMs = Number.parseInt(process.env.OPENCLAW_SYSTEM_SERVICE_TIM
 const maxFileListLimit = Number.parseInt(process.env.OPENCLAW_SYSTEM_FILE_LIST_LIMIT ?? "100", 10);
 const maxSearchLimit = Number.parseInt(process.env.OPENCLAW_SYSTEM_FILE_SEARCH_LIMIT ?? "100", 10);
 const maxSearchDepth = Number.parseInt(process.env.OPENCLAW_SYSTEM_FILE_SEARCH_DEPTH ?? "4", 10);
+const maxFileReadBytes = Number.parseInt(process.env.OPENCLAW_SYSTEM_FILE_READ_LIMIT ?? "65536", 10);
 const maxFileWriteBytes = Number.parseInt(process.env.OPENCLAW_SYSTEM_FILE_WRITE_LIMIT ?? "65536", 10);
 const commandAllowlist = (process.env.OPENCLAW_SYSTEM_COMMAND_ALLOWLIST ?? "echo,printf,pwd,whoami,ls,cat,head,tail,wc,find,grep,rg")
   .split(",")
@@ -267,6 +268,39 @@ function searchFiles(inputPath, query, limit) {
     count: results.length,
     limit: safeLimit,
     maxDepth: maxSearchDepth,
+  };
+}
+
+function readTextFile(inputPath) {
+  const resolved = resolveAllowedPath(inputPath);
+  if (!existsSync(resolved.path)) {
+    const error = new Error("Path does not exist.");
+    error.code = "PATH_NOT_FOUND";
+    throw error;
+  }
+
+  const metadata = buildFileMetadata(resolved.path);
+  if (metadata.type !== "file") {
+    const error = new Error("Text reads require a regular file.");
+    error.code = "TARGET_NOT_FILE";
+    error.details = { path: resolved.path, type: metadata.type };
+    throw error;
+  }
+  if (metadata.sizeBytes > maxFileReadBytes) {
+    const error = new Error("Text read exceeds OpenClaw file read limit.");
+    error.code = "FILE_READ_LIMIT_EXCEEDED";
+    error.details = { sizeBytes: metadata.sizeBytes, maxFileReadBytes };
+    throw error;
+  }
+
+  const content = readFileSync(resolved.path, "utf8");
+  return {
+    ...resolved,
+    mode: "read_text",
+    encoding: "utf8",
+    content,
+    contentBytes: Buffer.byteLength(content, "utf8"),
+    metadata,
   };
 }
 
@@ -878,6 +912,26 @@ const server = http.createServer(async (req, res) => {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       sendJson(res, 400, { ok: false, error: message, details: error.details ?? null });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/system/files/read-text") {
+    try {
+      const result = readTextFile(requestUrl.searchParams.get("path"));
+      await publishEvent("system.files.read", {
+        path: result.path,
+        contentBytes: result.contentBytes,
+        mode: result.mode,
+      });
+      sendJson(res, 200, {
+        ok: true,
+        allowedRoots,
+        ...result,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message, code: error.code ?? null, details: error.details ?? null });
     }
     return;
   }
