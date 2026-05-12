@@ -7,8 +7,11 @@ const host = process.env.OPENCLAW_CORE_HOST ?? "127.0.0.1";
 const port = Number.parseInt(process.env.OPENCLAW_CORE_PORT ?? "4100", 10);
 const eventHubUrl = process.env.OPENCLAW_EVENT_HUB_URL ?? "http://127.0.0.1:4101";
 const sessionManagerUrl = process.env.OPENCLAW_SESSION_MANAGER_URL ?? "http://127.0.0.1:4102";
+const browserRuntimeUrl = process.env.OPENCLAW_BROWSER_RUNTIME_URL ?? "http://127.0.0.1:4103";
 const screenSenseUrl = process.env.OPENCLAW_SCREEN_SENSE_URL ?? "http://127.0.0.1:4104";
 const screenActUrl = process.env.OPENCLAW_SCREEN_ACT_URL ?? "http://127.0.0.1:4105";
+const systemSenseUrl = process.env.OPENCLAW_SYSTEM_SENSE_URL ?? "http://127.0.0.1:4106";
+const systemHealUrl = process.env.OPENCLAW_SYSTEM_HEAL_URL ?? "http://127.0.0.1:4107";
 const stateFilePath = process.env.OPENCLAW_CORE_STATE_FILE
   ?? path.resolve(process.cwd(), "../../.artifacts/openclaw-core-state.json");
 
@@ -36,6 +39,10 @@ const DENIED_INTENTS = new Set([
   "body.destroy",
   "security.disable",
 ]);
+const CAPABILITY_HEALTH_TIMEOUT_MS = Number.parseInt(
+  process.env.OPENCLAW_CAPABILITY_HEALTH_TIMEOUT_MS ?? "1200",
+  10,
+);
 const STATUS_PRIORITY = {
   running: 0,
   paused: 1,
@@ -414,6 +421,242 @@ function buildOperatorState() {
       decisions: ["allow", "audit_only", "require_approval", "deny"],
     },
     summary: buildTaskSummary(),
+  };
+}
+
+function baseCapabilities() {
+  return [
+    {
+      id: "sense.screen.observe",
+      name: "Screen Observation",
+      kind: "sensor",
+      service: "openclaw-screen-sense",
+      endpoint: `${screenSenseUrl}/screen/state`,
+      intents: ["screen.observe"],
+      domains: ["body_internal"],
+      risk: "low",
+      governance: "audit_only",
+      description: "Observe focused window, screen readiness, and snapshot summaries.",
+    },
+    {
+      id: "sense.system.vitals",
+      name: "System Vitals",
+      kind: "sensor",
+      service: "openclaw-system-sense",
+      endpoint: `${systemSenseUrl}/system/health`,
+      intents: ["system.observe", "body.inspect"],
+      domains: ["body_internal"],
+      risk: "low",
+      governance: "audit_only",
+      description: "Read host identity, service health, resources, network, and alerts.",
+    },
+    {
+      id: "memory.event.audit",
+      name: "Event Audit Ledger",
+      kind: "memory",
+      service: "openclaw-event-hub",
+      endpoint: `${eventHubUrl}/events/audit/summary`,
+      intents: ["memory.audit", "event.query"],
+      domains: ["body_internal"],
+      risk: "low",
+      governance: "audit_only",
+      description: "Persist and query the control-plane black-box event log.",
+    },
+    {
+      id: "act.work_view.control",
+      name: "AI Work View Control",
+      kind: "actuator",
+      service: "openclaw-session-manager",
+      endpoint: `${sessionManagerUrl}/work-view/state`,
+      intents: ["work_view.prepare", "work_view.reveal", "work_view.hide"],
+      domains: ["user_task", "body_internal"],
+      risk: "low",
+      governance: "allow",
+      description: "Prepare, reveal, hide, and attach the observable AI work view.",
+    },
+    {
+      id: "act.browser.open",
+      name: "Browser Runtime Navigation",
+      kind: "actuator",
+      service: "openclaw-browser-runtime",
+      endpoint: `${browserRuntimeUrl}/browser/state`,
+      intents: ["browser.open", "network.navigate"],
+      domains: ["user_task"],
+      risk: "medium",
+      governance: "allow",
+      description: "Open target URLs inside the browser runtime body component.",
+    },
+    {
+      id: "act.screen.pointer_keyboard",
+      name: "Pointer And Keyboard Action",
+      kind: "actuator",
+      service: "openclaw-screen-act",
+      endpoint: `${screenActUrl}/act/state`,
+      intents: ["mouse.click", "keyboard.type"],
+      domains: ["user_task"],
+      risk: "medium",
+      governance: "allow",
+      description: "Perform bounded pointer and keyboard actions through screen-act.",
+    },
+    {
+      id: "act.system.heal",
+      name: "Conservative System Heal",
+      kind: "actuator",
+      service: "openclaw-system-heal",
+      endpoint: `${systemHealUrl}/heal/state`,
+      intents: ["heal.diagnose", "heal.restart-service", "system.repair"],
+      domains: ["body_internal"],
+      risk: "medium",
+      governance: "audit_only",
+      description: "Diagnose body health and execute conservative simulated repairs.",
+    },
+    {
+      id: "govern.policy.evaluate",
+      name: "Policy Governance",
+      kind: "governance",
+      service: "openclaw-core",
+      endpoint: `http://${host}:${port}/policy/state`,
+      intents: ["policy.evaluate", "approval.gate"],
+      domains: ["body_internal", "user_task", "cross_boundary"],
+      risk: "high",
+      governance: "required",
+      description: "Classify intent domains, enforce denial boundaries, and gate cross-boundary actions.",
+    },
+    {
+      id: "operate.task.loop",
+      name: "Operator Loop",
+      kind: "operator",
+      service: "openclaw-core",
+      endpoint: `http://${host}:${port}/operator/state`,
+      intents: ["operator.step", "operator.run", "operator.pause", "operator.resume"],
+      domains: ["body_internal", "user_task"],
+      risk: "medium",
+      governance: "policy_enforced",
+      description: "Consume queued planned tasks while respecting pause state and policy gates.",
+    },
+    {
+      id: "boundary.cross_domain.approval",
+      name: "Cross-Boundary Approval Boundary",
+      kind: "boundary",
+      service: "openclaw-core",
+      endpoint: `http://${host}:${port}/policy/state`,
+      intents: [...CROSS_BOUNDARY_INTENTS],
+      domains: ["cross_boundary"],
+      risk: "high",
+      governance: "require_approval",
+      requiresApproval: true,
+      description: "Represent actions that leave the user's local body boundary and require approval.",
+    },
+  ];
+}
+
+function serviceHealthUrl(service) {
+  const urls = {
+    "openclaw-core": `http://${host}:${port}/health`,
+    "openclaw-event-hub": `${eventHubUrl}/health`,
+    "openclaw-session-manager": `${sessionManagerUrl}/health`,
+    "openclaw-browser-runtime": `${browserRuntimeUrl}/health`,
+    "openclaw-screen-sense": `${screenSenseUrl}/health`,
+    "openclaw-screen-act": `${screenActUrl}/health`,
+    "openclaw-system-sense": `${systemSenseUrl}/health`,
+    "openclaw-system-heal": `${systemHealUrl}/health`,
+  };
+  return urls[service] ?? null;
+}
+
+async function probeServiceHealth(service) {
+  if (service === "openclaw-core") {
+    return {
+      ok: true,
+      status: "online",
+      detail: "local-core",
+      latencyMs: 0,
+      checkedAt: new Date().toISOString(),
+    };
+  }
+
+  const url = serviceHealthUrl(service);
+  if (!url) {
+    return {
+      ok: false,
+      status: "unknown",
+      detail: "no-health-url",
+      latencyMs: null,
+      checkedAt: new Date().toISOString(),
+    };
+  }
+
+  const startedAt = Date.now();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), CAPABILITY_HEALTH_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    const data = await response.json().catch(() => ({}));
+    return {
+      ok: response.ok && data?.ok !== false,
+      status: response.ok && data?.ok !== false ? "online" : "degraded",
+      detail: data?.service ?? data?.stage ?? response.statusText,
+      latencyMs: Date.now() - startedAt,
+      checkedAt: new Date().toISOString(),
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "unknown";
+    return {
+      ok: false,
+      status: "offline",
+      detail: message,
+      latencyMs: Date.now() - startedAt,
+      checkedAt: new Date().toISOString(),
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function summariseCapabilities(capabilities) {
+  return capabilities.reduce((summary, capability) => {
+    summary.total += 1;
+    summary[capability.status] = (summary[capability.status] ?? 0) + 1;
+    summary.byKind[capability.kind] = (summary.byKind[capability.kind] ?? 0) + 1;
+    summary.byRisk[capability.risk] = (summary.byRisk[capability.risk] ?? 0) + 1;
+    summary.byGovernance[capability.governance] = (summary.byGovernance[capability.governance] ?? 0) + 1;
+    if (capability.requiresApproval) {
+      summary.requiresApproval += 1;
+    }
+    return summary;
+  }, {
+    total: 0,
+    online: 0,
+    degraded: 0,
+    offline: 0,
+    unknown: 0,
+    requiresApproval: 0,
+    byKind: {},
+    byRisk: {},
+    byGovernance: {},
+  });
+}
+
+async function buildCapabilityRegistry() {
+  const serviceNames = [...new Set(baseCapabilities().map((capability) => capability.service))];
+  const healthEntries = await Promise.all(serviceNames.map(async (service) => [service, await probeServiceHealth(service)]));
+  const healthByService = Object.fromEntries(healthEntries);
+  const capabilities = baseCapabilities().map((capability) => {
+    const health = healthByService[capability.service] ?? { ok: false, status: "unknown" };
+    return {
+      ...capability,
+      status: health.status,
+      available: health.ok === true,
+      health,
+    };
+  });
+
+  return {
+    registry: "capability-v0",
+    mode: "local-body-registry",
+    generatedAt: new Date().toISOString(),
+    capabilities,
+    summary: summariseCapabilities(capabilities),
   };
 }
 
@@ -1417,8 +1660,11 @@ const server = http.createServer(async (req, res) => {
       port,
       eventHubUrl,
       sessionManagerUrl,
+      browserRuntimeUrl,
       screenSenseUrl,
       screenActUrl,
+      systemSenseUrl,
+      systemHealUrl,
       stateFilePath,
     });
     return;
@@ -1467,6 +1713,41 @@ const server = http.createServer(async (req, res) => {
     sendJson(res, 200, {
       ok: true,
       policy: buildPolicyState(),
+    });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/capabilities") {
+    const registry = await buildCapabilityRegistry();
+    sendJson(res, 200, {
+      ok: true,
+      ...registry,
+    });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/capabilities/summary") {
+    const registry = await buildCapabilityRegistry();
+    sendJson(res, 200, {
+      ok: true,
+      registry: registry.registry,
+      mode: registry.mode,
+      generatedAt: registry.generatedAt,
+      summary: registry.summary,
+    });
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/capabilities/refresh") {
+    const registry = await buildCapabilityRegistry();
+    await publishEvent("capability.updated", {
+      registry: registry.registry,
+      summary: registry.summary,
+    });
+    sendJson(res, 200, {
+      ok: true,
+      refreshed: true,
+      ...registry,
     });
     return;
   }

@@ -343,6 +343,13 @@ function observerHtml() {
           <pre id="policy-json">Loading policy state...</pre>
         </section>
         <section class="panel">
+          <h2>Body Capabilities</h2>
+          <div class="metric"><span>Registry</span><span id="capability-registry">capability-v0</span></div>
+          <div class="metric"><span>Online</span><span id="capability-online">0</span></div>
+          <div class="metric"><span>Approval Gates</span><span id="capability-approval">0</span></div>
+          <pre id="capability-json">Loading body capabilities...</pre>
+        </section>
+        <section class="panel">
           <h2>Recent Tasks</h2>
           <div class="metric"><span>Entries</span><span id="task-list-count">0</span></div>
           <div class="task-summary-grid">
@@ -525,6 +532,10 @@ const policyDecision = document.querySelector("#policy-decision");
 const policyDomain = document.querySelector("#policy-domain");
 const policyAuditCount = document.querySelector("#policy-audit-count");
 const policyJson = document.querySelector("#policy-json");
+const capabilityRegistry = document.querySelector("#capability-registry");
+const capabilityOnline = document.querySelector("#capability-online");
+const capabilityApproval = document.querySelector("#capability-approval");
+const capabilityJson = document.querySelector("#capability-json");
 let currentTaskState = null;
 let latestActionState = null;
 let latestHistoryTask = null;
@@ -681,6 +692,29 @@ function renderPolicyState(policy) {
   ].join("\\n");
 }
 
+function renderCapabilityState(registry) {
+  const capabilities = Array.isArray(registry?.capabilities) ? registry.capabilities : [];
+  const summary = registry?.summary ?? {};
+  const topCapabilities = capabilities
+    .slice()
+    .sort((left, right) => String(left.kind).localeCompare(String(right.kind)) || String(left.id).localeCompare(String(right.id)))
+    .slice(0, 8);
+
+  capabilityRegistry.textContent = registry?.registry ?? "capability-v0";
+  capabilityOnline.textContent = \`\${summary.online ?? 0}/\${summary.total ?? 0}\`;
+  capabilityApproval.textContent = String(summary.requiresApproval ?? 0);
+  capabilityJson.textContent = [
+    \`Mode: \${registry?.mode ?? "unknown"}\`,
+    \`Kinds: \${Object.entries(summary.byKind ?? {}).map(([kind, count]) => \`\${kind}=\${count}\`).join(", ") || "none"}\`,
+    \`Risks: \${Object.entries(summary.byRisk ?? {}).map(([risk, count]) => \`\${risk}=\${count}\`).join(", ") || "none"}\`,
+    \`Governance: \${Object.entries(summary.byGovernance ?? {}).map(([rule, count]) => \`\${rule}=\${count}\`).join(", ") || "none"}\`,
+    "",
+    ...topCapabilities.map((capability) => {
+      return \`[\${capability.status ?? "unknown"}] \${capability.id} \${capability.kind} \${capability.risk} governance=\${capability.governance}\`;
+    }),
+  ].join("\\n");
+}
+
 function renderOperatorPanel(result) {
   if (!result) {
     renderOperatorState(null);
@@ -745,6 +779,18 @@ async function refreshPolicyState() {
     policyDecision.textContent = "unknown";
     policyDomain.textContent = "unknown";
     policyJson.textContent = "Unable to read policy state.";
+  }
+}
+
+async function refreshCapabilityState() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/capabilities\`);
+    renderCapabilityState(data);
+  } catch {
+    capabilityRegistry.textContent = "offline";
+    capabilityOnline.textContent = "0";
+    capabilityApproval.textContent = "unknown";
+    capabilityJson.textContent = "Unable to read body capabilities.";
   }
 }
 
@@ -1675,6 +1721,7 @@ function subscribeEvents() {
     "task.resumed",
     "task.failed",
     "policy.evaluated",
+    "capability.updated",
     "service.started",
     "browser.started",
     "browser.updated",
@@ -1695,6 +1742,9 @@ function subscribeEvents() {
         await refreshWorkView();
         if (eventName === "policy.evaluated") {
           await refreshPolicyState();
+        }
+        if (eventName === "capability.updated" || eventName === "service.started" || eventName === "service.failed") {
+          await refreshCapabilityState();
         }
         if (
           eventName === "screen.updated"
@@ -1978,6 +2028,7 @@ await refreshScreen();
 await refreshActionState();
 await refreshOperatorState();
 await refreshPolicyState();
+await refreshCapabilityState();
 await refreshSystemState();
 await refreshHealState();
 await refreshAuditState();
@@ -1993,6 +2044,7 @@ setInterval(refreshScreen, 5000);
 setInterval(refreshActionState, 5000);
 setInterval(refreshOperatorState, 5000);
 setInterval(refreshPolicyState, 5000);
+setInterval(refreshCapabilityState, 5000);
 setInterval(refreshSystemState, 5000);
 setInterval(refreshHealState, 5000);
 setInterval(refreshAuditState, 5000);`;
