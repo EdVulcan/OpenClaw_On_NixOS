@@ -107,15 +107,15 @@ if (!step.ok || step.ran !== true || step.task?.status !== "completed") {
 }
 
 const invocations = step.execution?.capabilityInvocations ?? [];
-const readInvocation = invocations.find((item) => item.capability?.id === "sense.filesystem.read");
+const readInvocation = invocations.find((item) => item.capabilityId === "sense.filesystem.read");
 if (
   invocations.length !== 3
   || !readInvocation
   || readInvocation.summary?.kind !== "filesystem.read_text"
-  || readInvocation.result?.content !== expectedContent
-  || readInvocation.result?.contentBytes !== Buffer.byteLength(expectedContent)
+  || readInvocation.summary?.path !== targetFile
+  || readInvocation.summary?.contentBytes !== Buffer.byteLength(expectedContent)
 ) {
-  throw new Error(`operator execution should include governed read_text content: ${JSON.stringify(invocations)}`);
+  throw new Error(`operator execution should summarize governed read_text content: ${JSON.stringify(invocations)}`);
 }
 
 if (
