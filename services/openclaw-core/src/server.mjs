@@ -294,6 +294,9 @@ function resolvePlanCapabilityId({ kind, intent, plannerIntent }) {
   if (candidate === "filesystem.mkdir" || candidate === "filesystem.directory.create") {
     return "act.filesystem.mkdir";
   }
+  if (candidate === "filesystem.append" || candidate === "filesystem.append_text" || candidate === "filesystem.append-text") {
+    return "act.filesystem.append_text";
+  }
   if (candidate === "filesystem.write" || candidate === "filesystem.write_text" || candidate === "filesystem.write-text") {
     return "act.filesystem.write_text";
   }
@@ -818,6 +821,19 @@ function baseCapabilities() {
       description: "Write bounded UTF-8 text files inside configured body roots with audit and policy governance.",
     },
     {
+      id: "act.filesystem.append_text",
+      name: "Filesystem Text Append",
+      kind: "actuator",
+      service: "openclaw-system-sense",
+      endpoint: `${systemSenseUrl}/system/files/append-text`,
+      intents: ["filesystem.append", "filesystem.append_text", "filesystem.append-text"],
+      domains: ["body_internal"],
+      risk: "high",
+      governance: "require_approval",
+      requiresApproval: true,
+      description: "Append bounded UTF-8 text to existing files inside configured body roots with audit and policy governance.",
+    },
+    {
       id: "act.filesystem.mkdir",
       name: "Filesystem Directory Create",
       kind: "actuator",
@@ -1152,6 +1168,13 @@ async function callCapabilityBackend(capability, request) {
     });
   }
 
+  if (capability.id === "act.filesystem.append_text") {
+    return postJson(`${systemSenseUrl}/system/files/append-text`, {
+      ...request.params,
+      intent: request.intent ?? "filesystem.append",
+    });
+  }
+
   if (capability.id === "act.filesystem.mkdir") {
     return postJson(`${systemSenseUrl}/system/files/mkdir`, {
       ...request.params,
@@ -1237,6 +1260,16 @@ function summariseCapabilityInvocationResult(capability, result) {
       path: result?.path ?? null,
       contentBytes: result?.contentBytes ?? null,
       overwrite: result?.overwrite ?? null,
+    };
+  }
+  if (capability.id === "act.filesystem.append_text") {
+    return {
+      kind: "filesystem.append_text",
+      ok: result?.ok === true,
+      path: result?.path ?? null,
+      contentBytes: result?.contentBytes ?? null,
+      previousBytes: result?.previousBytes ?? null,
+      totalBytes: result?.totalBytes ?? null,
     };
   }
   if (capability.id === "act.filesystem.mkdir") {
@@ -1995,6 +2028,7 @@ const OPERATOR_INVOKABLE_CAPABILITIES = new Set([
   "sense.system.vitals",
   "sense.filesystem.read",
   "act.filesystem.write_text",
+  "act.filesystem.append_text",
   "act.filesystem.mkdir",
   "sense.process.list",
   "act.system.command.dry_run",
@@ -2218,6 +2252,7 @@ function serialiseCommandTranscriptSummary(summary) {
 const FILESYSTEM_CHANGE_CAPABILITIES = new Set([
   "act.filesystem.mkdir",
   "act.filesystem.write_text",
+  "act.filesystem.append_text",
 ]);
 
 function classifyFilesystemChange(entry) {
@@ -2226,6 +2261,9 @@ function classifyFilesystemChange(entry) {
   }
   if (entry.capability?.id === "act.filesystem.write_text") {
     return "write_text";
+  }
+  if (entry.capability?.id === "act.filesystem.append_text") {
+    return "append_text";
   }
   return "unknown";
 }
@@ -2244,6 +2282,8 @@ function buildFilesystemChangeRecords() {
       overwrite: entry.summary?.overwrite ?? null,
       created: entry.summary?.created ?? null,
       recursive: entry.summary?.recursive ?? null,
+      previousBytes: entry.summary?.previousBytes ?? null,
+      totalBytes: entry.summary?.totalBytes ?? null,
       policy: entry.policy ?? null,
       summary: entry.summary ?? null,
     }))
@@ -2274,6 +2314,7 @@ function buildFilesystemChangeSummary() {
     total: 0,
     mkdir: 0,
     write_text: 0,
+    append_text: 0,
     taskIds: new Set(),
     taskCount: 0,
     latestAt: null,

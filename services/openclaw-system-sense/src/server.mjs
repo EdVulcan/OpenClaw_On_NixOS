@@ -1,7 +1,7 @@
 import http from "node:http";
 import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, readdirSync, statfsSync, statSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statfsSync, statSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -360,6 +360,61 @@ function writeTextFile(body = {}) {
     contentBytes,
     encoding,
     overwrite: existedBefore,
+    metadata,
+  };
+}
+
+function appendTextFile(body = {}) {
+  const targetPath = typeof body.path === "string" && body.path.trim()
+    ? body.path.trim()
+    : null;
+  if (!targetPath) {
+    const error = new Error("File path is required for append-text.");
+    error.code = "FILE_PATH_REQUIRED";
+    throw error;
+  }
+
+  const content = typeof body.content === "string" ? body.content : "";
+  const encoding = typeof body.encoding === "string" && body.encoding.trim() ? body.encoding.trim() : "utf8";
+  if (encoding !== "utf8") {
+    const error = new Error("Only utf8 text appends are supported.");
+    error.code = "UNSUPPORTED_ENCODING";
+    throw error;
+  }
+
+  const contentBytes = Buffer.byteLength(content, "utf8");
+  const resolved = resolveAllowedPath(targetPath);
+  if (!existsSync(resolved.path)) {
+    const error = new Error("Target file must exist for append-text.");
+    error.code = "TARGET_NOT_FOUND";
+    throw error;
+  }
+
+  const existingStats = statSync(resolved.path);
+  if (!existingStats.isFile()) {
+    const error = new Error("Cannot append text to a non-file target.");
+    error.code = "TARGET_NOT_FILE";
+    throw error;
+  }
+
+  const previousBytes = existingStats.size;
+  const totalBytes = previousBytes + contentBytes;
+  if (totalBytes > maxFileWriteBytes) {
+    const error = new Error("Text append exceeds OpenClaw file write limit.");
+    error.code = "FILE_WRITE_LIMIT_EXCEEDED";
+    error.details = { previousBytes, contentBytes, totalBytes, maxFileWriteBytes };
+    throw error;
+  }
+
+  appendFileSync(resolved.path, content, { encoding });
+  const metadata = buildFileMetadata(resolved.path);
+  return {
+    ...resolved,
+    mode: "append_text",
+    contentBytes,
+    previousBytes,
+    totalBytes,
+    encoding,
     metadata,
   };
 }
@@ -944,6 +999,28 @@ const server = http.createServer(async (req, res) => {
         path: result.path,
         contentBytes: result.contentBytes,
         overwrite: result.overwrite,
+      });
+      sendJson(res, 200, {
+        ok: true,
+        allowedRoots,
+        ...result,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message, code: error.code ?? null, details: error.details ?? null });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/system/files/append-text") {
+    try {
+      const body = await readJsonBody(req);
+      const result = appendTextFile(body);
+      await publishEvent("system.files.appended", {
+        path: result.path,
+        contentBytes: result.contentBytes,
+        previousBytes: result.previousBytes,
+        totalBytes: result.totalBytes,
       });
       sendJson(res, 200, {
         ok: true,

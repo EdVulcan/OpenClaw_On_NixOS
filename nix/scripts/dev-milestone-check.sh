@@ -25,6 +25,7 @@ checks=(
   "sovereign-command-ledger|dev-sovereign-command-ledger-check.sh|Sovereign body command transcript ledger and restart recovery"
   "sovereign-filesystem-write|dev-sovereign-filesystem-write-check.sh|Sovereign body bounded filesystem text writes"
   "sovereign-filesystem-workspace|dev-sovereign-filesystem-workspace-check.sh|Sovereign body filesystem workspace creation chain"
+  "sovereign-filesystem-append|dev-sovereign-filesystem-append-check.sh|Sovereign body bounded filesystem text appends"
   "sovereign-filesystem-ledger|dev-sovereign-filesystem-ledger-check.sh|Sovereign body filesystem change ledger and restart recovery"
   "sovereign-filesystem-read-text|dev-sovereign-filesystem-read-text-check.sh|Sovereign body bounded filesystem text readback"
   "sovereign-filesystem-read-ledger|dev-sovereign-filesystem-read-ledger-check.sh|Sovereign body filesystem read access ledger and restart recovery"

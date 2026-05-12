@@ -185,6 +185,14 @@ npm run dev:sovereign-filesystem-workspace-check:unix
 
 This verifies `act.filesystem.mkdir`, `act.filesystem.write_text`, and filesystem metadata can form an autonomous workspace creation chain inside allowed body roots.
 
+Run the sovereign filesystem append slice directly:
+
+```bash
+npm run dev:sovereign-filesystem-append-check:unix
+```
+
+This verifies `act.filesystem.append_text` can autonomously append bounded UTF-8 text to existing files inside allowed body roots, record append metadata in the filesystem change ledger, and reject paths outside those roots.
+
 Run the sovereign filesystem ledger slice directly:
 
 ```bash
