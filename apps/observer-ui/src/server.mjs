@@ -403,6 +403,15 @@ function observerHtml() {
           <pre id="filesystem-ledger-json">Loading filesystem change ledger...</pre>
         </section>
         <section class="panel">
+          <h2>Filesystem Reads</h2>
+          <div class="metric"><span>Total</span><span id="filesystem-read-ledger-total">0</span></div>
+          <div class="metric"><span>Metadata</span><span id="filesystem-read-ledger-metadata">0</span></div>
+          <div class="metric"><span>List/Search</span><span id="filesystem-read-ledger-query">0</span></div>
+          <div class="metric"><span>Read Text</span><span id="filesystem-read-ledger-read-text">0</span></div>
+          <div class="metric"><span>Tasks</span><span id="filesystem-read-ledger-tasks">0</span></div>
+          <pre id="filesystem-read-ledger-json">Loading filesystem read ledger...</pre>
+        </section>
+        <section class="panel">
           <h2>Recent Tasks</h2>
           <div class="metric"><span>Entries</span><span id="task-list-count">0</span></div>
           <div class="task-summary-grid">
@@ -623,6 +632,12 @@ const filesystemLedgerMkdir = document.querySelector("#filesystem-ledger-mkdir")
 const filesystemLedgerWrites = document.querySelector("#filesystem-ledger-writes");
 const filesystemLedgerTasks = document.querySelector("#filesystem-ledger-tasks");
 const filesystemLedgerJson = document.querySelector("#filesystem-ledger-json");
+const filesystemReadLedgerTotal = document.querySelector("#filesystem-read-ledger-total");
+const filesystemReadLedgerMetadata = document.querySelector("#filesystem-read-ledger-metadata");
+const filesystemReadLedgerQuery = document.querySelector("#filesystem-read-ledger-query");
+const filesystemReadLedgerReadText = document.querySelector("#filesystem-read-ledger-read-text");
+const filesystemReadLedgerTasks = document.querySelector("#filesystem-read-ledger-tasks");
+const filesystemReadLedgerJson = document.querySelector("#filesystem-read-ledger-json");
 let currentTaskState = null;
 let latestActionState = null;
 let latestHistoryTask = null;
@@ -969,6 +984,33 @@ function renderFilesystemLedger(data) {
   ].join("\\n");
 }
 
+function renderFilesystemReadLedger(data) {
+  const summary = data?.summary ?? {};
+  const items = Array.isArray(data?.items) ? data.items : [];
+  const queryReads = (summary.list ?? 0) + (summary.search ?? 0);
+  filesystemReadLedgerTotal.textContent = String(summary.total ?? 0);
+  filesystemReadLedgerMetadata.textContent = String(summary.metadata ?? 0);
+  filesystemReadLedgerQuery.textContent = String(queryReads);
+  filesystemReadLedgerReadText.textContent = String(summary.read_text ?? 0);
+  filesystemReadLedgerTasks.textContent = String(summary.taskCount ?? 0);
+
+  filesystemReadLedgerJson.textContent = [
+    "Content: not displayed or stored in the read ledger.",
+    \`Total: \${summary.total ?? 0}\`,
+    \`Metadata: \${summary.metadata ?? 0}\`,
+    \`List: \${summary.list ?? 0}\`,
+    \`Search: \${summary.search ?? 0}\`,
+    \`Read Text: \${summary.read_text ?? 0}\`,
+    \`Tasks: \${summary.taskCount ?? 0}\`,
+    \`By Capability: \${Object.entries(summary.byCapability ?? {}).map(([capability, count]) => \`\${capability}=\${count}\`).join(", ") || "none"}\`,
+    \`By Policy: \${Object.entries(summary.byPolicy ?? {}).map(([policy, count]) => \`\${policy}=\${count}\`).join(", ") || "none"}\`,
+    "",
+    ...items.slice(0, 8).map((entry) => {
+      return \`[\${entry.operation ?? "read"}] task=\${entry.taskId ?? "none"} \${entry.path ?? "unknown"} count=\${entry.count ?? "n/a"} bytes=\${entry.contentBytes ?? "n/a"} encoding=\${entry.encoding ?? "n/a"}\`;
+    }),
+  ].join("\\n");
+}
+
 function renderOperatorPanel(result) {
   if (!result) {
     renderOperatorState(null);
@@ -1103,6 +1145,20 @@ async function refreshFilesystemLedger() {
     filesystemLedgerWrites.textContent = "0";
     filesystemLedgerTasks.textContent = "unknown";
     filesystemLedgerJson.textContent = "Unable to read filesystem change ledger.";
+  }
+}
+
+async function refreshFilesystemReadLedger() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/filesystem/reads?limit=8\`);
+    renderFilesystemReadLedger(data);
+  } catch {
+    filesystemReadLedgerTotal.textContent = "0";
+    filesystemReadLedgerMetadata.textContent = "0";
+    filesystemReadLedgerQuery.textContent = "0";
+    filesystemReadLedgerReadText.textContent = "0";
+    filesystemReadLedgerTasks.textContent = "unknown";
+    filesystemReadLedgerJson.textContent = "Unable to read filesystem read ledger.";
   }
 }
 
@@ -2466,6 +2522,7 @@ await refreshCapabilityState();
 await refreshCapabilityHistory();
 await refreshCommandLedger();
 await refreshFilesystemLedger();
+await refreshFilesystemReadLedger();
 await refreshSystemState();
 await refreshHealState();
 await refreshAuditState();
@@ -2486,6 +2543,7 @@ setInterval(refreshCapabilityState, 5000);
 setInterval(refreshCapabilityHistory, 5000);
 setInterval(refreshCommandLedger, 5000);
 setInterval(refreshFilesystemLedger, 5000);
+setInterval(refreshFilesystemReadLedger, 5000);
 setInterval(refreshSystemState, 5000);
 setInterval(refreshHealState, 5000);
 setInterval(refreshAuditState, 5000);`;

@@ -233,6 +233,14 @@ npm run dev:observer-filesystem-ledger-check:unix
 
 This verifies Observer surfaces the cross-task filesystem change ledger summary and recent mkdir/write records.
 
+Run the observer filesystem read ledger slice directly:
+
+```bash
+npm run dev:observer-filesystem-read-ledger-check:unix
+```
+
+This verifies Observer surfaces the filesystem read access ledger summary and recent metadata/list/search/read-text records without displaying file content.
+
 Run the approval inbox slice directly:
 
 ```bash
