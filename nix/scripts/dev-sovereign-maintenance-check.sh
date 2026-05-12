@@ -166,8 +166,8 @@ if (result.policy?.decision !== "audit_only" || result.policy?.domain !== "body_
 if (result.summary?.kind !== "maintenance.run" || result.summary?.status !== "repaired" || result.summary?.executed !== 1 || result.summary?.skipped !== 1) {
   throw new Error(`maintenance summary should show one conservative repair and one skipped high-risk observation: ${JSON.stringify(result.summary)}`);
 }
-if (result.response?.run?.autonomy?.approvalRequired !== false || result.response?.run?.autonomy?.governance !== "audit_only") {
-  throw new Error(`maintenance run should record autonomous audit governance: ${JSON.stringify(result.response?.run?.autonomy)}`);
+if (result.result?.run?.autonomy?.approvalRequired !== false || result.result?.run?.autonomy?.governance !== "audit_only") {
+  throw new Error(`maintenance run should record autonomous audit governance: ${JSON.stringify(result.result?.run?.autonomy)}`);
 }
 EOF
 
