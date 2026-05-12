@@ -1,7 +1,7 @@
 import http from "node:http";
 import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
-import { existsSync, readdirSync, statfsSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, statfsSync, statSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -326,6 +326,45 @@ function writeTextFile(body = {}) {
     contentBytes,
     encoding,
     overwrite: existedBefore,
+    metadata,
+  };
+}
+
+function createDirectory(body = {}) {
+  const targetPath = typeof body.path === "string" && body.path.trim()
+    ? body.path.trim()
+    : null;
+  if (!targetPath) {
+    const error = new Error("Directory path is required.");
+    error.code = "DIRECTORY_PATH_REQUIRED";
+    throw error;
+  }
+
+  const resolved = resolveAllowedPath(targetPath);
+  const recursive = body.recursive === true;
+  const parentPath = path.dirname(resolved.path);
+  resolveAllowedPath(parentPath);
+  if (!recursive && (!existsSync(parentPath) || !statSync(parentPath).isDirectory())) {
+    const error = new Error("Parent directory must exist inside allowed roots.");
+    error.code = "PARENT_DIRECTORY_NOT_FOUND";
+    error.details = { parentPath };
+    throw error;
+  }
+
+  const existedBefore = existsSync(resolved.path);
+  if (existedBefore && !statSync(resolved.path).isDirectory()) {
+    const error = new Error("Target path exists and is not a directory.");
+    error.code = "TARGET_NOT_DIRECTORY";
+    throw error;
+  }
+
+  mkdirSync(resolved.path, { recursive });
+  const metadata = buildFileMetadata(resolved.path);
+  return {
+    ...resolved,
+    mode: "mkdir",
+    recursive,
+    created: !existedBefore,
     metadata,
   };
 }
@@ -851,6 +890,27 @@ const server = http.createServer(async (req, res) => {
         path: result.path,
         contentBytes: result.contentBytes,
         overwrite: result.overwrite,
+      });
+      sendJson(res, 200, {
+        ok: true,
+        allowedRoots,
+        ...result,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message, code: error.code ?? null, details: error.details ?? null });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/system/files/mkdir") {
+    try {
+      const body = await readJsonBody(req);
+      const result = createDirectory(body);
+      await publishEvent("system.files.directory_created", {
+        path: result.path,
+        recursive: result.recursive,
+        created: result.created,
       });
       sendJson(res, 200, {
         ok: true,

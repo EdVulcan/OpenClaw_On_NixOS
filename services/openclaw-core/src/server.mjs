@@ -291,6 +291,9 @@ function resolvePlanCapabilityId({ kind, intent, plannerIntent }) {
   if (directMap[candidate]) {
     return directMap[candidate];
   }
+  if (candidate === "filesystem.mkdir" || candidate === "filesystem.directory.create") {
+    return "act.filesystem.mkdir";
+  }
   if (candidate === "filesystem.write" || candidate === "filesystem.write_text" || candidate === "filesystem.write-text") {
     return "act.filesystem.write_text";
   }
@@ -815,6 +818,19 @@ function baseCapabilities() {
       description: "Write bounded UTF-8 text files inside configured body roots with audit and policy governance.",
     },
     {
+      id: "act.filesystem.mkdir",
+      name: "Filesystem Directory Create",
+      kind: "actuator",
+      service: "openclaw-system-sense",
+      endpoint: `${systemSenseUrl}/system/files/mkdir`,
+      intents: ["filesystem.mkdir", "filesystem.directory.create"],
+      domains: ["body_internal"],
+      risk: "high",
+      governance: "require_approval",
+      requiresApproval: true,
+      description: "Create directories inside configured body roots with optional recursive creation and audit.",
+    },
+    {
       id: "sense.process.list",
       name: "Process List Sense",
       kind: "sensor",
@@ -1129,6 +1145,13 @@ async function callCapabilityBackend(capability, request) {
     });
   }
 
+  if (capability.id === "act.filesystem.mkdir") {
+    return postJson(`${systemSenseUrl}/system/files/mkdir`, {
+      ...request.params,
+      intent: request.intent ?? "filesystem.mkdir",
+    });
+  }
+
   if (capability.id === "sense.process.list") {
     return fetchJson(buildSystemSenseUrl("/system/processes", {
       query: request.params.query ?? request.params.q,
@@ -1177,6 +1200,15 @@ function summariseCapabilityInvocationResult(capability, result) {
       path: result?.path ?? null,
       contentBytes: result?.contentBytes ?? null,
       overwrite: result?.overwrite ?? null,
+    };
+  }
+  if (capability.id === "act.filesystem.mkdir") {
+    return {
+      kind: "filesystem.mkdir",
+      ok: result?.ok === true,
+      path: result?.path ?? null,
+      created: result?.created ?? null,
+      recursive: result?.recursive ?? null,
     };
   }
   if (capability.id === "sense.process.list") {
@@ -1925,6 +1957,7 @@ const OPERATOR_INVOKABLE_CAPABILITIES = new Set([
   "sense.system.vitals",
   "sense.filesystem.read",
   "act.filesystem.write_text",
+  "act.filesystem.mkdir",
   "sense.process.list",
   "act.system.command.dry_run",
   "act.system.command.execute",

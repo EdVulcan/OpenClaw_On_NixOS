@@ -177,6 +177,14 @@ npm run dev:sovereign-filesystem-write-check:unix
 
 This verifies `act.filesystem.write_text` can autonomously write bounded UTF-8 text inside allowed body roots in `sovereign_body` mode while rejecting paths outside those roots.
 
+Run the sovereign filesystem workspace slice directly:
+
+```bash
+npm run dev:sovereign-filesystem-workspace-check:unix
+```
+
+This verifies `act.filesystem.mkdir`, `act.filesystem.write_text`, and filesystem metadata can form an autonomous workspace creation chain inside allowed body roots.
+
 Run the observer command transcript slice directly:
 
 ```bash
@@ -506,6 +514,7 @@ This is based on real NixOS VM validation:
 - `dev:sovereign-command-recovery-check:unix` covers non-zero command exit recovery and default command task failure
 - `dev:sovereign-command-ledger-check:unix` covers queryable command transcript ledger and restart recovery
 - `dev:sovereign-filesystem-write-check:unix` covers bounded autonomous filesystem text writes under sovereign body autonomy
+- `dev:sovereign-filesystem-workspace-check:unix` covers autonomous directory creation, file write, and metadata verification chains
 - `dev:observer-command-transcript-check:unix` covers Observer visibility for sovereign command transcripts
 - `dev:observer-command-ledger-check:unix` covers Observer visibility for the cross-task command transcript ledger
 - `dev:capability-planner-check:unix` covers capability-aware plan metadata and approval-gated body capabilities
