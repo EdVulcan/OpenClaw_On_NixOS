@@ -161,6 +161,14 @@ npm run dev:capability-history-check:unix
 
 This verifies capability invocation records, blocked/invoked summaries, audit events, and restart recovery for core-held body capability history.
 
+Run the capability operator execution slice directly:
+
+```bash
+npm run dev:capability-operator-check:unix
+```
+
+This verifies system-task plans are executed by the operator through governed capability invocation for process listing and approved command dry-run.
+
 Run the Observer capability-plan visibility slice directly:
 
 ```bash
@@ -414,6 +422,7 @@ This is based on real NixOS VM validation:
 - `dev:capability-planner-check:unix` covers capability-aware plan metadata and approval-gated body capabilities
 - `dev:capability-invoke-check:unix` covers policy-governed capability invocation through core
 - `dev:capability-history-check:unix` covers persistent capability invocation history and restart recovery
+- `dev:capability-operator-check:unix` covers operator execution through governed capability invocation
 - `dev:observer-capability-plan-check:unix` covers Observer visibility for body capability decisions inside plans
 - `dev:observer-capability-invoke-check:unix` covers Observer controls for policy-governed capability invocation
 - `dev:observer-capability-history-check:unix` covers Observer visibility for persistent capability invocation history

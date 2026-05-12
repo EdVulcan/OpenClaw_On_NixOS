@@ -1822,6 +1822,52 @@ function normaliseExecutorActions(actions) {
     }));
 }
 
+const OPERATOR_INVOKABLE_CAPABILITIES = new Set([
+  "sense.system.vitals",
+  "sense.filesystem.read",
+  "sense.process.list",
+  "act.system.command.dry_run",
+]);
+
+function planCapabilityActionSteps(task) {
+  return (task.plan?.steps ?? [])
+    .filter((step) => step.phase === "acting_on_target" && OPERATOR_INVOKABLE_CAPABILITIES.has(step.capabilityId));
+}
+
+function shouldExecuteCapabilityPlan(task) {
+  return task?.type === "system_task" && planCapabilityActionSteps(task).length > 0;
+}
+
+function inferCapabilityOperation(step) {
+  if (typeof step.params?.operation === "string" && step.params.operation.trim()) {
+    return step.params.operation.trim();
+  }
+  if (step.kind === "filesystem.metadata") {
+    return "metadata";
+  }
+  if (step.kind === "filesystem.search") {
+    return "search";
+  }
+  if (step.kind === "filesystem.list") {
+    return "list";
+  }
+  return null;
+}
+
+function buildCapabilityInvokeBodyFromPlanStep(step, task) {
+  return {
+    capabilityId: step.capabilityId,
+    intent: step.intent ?? step.kind,
+    operation: inferCapabilityOperation(step),
+    approved: task.policy?.decision?.approved === true || task.policy?.request?.approved === true,
+    params: step.params ?? {},
+    policy: {
+      intent: step.intent ?? step.kind,
+      approved: task.policy?.decision?.approved === true || task.policy?.request?.approved === true,
+    },
+  };
+}
+
 function buildExecutionVerification({ targetUrl, options, verifiedScreen, actionResults, workView }) {
   const expectedUrl =
     typeof options.expectedUrl === "string" && options.expectedUrl.trim()
@@ -2072,6 +2118,121 @@ async function executeTask(task, options = {}) {
   }
 }
 
+async function executeCapabilityPlanTask(task, options = {}) {
+  if (!isActiveTask(task)) {
+    throw new Error("Task is not active and cannot be executed.");
+  }
+
+  const actionSteps = planCapabilityActionSteps(task);
+  if (actionSteps.length === 0) {
+    throw new Error("Task does not include invokable capability plan steps.");
+  }
+
+  const policy = ensureTaskPolicy(task, { stage: "capability_plan.execute" });
+  await publishEvent("policy.evaluated", { task: serialiseTask(task), policy: policy.decision });
+  if (!isPolicyExecutionAllowed(policy.decision)) {
+    const approval = task.approval?.requestId ? approvals.get(task.approval.requestId) : null;
+    const failedTask = failTask(task, `Policy blocked capability plan execution: ${policy.decision.reason}`, {
+      executor: "capability-invoke-v1",
+      policy: policy.decision,
+      approval: approval ? serialiseApproval(approval) : null,
+    });
+    await publishEvent("task.failed", {
+      task: serialiseTask(failedTask),
+      reason: "Policy blocked capability plan execution.",
+      policy: policy.decision,
+      executor: "capability-invoke-v1",
+    });
+    return {
+      task: failedTask,
+      actions: [],
+      capabilityInvocations: [],
+      verification: null,
+      policy: policy.decision,
+      approval: approval ? serialiseApproval(approval) : null,
+    };
+  }
+
+  const capabilityInvocations = [];
+  try {
+    for (const step of actionSteps) {
+      const invocation = await invokeCapability(buildCapabilityInvokeBodyFromPlanStep(step, task));
+      const response = invocation.response;
+      capabilityInvocations.push(response);
+      if (response.blocked === true || response.invoked !== true) {
+        const failedTask = failTask(task, `Capability invocation blocked: ${response.reason ?? "unknown"}`, {
+          executor: "capability-invoke-v1",
+          step,
+          invocation: response.invocation ?? null,
+          policy: response.policy ?? null,
+        });
+        await publishEvent("task.failed", {
+          task: serialiseTask(failedTask),
+          reason: "Capability invocation blocked.",
+          invocation: response.invocation ?? null,
+          executor: "capability-invoke-v1",
+        });
+        return {
+          task: failedTask,
+          actions: [],
+          capabilityInvocations,
+          verification: null,
+          policy: response.policy ?? policy.decision,
+        };
+      }
+
+      await setTaskPhase(task, "acting_on_target", {
+        status: "running",
+        details: {
+          actionKind: step.kind,
+          capabilityId: step.capabilityId,
+          invocationId: response.invocation?.id ?? null,
+          summary: response.summary ?? null,
+          executor: "capability-invoke-v1",
+        },
+      });
+    }
+
+    const completedTask = completeTask(task, {
+      executor: "capability-invoke-v1",
+      summary: `Completed ${capabilityInvocations.length} capability invocation(s).`,
+      capabilityInvocations: capabilityInvocations.map((response) => ({
+        id: response.invocation?.id ?? null,
+        capabilityId: response.capability?.id ?? null,
+        invoked: response.invoked === true,
+        blocked: response.blocked === true,
+        summary: response.summary ?? null,
+      })),
+    });
+    await publishEvent("task.completed", {
+      task: serialiseTask(completedTask),
+      executor: "capability-invoke-v1",
+      capabilityInvocations: capabilityInvocations.map((response) => response.invocation ?? null),
+    });
+    return {
+      task: completedTask,
+      actions: [],
+      capabilityInvocations,
+      verification: { ok: true, checks: [], failedChecks: [] },
+      policy: policy.decision,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown execution error";
+    const failedTask = failTask(task, message, {
+      executor: "capability-invoke-v1",
+      capabilityInvocations,
+    });
+    await publishEvent("task.failed", { task: serialiseTask(failedTask), reason: message, executor: "capability-invoke-v1" });
+    return {
+      task: failedTask,
+      actions: [],
+      capabilityInvocations,
+      verification: null,
+      policy: policy.decision,
+    };
+  }
+}
+
 function recoverTask(sourceTask) {
   const recoveryAttempt = (sourceTask.recovery?.attempt ?? 0) + 1;
   const recoveredTask = createTask({
@@ -2113,7 +2274,7 @@ function buildRecoveryExecuteOptions(options, attempt) {
 function serialiseExecutionResult(executionResult) {
   const finalExecution = executionResult.finalExecution ?? executionResult;
   return {
-    executor: executionResult.recovery?.attempted ? "core-v3" : finalExecution.verification ? "core-v2" : "core-v1",
+    executor: finalExecution.capabilityInvocations ? "capability-invoke-v1" : executionResult.recovery?.attempted ? "core-v3" : finalExecution.verification ? "core-v2" : "core-v1",
     actions: (finalExecution.actions ?? []).map((action) => ({
       kind: action?.kind ?? null,
       degraded: Boolean(action?.degraded),
@@ -2121,6 +2282,14 @@ function serialiseExecutionResult(executionResult) {
     })),
     policy: finalExecution.policy ?? finalExecution.task?.policy?.decision ?? null,
     verification: finalExecution.verification ?? null,
+    capabilityInvocations: (finalExecution.capabilityInvocations ?? []).map((response) => ({
+      id: response.invocation?.id ?? null,
+      capabilityId: response.capability?.id ?? null,
+      invoked: response.invoked === true,
+      blocked: response.blocked === true,
+      reason: response.reason ?? null,
+      summary: response.summary ?? null,
+    })),
     finalReadiness: finalExecution.verifiedScreen?.screen?.readiness ?? null,
     finalWorkView: finalExecution.finalWorkViewState?.workView ?? null,
     recovery: executionResult.recovery ?? null,
@@ -2135,6 +2304,18 @@ function serialiseExecutionResult(executionResult) {
 }
 
 async function executeTaskWithRecovery(task, options = {}) {
+  if (shouldExecuteCapabilityPlan(task)) {
+    const capabilityExecution = await executeCapabilityPlanTask(task, options);
+    return {
+      finalExecution: capabilityExecution,
+      attempts: [capabilityExecution],
+      recovery: {
+        attempted: false,
+        maxAttempts: 0,
+      },
+    };
+  }
+
   const firstExecution = await executeTask(task, options);
   const maxRecoveryAttempts =
     Number.isInteger(options.maxRecoveryAttempts) && options.maxRecoveryAttempts > 0
