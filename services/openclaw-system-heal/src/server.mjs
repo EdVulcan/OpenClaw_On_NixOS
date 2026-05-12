@@ -16,6 +16,15 @@ let latestDiagnosis = null;
 let latestMaintenanceRun = null;
 const MAX_HEAL_HISTORY = 100;
 const MAX_MAINTENANCE_RUNS = 100;
+const maintenancePolicy = {
+  enabled: parseBooleanEnv(process.env.OPENCLAW_MAINTENANCE_AUTORUN, false),
+  intervalMs: parsePositiveInteger(process.env.OPENCLAW_MAINTENANCE_INTERVAL_MS, 15 * 60 * 1000),
+  autofix: parseBooleanEnv(process.env.OPENCLAW_MAINTENANCE_AUTOFIX, true),
+  mode: "simulated",
+  lastCheckedAt: null,
+  nextDueAt: null,
+  lastTick: null,
+};
 
 function corsHeaders(extraHeaders = {}) {
   return {
@@ -48,6 +57,25 @@ function readJsonBody(req) {
     });
     req.on("error", reject);
   });
+}
+
+function parseBooleanEnv(value, fallback) {
+  if (typeof value !== "string" || !value.trim()) {
+    return fallback;
+  }
+  const normalised = value.trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(normalised)) {
+    return true;
+  }
+  if (["0", "false", "no", "off"].includes(normalised)) {
+    return false;
+  }
+  return fallback;
+}
+
+function parsePositiveInteger(value, fallback) {
+  const parsed = Number.parseInt(value ?? "", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 async function publishEvent(type, payload = {}) {
@@ -91,6 +119,7 @@ function persistState() {
       savedAt: new Date().toISOString(),
       latestDiagnosis,
       latestMaintenanceRun,
+      maintenancePolicy,
       healHistory,
       maintenanceRuns,
     };
@@ -121,9 +150,74 @@ function loadPersistentState() {
     if (Array.isArray(data?.maintenanceRuns)) {
       maintenanceRuns.splice(0, maintenanceRuns.length, ...data.maintenanceRuns.slice(0, MAX_MAINTENANCE_RUNS));
     }
+    if (data?.maintenancePolicy && typeof data.maintenancePolicy === "object") {
+      Object.assign(maintenancePolicy, {
+        enabled: data.maintenancePolicy.enabled === true,
+        intervalMs: parsePositiveInteger(data.maintenancePolicy.intervalMs, maintenancePolicy.intervalMs),
+        autofix: data.maintenancePolicy.autofix !== false,
+        mode: typeof data.maintenancePolicy.mode === "string" && data.maintenancePolicy.mode.trim()
+          ? data.maintenancePolicy.mode.trim()
+          : maintenancePolicy.mode,
+        lastCheckedAt: typeof data.maintenancePolicy.lastCheckedAt === "string"
+          ? data.maintenancePolicy.lastCheckedAt
+          : null,
+        nextDueAt: typeof data.maintenancePolicy.nextDueAt === "string"
+          ? data.maintenancePolicy.nextDueAt
+          : null,
+        lastTick: data.maintenancePolicy.lastTick && typeof data.maintenancePolicy.lastTick === "object"
+          ? data.maintenancePolicy.lastTick
+          : null,
+      });
+    }
   } catch (error) {
     console.error("Failed to load persisted system-heal state:", error);
   }
+}
+
+function serialiseMaintenancePolicy() {
+  return {
+    enabled: maintenancePolicy.enabled,
+    intervalMs: maintenancePolicy.intervalMs,
+    autofix: maintenancePolicy.autofix,
+    mode: maintenancePolicy.mode,
+    lastCheckedAt: maintenancePolicy.lastCheckedAt,
+    nextDueAt: maintenancePolicy.nextDueAt,
+    lastTick: maintenancePolicy.lastTick,
+  };
+}
+
+function calculateNextDueAt(from = new Date()) {
+  return new Date(from.getTime() + maintenancePolicy.intervalMs).toISOString();
+}
+
+function updateMaintenancePolicy(patch = {}) {
+  if (typeof patch.enabled === "boolean") {
+    maintenancePolicy.enabled = patch.enabled;
+  }
+  if (Number.isFinite(patch.intervalMs) && patch.intervalMs > 0) {
+    maintenancePolicy.intervalMs = Math.trunc(patch.intervalMs);
+  }
+  if (typeof patch.autofix === "boolean") {
+    maintenancePolicy.autofix = patch.autofix;
+  }
+  if (typeof patch.mode === "string" && patch.mode.trim()) {
+    maintenancePolicy.mode = patch.mode.trim();
+  }
+
+  if (!maintenancePolicy.nextDueAt || patch.resetSchedule === true) {
+    maintenancePolicy.nextDueAt = calculateNextDueAt();
+  }
+
+  persistState();
+  return serialiseMaintenancePolicy();
+}
+
+function isMaintenanceDue(now = new Date()) {
+  if (!maintenancePolicy.nextDueAt) {
+    return true;
+  }
+  const dueAtMs = Date.parse(maintenancePolicy.nextDueAt);
+  return Number.isNaN(dueAtMs) || dueAtMs <= now.getTime();
 }
 
 async function fetchSystemHealth() {
@@ -309,6 +403,64 @@ async function runMaintenance(body = {}) {
   return run;
 }
 
+async function tickMaintenance(body = {}) {
+  const now = new Date();
+  const force = body.force === true;
+  const tickBase = {
+    id: randomUUID(),
+    at: now.toISOString(),
+    force,
+    enabled: maintenancePolicy.enabled,
+    due: force || isMaintenanceDue(now),
+  };
+
+  if (!maintenancePolicy.enabled && !force) {
+    const tick = {
+      ...tickBase,
+      status: "skipped",
+      reason: "maintenance_policy_disabled",
+      nextDueAt: maintenancePolicy.nextDueAt,
+    };
+    maintenancePolicy.lastTick = tick;
+    persistState();
+    await publishEvent("maintenance.tick", { tick, policy: serialiseMaintenancePolicy() });
+    return { tick, run: null };
+  }
+
+  if (!force && !isMaintenanceDue(now)) {
+    const tick = {
+      ...tickBase,
+      status: "skipped",
+      reason: "maintenance_not_due",
+      nextDueAt: maintenancePolicy.nextDueAt,
+    };
+    maintenancePolicy.lastTick = tick;
+    persistState();
+    await publishEvent("maintenance.tick", { tick, policy: serialiseMaintenancePolicy() });
+    return { tick, run: null };
+  }
+
+  const run = await runMaintenance({
+    ...body,
+    autofix: typeof body.autofix === "boolean" ? body.autofix : maintenancePolicy.autofix,
+    mode: typeof body.mode === "string" && body.mode.trim() ? body.mode.trim() : maintenancePolicy.mode,
+  });
+  maintenancePolicy.lastCheckedAt = run.completedAt;
+  maintenancePolicy.nextDueAt = calculateNextDueAt(new Date(run.completedAt));
+  const tick = {
+    ...tickBase,
+    status: "ran",
+    reason: force ? "forced" : "maintenance_due",
+    nextDueAt: maintenancePolicy.nextDueAt,
+    runId: run.id,
+    runStatus: run.status,
+  };
+  maintenancePolicy.lastTick = tick;
+  persistState();
+  await publishEvent("maintenance.tick", { tick, policy: serialiseMaintenancePolicy(), run });
+  return { tick, run };
+}
+
 const server = http.createServer(async (req, res) => {
   const requestUrl = new URL(req.url ?? "/", `http://${req.headers.host ?? `${host}:${port}`}`);
 
@@ -340,10 +492,12 @@ const server = http.createServer(async (req, res) => {
       latestMaintenanceRun,
       historyCount: healHistory.length,
       maintenanceCount: maintenanceRuns.length,
+      maintenancePolicy: serialiseMaintenancePolicy(),
       capabilities: {
         diagnose: true,
         autoFix: true,
         maintenance: true,
+        scheduler: true,
         persistentLedger: true,
         restartService: "simulated",
         observeOnlyForHighRisk: true,
@@ -370,7 +524,32 @@ const server = http.createServer(async (req, res) => {
       latestRun: latestMaintenanceRun,
       runCount: maintenanceRuns.length,
       healHistoryCount: healHistory.length,
+      policy: serialiseMaintenancePolicy(),
     });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/maintenance/policy") {
+    sendJson(res, 200, {
+      ok: true,
+      policy: serialiseMaintenancePolicy(),
+    });
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/maintenance/policy") {
+    try {
+      const body = await readJsonBody(req);
+      const policy = updateMaintenancePolicy(body);
+      await publishEvent("maintenance.policy.updated", { policy });
+      sendJson(res, 200, {
+        ok: true,
+        policy,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
     return;
   }
 
@@ -383,6 +562,25 @@ const server = http.createServer(async (req, res) => {
       count: maintenanceRuns.length,
       latestRun: latestMaintenanceRun,
     });
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/maintenance/tick") {
+    try {
+      const body = await readJsonBody(req);
+      const { tick, run } = await tickMaintenance(body);
+      sendJson(res, 200, {
+        ok: true,
+        tick,
+        run,
+        policy: serialiseMaintenancePolicy(),
+        historyCount: healHistory.length,
+        maintenanceCount: maintenanceRuns.length,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
     return;
   }
 

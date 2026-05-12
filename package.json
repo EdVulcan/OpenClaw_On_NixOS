@@ -36,6 +36,7 @@
     "dev:sovereign-command-recovery-check:unix": "bash ./nix/scripts/dev-sovereign-command-recovery-check.sh",
     "dev:sovereign-command-ledger-check:unix": "bash ./nix/scripts/dev-sovereign-command-ledger-check.sh",
     "dev:sovereign-maintenance-check:unix": "bash ./nix/scripts/dev-sovereign-maintenance-check.sh",
+    "dev:sovereign-maintenance-scheduler-check:unix": "bash ./nix/scripts/dev-sovereign-maintenance-scheduler-check.sh",
     "dev:sovereign-filesystem-write-check:unix": "bash ./nix/scripts/dev-sovereign-filesystem-write-check.sh",
     "dev:sovereign-filesystem-workspace-check:unix": "bash ./nix/scripts/dev-sovereign-filesystem-workspace-check.sh",
     "dev:sovereign-filesystem-append-check:unix": "bash ./nix/scripts/dev-sovereign-filesystem-append-check.sh",

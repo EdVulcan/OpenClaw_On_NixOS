@@ -1439,7 +1439,7 @@ function baseCapabilities() {
       kind: "actuator",
       service: "openclaw-system-heal",
       endpoint: `${systemHealUrl}/heal/state`,
-      intents: ["heal.diagnose", "heal.autofix", "heal.maintenance", "heal.restart-service", "system.repair"],
+      intents: ["heal.diagnose", "heal.autofix", "heal.maintenance", "heal.maintenance.tick", "heal.restart-service", "system.repair"],
       domains: ["body_internal"],
       risk: "medium",
       governance: "audit_only",
@@ -1715,6 +1715,9 @@ async function callCapabilityBackend(capability, request) {
     if (operation === "heal.maintenance" || operation === "maintenance" || operation === "system.repair") {
       return postJson(`${systemHealUrl}/maintenance/run`, request.params);
     }
+    if (operation === "heal.maintenance.tick" || operation === "maintenance.tick" || operation === "tick") {
+      return postJson(`${systemHealUrl}/maintenance/tick`, request.params);
+    }
     return postJson(`${systemHealUrl}/heal/autofix`, request.params);
   }
 
@@ -1833,12 +1836,14 @@ function summariseCapabilityInvocationResult(capability, result) {
     return {
       kind: run ? "maintenance.run" : "system.heal",
       ok: result?.ok === true,
-      status: run?.status ?? diagnosis?.status ?? null,
+      status: result?.tick?.status ?? run?.status ?? diagnosis?.status ?? null,
       diagnosisStatus: diagnosis?.status ?? null,
       planSteps: diagnosis?.plan?.stepCount ?? 0,
       executed: Array.isArray(executed) ? executed.length : 0,
       skipped: Array.isArray(skipped) ? skipped.length : 0,
       maintenanceRunId: run?.id ?? null,
+      tickReason: result?.tick?.reason ?? null,
+      nextDueAt: result?.policy?.nextDueAt ?? null,
     };
   }
   return {
