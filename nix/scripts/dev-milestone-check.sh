@@ -60,6 +60,7 @@ checks=(
   "observer-workspace-command-task|dev-observer-workspace-command-task-check.sh|Observer controls for approval-gated OpenClaw workspace command tasks"
   "observer-workspace-command-execute|dev-observer-workspace-command-execute-check.sh|Observer controls and visibility for approved OpenClaw workspace command execution"
   "observer-workspace-command-failure|dev-observer-workspace-command-failure-check.sh|Observer visibility for failed OpenClaw workspace command execution"
+  "observer-workspace-command-recovery|dev-observer-workspace-command-recovery-check.sh|Observer controls and visibility for recovered OpenClaw workspace commands"
   "observer-operator|dev-observer-operator-check.sh|Observer UI planner/operator controls and API wiring"
 )
 
