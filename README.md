@@ -177,6 +177,14 @@ npm run dev:observer-capability-invoke-check:unix
 
 This verifies Observer exposes capability invocation controls and result visibility for audited vitals/process calls, blocked command dry-run, and approved dry-run.
 
+Run the Observer capability history slice directly:
+
+```bash
+npm run dev:observer-capability-history-check:unix
+```
+
+This verifies Observer exposes persistent capability invocation history, invoked/blocked totals, latest timestamp, and restart-restored history entries.
+
 Run the conservative system capability slice directly:
 
 ```bash
@@ -408,6 +416,7 @@ This is based on real NixOS VM validation:
 - `dev:capability-history-check:unix` covers persistent capability invocation history and restart recovery
 - `dev:observer-capability-plan-check:unix` covers Observer visibility for body capability decisions inside plans
 - `dev:observer-capability-invoke-check:unix` covers Observer controls for policy-governed capability invocation
+- `dev:observer-capability-history-check:unix` covers Observer visibility for persistent capability invocation history
 - `dev:system-sense-check:unix` covers real body vitals and service health telemetry
 - `dev:system-heal-check:unix` covers conservative diagnosis, autofix, and heal history
 - direct GNOME/Wayland whole-desktop capture remains inconsistent across:

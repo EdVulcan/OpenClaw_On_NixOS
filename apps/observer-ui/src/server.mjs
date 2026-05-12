@@ -370,6 +370,14 @@ function observerHtml() {
           <pre id="capability-invoke-json">No capability invocation yet.</pre>
         </section>
         <section class="panel">
+          <h2>Capability History</h2>
+          <div class="metric"><span>Total</span><span id="capability-history-total">0</span></div>
+          <div class="metric"><span>Invoked</span><span id="capability-history-invoked">0</span></div>
+          <div class="metric"><span>Blocked</span><span id="capability-history-blocked">0</span></div>
+          <div class="metric"><span>Latest</span><span id="capability-history-latest">none</span></div>
+          <pre id="capability-history-json">Loading capability invocation history...</pre>
+        </section>
+        <section class="panel">
           <h2>Recent Tasks</h2>
           <div class="metric"><span>Entries</span><span id="task-list-count">0</span></div>
           <div class="task-summary-grid">
@@ -569,6 +577,11 @@ const invokeVitalsButton = document.querySelector("#invoke-vitals-button");
 const invokeProcessButton = document.querySelector("#invoke-process-button");
 const invokeCommandDryRunButton = document.querySelector("#invoke-command-dry-run-button");
 const invokeApprovedCommandDryRunButton = document.querySelector("#invoke-approved-command-dry-run-button");
+const capabilityHistoryTotal = document.querySelector("#capability-history-total");
+const capabilityHistoryInvoked = document.querySelector("#capability-history-invoked");
+const capabilityHistoryBlocked = document.querySelector("#capability-history-blocked");
+const capabilityHistoryLatest = document.querySelector("#capability-history-latest");
+const capabilityHistoryJson = document.querySelector("#capability-history-json");
 let currentTaskState = null;
 let latestActionState = null;
 let latestHistoryTask = null;
@@ -795,6 +808,29 @@ function renderCapabilityInvocation(result) {
   ].join("\\n");
 }
 
+function renderCapabilityHistory(data) {
+  const summary = data?.summary ?? {};
+  const items = Array.isArray(data?.items) ? data.items : [];
+  capabilityHistoryTotal.textContent = String(summary.total ?? 0);
+  capabilityHistoryInvoked.textContent = String(summary.invoked ?? 0);
+  capabilityHistoryBlocked.textContent = String(summary.blocked ?? 0);
+  capabilityHistoryLatest.textContent = summary.latestAt ? formatTimestamp(summary.latestAt) : "none";
+  capabilityHistoryJson.textContent = [
+    \`Total: \${summary.total ?? 0}\`,
+    \`Invoked: \${summary.invoked ?? 0}\`,
+    \`Blocked: \${summary.blocked ?? 0}\`,
+    \`By Policy: \${Object.entries(summary.byPolicy ?? {}).map(([policy, count]) => \`\${policy}=\${count}\`).join(", ") || "none"}\`,
+    \`By Capability: \${Object.entries(summary.byCapability ?? {}).map(([capability, count]) => \`\${capability}=\${count}\`).join(", ") || "none"}\`,
+    "",
+    ...items.slice(0, 8).map((entry) => {
+      const state = entry.blocked ? "blocked" : entry.invoked ? "invoked" : "recorded";
+      const decision = entry.policy?.decision ?? "unknown";
+      const reason = entry.reason ?? entry.policy?.reason ?? "none";
+      return \`[\${formatTimestamp(entry.at)}] \${state} \${entry.capability?.id ?? "unknown"} policy=\${decision} reason=\${reason}\`;
+    }),
+  ].join("\\n");
+}
+
 function renderOperatorPanel(result) {
   if (!result) {
     renderOperatorState(null);
@@ -886,6 +922,19 @@ async function refreshCapabilityState() {
   }
 }
 
+async function refreshCapabilityHistory() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/capabilities/invocations?limit=8\`);
+    renderCapabilityHistory(data);
+  } catch {
+    capabilityHistoryTotal.textContent = "0";
+    capabilityHistoryInvoked.textContent = "0";
+    capabilityHistoryBlocked.textContent = "0";
+    capabilityHistoryLatest.textContent = "unknown";
+    capabilityHistoryJson.textContent = "Unable to read capability invocation history.";
+  }
+}
+
 async function invokeCapabilityFromUi(kind) {
   const requests = {
     vitals: {
@@ -924,6 +973,7 @@ async function invokeCapabilityFromUi(kind) {
     ? \`Capability invoked: \${result.capability?.id ?? body.capabilityId}\`
     : \`Capability blocked: \${result.reason ?? "unknown"}\`);
   await refreshCapabilityState();
+  await refreshCapabilityHistory();
   await refreshPolicyState();
   await refreshAuditState();
 }
@@ -1915,6 +1965,9 @@ function subscribeEvents() {
         ) {
           await refreshCapabilityState();
         }
+        if (eventName === "capability.invoked" || eventName === "capability.blocked") {
+          await refreshCapabilityHistory();
+        }
         if (
           eventName === "screen.updated"
           || eventName === "service.started"
@@ -2235,6 +2288,7 @@ await refreshOperatorState();
 await refreshPolicyState();
 await refreshApprovalState();
 await refreshCapabilityState();
+await refreshCapabilityHistory();
 await refreshSystemState();
 await refreshHealState();
 await refreshAuditState();
@@ -2252,6 +2306,7 @@ setInterval(refreshOperatorState, 5000);
 setInterval(refreshPolicyState, 5000);
 setInterval(refreshApprovalState, 5000);
 setInterval(refreshCapabilityState, 5000);
+setInterval(refreshCapabilityHistory, 5000);
 setInterval(refreshSystemState, 5000);
 setInterval(refreshHealState, 5000);
 setInterval(refreshAuditState, 5000);`;

@@ -28,6 +28,7 @@ checks=(
   "system-heal|dev-system-heal-check.sh|Conservative diagnosis, repair plan, autofix, and heal history"
   "observer-capability-plan|dev-observer-capability-plan-check.sh|Observer visibility for capability-aware plan metadata"
   "observer-capability-invoke|dev-observer-capability-invoke-check.sh|Observer controls for policy-governed capability invocation"
+  "observer-capability-history|dev-observer-capability-history-check.sh|Observer visibility for persistent capability invocation history"
   "observer-operator|dev-observer-operator-check.sh|Observer UI planner/operator controls and API wiring"
 )
 

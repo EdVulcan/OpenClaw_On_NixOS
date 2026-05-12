@@ -40,6 +40,7 @@
     "dev:system-heal-check:unix": "bash ./nix/scripts/dev-system-heal-check.sh",
     "dev:observer-capability-plan-check:unix": "bash ./nix/scripts/dev-observer-capability-plan-check.sh",
     "dev:observer-capability-invoke-check:unix": "bash ./nix/scripts/dev-observer-capability-invoke-check.sh",
+    "dev:observer-capability-history-check:unix": "bash ./nix/scripts/dev-observer-capability-history-check.sh",
     "dev:observer-operator-check:unix": "bash ./nix/scripts/dev-observer-operator-check.sh",
     "dev:milestone-check:unix": "bash ./nix/scripts/dev-milestone-check.sh"
   }
