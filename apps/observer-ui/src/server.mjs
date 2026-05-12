@@ -1642,6 +1642,7 @@ function subscribeEvents() {
     "action.completed",
     "system.updated",
     "service.failed",
+    "heal.diagnosed",
     "heal.started",
     "heal.completed",
   ]) {
@@ -1670,7 +1671,7 @@ function subscribeEvents() {
         if (eventName === "system.updated" || eventName === "service.failed" || eventName === "service.started") {
           await refreshSystemState();
         }
-        if (eventName === "heal.started" || eventName === "heal.completed" || eventName === "service.started") {
+        if (eventName === "heal.diagnosed" || eventName === "heal.started" || eventName === "heal.completed" || eventName === "service.started") {
           await refreshHealState();
         }
       } catch (error) {

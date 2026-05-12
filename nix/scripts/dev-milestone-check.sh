@@ -18,6 +18,7 @@ checks=(
   "operator-control|dev-operator-control-check.sh|Operator state, dry-run, pause gate, and resume control"
   "policy|dev-policy-check.sh|Policy governance, audit, and cross-boundary execution gate"
   "system-sense|dev-system-sense-check.sh|Real body vitals, service latency, resources, and alerts"
+  "system-heal|dev-system-heal-check.sh|Conservative diagnosis, repair plan, autofix, and heal history"
   "observer-operator|dev-observer-operator-check.sh|Observer UI planner/operator controls and API wiring"
 )
 

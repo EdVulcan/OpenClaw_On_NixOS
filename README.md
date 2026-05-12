@@ -129,6 +129,14 @@ npm run dev:system-sense-check:unix
 
 This verifies host/body identity, uptime, CPU/memory/disk vitals, service latency, network summary, and structured alerts.
 
+Run the conservative self-heal slice directly:
+
+```bash
+npm run dev:system-heal-check:unix
+```
+
+This verifies diagnosis, repair-plan generation, simulated restart actions, observe-only handling for high-risk resource alerts, and heal history.
+
 Stop everything that `dev:up` started:
 
 ```bash
@@ -324,6 +332,7 @@ This is based on real NixOS VM validation:
 - `dev:operator-control-check:unix` covers operator dry-run, pause gating, and resume
 - `dev:policy-check:unix` covers the first policy governance and cross-boundary gate
 - `dev:system-sense-check:unix` covers real body vitals and service health telemetry
+- `dev:system-heal-check:unix` covers conservative diagnosis, autofix, and heal history
 - direct GNOME/Wayland whole-desktop capture remains inconsistent across:
   - `org.gnome.Shell.Screenshot`
   - `grim`

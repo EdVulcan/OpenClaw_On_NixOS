@@ -20,6 +20,7 @@ export const eventNames = [
   "browser.updated",
   "system.updated",
   "service.failed",
+  "heal.diagnosed",
   "heal.started",
   "heal.completed",
 ] as const;
