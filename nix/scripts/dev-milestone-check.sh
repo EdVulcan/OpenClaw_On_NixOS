@@ -47,6 +47,7 @@ checks=(
   "openclaw-workspace-command-execute|dev-openclaw-workspace-command-execute-check.sh|Approved execution of allowlisted OpenClaw workspace commands"
   "openclaw-workspace-command-failure|dev-openclaw-workspace-command-failure-check.sh|Failure capture for approved OpenClaw workspace commands"
   "openclaw-workspace-command-recovery|dev-openclaw-workspace-command-recovery-check.sh|Recovery of failed OpenClaw workspace commands behind fresh approval"
+  "openclaw-workspace-command-recovery-persistence|dev-openclaw-workspace-command-recovery-persistence-check.sh|Restart persistence for recovered OpenClaw workspace command chains"
   "observer-capability-plan|dev-observer-capability-plan-check.sh|Observer visibility for capability-aware plan metadata"
   "observer-capability-invoke|dev-observer-capability-invoke-check.sh|Observer controls for policy-governed capability invocation"
   "observer-capability-history|dev-observer-capability-history-check.sh|Observer visibility for persistent capability invocation history"

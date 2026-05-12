@@ -473,6 +473,14 @@ npm run dev:openclaw-workspace-command-recovery-check:unix
 
 This verifies a failed workspace command is recoverable as a fresh queued system task with the original command plan, a new explicit approval gate, preserved recovery links, and separate failed/successful command transcripts.
 
+Run the OpenClaw workspace command recovery persistence slice directly:
+
+```bash
+npm run dev:openclaw-workspace-command-recovery-persistence-check:unix
+```
+
+This verifies recovered workspace command chains survive core restarts before approval and after completion, including pending approval restoration, recovery links, command transcript ledger, and capability invocation history.
+
 Stop everything that `dev:up` started:
 
 ```bash
@@ -703,6 +711,7 @@ This is based on real NixOS VM validation:
 - `dev:openclaw-workspace-command-execute-check:unix` covers approved execution of allowlisted OpenClaw workspace commands
 - `dev:openclaw-workspace-command-failure-check:unix` covers failure capture for approved OpenClaw workspace commands
 - `dev:openclaw-workspace-command-recovery-check:unix` covers recovery of failed OpenClaw workspace commands behind a fresh approval gate
+- `dev:openclaw-workspace-command-recovery-persistence-check:unix` covers restart persistence for recovered OpenClaw workspace command chains
 - direct GNOME/Wayland whole-desktop capture remains inconsistent across:
   - `org.gnome.Shell.Screenshot`
   - `grim`
