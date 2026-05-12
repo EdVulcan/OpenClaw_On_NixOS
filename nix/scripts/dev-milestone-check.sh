@@ -50,6 +50,7 @@ checks=(
   "observer-filesystem-ledger|dev-observer-filesystem-ledger-check.sh|Observer visibility for sovereign filesystem change ledger"
   "observer-filesystem-read-ledger|dev-observer-filesystem-read-ledger-check.sh|Observer visibility for sovereign filesystem read access ledger"
   "observer-workspace-detect|dev-observer-workspace-detect-check.sh|Observer visibility for read-only OpenClaw workspace detection"
+  "observer-workspace-command-proposals|dev-observer-workspace-command-proposals-check.sh|Observer visibility for OpenClaw workspace command proposals"
   "observer-operator|dev-observer-operator-check.sh|Observer UI planner/operator controls and API wiring"
 )
 

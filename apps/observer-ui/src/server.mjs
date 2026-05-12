@@ -421,6 +421,16 @@ function observerHtml() {
           <pre id="workspace-json">Loading OpenClaw workspace registry...</pre>
         </section>
         <section class="panel">
+          <h2>Workspace Command Proposals</h2>
+          <div class="metric"><span>Registry</span><span id="workspace-command-registry">workspace-command-proposals-v0</span></div>
+          <div class="metric"><span>Total</span><span id="workspace-command-total">0</span></div>
+          <div class="metric"><span>Validation</span><span id="workspace-command-validation">0</span></div>
+          <div class="metric"><span>Build</span><span id="workspace-command-build">0</span></div>
+          <div class="metric"><span>Runtime</span><span id="workspace-command-runtime">0</span></div>
+          <div class="metric"><span>Mode</span><span id="workspace-command-mode">proposal-only</span></div>
+          <pre id="workspace-command-json">Loading workspace command proposals...</pre>
+        </section>
+        <section class="panel">
           <h2>Recent Tasks</h2>
           <div class="metric"><span>Entries</span><span id="task-list-count">0</span></div>
           <div class="task-summary-grid">
@@ -653,6 +663,13 @@ const workspaceMissing = document.querySelector("#workspace-missing");
 const workspaceNode = document.querySelector("#workspace-node");
 const workspaceMode = document.querySelector("#workspace-mode");
 const workspaceJson = document.querySelector("#workspace-json");
+const workspaceCommandRegistry = document.querySelector("#workspace-command-registry");
+const workspaceCommandTotal = document.querySelector("#workspace-command-total");
+const workspaceCommandValidation = document.querySelector("#workspace-command-validation");
+const workspaceCommandBuild = document.querySelector("#workspace-command-build");
+const workspaceCommandRuntime = document.querySelector("#workspace-command-runtime");
+const workspaceCommandMode = document.querySelector("#workspace-command-mode");
+const workspaceCommandJson = document.querySelector("#workspace-command-json");
 let currentTaskState = null;
 let latestActionState = null;
 let latestHistoryTask = null;
@@ -1054,6 +1071,35 @@ function renderWorkspaceRegistry(data) {
   ].join("\\n");
 }
 
+function renderWorkspaceCommandProposals(data) {
+  const summary = data?.summary ?? {};
+  const items = Array.isArray(data?.items) ? data.items : [];
+  workspaceCommandRegistry.textContent = data?.registry ?? "workspace-command-proposals-v0";
+  workspaceCommandTotal.textContent = String(summary.total ?? data?.count ?? 0);
+  workspaceCommandValidation.textContent = String(summary.byCategory?.validation ?? 0);
+  workspaceCommandBuild.textContent = String(summary.byCategory?.build ?? 0);
+  workspaceCommandRuntime.textContent = String(summary.byCategory?.runtime ?? 0);
+  workspaceCommandMode.textContent = data?.mode ?? "proposal-only";
+
+  workspaceCommandJson.textContent = [
+    "Proposal-only: command shapes are visible, execution remains disabled here.",
+    "Script bodies are not displayed.",
+    \`Registry: \${data?.registry ?? "workspace-command-proposals-v0"}\`,
+    \`Mode: \${data?.mode ?? "proposal-only"}\`,
+    \`Total: \${summary.total ?? data?.count ?? 0}\`,
+    \`Workspaces: \${summary.workspaces ?? 0}\`,
+    \`By Package Manager: \${Object.entries(summary.byPackageManager ?? {}).map(([manager, count]) => \`\${manager}=\${count}\`).join(", ") || "none"}\`,
+    \`By Category: \${Object.entries(summary.byCategory ?? {}).map(([category, count]) => \`\${category}=\${count}\`).join(", ") || "none"}\`,
+    \`By Risk: \${Object.entries(summary.byRisk ?? {}).map(([risk, count]) => \`\${risk}=\${count}\`).join(", ") || "none"}\`,
+    "",
+    ...items.slice(0, 8).map((entry) => {
+      const commandShape = [entry.command, ...(Array.isArray(entry.args) ? entry.args : [])].filter(Boolean).join(" ");
+      const governance = entry.governance ?? {};
+      return \`[\${entry.risk ?? "unknown"}] \${entry.workspaceName ?? "workspace"}:\${entry.scriptName ?? "script"} \${commandShape} cwd=\${entry.cwd ?? "unknown"} execute=\${Boolean(governance.canExecute)} approval=\${Boolean(governance.requiresExplicitExecutionApproval)} scriptBody=\${Boolean(governance.exposesScriptBody)}\`;
+    }),
+  ].join("\\n");
+}
+
 function renderOperatorPanel(result) {
   if (!result) {
     renderOperatorState(null);
@@ -1216,6 +1262,21 @@ async function refreshWorkspaceRegistry() {
     workspaceNode.textContent = "0";
     workspaceMode.textContent = "unknown";
     workspaceJson.textContent = "Unable to read OpenClaw workspace registry.";
+  }
+}
+
+async function refreshWorkspaceCommandProposals() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/workspaces/command-proposals\`);
+    renderWorkspaceCommandProposals(data);
+  } catch {
+    workspaceCommandRegistry.textContent = "offline";
+    workspaceCommandTotal.textContent = "0";
+    workspaceCommandValidation.textContent = "0";
+    workspaceCommandBuild.textContent = "0";
+    workspaceCommandRuntime.textContent = "0";
+    workspaceCommandMode.textContent = "unknown";
+    workspaceCommandJson.textContent = "Unable to read workspace command proposals.";
   }
 }
 
@@ -2581,6 +2642,7 @@ await refreshCommandLedger();
 await refreshFilesystemLedger();
 await refreshFilesystemReadLedger();
 await refreshWorkspaceRegistry();
+await refreshWorkspaceCommandProposals();
 await refreshSystemState();
 await refreshHealState();
 await refreshAuditState();
@@ -2603,6 +2665,7 @@ setInterval(refreshCommandLedger, 5000);
 setInterval(refreshFilesystemLedger, 5000);
 setInterval(refreshFilesystemReadLedger, 5000);
 setInterval(refreshWorkspaceRegistry, 5000);
+setInterval(refreshWorkspaceCommandProposals, 5000);
 setInterval(refreshSystemState, 5000);
 setInterval(refreshHealState, 5000);
 setInterval(refreshAuditState, 5000);`;

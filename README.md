@@ -257,6 +257,14 @@ npm run dev:observer-workspace-detect-check:unix
 
 This verifies Observer surfaces the read-only OpenClaw workspace registry, including package metadata, scripts, markers, shallow directories, and governance flags without exposing file contents or enabling mutation/execution.
 
+Run the observer OpenClaw workspace command proposal slice directly:
+
+```bash
+npm run dev:observer-workspace-command-proposals-check:unix
+```
+
+This verifies Observer surfaces proposal-only workspace command shapes, risks, and governance flags without exposing script bodies or enabling execution.
+
 Run the approval inbox slice directly:
 
 ```bash
@@ -593,6 +601,7 @@ This is based on real NixOS VM validation:
 - `dev:observer-filesystem-ledger-check:unix` covers Observer visibility for the cross-task filesystem change ledger
 - `dev:observer-filesystem-read-ledger-check:unix` covers Observer visibility for the cross-task filesystem read access ledger
 - `dev:observer-workspace-detect-check:unix` covers Observer visibility for read-only OpenClaw workspace detection
+- `dev:observer-workspace-command-proposals-check:unix` covers Observer visibility for OpenClaw workspace command proposals
 - `dev:capability-planner-check:unix` covers capability-aware plan metadata and approval-gated body capabilities
 - `dev:capability-invoke-check:unix` covers policy-governed capability invocation through core
 - `dev:capability-history-check:unix` covers persistent capability invocation history and restart recovery
