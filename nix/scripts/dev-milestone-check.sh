@@ -42,6 +42,7 @@ checks=(
   "observer-capability-history|dev-observer-capability-history-check.sh|Observer visibility for persistent capability invocation history"
   "observer-command-transcript|dev-observer-command-transcript-check.sh|Observer visibility for sovereign command transcripts"
   "observer-command-ledger|dev-observer-command-ledger-check.sh|Observer visibility for sovereign command transcript ledger"
+  "observer-filesystem-ledger|dev-observer-filesystem-ledger-check.sh|Observer visibility for sovereign filesystem change ledger"
   "observer-operator|dev-observer-operator-check.sh|Observer UI planner/operator controls and API wiring"
 )
 

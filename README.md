@@ -209,6 +209,14 @@ npm run dev:observer-command-ledger-check:unix
 
 This verifies Observer surfaces the cross-task command transcript ledger summary and recent command records.
 
+Run the observer filesystem ledger slice directly:
+
+```bash
+npm run dev:observer-filesystem-ledger-check:unix
+```
+
+This verifies Observer surfaces the cross-task filesystem change ledger summary and recent mkdir/write records.
+
 Run the approval inbox slice directly:
 
 ```bash
@@ -526,6 +534,7 @@ This is based on real NixOS VM validation:
 - `dev:sovereign-filesystem-ledger-check:unix` covers queryable filesystem change ledger and restart recovery
 - `dev:observer-command-transcript-check:unix` covers Observer visibility for sovereign command transcripts
 - `dev:observer-command-ledger-check:unix` covers Observer visibility for the cross-task command transcript ledger
+- `dev:observer-filesystem-ledger-check:unix` covers Observer visibility for the cross-task filesystem change ledger
 - `dev:capability-planner-check:unix` covers capability-aware plan metadata and approval-gated body capabilities
 - `dev:capability-invoke-check:unix` covers policy-governed capability invocation through core
 - `dev:capability-history-check:unix` covers persistent capability invocation history and restart recovery

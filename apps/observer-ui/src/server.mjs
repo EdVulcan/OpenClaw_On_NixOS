@@ -395,6 +395,14 @@ function observerHtml() {
           <pre id="command-ledger-json">Loading command transcript ledger...</pre>
         </section>
         <section class="panel">
+          <h2>Filesystem Ledger</h2>
+          <div class="metric"><span>Total</span><span id="filesystem-ledger-total">0</span></div>
+          <div class="metric"><span>Mkdir</span><span id="filesystem-ledger-mkdir">0</span></div>
+          <div class="metric"><span>Writes</span><span id="filesystem-ledger-writes">0</span></div>
+          <div class="metric"><span>Tasks</span><span id="filesystem-ledger-tasks">0</span></div>
+          <pre id="filesystem-ledger-json">Loading filesystem change ledger...</pre>
+        </section>
+        <section class="panel">
           <h2>Recent Tasks</h2>
           <div class="metric"><span>Entries</span><span id="task-list-count">0</span></div>
           <div class="task-summary-grid">
@@ -610,6 +618,11 @@ const commandLedgerFailed = document.querySelector("#command-ledger-failed");
 const commandLedgerSkipped = document.querySelector("#command-ledger-skipped");
 const commandLedgerTasks = document.querySelector("#command-ledger-tasks");
 const commandLedgerJson = document.querySelector("#command-ledger-json");
+const filesystemLedgerTotal = document.querySelector("#filesystem-ledger-total");
+const filesystemLedgerMkdir = document.querySelector("#filesystem-ledger-mkdir");
+const filesystemLedgerWrites = document.querySelector("#filesystem-ledger-writes");
+const filesystemLedgerTasks = document.querySelector("#filesystem-ledger-tasks");
+const filesystemLedgerJson = document.querySelector("#filesystem-ledger-json");
 let currentTaskState = null;
 let latestActionState = null;
 let latestHistoryTask = null;
@@ -934,6 +947,28 @@ function renderCommandLedger(data) {
   ].join("\\n");
 }
 
+function renderFilesystemLedger(data) {
+  const summary = data?.summary ?? {};
+  const items = Array.isArray(data?.items) ? data.items : [];
+  filesystemLedgerTotal.textContent = String(summary.total ?? 0);
+  filesystemLedgerMkdir.textContent = String(summary.mkdir ?? 0);
+  filesystemLedgerWrites.textContent = String(summary.write_text ?? 0);
+  filesystemLedgerTasks.textContent = String(summary.taskCount ?? 0);
+
+  filesystemLedgerJson.textContent = [
+    \`Total: \${summary.total ?? 0}\`,
+    \`Mkdir: \${summary.mkdir ?? 0}\`,
+    \`Writes: \${summary.write_text ?? 0}\`,
+    \`Tasks: \${summary.taskCount ?? 0}\`,
+    \`By Capability: \${Object.entries(summary.byCapability ?? {}).map(([capability, count]) => \`\${capability}=\${count}\`).join(", ") || "none"}\`,
+    \`By Policy: \${Object.entries(summary.byPolicy ?? {}).map(([policy, count]) => \`\${policy}=\${count}\`).join(", ") || "none"}\`,
+    "",
+    ...items.slice(0, 8).map((entry) => {
+      return \`[\${entry.change ?? "unknown"}] task=\${entry.taskId ?? "none"} \${entry.path ?? "unknown"} bytes=\${entry.contentBytes ?? "n/a"} created=\${entry.created ?? "n/a"}\`;
+    }),
+  ].join("\\n");
+}
+
 function renderOperatorPanel(result) {
   if (!result) {
     renderOperatorState(null);
@@ -1055,6 +1090,19 @@ async function refreshCommandLedger() {
     commandLedgerSkipped.textContent = "0";
     commandLedgerTasks.textContent = "unknown";
     commandLedgerJson.textContent = "Unable to read command transcript ledger.";
+  }
+}
+
+async function refreshFilesystemLedger() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/filesystem/changes?limit=8\`);
+    renderFilesystemLedger(data);
+  } catch {
+    filesystemLedgerTotal.textContent = "0";
+    filesystemLedgerMkdir.textContent = "0";
+    filesystemLedgerWrites.textContent = "0";
+    filesystemLedgerTasks.textContent = "unknown";
+    filesystemLedgerJson.textContent = "Unable to read filesystem change ledger.";
   }
 }
 
@@ -2417,6 +2465,7 @@ await refreshApprovalState();
 await refreshCapabilityState();
 await refreshCapabilityHistory();
 await refreshCommandLedger();
+await refreshFilesystemLedger();
 await refreshSystemState();
 await refreshHealState();
 await refreshAuditState();
@@ -2436,6 +2485,7 @@ setInterval(refreshApprovalState, 5000);
 setInterval(refreshCapabilityState, 5000);
 setInterval(refreshCapabilityHistory, 5000);
 setInterval(refreshCommandLedger, 5000);
+setInterval(refreshFilesystemLedger, 5000);
 setInterval(refreshSystemState, 5000);
 setInterval(refreshHealState, 5000);
 setInterval(refreshAuditState, 5000);`;
