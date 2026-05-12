@@ -145,6 +145,14 @@ npm run dev:sovereign-command-chain-check:unix
 
 This verifies multi-step body-internal command execution preserves a command transcript across task outcome, execution response, capability history, and audit events.
 
+Run the sovereign command branch slice directly:
+
+```bash
+npm run dev:sovereign-command-branch-check:unix
+```
+
+This verifies command steps can branch on previous transcript output/exit code, executing matching steps and preserving skipped steps in the task transcript.
+
 Run the approval inbox slice directly:
 
 ```bash
@@ -454,6 +462,7 @@ This is based on real NixOS VM validation:
 - `dev:sovereign-body-policy-check:unix` covers body-internal autonomy under `OPENCLAW_AUTONOMY_MODE=sovereign_body`
 - `dev:sovereign-command-execute-check:unix` covers allowlisted body-internal command execution under sovereign body autonomy
 - `dev:sovereign-command-chain-check:unix` covers multi-step command execution transcripts under sovereign body autonomy
+- `dev:sovereign-command-branch-check:unix` covers branching command execution from previous transcript results
 - `dev:capability-planner-check:unix` covers capability-aware plan metadata and approval-gated body capabilities
 - `dev:capability-invoke-check:unix` covers policy-governed capability invocation through core
 - `dev:capability-history-check:unix` covers persistent capability invocation history and restart recovery

@@ -20,6 +20,7 @@ checks=(
   "sovereign-body-policy|dev-sovereign-body-policy-check.sh|Sovereign body autonomy for body-internal capability governance"
   "sovereign-command-execute|dev-sovereign-command-execute-check.sh|Sovereign body execution of allowlisted system commands"
   "sovereign-command-chain|dev-sovereign-command-chain-check.sh|Sovereign body command chains with persisted transcripts"
+  "sovereign-command-branch|dev-sovereign-command-branch-check.sh|Sovereign body command branching from previous transcripts"
   "approval|dev-approval-check.sh|Approval inbox, user decisions, and operator approval gate"
   "capability|dev-capability-check.sh|Body capability registry, risks, health, and approval boundaries"
   "capability-planner|dev-capability-planner-check.sh|Capability-aware planning with risk and governance metadata"

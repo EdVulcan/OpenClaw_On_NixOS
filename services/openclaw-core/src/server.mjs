@@ -252,6 +252,7 @@ function normalisePlanActions(actions) {
       kind: typeof action.kind === "string" && action.kind.trim() ? action.kind.trim() : "mouse.click",
       intent: typeof action.intent === "string" && action.intent.trim() ? action.intent.trim() : null,
       params: action.params && typeof action.params === "object" ? action.params : {},
+      when: action.when && typeof action.when === "object" ? action.when : null,
     }));
 }
 
@@ -378,6 +379,7 @@ function buildRulePlan({ goal, targetUrl, actions, type, intent, policy }) {
     title: `Perform ${action.kind}`,
     status: "pending",
     params: action.params,
+    when: action.when,
   }));
 
   const steps = [
@@ -1949,6 +1951,54 @@ function buildCommandTranscriptEntry(step, response) {
   };
 }
 
+function latestExecutedCommandTranscriptEntry(commandTranscript) {
+  return commandTranscript
+    .slice()
+    .reverse()
+    .find((entry) => entry.capabilityId === "act.system.command.execute" && entry.skipped !== true) ?? null;
+}
+
+function evaluateCommandStepCondition(step, commandTranscript) {
+  const condition = step.when && typeof step.when === "object" ? step.when : null;
+  if (!condition) {
+    return { shouldRun: true, reason: null, condition: null };
+  }
+
+  const previous = latestExecutedCommandTranscriptEntry(commandTranscript);
+  if (!previous) {
+    return { shouldRun: false, reason: "missing_previous_command_result", condition };
+  }
+
+  if (typeof condition.previousStdoutIncludes === "string" && !previous.stdout.includes(condition.previousStdoutIncludes)) {
+    return { shouldRun: false, reason: "previous_stdout_missing_text", condition };
+  }
+  if (typeof condition.previousStdoutNotIncludes === "string" && previous.stdout.includes(condition.previousStdoutNotIncludes)) {
+    return { shouldRun: false, reason: "previous_stdout_contains_text", condition };
+  }
+  if (Number.isInteger(condition.previousExitCode) && previous.exitCode !== condition.previousExitCode) {
+    return { shouldRun: false, reason: "previous_exit_code_mismatch", condition };
+  }
+
+  return { shouldRun: true, reason: null, condition };
+}
+
+function buildSkippedCommandTranscriptEntry(step, conditionResult) {
+  return {
+    stepId: step.id ?? null,
+    actionKind: step.kind ?? null,
+    capabilityId: step.capabilityId ?? null,
+    invocationId: null,
+    command: step.params?.command ?? null,
+    skipped: true,
+    skipReason: conditionResult.reason,
+    condition: conditionResult.condition,
+    exitCode: null,
+    timedOut: false,
+    stdout: "",
+    stderr: "",
+  };
+}
+
 function isTaskPolicyApproved(task) {
   const approval = task?.approval?.requestId ? approvals.get(task.approval.requestId) : null;
   return task?.policy?.decision?.approved === true
@@ -2314,6 +2364,24 @@ async function executeCapabilityPlanTask(task, options = {}) {
   const commandTranscript = [];
   try {
     for (const step of actionSteps) {
+      const conditionResult = evaluateCommandStepCondition(step, commandTranscript);
+      if (!conditionResult.shouldRun) {
+        const transcriptEntry = buildSkippedCommandTranscriptEntry(step, conditionResult);
+        commandTranscript.push(transcriptEntry);
+        await setTaskPhase(task, "acting_on_target", {
+          status: "running",
+          details: {
+            actionKind: step.kind,
+            capabilityId: step.capabilityId,
+            skipped: true,
+            skipReason: conditionResult.reason,
+            condition: conditionResult.condition,
+            executor: "capability-invoke-v1",
+          },
+        });
+        continue;
+      }
+
       const invocation = await invokeCapability(buildCapabilityInvokeBodyFromPlanStep(step, task));
       const response = invocation.response;
       capabilityInvocations.push(response);
