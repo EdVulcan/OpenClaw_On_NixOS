@@ -566,6 +566,52 @@ function buildWorkspaceCommandPlanDraft({ proposalId = null, workspaceId = null,
   };
 }
 
+async function createWorkspaceCommandTask({ proposalId = null, workspaceId = null, scriptName = null, confirm = false } = {}) {
+  if (confirm !== true) {
+    throw new Error("Workspace command task creation requires confirm=true.");
+  }
+
+  const draftEnvelope = buildWorkspaceCommandPlanDraft({ proposalId, workspaceId, scriptName });
+  const draft = draftEnvelope.draft;
+  const task = createTask({
+    goal: draft.goal,
+    type: draft.type,
+    workViewStrategy: "workspace-command",
+    plan: draft.plan,
+    policy: draft.policy.request,
+  }, { skipInitialPolicy: true });
+  task.policy = draft.policy;
+  const approval = createApprovalRequestForTask(task, draft.policy.decision);
+  const reclaimedTasks = supersedeOtherActiveTasks(task.id);
+  reconcileRuntimeState();
+  persistState();
+
+  await publishEvent("task.created", { task: serialiseTask(task), planner: draft.plan?.planner ?? "workspace-command-plan-v0" });
+  await publishTaskApprovalIfPending(task);
+  await publishEvent("task.planned", { task: serialiseTask(task), plan: task.plan });
+  await Promise.all(reclaimedTasks.map((reclaimedTask) => publishEvent("task.phase_changed", {
+    task: serialiseTask(reclaimedTask),
+  })));
+
+  return {
+    registry: "workspace-command-task-v0",
+    mode: "approval-gated",
+    generatedAt: new Date().toISOString(),
+    sourceRegistry: draftEnvelope.registry,
+    proposal: draftEnvelope.proposal,
+    task,
+    approval,
+    governance: {
+      createsTask: true,
+      createsApproval: true,
+      canExecuteWithoutApproval: false,
+      executed: false,
+      requiresExplicitApproval: true,
+      exposesScriptBody: false,
+    },
+  };
+}
+
 function serialiseTask(task) {
   const currentTask = getCurrentTask();
   return {
@@ -2100,7 +2146,7 @@ function ensureTaskPolicy(task, context = {}) {
   return task.policy;
 }
 
-function createTask(body) {
+function createTask(body, options = {}) {
   const goal = typeof body.goal === "string" ? body.goal.trim() : "";
   if (!goal) {
     throw new Error("Task goal is required.");
@@ -2181,7 +2227,9 @@ function createTask(body) {
   };
 
   tasks.set(task.id, task);
-  ensureTaskPolicy(task, { stage: "task.created" });
+  if (options.skipInitialPolicy !== true) {
+    ensureTaskPolicy(task, { stage: "task.created" });
+  }
   persistState();
   return task;
 }
@@ -3694,6 +3742,34 @@ const server = http.createServer(async (req, res) => {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       sendJson(res, 404, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/workspaces/command-proposals/tasks") {
+    try {
+      const body = await readJsonBody(req);
+      const result = await createWorkspaceCommandTask({
+        proposalId: typeof body.proposalId === "string" ? body.proposalId : null,
+        workspaceId: typeof body.workspaceId === "string" ? body.workspaceId : null,
+        scriptName: typeof body.scriptName === "string" ? body.scriptName : null,
+        confirm: body.confirm === true,
+      });
+      sendJson(res, 201, {
+        ok: true,
+        registry: result.registry,
+        mode: result.mode,
+        generatedAt: result.generatedAt,
+        sourceRegistry: result.sourceRegistry,
+        proposal: result.proposal,
+        task: serialiseTask(result.task),
+        approval: serialiseApproval(result.approval),
+        governance: result.governance,
+        summary: buildTaskSummary(),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
     }
     return;
   }

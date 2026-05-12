@@ -409,6 +409,14 @@ npm run dev:openclaw-workspace-command-plan-check:unix
 
 This verifies core can render a plan-only execution draft for a selected workspace command proposal, including command shape and explicit approval governance, without creating tasks, approvals, or command executions.
 
+Run the OpenClaw workspace command task slice directly:
+
+```bash
+npm run dev:openclaw-workspace-command-task-check:unix
+```
+
+This verifies core can materialize a selected workspace command proposal into a queued task with a pending approval, while the operator remains blocked and no command transcript is created before approval.
+
 Stop everything that `dev:up` started:
 
 ```bash
@@ -631,6 +639,7 @@ This is based on real NixOS VM validation:
 - `dev:system-heal-check:unix` covers conservative diagnosis, autofix, and heal history
 - `dev:openclaw-workspace-command-proposals-check:unix` covers proposal-only command shapes for detected OpenClaw workspaces
 - `dev:openclaw-workspace-command-plan-check:unix` covers plan-only execution drafts for selected OpenClaw workspace commands
+- `dev:openclaw-workspace-command-task-check:unix` covers approval-gated task materialization for selected OpenClaw workspace commands
 - direct GNOME/Wayland whole-desktop capture remains inconsistent across:
   - `org.gnome.Shell.Screenshot`
   - `grim`
