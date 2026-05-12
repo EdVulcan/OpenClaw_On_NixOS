@@ -66,6 +66,7 @@
     "dev:observer-workspace-detect-check:unix": "bash ./nix/scripts/dev-observer-workspace-detect-check.sh",
     "dev:observer-workspace-command-proposals-check:unix": "bash ./nix/scripts/dev-observer-workspace-command-proposals-check.sh",
     "dev:observer-workspace-command-plan-check:unix": "bash ./nix/scripts/dev-observer-workspace-command-plan-check.sh",
+    "dev:observer-workspace-command-task-check:unix": "bash ./nix/scripts/dev-observer-workspace-command-task-check.sh",
     "dev:observer-operator-check:unix": "bash ./nix/scripts/dev-observer-operator-check.sh",
     "dev:milestone-check:unix": "bash ./nix/scripts/dev-milestone-check.sh"
   }

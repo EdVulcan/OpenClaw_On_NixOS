@@ -438,6 +438,9 @@ function observerHtml() {
           <div class="metric"><span>Approval</span><span id="workspace-command-plan-approval">required</span></div>
           <div class="metric"><span>Creates Task</span><span id="workspace-command-plan-task">false</span></div>
           <div class="metric"><span>Mode</span><span id="workspace-command-plan-mode">plan-only</span></div>
+          <div class="actions tight">
+            <button id="workspace-command-task-button" class="secondary">Create Approval Task</button>
+          </div>
           <pre id="workspace-command-plan-json">Loading workspace command plan draft...</pre>
         </section>
         <section class="panel">
@@ -687,6 +690,7 @@ const workspaceCommandPlanApproval = document.querySelector("#workspace-command-
 const workspaceCommandPlanTask = document.querySelector("#workspace-command-plan-task");
 const workspaceCommandPlanMode = document.querySelector("#workspace-command-plan-mode");
 const workspaceCommandPlanJson = document.querySelector("#workspace-command-plan-json");
+const workspaceCommandTaskButton = document.querySelector("#workspace-command-task-button");
 let currentTaskState = null;
 let latestActionState = null;
 let latestHistoryTask = null;
@@ -1897,6 +1901,29 @@ async function createPlannedTask() {
   await refreshOperatorState();
 }
 
+async function createWorkspaceCommandApprovalTask() {
+  const result = await fetchJson(\`\${observerConfig.coreUrl}/workspaces/command-proposals/tasks\`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      proposalId: "openclaw:typecheck",
+      confirm: true,
+    }),
+  });
+
+  taskHistoryFocus = "selected-task";
+  selectedHistoryTaskId = result.task?.id ?? null;
+  taskDetailIdInput.value = result.task?.id ?? "";
+  renderPlanPanel(result.task);
+  setControlMessage(\`Created approval-gated workspace command task \${result.task?.id ?? "unknown"} for openclaw:typecheck.\`);
+  await refreshRuntime();
+  await refreshTaskList();
+  await refreshTaskHistoryDetail();
+  await refreshApprovalState();
+  await refreshOperatorState();
+  await refreshWorkspaceCommandPlanDraft();
+}
+
 async function runOperatorStepFromUi() {
   const result = await fetchJson(\`\${observerConfig.coreUrl}/operator/step\`, {
     method: "POST",
@@ -2413,6 +2440,12 @@ createTaskButton.addEventListener("click", () => {
 
 createPlannedTaskButton.addEventListener("click", () => {
   createPlannedTask().catch((error) => {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  });
+});
+
+workspaceCommandTaskButton.addEventListener("click", () => {
+  createWorkspaceCommandApprovalTask().catch((error) => {
     setControlMessage(\`Request failed: \${formatError(error)}\`);
   });
 });

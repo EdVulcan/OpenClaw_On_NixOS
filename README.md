@@ -273,6 +273,14 @@ npm run dev:observer-workspace-command-plan-check:unix
 
 This verifies Observer surfaces the plan-only execution draft for the default workspace command proposal, including command shape, approval gate, and inert governance flags without creating tasks or approvals.
 
+Run the observer OpenClaw workspace command task slice directly:
+
+```bash
+npm run dev:observer-workspace-command-task-check:unix
+```
+
+This verifies Observer can create an approval-gated workspace command task from the default proposal while preserving the explicit approval gate and avoiding command execution before approval.
+
 Run the approval inbox slice directly:
 
 ```bash
@@ -627,6 +635,7 @@ This is based on real NixOS VM validation:
 - `dev:observer-workspace-detect-check:unix` covers Observer visibility for read-only OpenClaw workspace detection
 - `dev:observer-workspace-command-proposals-check:unix` covers Observer visibility for OpenClaw workspace command proposals
 - `dev:observer-workspace-command-plan-check:unix` covers Observer visibility for OpenClaw workspace command plan drafts
+- `dev:observer-workspace-command-task-check:unix` covers Observer controls for approval-gated OpenClaw workspace command tasks
 - `dev:capability-planner-check:unix` covers capability-aware plan metadata and approval-gated body capabilities
 - `dev:capability-invoke-check:unix` covers policy-governed capability invocation through core
 - `dev:capability-history-check:unix` covers persistent capability invocation history and restart recovery
