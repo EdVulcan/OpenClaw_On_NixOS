@@ -489,6 +489,14 @@ npm run dev:openclaw-workspace-command-denial-check:unix
 
 This verifies denying a workspace command approval fails the queued task without executing the command, creating command transcripts, or invoking the command capability.
 
+Run the OpenClaw workspace command denial recovery slice directly:
+
+```bash
+npm run dev:openclaw-workspace-command-denial-recovery-check:unix
+```
+
+This verifies a denied workspace command can only recover into a fresh approval-gated task, does not execute during recovery, and executes only after the new approval.
+
 Run the OpenClaw workspace command recovery slice directly:
 
 ```bash
@@ -737,6 +745,7 @@ This is based on real NixOS VM validation:
 - `dev:openclaw-workspace-command-execute-check:unix` covers approved execution of allowlisted OpenClaw workspace commands
 - `dev:openclaw-workspace-command-failure-check:unix` covers failure capture for approved OpenClaw workspace commands
 - `dev:openclaw-workspace-command-denial-check:unix` covers denial safety for approval-gated OpenClaw workspace commands
+- `dev:openclaw-workspace-command-denial-recovery-check:unix` covers recovery of denied OpenClaw workspace commands behind a fresh approval gate
 - `dev:openclaw-workspace-command-recovery-check:unix` covers recovery of failed OpenClaw workspace commands behind a fresh approval gate
 - `dev:openclaw-workspace-command-recovery-persistence-check:unix` covers restart persistence for recovered OpenClaw workspace command chains
 - direct GNOME/Wayland whole-desktop capture remains inconsistent across:
