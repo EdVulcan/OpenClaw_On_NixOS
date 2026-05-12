@@ -1,7 +1,7 @@
 import http from "node:http";
 import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
-import { existsSync, readdirSync, statfsSync, statSync } from "node:fs";
+import { existsSync, readdirSync, statfsSync, statSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -22,6 +22,7 @@ const serviceTimeoutMs = Number.parseInt(process.env.OPENCLAW_SYSTEM_SERVICE_TIM
 const maxFileListLimit = Number.parseInt(process.env.OPENCLAW_SYSTEM_FILE_LIST_LIMIT ?? "100", 10);
 const maxSearchLimit = Number.parseInt(process.env.OPENCLAW_SYSTEM_FILE_SEARCH_LIMIT ?? "100", 10);
 const maxSearchDepth = Number.parseInt(process.env.OPENCLAW_SYSTEM_FILE_SEARCH_DEPTH ?? "4", 10);
+const maxFileWriteBytes = Number.parseInt(process.env.OPENCLAW_SYSTEM_FILE_WRITE_LIMIT ?? "65536", 10);
 const commandAllowlist = (process.env.OPENCLAW_SYSTEM_COMMAND_ALLOWLIST ?? "echo,printf,pwd,whoami,ls,cat,head,tail,wc,find,grep,rg")
   .split(",")
   .map((command) => command.trim())
@@ -266,6 +267,66 @@ function searchFiles(inputPath, query, limit) {
     count: results.length,
     limit: safeLimit,
     maxDepth: maxSearchDepth,
+  };
+}
+
+function writeTextFile(body = {}) {
+  const targetPath = typeof body.path === "string" && body.path.trim()
+    ? body.path.trim()
+    : null;
+  if (!targetPath) {
+    const error = new Error("File path is required for write-text.");
+    error.code = "FILE_PATH_REQUIRED";
+    throw error;
+  }
+
+  const content = typeof body.content === "string" ? body.content : "";
+  const encoding = typeof body.encoding === "string" && body.encoding.trim() ? body.encoding.trim() : "utf8";
+  if (encoding !== "utf8") {
+    const error = new Error("Only utf8 text writes are supported.");
+    error.code = "UNSUPPORTED_ENCODING";
+    throw error;
+  }
+
+  const contentBytes = Buffer.byteLength(content, "utf8");
+  if (contentBytes > maxFileWriteBytes) {
+    const error = new Error("Text write exceeds OpenClaw file write limit.");
+    error.code = "FILE_WRITE_LIMIT_EXCEEDED";
+    error.details = { contentBytes, maxFileWriteBytes };
+    throw error;
+  }
+
+  const resolved = resolveAllowedPath(targetPath);
+  const parentPath = path.dirname(resolved.path);
+  resolveAllowedPath(parentPath);
+  if (!existsSync(parentPath) || !statSync(parentPath).isDirectory()) {
+    const error = new Error("Parent directory must exist inside allowed roots.");
+    error.code = "PARENT_DIRECTORY_NOT_FOUND";
+    error.details = { parentPath };
+    throw error;
+  }
+
+  const existedBefore = existsSync(resolved.path);
+  if (existedBefore && statSync(resolved.path).isDirectory()) {
+    const error = new Error("Cannot write text over a directory.");
+    error.code = "TARGET_IS_DIRECTORY";
+    throw error;
+  }
+  if (existedBefore && body.overwrite === false) {
+    const error = new Error("Target file exists and overwrite is disabled.");
+    error.code = "TARGET_EXISTS";
+    throw error;
+  }
+
+  writeFileSync(resolved.path, content, { encoding });
+  const metadata = buildFileMetadata(resolved.path);
+  return {
+    ...resolved,
+    mode: "write_text",
+    contentBytes,
+    encoding,
+    overwrite: existedBefore,
+    metadata,
   };
 }
 
@@ -778,6 +839,27 @@ const server = http.createServer(async (req, res) => {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       sendJson(res, 400, { ok: false, error: message, details: error.details ?? null });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/system/files/write-text") {
+    try {
+      const body = await readJsonBody(req);
+      const result = writeTextFile(body);
+      await publishEvent("system.files.written", {
+        path: result.path,
+        contentBytes: result.contentBytes,
+        overwrite: result.overwrite,
+      });
+      sendJson(res, 200, {
+        ok: true,
+        allowedRoots,
+        ...result,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message, code: error.code ?? null, details: error.details ?? null });
     }
     return;
   }

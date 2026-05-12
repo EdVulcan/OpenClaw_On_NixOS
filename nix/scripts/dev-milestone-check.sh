@@ -23,6 +23,7 @@ checks=(
   "sovereign-command-branch|dev-sovereign-command-branch-check.sh|Sovereign body command branching from previous transcripts"
   "sovereign-command-recovery|dev-sovereign-command-recovery-check.sh|Sovereign body command recovery from non-zero exit codes"
   "sovereign-command-ledger|dev-sovereign-command-ledger-check.sh|Sovereign body command transcript ledger and restart recovery"
+  "sovereign-filesystem-write|dev-sovereign-filesystem-write-check.sh|Sovereign body bounded filesystem text writes"
   "approval|dev-approval-check.sh|Approval inbox, user decisions, and operator approval gate"
   "capability|dev-capability-check.sh|Body capability registry, risks, health, and approval boundaries"
   "capability-planner|dev-capability-planner-check.sh|Capability-aware planning with risk and governance metadata"

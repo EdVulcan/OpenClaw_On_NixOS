@@ -291,6 +291,9 @@ function resolvePlanCapabilityId({ kind, intent, plannerIntent }) {
   if (directMap[candidate]) {
     return directMap[candidate];
   }
+  if (candidate === "filesystem.write" || candidate === "filesystem.write_text" || candidate === "filesystem.write-text") {
+    return "act.filesystem.write_text";
+  }
   if (candidate.startsWith("filesystem.")) {
     return "sense.filesystem.read";
   }
@@ -799,6 +802,19 @@ function baseCapabilities() {
       description: "Read file metadata, list allowed directories, and search filenames inside configured body roots.",
     },
     {
+      id: "act.filesystem.write_text",
+      name: "Filesystem Text Write",
+      kind: "actuator",
+      service: "openclaw-system-sense",
+      endpoint: `${systemSenseUrl}/system/files/write-text`,
+      intents: ["filesystem.write", "filesystem.write_text", "filesystem.write-text"],
+      domains: ["body_internal"],
+      risk: "high",
+      governance: "require_approval",
+      requiresApproval: true,
+      description: "Write bounded UTF-8 text files inside configured body roots with audit and policy governance.",
+    },
+    {
       id: "sense.process.list",
       name: "Process List Sense",
       kind: "sensor",
@@ -1106,6 +1122,13 @@ async function callCapabilityBackend(capability, request) {
     }));
   }
 
+  if (capability.id === "act.filesystem.write_text") {
+    return postJson(`${systemSenseUrl}/system/files/write-text`, {
+      ...request.params,
+      intent: request.intent ?? "filesystem.write",
+    });
+  }
+
   if (capability.id === "sense.process.list") {
     return fetchJson(buildSystemSenseUrl("/system/processes", {
       query: request.params.query ?? request.params.q,
@@ -1145,6 +1168,15 @@ function summariseCapabilityInvocationResult(capability, result) {
       ok: result?.ok === true,
       count: result?.count ?? (result?.metadata ? 1 : 0),
       path: result?.path ?? null,
+    };
+  }
+  if (capability.id === "act.filesystem.write_text") {
+    return {
+      kind: "filesystem.write_text",
+      ok: result?.ok === true,
+      path: result?.path ?? null,
+      contentBytes: result?.contentBytes ?? null,
+      overwrite: result?.overwrite ?? null,
     };
   }
   if (capability.id === "sense.process.list") {
@@ -1200,6 +1232,7 @@ function recordCapabilityInvocation({ capability, request, policy, invoked, bloc
       approved: request.approved === true,
       command: typeof request.params?.command === "string" ? request.params.command : null,
       cwd: typeof request.params?.cwd === "string" ? request.params.cwd : typeof request.params?.workingDirectory === "string" ? request.params.workingDirectory : null,
+      path: typeof request.params?.path === "string" ? request.params.path : null,
     },
     policy: {
       id: policy.id,
@@ -1891,6 +1924,7 @@ function normaliseExecutorActions(actions) {
 const OPERATOR_INVOKABLE_CAPABILITIES = new Set([
   "sense.system.vitals",
   "sense.filesystem.read",
+  "act.filesystem.write_text",
   "sense.process.list",
   "act.system.command.dry_run",
   "act.system.command.execute",
