@@ -14,6 +14,7 @@ const systemSenseUrl = process.env.OPENCLAW_SYSTEM_SENSE_URL ?? "http://127.0.0.
 const systemHealUrl = process.env.OPENCLAW_SYSTEM_HEAL_URL ?? "http://127.0.0.1:4107";
 const stateFilePath = process.env.OPENCLAW_CORE_STATE_FILE
   ?? path.resolve(process.cwd(), "../../.artifacts/openclaw-core-state.json");
+const autonomyMode = normaliseAutonomyMode(process.env.OPENCLAW_AUTONOMY_MODE);
 
 const tasks = new Map();
 const approvals = new Map();
@@ -55,6 +56,14 @@ const STATUS_PRIORITY = {
   completed: 4,
   superseded: 5,
 };
+
+function normaliseAutonomyMode(value) {
+  const mode = typeof value === "string" && value.trim() ? value.trim() : "guardian";
+  if (["guardian", "sovereign_body", "full_autonomy"].includes(mode)) {
+    return mode;
+  }
+  return "guardian";
+}
 
 function corsHeaders(extraHeaders = {}) {
   return {
@@ -1157,6 +1166,8 @@ function recordCapabilityInvocation({ capability, request, policy, invoked, bloc
       risk: policy.risk,
       reason: policy.reason,
       approved: policy.approved,
+      autonomyMode: policy.autonomyMode,
+      autonomous: policy.autonomous === true,
     },
     invoked: invoked === true,
     blocked: blocked === true,
@@ -1420,6 +1431,8 @@ function evaluatePolicyIntent(input = {}, context = {}) {
   const approved = policy.approved === true || input.approved === true || context.approved === true;
   const requiresApproval = policy.requiresApproval === true || input.requiresApproval === true;
   const auditRequired = domain !== "user_task" || risk !== "low" || policy.audit === true || input.audit === true;
+  const bodyAutonomyAllowed = autonomyMode !== "guardian" && domain === "body_internal";
+  const crossBoundaryAutonomyAllowed = autonomyMode === "full_autonomy" && domain === "cross_boundary";
 
   let decision = "allow";
   let reason = "within_user_task_boundary";
@@ -1427,15 +1440,21 @@ function evaluatePolicyIntent(input = {}, context = {}) {
   if (DENIED_INTENTS.has(intent) || policy.deny === true || input.deny === true) {
     decision = "deny";
     reason = "absolute_boundary";
-  } else if (domain === "cross_boundary" && !approved) {
+  } else if (domain === "cross_boundary" && !approved && !crossBoundaryAutonomyAllowed) {
     decision = "require_approval";
     reason = "cross_boundary_requires_user_approval";
-  } else if (requiresApproval && !approved) {
+  } else if (requiresApproval && !approved && !bodyAutonomyAllowed && !crossBoundaryAutonomyAllowed) {
     decision = "require_approval";
     reason = "approval_required";
   } else if (auditRequired) {
     decision = "audit_only";
-    reason = approved ? "approved_and_audited" : "body_internal_audit";
+    reason = approved
+      ? "approved_and_audited"
+      : requiresApproval && bodyAutonomyAllowed
+        ? "body_sovereignty_autonomy"
+        : requiresApproval && crossBoundaryAutonomyAllowed
+          ? "full_autonomy_audit"
+          : "body_internal_audit";
   }
 
   const now = new Date().toISOString();
@@ -1456,6 +1475,8 @@ function evaluatePolicyIntent(input = {}, context = {}) {
     decision,
     reason,
     approved,
+    autonomyMode,
+    autonomous: (requiresApproval && !approved && (bodyAutonomyAllowed || crossBoundaryAutonomyAllowed)) === true,
     auditRequired,
     tags,
   };
@@ -1478,10 +1499,13 @@ function buildPolicyState() {
   return {
     engine: "policy-v0",
     mode: "local-rule-governance",
+    autonomyMode,
     rules: {
       bodyInternalDefault: "allow_with_audit",
       userTaskDefault: "allow",
       crossBoundaryDefault: "require_approval",
+      bodyInternalAutonomy: autonomyMode === "guardian" ? "approval_gated" : "autonomous_with_audit",
+      crossBoundaryAutonomy: autonomyMode === "full_autonomy" ? "autonomous_with_audit" : "approval_gated",
       deniedIntents: [...DENIED_INTENTS],
       crossBoundaryIntents: [...CROSS_BOUNDARY_INTENTS],
     },
@@ -2638,6 +2662,7 @@ const server = http.createServer(async (req, res) => {
       systemSenseUrl,
       systemHealUrl,
       stateFilePath,
+      autonomyMode,
     });
     return;
   }

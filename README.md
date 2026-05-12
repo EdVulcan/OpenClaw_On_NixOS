@@ -121,6 +121,14 @@ npm run dev:policy-check:unix
 
 This verifies body-internal actions, ordinary user tasks, cross-boundary approval gates, denial boundaries, audit history, and the operator execution gate.
 
+Run the sovereign body policy slice directly:
+
+```bash
+npm run dev:sovereign-body-policy-check:unix
+```
+
+This verifies `OPENCLAW_AUTONOMY_MODE=sovereign_body`, where body-internal high-risk capability actions run autonomously with audit while cross-boundary and absolute-deny policies remain gated.
+
 Run the approval inbox slice directly:
 
 ```bash
@@ -427,6 +435,7 @@ This is based on real NixOS VM validation:
 - `dev:milestone-check:unix` is the preferred mainline regression suite
 - `dev:operator-control-check:unix` covers operator dry-run, pause gating, and resume
 - `dev:policy-check:unix` covers the first policy governance and cross-boundary gate
+- `dev:sovereign-body-policy-check:unix` covers body-internal autonomy under `OPENCLAW_AUTONOMY_MODE=sovereign_body`
 - `dev:capability-planner-check:unix` covers capability-aware plan metadata and approval-gated body capabilities
 - `dev:capability-invoke-check:unix` covers policy-governed capability invocation through core
 - `dev:capability-history-check:unix` covers persistent capability invocation history and restart recovery
