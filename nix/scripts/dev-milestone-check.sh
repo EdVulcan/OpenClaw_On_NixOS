@@ -23,6 +23,7 @@ checks=(
   "sovereign-command-branch|dev-sovereign-command-branch-check.sh|Sovereign body command branching from previous transcripts"
   "sovereign-command-recovery|dev-sovereign-command-recovery-check.sh|Sovereign body command recovery from non-zero exit codes"
   "sovereign-command-ledger|dev-sovereign-command-ledger-check.sh|Sovereign body command transcript ledger and restart recovery"
+  "sovereign-maintenance|dev-sovereign-maintenance-check.sh|Sovereign body autonomous maintenance through conservative heal runs"
   "sovereign-filesystem-write|dev-sovereign-filesystem-write-check.sh|Sovereign body bounded filesystem text writes"
   "sovereign-filesystem-workspace|dev-sovereign-filesystem-workspace-check.sh|Sovereign body filesystem workspace creation chain"
   "sovereign-filesystem-append|dev-sovereign-filesystem-append-check.sh|Sovereign body bounded filesystem text appends"

@@ -1439,11 +1439,11 @@ function baseCapabilities() {
       kind: "actuator",
       service: "openclaw-system-heal",
       endpoint: `${systemHealUrl}/heal/state`,
-      intents: ["heal.diagnose", "heal.restart-service", "system.repair"],
+      intents: ["heal.diagnose", "heal.autofix", "heal.maintenance", "heal.restart-service", "system.repair"],
       domains: ["body_internal"],
       risk: "medium",
       governance: "audit_only",
-      description: "Diagnose body health and execute conservative simulated repairs.",
+      description: "Diagnose body health, run conservative maintenance, and execute simulated repairs.",
     },
     {
       id: "govern.policy.evaluate",
@@ -1704,6 +1704,20 @@ async function callCapabilityBackend(capability, request) {
     });
   }
 
+  if (capability.id === "act.system.heal") {
+    const operation = request.operation ?? request.params.operation ?? request.intent ?? "heal.autofix";
+    if (operation === "heal.diagnose" || operation === "diagnose") {
+      return postJson(`${systemHealUrl}/heal/diagnose`, request.params);
+    }
+    if (operation === "heal.restart-service" || operation === "restart-service") {
+      return postJson(`${systemHealUrl}/heal/restart-service`, request.params);
+    }
+    if (operation === "heal.maintenance" || operation === "maintenance" || operation === "system.repair") {
+      return postJson(`${systemHealUrl}/maintenance/run`, request.params);
+    }
+    return postJson(`${systemHealUrl}/heal/autofix`, request.params);
+  }
+
   throw new Error(`Capability ${capability.id} is not invokable through core-v0.`);
 }
 
@@ -1809,6 +1823,22 @@ function summariseCapabilityInvocationResult(capability, result) {
       timedOut: result?.execution?.result?.timedOut ?? null,
       stdout: result?.execution?.result?.stdout ?? "",
       stderr: result?.execution?.result?.stderr ?? "",
+    };
+  }
+  if (capability.id === "act.system.heal") {
+    const run = result?.run ?? null;
+    const diagnosis = run?.diagnosis ?? result?.diagnosis ?? null;
+    const executed = run?.executed ?? result?.executed ?? [];
+    const skipped = run?.skipped ?? result?.skipped ?? [];
+    return {
+      kind: run ? "maintenance.run" : "system.heal",
+      ok: result?.ok === true,
+      status: run?.status ?? diagnosis?.status ?? null,
+      diagnosisStatus: diagnosis?.status ?? null,
+      planSteps: diagnosis?.plan?.stepCount ?? 0,
+      executed: Array.isArray(executed) ? executed.length : 0,
+      skipped: Array.isArray(skipped) ? skipped.length : 0,
+      maintenanceRunId: run?.id ?? null,
     };
   }
   return {
@@ -2536,6 +2566,7 @@ const OPERATOR_INVOKABLE_CAPABILITIES = new Set([
   "sense.process.list",
   "act.system.command.dry_run",
   "act.system.command.execute",
+  "act.system.heal",
 ]);
 
 function planCapabilityActionSteps(task) {

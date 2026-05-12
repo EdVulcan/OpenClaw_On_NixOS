@@ -1,13 +1,21 @@
 import http from "node:http";
 import { randomUUID } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import path from "node:path";
 
 const host = process.env.OPENCLAW_SYSTEM_HEAL_HOST ?? "127.0.0.1";
 const port = Number.parseInt(process.env.OPENCLAW_SYSTEM_HEAL_PORT ?? "4107", 10);
 const eventHubUrl = process.env.OPENCLAW_EVENT_HUB_URL ?? "http://127.0.0.1:4101";
 const systemSenseUrl = process.env.OPENCLAW_SYSTEM_SENSE_URL ?? "http://127.0.0.1:4106";
+const stateFilePath = process.env.OPENCLAW_SYSTEM_HEAL_STATE_FILE
+  ?? path.resolve(process.cwd(), "../../.artifacts/openclaw-system-heal-state.json");
 
 const healHistory = [];
+const maintenanceRuns = [];
 let latestDiagnosis = null;
+let latestMaintenanceRun = null;
+const MAX_HEAL_HISTORY = 100;
+const MAX_MAINTENANCE_RUNS = 100;
 
 function corsHeaders(extraHeaders = {}) {
   return {
@@ -60,8 +68,61 @@ async function publishEvent(type, payload = {}) {
 
 function addHistory(entry) {
   healHistory.unshift(entry);
-  while (healHistory.length > 50) {
+  while (healHistory.length > MAX_HEAL_HISTORY) {
     healHistory.pop();
+  }
+  persistState();
+}
+
+function addMaintenanceRun(run) {
+  latestMaintenanceRun = run;
+  maintenanceRuns.unshift(run);
+  while (maintenanceRuns.length > MAX_MAINTENANCE_RUNS) {
+    maintenanceRuns.pop();
+  }
+  persistState();
+}
+
+function persistState() {
+  try {
+    mkdirSync(path.dirname(stateFilePath), { recursive: true });
+    const payload = {
+      version: 1,
+      savedAt: new Date().toISOString(),
+      latestDiagnosis,
+      latestMaintenanceRun,
+      healHistory,
+      maintenanceRuns,
+    };
+    const tempPath = `${stateFilePath}.tmp`;
+    writeFileSync(tempPath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+    renameSync(tempPath, stateFilePath);
+  } catch (error) {
+    console.error("Failed to persist system-heal state:", error);
+  }
+}
+
+function loadPersistentState() {
+  if (!existsSync(stateFilePath)) {
+    return;
+  }
+
+  try {
+    const data = JSON.parse(readFileSync(stateFilePath, "utf8"));
+    latestDiagnosis = data?.latestDiagnosis && typeof data.latestDiagnosis === "object"
+      ? data.latestDiagnosis
+      : null;
+    latestMaintenanceRun = data?.latestMaintenanceRun && typeof data.latestMaintenanceRun === "object"
+      ? data.latestMaintenanceRun
+      : null;
+    if (Array.isArray(data?.healHistory)) {
+      healHistory.splice(0, healHistory.length, ...data.healHistory.slice(0, MAX_HEAL_HISTORY));
+    }
+    if (Array.isArray(data?.maintenanceRuns)) {
+      maintenanceRuns.splice(0, maintenanceRuns.length, ...data.maintenanceRuns.slice(0, MAX_MAINTENANCE_RUNS));
+    }
+  } catch (error) {
+    console.error("Failed to load persisted system-heal state:", error);
   }
 }
 
@@ -160,6 +221,7 @@ async function buildDiagnosisFromRequest(body = {}) {
     mode: typeof body.mode === "string" && body.mode.trim() ? body.mode.trim() : "simulated",
   });
   latestDiagnosis = diagnosis;
+  persistState();
   return diagnosis;
 }
 
@@ -184,6 +246,69 @@ async function executeHealStep(step) {
   return entry;
 }
 
+function shouldAutofix(body = {}) {
+  return body.autofix !== false && body.autoFix !== false && body.diagnoseOnly !== true;
+}
+
+function summariseMaintenanceStatus(diagnosis, entries, autofix) {
+  if (diagnosis.status === "healthy") {
+    return "healthy";
+  }
+  if (entries.some((entry) => entry.status === "completed")) {
+    return "repaired";
+  }
+  if (!autofix) {
+    return "diagnosed";
+  }
+  return "attention_required";
+}
+
+async function runMaintenance(body = {}) {
+  const startedAt = new Date().toISOString();
+  const autofix = shouldAutofix(body);
+  const diagnosis = await buildDiagnosisFromRequest(body);
+  const entries = [];
+
+  await publishEvent("maintenance.started", {
+    diagnosis,
+    autofix,
+    governance: "body_internal_audit",
+  });
+
+  if (autofix) {
+    const executableSteps = diagnosis.plan.steps.filter((step) => step.kind === "restart-service");
+    const skippedSteps = diagnosis.plan.steps.filter((step) => step.kind !== "restart-service");
+    for (const step of executableSteps) {
+      entries.push(await executeHealStep(step));
+    }
+    for (const step of skippedSteps) {
+      entries.push(await executeHealStep(step));
+    }
+  }
+
+  const run = {
+    id: randomUUID(),
+    engine: "maintenance-v0",
+    status: summariseMaintenanceStatus(diagnosis, entries, autofix),
+    autonomy: {
+      domain: "body_internal",
+      governance: "audit_only",
+      approvalRequired: false,
+      mode: "conservative",
+    },
+    autofix,
+    diagnosis,
+    executed: entries.filter((entry) => entry.status === "completed"),
+    skipped: entries.filter((entry) => entry.status !== "completed"),
+    startedAt,
+    completedAt: new Date().toISOString(),
+  };
+  addMaintenanceRun(run);
+
+  await publishEvent("maintenance.completed", { run });
+  return run;
+}
+
 const server = http.createServer(async (req, res) => {
   const requestUrl = new URL(req.url ?? "/", `http://${req.headers.host ?? `${host}:${port}`}`);
 
@@ -201,6 +326,7 @@ const server = http.createServer(async (req, res) => {
       host,
       port,
       systemSenseUrl,
+      stateFilePath,
     });
     return;
   }
@@ -211,10 +337,14 @@ const server = http.createServer(async (req, res) => {
       engine: "heal-v0",
       mode: "conservative-simulated",
       latestDiagnosis,
+      latestMaintenanceRun,
       historyCount: healHistory.length,
+      maintenanceCount: maintenanceRuns.length,
       capabilities: {
         diagnose: true,
         autoFix: true,
+        maintenance: true,
+        persistentLedger: true,
         restartService: "simulated",
         observeOnlyForHighRisk: true,
       },
@@ -228,6 +358,48 @@ const server = http.createServer(async (req, res) => {
       items: healHistory,
       count: healHistory.length,
     });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/maintenance/state") {
+    sendJson(res, 200, {
+      ok: true,
+      engine: "maintenance-v0",
+      mode: "body-internal-conservative",
+      stateFilePath,
+      latestRun: latestMaintenanceRun,
+      runCount: maintenanceRuns.length,
+      healHistoryCount: healHistory.length,
+    });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/maintenance/history") {
+    const limit = Number.parseInt(requestUrl.searchParams.get("limit") ?? "20", 10);
+    const safeLimit = Number.isNaN(limit) ? 20 : Math.max(1, Math.min(limit, 100));
+    sendJson(res, 200, {
+      ok: true,
+      items: maintenanceRuns.slice(0, safeLimit),
+      count: maintenanceRuns.length,
+      latestRun: latestMaintenanceRun,
+    });
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/maintenance/run") {
+    try {
+      const body = await readJsonBody(req);
+      const run = await runMaintenance(body);
+      sendJson(res, 200, {
+        ok: true,
+        run,
+        historyCount: healHistory.length,
+        maintenanceCount: maintenanceRuns.length,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
     return;
   }
 
@@ -310,6 +482,8 @@ const server = http.createServer(async (req, res) => {
 
   sendJson(res, 404, { ok: false, error: "Route not found." });
 });
+
+loadPersistentState();
 
 server.listen(port, host, async () => {
   console.log(`openclaw-system-heal listening on http://${host}:${port}`);

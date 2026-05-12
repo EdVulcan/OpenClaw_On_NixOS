@@ -111,6 +111,7 @@ let
     OPENCLAW_SYSTEM_SENSE_URL = urlFor cfg.ports.systemSense;
     OPENCLAW_SYSTEM_HEAL_URL = urlFor cfg.ports.systemHeal;
     OPENCLAW_CORE_STATE_FILE = "${cfg.stateDir}/openclaw-core-state.json";
+    OPENCLAW_SYSTEM_HEAL_STATE_FILE = "${cfg.stateDir}/openclaw-system-heal-state.json";
     OPENCLAW_EVENT_LOG_FILE = "${cfg.stateDir}/openclaw-events.jsonl";
   };
 
