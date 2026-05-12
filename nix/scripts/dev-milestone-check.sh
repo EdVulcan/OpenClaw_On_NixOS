@@ -27,6 +27,7 @@ checks=(
   "sovereign-filesystem-workspace|dev-sovereign-filesystem-workspace-check.sh|Sovereign body filesystem workspace creation chain"
   "sovereign-filesystem-ledger|dev-sovereign-filesystem-ledger-check.sh|Sovereign body filesystem change ledger and restart recovery"
   "sovereign-filesystem-read-text|dev-sovereign-filesystem-read-text-check.sh|Sovereign body bounded filesystem text readback"
+  "sovereign-filesystem-read-ledger|dev-sovereign-filesystem-read-ledger-check.sh|Sovereign body filesystem read access ledger and restart recovery"
   "approval|dev-approval-check.sh|Approval inbox, user decisions, and operator approval gate"
   "capability|dev-capability-check.sh|Body capability registry, risks, health, and approval boundaries"
   "capability-planner|dev-capability-planner-check.sh|Capability-aware planning with risk and governance metadata"

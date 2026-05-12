@@ -201,6 +201,14 @@ npm run dev:sovereign-filesystem-read-text-check:unix
 
 This verifies `sense.filesystem.read` can read bounded UTF-8 text through governed body sense after autonomous mkdir/write chains while rejecting paths outside allowed roots.
 
+Run the sovereign filesystem read ledger slice directly:
+
+```bash
+npm run dev:sovereign-filesystem-read-ledger-check:unix
+```
+
+This verifies `/filesystem/reads` and `/filesystem/reads/summary` expose metadata/list/search/read-text access records without leaking file content and survive core restart recovery.
+
 Run the observer command transcript slice directly:
 
 ```bash

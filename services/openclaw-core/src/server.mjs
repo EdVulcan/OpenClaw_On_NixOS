@@ -1183,6 +1183,22 @@ async function callCapabilityBackend(capability, request) {
   throw new Error(`Capability ${capability.id} is not invokable through core-v0.`);
 }
 
+function requestOperationFromResult(result) {
+  if (result?.mode === "read_text") {
+    return "read_text";
+  }
+  if (result?.metadata) {
+    return "metadata";
+  }
+  if (Array.isArray(result?.results)) {
+    return "search";
+  }
+  if (Array.isArray(result?.entries)) {
+    return "list";
+  }
+  return "read";
+}
+
 function summariseCapabilityInvocationResult(capability, result) {
   if (capability.id === "sense.system.vitals") {
     return {
@@ -1193,6 +1209,9 @@ function summariseCapabilityInvocationResult(capability, result) {
     };
   }
   if (capability.id === "sense.filesystem.read") {
+    const operation = result?.mode === "read_text"
+      ? "read_text"
+      : requestOperationFromResult(result);
     if (result?.mode === "read_text") {
       return {
         kind: "filesystem.read_text",
@@ -1200,6 +1219,7 @@ function summariseCapabilityInvocationResult(capability, result) {
         path: result?.path ?? null,
         contentBytes: result?.contentBytes ?? null,
         encoding: result?.encoding ?? null,
+        operation,
       };
     }
     return {
@@ -1207,6 +1227,7 @@ function summariseCapabilityInvocationResult(capability, result) {
       ok: result?.ok === true,
       count: result?.count ?? (result?.metadata ? 1 : 0),
       path: result?.path ?? null,
+      operation,
     };
   }
   if (capability.id === "act.filesystem.write_text") {
@@ -2269,6 +2290,76 @@ function serialiseFilesystemChangeSummary(summary) {
   };
 }
 
+function classifyFilesystemRead(entry) {
+  const requestedOperation = entry.request?.operation ?? null;
+  if (requestedOperation === "read-text") {
+    return "read_text";
+  }
+  return entry.summary?.operation ?? requestedOperation ?? "read";
+}
+
+function buildFilesystemReadRecords() {
+  return capabilityInvocationLog
+    .filter((entry) => entry.invoked === true && entry.blocked !== true && entry.capability?.id === "sense.filesystem.read")
+    .map((entry) => ({
+      id: entry.id,
+      at: entry.at,
+      taskId: entry.request?.taskId ?? null,
+      capabilityId: entry.capability?.id ?? null,
+      operation: classifyFilesystemRead(entry),
+      path: entry.summary?.path ?? entry.request?.path ?? null,
+      count: entry.summary?.count ?? null,
+      contentBytes: entry.summary?.contentBytes ?? null,
+      encoding: entry.summary?.encoding ?? null,
+      policy: entry.policy ?? null,
+      summary: entry.summary ?? null,
+    }))
+    .sort((left, right) => String(right.at).localeCompare(String(left.at)));
+}
+
+function listFilesystemReadRecords({ limit = 20 } = {}) {
+  const safeLimit = Math.max(1, Math.min(Number.isInteger(limit) ? limit : 20, 100));
+  return buildFilesystemReadRecords().slice(0, safeLimit);
+}
+
+function buildFilesystemReadSummary() {
+  return buildFilesystemReadRecords().reduce((summary, record) => {
+    summary.total += 1;
+    summary[record.operation] = (summary[record.operation] ?? 0) + 1;
+    if (record.taskId) {
+      summary.taskIds.add(record.taskId);
+    }
+    const capabilityId = record.capabilityId ?? "unknown";
+    summary.byCapability[capabilityId] = (summary.byCapability[capabilityId] ?? 0) + 1;
+    const decision = record.policy?.decision ?? "unknown";
+    summary.byPolicy[decision] = (summary.byPolicy[decision] ?? 0) + 1;
+    if (!summary.latestAt || String(record.at).localeCompare(summary.latestAt) > 0) {
+      summary.latestAt = record.at;
+    }
+    return summary;
+  }, {
+    total: 0,
+    metadata: 0,
+    list: 0,
+    search: 0,
+    read_text: 0,
+    read: 0,
+    taskIds: new Set(),
+    taskCount: 0,
+    latestAt: null,
+    byCapability: {},
+    byPolicy: {},
+  });
+}
+
+function serialiseFilesystemReadSummary(summary) {
+  return {
+    ...summary,
+    taskIds: [...summary.taskIds],
+    taskCount: summary.taskIds.size,
+  };
+}
+
 function isTaskPolicyApproved(task) {
   const approval = task?.approval?.requestId ? approvals.get(task.approval.requestId) : null;
   return task?.policy?.decision?.approved === true
@@ -3246,6 +3337,27 @@ const server = http.createServer(async (req, res) => {
     sendJson(res, 200, {
       ok: true,
       summary: serialiseFilesystemChangeSummary(buildFilesystemChangeSummary()),
+    });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/filesystem/reads") {
+    const limit = Number.parseInt(requestUrl.searchParams.get("limit") ?? "20", 10);
+    const safeLimit = Number.isNaN(limit) ? 20 : Math.max(1, Math.min(limit, 100));
+    const items = listFilesystemReadRecords({ limit: safeLimit });
+    sendJson(res, 200, {
+      ok: true,
+      count: items.length,
+      items,
+      summary: serialiseFilesystemReadSummary(buildFilesystemReadSummary()),
+    });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/filesystem/reads/summary") {
+    sendJson(res, 200, {
+      ok: true,
+      summary: serialiseFilesystemReadSummary(buildFilesystemReadSummary()),
     });
     return;
   }
