@@ -53,6 +53,7 @@
     "dev:system-sense-check:unix": "bash ./nix/scripts/dev-system-sense-check.sh",
     "dev:system-heal-check:unix": "bash ./nix/scripts/dev-system-heal-check.sh",
     "dev:openclaw-workspace-detect-check:unix": "bash ./nix/scripts/dev-openclaw-workspace-detect-check.sh",
+    "dev:openclaw-workspace-command-proposals-check:unix": "bash ./nix/scripts/dev-openclaw-workspace-command-proposals-check.sh",
     "dev:observer-capability-plan-check:unix": "bash ./nix/scripts/dev-observer-capability-plan-check.sh",
     "dev:observer-capability-invoke-check:unix": "bash ./nix/scripts/dev-observer-capability-invoke-check.sh",
     "dev:observer-capability-history-check:unix": "bash ./nix/scripts/dev-observer-capability-history-check.sh",

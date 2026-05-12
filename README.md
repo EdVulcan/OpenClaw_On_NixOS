@@ -377,6 +377,14 @@ npm run dev:openclaw-workspace-detect-check:unix
 
 This verifies core can build a read-only profile for configured OpenClaw workspaces, including package metadata, scripts, workspace globs, markers, and governance flags, without reading file contents, mutating files, or executing commands.
 
+Run the OpenClaw workspace command proposal slice directly:
+
+```bash
+npm run dev:openclaw-workspace-command-proposals-check:unix
+```
+
+This verifies core can derive proposal-only `pnpm run <script>` command shapes from detected OpenClaw workspace scripts without exposing script bodies or executing commands.
+
 Stop everything that `dev:up` started:
 
 ```bash
@@ -595,6 +603,7 @@ This is based on real NixOS VM validation:
 - `dev:observer-capability-history-check:unix` covers Observer visibility for persistent capability invocation history
 - `dev:system-sense-check:unix` covers real body vitals and service health telemetry
 - `dev:system-heal-check:unix` covers conservative diagnosis, autofix, and heal history
+- `dev:openclaw-workspace-command-proposals-check:unix` covers proposal-only command shapes for detected OpenClaw workspaces
 - direct GNOME/Wayland whole-desktop capture remains inconsistent across:
   - `org.gnome.Shell.Screenshot`
   - `grim`

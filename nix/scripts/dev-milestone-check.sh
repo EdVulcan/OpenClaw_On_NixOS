@@ -41,6 +41,7 @@ checks=(
   "system-sense|dev-system-sense-check.sh|Real body vitals, service latency, resources, and alerts"
   "system-heal|dev-system-heal-check.sh|Conservative diagnosis, repair plan, autofix, and heal history"
   "openclaw-workspace-detect|dev-openclaw-workspace-detect-check.sh|Read-only detection of configured OpenClaw workspaces"
+  "openclaw-workspace-command-proposals|dev-openclaw-workspace-command-proposals-check.sh|Proposal-only command shapes for detected OpenClaw workspaces"
   "observer-capability-plan|dev-observer-capability-plan-check.sh|Observer visibility for capability-aware plan metadata"
   "observer-capability-invoke|dev-observer-capability-invoke-check.sh|Observer controls for policy-governed capability invocation"
   "observer-capability-history|dev-observer-capability-history-check.sh|Observer visibility for persistent capability invocation history"

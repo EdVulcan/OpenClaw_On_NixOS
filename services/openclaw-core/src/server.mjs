@@ -352,6 +352,125 @@ function buildWorkspaceRegistry() {
   };
 }
 
+const WORKSPACE_COMMAND_SCRIPT_ORDER = [
+  "typecheck",
+  "test",
+  "lint",
+  "build",
+  "dev",
+];
+
+function workspaceScriptCategory(scriptName) {
+  if (scriptName === "typecheck" || scriptName === "test" || scriptName === "lint") {
+    return "validation";
+  }
+  if (scriptName === "build") {
+    return "build";
+  }
+  if (scriptName === "dev" || scriptName === "start") {
+    return "runtime";
+  }
+  return "script";
+}
+
+function workspacePackageManagerCommand(packageManager) {
+  if (packageManager === "pnpm") {
+    return "pnpm";
+  }
+  if (packageManager === "yarn") {
+    return "yarn";
+  }
+  if (packageManager === "bun") {
+    return "bun";
+  }
+  return "npm";
+}
+
+function workspaceScriptArgs(packageManager, scriptName) {
+  if (packageManager === "yarn") {
+    return ["run", scriptName];
+  }
+  if (packageManager === "bun") {
+    return ["run", scriptName];
+  }
+  return ["run", scriptName];
+}
+
+function workspaceScriptRisk(scriptName) {
+  return scriptName === "dev" || scriptName === "start" ? "medium" : "low";
+}
+
+function buildWorkspaceCommandProposals() {
+  const registry = buildWorkspaceRegistry();
+  const items = registry.items
+    .filter((workspace) => workspace.kind === "node_workspace" && workspace.exists && workspace.readable)
+    .flatMap((workspace) => {
+      const orderedScripts = [...workspace.scripts]
+        .sort((left, right) => {
+          const leftIndex = WORKSPACE_COMMAND_SCRIPT_ORDER.indexOf(left);
+          const rightIndex = WORKSPACE_COMMAND_SCRIPT_ORDER.indexOf(right);
+          if (leftIndex !== -1 || rightIndex !== -1) {
+            return (leftIndex === -1 ? 999 : leftIndex) - (rightIndex === -1 ? 999 : rightIndex);
+          }
+          return left.localeCompare(right);
+        });
+      return orderedScripts.map((scriptName) => {
+        const command = workspacePackageManagerCommand(workspace.packageManager);
+        return {
+          id: `${workspace.id}:${scriptName}`,
+          workspaceId: workspace.id,
+          workspaceName: workspace.name,
+          workspacePath: workspace.path,
+          scriptName,
+          category: workspaceScriptCategory(scriptName),
+          packageManager: workspace.packageManager ?? "npm",
+          command,
+          args: workspaceScriptArgs(workspace.packageManager, scriptName),
+          cwd: workspace.path,
+          usesShell: false,
+          risk: workspaceScriptRisk(scriptName),
+          status: "proposed",
+          governance: {
+            mode: "proposal_only",
+            canExecute: false,
+            requiresExplicitExecutionApproval: true,
+            exposesScriptBody: false,
+          },
+        };
+      });
+    });
+
+  return {
+    registry: "workspace-command-proposals-v0",
+    mode: "proposal-only",
+    generatedAt: registry.generatedAt,
+    workspaceRegistry: registry.registry,
+    roots: registry.roots,
+    count: items.length,
+    items,
+    summary: {
+      total: items.length,
+      workspaces: new Set(items.map((item) => item.workspaceId)).size,
+      byWorkspace: items.reduce((accumulator, item) => {
+        accumulator[item.workspaceName] = (accumulator[item.workspaceName] ?? 0) + 1;
+        return accumulator;
+      }, {}),
+      byPackageManager: items.reduce((accumulator, item) => {
+        accumulator[item.packageManager] = (accumulator[item.packageManager] ?? 0) + 1;
+        return accumulator;
+      }, {}),
+      byCategory: items.reduce((accumulator, item) => {
+        accumulator[item.category] = (accumulator[item.category] ?? 0) + 1;
+        return accumulator;
+      }, {}),
+      byRisk: items.reduce((accumulator, item) => {
+        accumulator[item.risk] = (accumulator[item.risk] ?? 0) + 1;
+        return accumulator;
+      }, {}),
+    },
+  };
+}
+
 function serialiseTask(task) {
   const currentTask = getCurrentTask();
   return {
@@ -3441,6 +3560,27 @@ const server = http.createServer(async (req, res) => {
       generatedAt: registry.generatedAt,
       roots: registry.roots,
       summary: registry.summary,
+    });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/workspaces/command-proposals") {
+    sendJson(res, 200, {
+      ok: true,
+      ...buildWorkspaceCommandProposals(),
+    });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/workspaces/command-proposals/summary") {
+    const proposals = buildWorkspaceCommandProposals();
+    sendJson(res, 200, {
+      ok: true,
+      registry: proposals.registry,
+      mode: proposals.mode,
+      generatedAt: proposals.generatedAt,
+      roots: proposals.roots,
+      summary: proposals.summary,
     });
     return;
   }
