@@ -153,6 +153,14 @@ npm run dev:sovereign-command-branch-check:unix
 
 This verifies command steps can branch on previous transcript output/exit code, executing matching steps and preserving skipped steps in the task transcript.
 
+Run the sovereign command recovery slice directly:
+
+```bash
+npm run dev:sovereign-command-recovery-check:unix
+```
+
+This verifies non-zero command exits are persisted in transcripts, can drive explicit recovery branches with `onFailure: "continue"`, and fail the task by default when no recovery policy is declared.
+
 Run the approval inbox slice directly:
 
 ```bash
@@ -463,6 +471,7 @@ This is based on real NixOS VM validation:
 - `dev:sovereign-command-execute-check:unix` covers allowlisted body-internal command execution under sovereign body autonomy
 - `dev:sovereign-command-chain-check:unix` covers multi-step command execution transcripts under sovereign body autonomy
 - `dev:sovereign-command-branch-check:unix` covers branching command execution from previous transcript results
+- `dev:sovereign-command-recovery-check:unix` covers non-zero command exit recovery and default command task failure
 - `dev:capability-planner-check:unix` covers capability-aware plan metadata and approval-gated body capabilities
 - `dev:capability-invoke-check:unix` covers policy-governed capability invocation through core
 - `dev:capability-history-check:unix` covers persistent capability invocation history and restart recovery

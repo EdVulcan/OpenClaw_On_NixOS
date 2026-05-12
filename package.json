@@ -33,6 +33,7 @@
     "dev:sovereign-command-execute-check:unix": "bash ./nix/scripts/dev-sovereign-command-execute-check.sh",
     "dev:sovereign-command-chain-check:unix": "bash ./nix/scripts/dev-sovereign-command-chain-check.sh",
     "dev:sovereign-command-branch-check:unix": "bash ./nix/scripts/dev-sovereign-command-branch-check.sh",
+    "dev:sovereign-command-recovery-check:unix": "bash ./nix/scripts/dev-sovereign-command-recovery-check.sh",
     "dev:approval-check:unix": "bash ./nix/scripts/dev-approval-check.sh",
     "dev:capability-check:unix": "bash ./nix/scripts/dev-capability-check.sh",
     "dev:capability-planner-check:unix": "bash ./nix/scripts/dev-capability-planner-check.sh",

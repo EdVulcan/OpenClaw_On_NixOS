@@ -253,6 +253,7 @@ function normalisePlanActions(actions) {
       intent: typeof action.intent === "string" && action.intent.trim() ? action.intent.trim() : null,
       params: action.params && typeof action.params === "object" ? action.params : {},
       when: action.when && typeof action.when === "object" ? action.when : null,
+      onFailure: typeof action.onFailure === "string" && action.onFailure.trim() ? action.onFailure.trim() : null,
     }));
 }
 
@@ -380,6 +381,7 @@ function buildRulePlan({ goal, targetUrl, actions, type, intent, policy }) {
     status: "pending",
     params: action.params,
     when: action.when,
+    onFailure: action.onFailure,
   }));
 
   const steps = [
@@ -1951,6 +1953,15 @@ function buildCommandTranscriptEntry(step, response) {
   };
 }
 
+function normaliseCommandFailureMode(step) {
+  const mode = typeof step.onFailure === "string" ? step.onFailure.trim() : "";
+  return mode === "continue" ? "continue" : "fail_task";
+}
+
+function isFailedCommandTranscriptEntry(entry) {
+  return entry?.timedOut === true || (Number.isInteger(entry?.exitCode) && entry.exitCode !== 0);
+}
+
 function latestExecutedCommandTranscriptEntry(commandTranscript) {
   return commandTranscript
     .slice()
@@ -2411,6 +2422,7 @@ async function executeCapabilityPlanTask(task, options = {}) {
         };
       }
 
+      const failureMode = transcriptEntry ? normaliseCommandFailureMode(step) : null;
       await setTaskPhase(task, "acting_on_target", {
         status: "running",
         details: {
@@ -2418,9 +2430,40 @@ async function executeCapabilityPlanTask(task, options = {}) {
           capabilityId: step.capabilityId,
           invocationId: response.invocation?.id ?? null,
           summary: response.summary ?? null,
+          commandFailed: transcriptEntry ? isFailedCommandTranscriptEntry(transcriptEntry) : false,
+          onFailure: failureMode,
           executor: "capability-invoke-v1",
         },
       });
+
+      if (transcriptEntry && isFailedCommandTranscriptEntry(transcriptEntry) && failureMode !== "continue") {
+        const reason = transcriptEntry.timedOut === true
+          ? "Command execution timed out."
+          : `Command execution failed with exit code ${transcriptEntry.exitCode}.`;
+        const failedTask = failTask(task, reason, {
+          executor: "capability-invoke-v1",
+          step,
+          invocation: response.invocation ?? null,
+          policy: response.policy ?? null,
+          commandTranscript,
+          failedCommand: transcriptEntry,
+          onFailure: failureMode,
+        });
+        await publishEvent("task.failed", {
+          task: serialiseTask(failedTask),
+          reason,
+          invocation: response.invocation ?? null,
+          executor: "capability-invoke-v1",
+        });
+        return {
+          task: failedTask,
+          actions: [],
+          capabilityInvocations,
+          commandTranscript,
+          verification: null,
+          policy: response.policy ?? policy.decision,
+        };
+      }
     }
 
     const completedTask = completeTask(task, {
@@ -2444,6 +2487,7 @@ async function executeCapabilityPlanTask(task, options = {}) {
       task: completedTask,
       actions: [],
       capabilityInvocations,
+      commandTranscript,
       verification: { ok: true, checks: [], failedChecks: [] },
       policy: policy.decision,
     };
@@ -2452,12 +2496,14 @@ async function executeCapabilityPlanTask(task, options = {}) {
     const failedTask = failTask(task, message, {
       executor: "capability-invoke-v1",
       capabilityInvocations,
+      commandTranscript,
     });
     await publishEvent("task.failed", { task: serialiseTask(failedTask), reason: message, executor: "capability-invoke-v1" });
     return {
       task: failedTask,
       actions: [],
       capabilityInvocations,
+      commandTranscript,
       verification: null,
       policy: policy.decision,
     };
