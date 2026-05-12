@@ -110,7 +110,7 @@ npm run dev:body-config-check:unix
 To run only a subset:
 
 ```bash
-OPENCLAW_MILESTONE_CHECKS=body-config,planner,operator-loop,operator-control,policy,capability,event-audit npm run dev:milestone-check:unix
+OPENCLAW_MILESTONE_CHECKS=body-config,planner,operator-loop,operator-control,policy,approval,capability,event-audit npm run dev:milestone-check:unix
 ```
 
 Run the policy governance slice directly:
@@ -120,6 +120,14 @@ npm run dev:policy-check:unix
 ```
 
 This verifies body-internal actions, ordinary user tasks, cross-boundary approval gates, denial boundaries, audit history, and the operator execution gate.
+
+Run the approval inbox slice directly:
+
+```bash
+npm run dev:approval-check:unix
+```
+
+This verifies pending approval creation, operator blocking, user approve/deny decisions, audited continuation after approval, denial failure handling, Observer visibility, and approval audit events.
 
 Run the body capability registry slice directly:
 

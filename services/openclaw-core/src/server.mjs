@@ -16,6 +16,7 @@ const stateFilePath = process.env.OPENCLAW_CORE_STATE_FILE
   ?? path.resolve(process.cwd(), "../../.artifacts/openclaw-core-state.json");
 
 const tasks = new Map();
+const approvals = new Map();
 const policyAuditLog = [];
 const runtimeState = {
   status: "idle",
@@ -26,6 +27,7 @@ const runtimeState = {
 
 const ACTIVE_TASK_STATUSES = new Set(["queued", "running", "paused"]);
 const MAX_POLICY_AUDIT_ENTRIES = 100;
+const MAX_APPROVAL_ITEMS = 200;
 const CROSS_BOUNDARY_INTENTS = new Set([
   "account.login",
   "data.egress",
@@ -105,6 +107,7 @@ function persistState() {
       savedAt: new Date().toISOString(),
       runtime: runtimeState,
       tasks: [...tasks.values()],
+      approvals: [...approvals.values()],
       policyAuditLog,
     };
     const tempPath = `${stateFilePath}.tmp`;
@@ -130,6 +133,14 @@ function loadPersistentState() {
       for (const task of data.tasks) {
         if (task?.id) {
           tasks.set(task.id, task);
+        }
+      }
+    }
+    if (Array.isArray(data?.approvals)) {
+      approvals.clear();
+      for (const approval of data.approvals.slice(-MAX_APPROVAL_ITEMS)) {
+        if (approval?.id) {
+          approvals.set(approval.id, approval);
         }
       }
     }
@@ -191,6 +202,7 @@ function serialiseTask(task) {
     workViewStrategy: task.workViewStrategy ?? null,
     plan: task.plan ?? null,
     policy: task.policy ?? null,
+    approval: task.approval ?? null,
     workView: task.workView ?? null,
     lastAction: task.lastAction ?? null,
     outcome: task.outcome ?? null,
@@ -401,6 +413,185 @@ function buildTaskSummary() {
   };
 }
 
+function serialiseApproval(approval) {
+  return {
+    id: approval.id,
+    status: approval.status,
+    taskId: approval.taskId ?? null,
+    policyDecisionId: approval.policyDecisionId ?? null,
+    intent: approval.intent ?? null,
+    domain: approval.domain ?? null,
+    risk: approval.risk ?? null,
+    decision: approval.decision ?? null,
+    reason: approval.reason ?? null,
+    requestedBy: approval.requestedBy ?? "openclaw-core",
+    approvedBy: approval.approvedBy ?? null,
+    deniedBy: approval.deniedBy ?? null,
+    resolutionReason: approval.resolutionReason ?? null,
+    createdAt: approval.createdAt,
+    updatedAt: approval.updatedAt,
+    resolvedAt: approval.resolvedAt ?? null,
+    task: approval.taskId && tasks.has(approval.taskId) ? serialiseTask(tasks.get(approval.taskId)) : null,
+  };
+}
+
+function listApprovals() {
+  return [...approvals.values()]
+    .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))
+    .map((approval) => serialiseApproval(approval));
+}
+
+function buildApprovalSummary() {
+  const counts = {
+    total: 0,
+    pending: 0,
+    approved: 0,
+    denied: 0,
+    expired: 0,
+  };
+
+  for (const approval of approvals.values()) {
+    counts.total += 1;
+    counts[approval.status] = (counts[approval.status] ?? 0) + 1;
+  }
+
+  const pending = [...approvals.values()]
+    .filter((approval) => approval.status === "pending")
+    .sort((left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt));
+
+  return {
+    counts,
+    pendingCount: pending.length,
+    latestPendingId: pending[0]?.id ?? null,
+  };
+}
+
+function findExistingApprovalForTask(taskId) {
+  return [...approvals.values()]
+    .filter((approval) => approval.taskId === taskId && ["pending", "approved"].includes(approval.status))
+    .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))[0] ?? null;
+}
+
+function createApprovalRequestForTask(task, decision) {
+  const existing = findExistingApprovalForTask(task.id);
+  if (existing) {
+    task.approval = {
+      requestId: existing.id,
+      status: existing.status,
+      required: existing.status === "pending",
+      updatedAt: existing.updatedAt,
+    };
+    return existing;
+  }
+
+  const now = new Date().toISOString();
+  const approval = {
+    id: randomUUID(),
+    status: "pending",
+    taskId: task.id,
+    policyDecisionId: decision.id,
+    intent: decision.subject?.intent ?? null,
+    domain: decision.domain,
+    risk: decision.risk,
+    decision: decision.decision,
+    reason: decision.reason,
+    requestedBy: "openclaw-core",
+    createdAt: now,
+    updatedAt: now,
+    resolvedAt: null,
+  };
+  approvals.set(approval.id, approval);
+  task.approval = {
+    requestId: approval.id,
+    status: approval.status,
+    required: true,
+    updatedAt: approval.updatedAt,
+  };
+
+  if (approvals.size > MAX_APPROVAL_ITEMS) {
+    const removable = [...approvals.values()]
+      .filter((item) => item.status !== "pending")
+      .sort((left, right) => Date.parse(left.updatedAt) - Date.parse(right.updatedAt))[0];
+    if (removable) {
+      approvals.delete(removable.id);
+    }
+  }
+
+  persistState();
+  return approval;
+}
+
+function markApprovalApproved(approval, { approvedBy = "user", reason = "Approved by user." } = {}) {
+  const now = new Date().toISOString();
+  approval.status = "approved";
+  approval.approvedBy = approvedBy;
+  approval.resolutionReason = reason;
+  approval.resolvedAt = now;
+  approval.updatedAt = now;
+
+  const task = approval.taskId ? getTaskById(approval.taskId) : null;
+  if (task) {
+    task.policy = {
+      request: {
+        ...(task.policy?.request ?? {}),
+        approved: true,
+      },
+      decision: task.policy?.decision ?? null,
+    };
+    task.approval = {
+      requestId: approval.id,
+      status: approval.status,
+      required: false,
+      updatedAt: now,
+    };
+    ensureTaskPolicy(task, { stage: "approval.approved", force: true });
+  }
+
+  persistState();
+  return { approval, task };
+}
+
+function markApprovalDenied(approval, { deniedBy = "user", reason = "Denied by user." } = {}) {
+  const now = new Date().toISOString();
+  approval.status = "denied";
+  approval.deniedBy = deniedBy;
+  approval.resolutionReason = reason;
+  approval.resolvedAt = now;
+  approval.updatedAt = now;
+
+  const task = approval.taskId ? getTaskById(approval.taskId) : null;
+  if (task) {
+    task.approval = {
+      requestId: approval.id,
+      status: approval.status,
+      required: false,
+      updatedAt: now,
+    };
+    if (isActiveTask(task)) {
+      failTask(task, "Approval denied by user.", {
+        approvalId: approval.id,
+        reason,
+      });
+    } else {
+      persistState();
+    }
+  } else {
+    persistState();
+  }
+
+  return { approval, task };
+}
+
+async function publishTaskApprovalIfPending(task) {
+  const approval = task?.approval?.requestId ? approvals.get(task.approval.requestId) : null;
+  if (approval?.status === "pending") {
+    await publishEvent("approval.created", {
+      approval: serialiseApproval(approval),
+      task: serialiseTask(task),
+    });
+  }
+}
+
 function buildOperatorState() {
   reconcileRuntimeState();
   const currentTask = getCurrentTask();
@@ -420,6 +611,7 @@ function buildOperatorState() {
       supportsDryRun: true,
       decisions: ["allow", "audit_only", "require_approval", "deny"],
     },
+    approvals: buildApprovalSummary(),
     summary: buildTaskSummary(),
   };
 }
@@ -866,6 +1058,17 @@ function ensureTaskPolicy(task, context = {}) {
     decision,
   };
   recordPolicyDecision(decision);
+  if (decision.decision === "require_approval") {
+    createApprovalRequestForTask(task, decision);
+  } else if (task.approval?.requestId) {
+    const approval = approvals.get(task.approval.requestId);
+    task.approval = {
+      requestId: task.approval.requestId,
+      status: approval?.status ?? task.approval.status ?? "resolved",
+      required: false,
+      updatedAt: approval?.updatedAt ?? new Date().toISOString(),
+    };
+  }
   return task.policy;
 }
 
@@ -1216,10 +1419,12 @@ async function executeTask(task, options = {}) {
   const policy = ensureTaskPolicy(task, { stage: "task.execute", targetUrl });
   await publishEvent("policy.evaluated", { task: serialiseTask(task), policy: policy.decision });
   if (!isPolicyExecutionAllowed(policy.decision)) {
+    const approval = task.approval?.requestId ? approvals.get(task.approval.requestId) : null;
     const failedTask = failTask(task, `Policy blocked task execution: ${policy.decision.reason}`, {
       targetUrl,
       executor: "core-v2",
       policy: policy.decision,
+      approval: approval ? serialiseApproval(approval) : null,
     });
     await publishEvent("task.failed", {
       task: serialiseTask(failedTask),
@@ -1237,6 +1442,7 @@ async function executeTask(task, options = {}) {
       finalWorkViewState: null,
       verification: null,
       policy: policy.decision,
+      approval: approval ? serialiseApproval(approval) : null,
     };
   }
 
@@ -1484,6 +1690,7 @@ async function executeTaskWithRecovery(task, options = {}) {
     recoveredTaskIds.push(recoveredTask.id);
     reconcileRuntimeState();
     await publishEvent("task.created", { task: serialiseTask(recoveredTask), executor: "core-v3" });
+    await publishTaskApprovalIfPending(recoveredTask);
     await publishEvent("task.recovered", {
       task: serialiseTask(recoveredTask),
       recoveredFromTaskId: sourceTask.id,
@@ -1584,6 +1791,7 @@ async function runOperatorStep(body = {}) {
   const policy = ensureTaskPolicy(task, { stage: "operator.step" });
   await publishEvent("policy.evaluated", { task: serialiseTask(task), policy: policy.decision });
   if (!isPolicyExecutionAllowed(policy.decision)) {
+    const approval = task.approval?.requestId ? approvals.get(task.approval.requestId) : null;
     return {
       ran: false,
       blocked: true,
@@ -1592,6 +1800,7 @@ async function runOperatorStep(body = {}) {
       task,
       execution: null,
       policy: policy.decision,
+      approval: approval ? serialiseApproval(approval) : null,
       summary: buildTaskSummary(),
       operator: buildOperatorState(),
     };
@@ -1769,6 +1978,107 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === "GET" && requestUrl.pathname === "/approvals") {
+    const status = requestUrl.searchParams.get("status") || null;
+    const limit = Number.parseInt(requestUrl.searchParams.get("limit") ?? "20", 10);
+    const safeLimit = Number.isNaN(limit) ? 20 : Math.max(1, Math.min(limit, 100));
+    const items = listApprovals()
+      .filter((approval) => !status || approval.status === status)
+      .slice(0, safeLimit);
+    sendJson(res, 200, {
+      ok: true,
+      count: items.length,
+      items,
+      summary: buildApprovalSummary(),
+    });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/approvals/summary") {
+    sendJson(res, 200, {
+      ok: true,
+      summary: buildApprovalSummary(),
+    });
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname.startsWith("/approvals/") && requestUrl.pathname.endsWith("/approve")) {
+    const approvalId = requestUrl.pathname.slice("/approvals/".length, -"/approve".length);
+    const approval = approvals.get(approvalId);
+    if (!approval) {
+      sendJson(res, 404, { ok: false, error: "Approval request not found." });
+      return;
+    }
+    if (approval.status !== "pending") {
+      sendJson(res, 409, { ok: false, error: `Approval request is already ${approval.status}.` });
+      return;
+    }
+
+    try {
+      const body = await readJsonBody(req);
+      const result = markApprovalApproved(approval, {
+        approvedBy: typeof body.approvedBy === "string" && body.approvedBy.trim() ? body.approvedBy.trim() : "user",
+        reason: typeof body.reason === "string" && body.reason.trim() ? body.reason.trim() : "Approved by user.",
+      });
+      await publishEvent("approval.approved", {
+        approval: serialiseApproval(result.approval),
+        task: result.task ? serialiseTask(result.task) : null,
+      });
+      sendJson(res, 200, {
+        ok: true,
+        approval: serialiseApproval(result.approval),
+        task: result.task ? serialiseTask(result.task) : null,
+        summary: buildApprovalSummary(),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname.startsWith("/approvals/") && requestUrl.pathname.endsWith("/deny")) {
+    const approvalId = requestUrl.pathname.slice("/approvals/".length, -"/deny".length);
+    const approval = approvals.get(approvalId);
+    if (!approval) {
+      sendJson(res, 404, { ok: false, error: "Approval request not found." });
+      return;
+    }
+    if (approval.status !== "pending") {
+      sendJson(res, 409, { ok: false, error: `Approval request is already ${approval.status}.` });
+      return;
+    }
+
+    try {
+      const body = await readJsonBody(req);
+      const result = markApprovalDenied(approval, {
+        deniedBy: typeof body.deniedBy === "string" && body.deniedBy.trim() ? body.deniedBy.trim() : "user",
+        reason: typeof body.reason === "string" && body.reason.trim() ? body.reason.trim() : "Denied by user.",
+      });
+      await publishEvent("approval.denied", {
+        approval: serialiseApproval(result.approval),
+        task: result.task ? serialiseTask(result.task) : null,
+      });
+      if (result.task?.status === "failed") {
+        await publishEvent("task.failed", {
+          task: serialiseTask(result.task),
+          reason: "Approval denied by user.",
+          approval: serialiseApproval(result.approval),
+        });
+      }
+      sendJson(res, 200, {
+        ok: true,
+        approval: serialiseApproval(result.approval),
+        task: result.task ? serialiseTask(result.task) : null,
+        summary: buildApprovalSummary(),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
   if (req.method === "GET" && requestUrl.pathname === "/tasks/focus/current") {
     reconcileRuntimeState();
     const task = getCurrentTask();
@@ -1845,6 +2155,7 @@ const server = http.createServer(async (req, res) => {
       reconcileRuntimeState();
 
       await publishEvent("task.created", { task: serialiseTask(task) });
+      await publishTaskApprovalIfPending(task);
       await Promise.all(reclaimedTasks.map((reclaimedTask) => publishEvent("task.phase_changed", {
         task: serialiseTask(reclaimedTask),
       })));
@@ -1869,6 +2180,7 @@ const server = http.createServer(async (req, res) => {
         task: step.task ? serialiseTask(step.task) : null,
         execution: step.execution ? serialiseExecutionResult(step.execution) : null,
         policy: step.policy ?? step.task?.policy?.decision ?? null,
+        approval: step.approval ?? step.task?.approval ?? null,
         operator: step.operator ?? buildOperatorState(),
         summary: step.summary,
       });
@@ -1926,6 +2238,7 @@ const server = http.createServer(async (req, res) => {
       reconcileRuntimeState();
 
       await publishEvent("task.created", { task: serialiseTask(task), planner: "rule-v1" });
+      await publishTaskApprovalIfPending(task);
       await publishEvent("task.planned", { task: serialiseTask(task), plan: task.plan });
       await Promise.all(reclaimedTasks.map((reclaimedTask) => publishEvent("task.phase_changed", {
         task: serialiseTask(reclaimedTask),
@@ -1962,6 +2275,7 @@ const server = http.createServer(async (req, res) => {
       reconcileRuntimeState();
 
       await publishEvent("task.created", { task: serialiseTask(task), planner: "rule-v1" });
+      await publishTaskApprovalIfPending(task);
       await publishEvent("task.planned", { task: serialiseTask(task), plan: task.plan });
       await Promise.all(reclaimedTasks.map((reclaimedTask) => publishEvent("task.phase_changed", {
         task: serialiseTask(reclaimedTask),
@@ -2007,6 +2321,7 @@ const server = http.createServer(async (req, res) => {
       reconcileRuntimeState();
 
       await publishEvent("task.created", { task: serialiseTask(task), executor: "core-v1" });
+      await publishTaskApprovalIfPending(task);
       await Promise.all(reclaimedTasks.map((reclaimedTask) => publishEvent("task.phase_changed", {
         task: serialiseTask(reclaimedTask),
       })));
@@ -2049,6 +2364,7 @@ const server = http.createServer(async (req, res) => {
       reconcileRuntimeState();
 
       await publishEvent("task.created", { task: serialiseTask(recoveredTask) });
+      await publishTaskApprovalIfPending(recoveredTask);
       await publishEvent("task.recovered", {
         task: serialiseTask(recoveredTask),
         recoveredFromTaskId: sourceTask.id,

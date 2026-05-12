@@ -29,6 +29,7 @@
     "dev:operator-loop-check:unix": "bash ./nix/scripts/dev-operator-loop-check.sh",
     "dev:operator-control-check:unix": "bash ./nix/scripts/dev-operator-control-check.sh",
     "dev:policy-check:unix": "bash ./nix/scripts/dev-policy-check.sh",
+    "dev:approval-check:unix": "bash ./nix/scripts/dev-approval-check.sh",
     "dev:capability-check:unix": "bash ./nix/scripts/dev-capability-check.sh",
     "dev:event-audit-check:unix": "bash ./nix/scripts/dev-event-audit-check.sh",
     "dev:system-sense-check:unix": "bash ./nix/scripts/dev-system-sense-check.sh",

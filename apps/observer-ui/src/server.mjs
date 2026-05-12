@@ -343,6 +343,16 @@ function observerHtml() {
           <pre id="policy-json">Loading policy state...</pre>
         </section>
         <section class="panel">
+          <h2>Approval Inbox</h2>
+          <div class="metric"><span>Pending</span><span id="approval-pending-count">0</span></div>
+          <div class="metric"><span>Latest</span><span id="approval-latest">none</span></div>
+          <div class="actions tight">
+            <button id="approve-latest-button" class="secondary">Approve Latest</button>
+            <button id="deny-latest-button" class="secondary">Deny Latest</button>
+          </div>
+          <pre id="approval-json">Loading approval inbox...</pre>
+        </section>
+        <section class="panel">
           <h2>Body Capabilities</h2>
           <div class="metric"><span>Registry</span><span id="capability-registry">capability-v0</span></div>
           <div class="metric"><span>Online</span><span id="capability-online">0</span></div>
@@ -532,6 +542,11 @@ const policyDecision = document.querySelector("#policy-decision");
 const policyDomain = document.querySelector("#policy-domain");
 const policyAuditCount = document.querySelector("#policy-audit-count");
 const policyJson = document.querySelector("#policy-json");
+const approvalPendingCount = document.querySelector("#approval-pending-count");
+const approvalLatest = document.querySelector("#approval-latest");
+const approvalJson = document.querySelector("#approval-json");
+const approveLatestButton = document.querySelector("#approve-latest-button");
+const denyLatestButton = document.querySelector("#deny-latest-button");
 const capabilityRegistry = document.querySelector("#capability-registry");
 const capabilityOnline = document.querySelector("#capability-online");
 const capabilityApproval = document.querySelector("#capability-approval");
@@ -545,6 +560,7 @@ let latestTaskSummary = null;
 let desiredWorkViewUrl = workViewUrlInput.value.trim() || "https://example.com/work-view";
 let desiredWorkViewUrlPinned = false;
 let latestWorkViewState = null;
+let latestPendingApproval = null;
 let taskHistoryFocus = "latest-finished";
 
 function setHealthPill(target, ok, text) {
@@ -692,6 +708,24 @@ function renderPolicyState(policy) {
   ].join("\\n");
 }
 
+function renderApprovalState(data) {
+  const items = Array.isArray(data?.items) ? data.items : [];
+  const pendingItems = items.filter((approval) => approval.status === "pending");
+  latestPendingApproval = pendingItems[0] ?? null;
+  approvalPendingCount.textContent = String(data?.summary?.pendingCount ?? pendingItems.length);
+  approvalLatest.textContent = latestPendingApproval?.id ? latestPendingApproval.id.slice(0, 8) : "none";
+  approvalJson.textContent = [
+    \`Total: \${data?.summary?.counts?.total ?? 0}\`,
+    \`Pending: \${data?.summary?.counts?.pending ?? 0}\`,
+    \`Approved: \${data?.summary?.counts?.approved ?? 0}\`,
+    \`Denied: \${data?.summary?.counts?.denied ?? 0}\`,
+    "",
+    ...items.slice(0, 6).map((approval) => {
+      return \`[\${approval.status}] \${approval.id} task=\${approval.taskId ?? "none"} \${approval.intent ?? "unknown"} risk=\${approval.risk ?? "unknown"} reason=\${approval.reason ?? "none"}\`;
+    }),
+  ].join("\\n");
+}
+
 function renderCapabilityState(registry) {
   const capabilities = Array.isArray(registry?.capabilities) ? registry.capabilities : [];
   const summary = registry?.summary ?? {};
@@ -782,6 +816,18 @@ async function refreshPolicyState() {
   }
 }
 
+async function refreshApprovalState() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/approvals?limit=10\`);
+    renderApprovalState(data);
+  } catch {
+    latestPendingApproval = null;
+    approvalPendingCount.textContent = "0";
+    approvalLatest.textContent = "unknown";
+    approvalJson.textContent = "Unable to read approval inbox.";
+  }
+}
+
 async function refreshCapabilityState() {
   try {
     const data = await fetchJson(\`\${observerConfig.coreUrl}/capabilities\`);
@@ -792,6 +838,27 @@ async function refreshCapabilityState() {
     capabilityApproval.textContent = "unknown";
     capabilityJson.textContent = "Unable to read body capabilities.";
   }
+}
+
+async function resolveLatestApproval(action) {
+  if (!latestPendingApproval?.id) {
+    throw new Error("No pending approval request.");
+  }
+
+  const result = await fetchJson(\`\${observerConfig.coreUrl}/approvals/\${latestPendingApproval.id}/\${action}\`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      reason: action === "approve" ? "Approved from Observer UI." : "Denied from Observer UI.",
+    }),
+  });
+  setControlMessage(\`Approval \${action} completed: \${result.approval?.id ?? latestPendingApproval.id}\`);
+  await refreshApprovalState();
+  await refreshPolicyState();
+  await refreshRuntime();
+  await refreshTaskList();
+  await refreshTaskHistoryDetail();
+  await refreshOperatorState();
 }
 
 function renderTaskSummary(task, { includeRecovery = true, includeOutcome = true } = {}) {
@@ -1721,6 +1788,9 @@ function subscribeEvents() {
     "task.resumed",
     "task.failed",
     "policy.evaluated",
+    "approval.created",
+    "approval.approved",
+    "approval.denied",
     "capability.updated",
     "service.started",
     "browser.started",
@@ -1742,6 +1812,9 @@ function subscribeEvents() {
         await refreshWorkView();
         if (eventName === "policy.evaluated") {
           await refreshPolicyState();
+        }
+        if (eventName === "approval.created" || eventName === "approval.approved" || eventName === "approval.denied") {
+          await refreshApprovalState();
         }
         if (eventName === "capability.updated" || eventName === "service.started" || eventName === "service.failed") {
           await refreshCapabilityState();
@@ -1792,6 +1865,18 @@ operatorStepButton.addEventListener("click", () => {
 
 operatorRunButton.addEventListener("click", () => {
   runOperatorLoopFromUi().catch((error) => {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  });
+});
+
+approveLatestButton.addEventListener("click", () => {
+  resolveLatestApproval("approve").catch((error) => {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  });
+});
+
+denyLatestButton.addEventListener("click", () => {
+  resolveLatestApproval("deny").catch((error) => {
     setControlMessage(\`Request failed: \${formatError(error)}\`);
   });
 });
@@ -2028,6 +2113,7 @@ await refreshScreen();
 await refreshActionState();
 await refreshOperatorState();
 await refreshPolicyState();
+await refreshApprovalState();
 await refreshCapabilityState();
 await refreshSystemState();
 await refreshHealState();
@@ -2044,6 +2130,7 @@ setInterval(refreshScreen, 5000);
 setInterval(refreshActionState, 5000);
 setInterval(refreshOperatorState, 5000);
 setInterval(refreshPolicyState, 5000);
+setInterval(refreshApprovalState, 5000);
 setInterval(refreshCapabilityState, 5000);
 setInterval(refreshSystemState, 5000);
 setInterval(refreshHealState, 5000);
