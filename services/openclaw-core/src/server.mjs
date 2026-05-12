@@ -1855,17 +1855,63 @@ function inferCapabilityOperation(step) {
 }
 
 function buildCapabilityInvokeBodyFromPlanStep(step, task) {
+  const approved = isTaskPolicyApproved(task);
   return {
     capabilityId: step.capabilityId,
     intent: step.intent ?? step.kind,
     operation: inferCapabilityOperation(step),
-    approved: task.policy?.decision?.approved === true || task.policy?.request?.approved === true,
+    approved,
     params: step.params ?? {},
     policy: {
       intent: step.intent ?? step.kind,
-      approved: task.policy?.decision?.approved === true || task.policy?.request?.approved === true,
+      approved,
     },
   };
+}
+
+function isTaskPolicyApproved(task) {
+  const approval = task?.approval?.requestId ? approvals.get(task.approval.requestId) : null;
+  return task?.policy?.decision?.approved === true
+    || task?.policy?.request?.approved === true
+    || approval?.status === "approved";
+}
+
+function buildCapabilityApprovalGate(task, actionSteps) {
+  if (isTaskPolicyApproved(task)) {
+    return null;
+  }
+
+  for (const step of actionSteps) {
+    const capability = capabilityById(step.capabilityId);
+    const requiresApproval = step.requiresApproval === true
+      || capability?.requiresApproval === true
+      || capability?.governance === "require_approval";
+    if (!capability || !requiresApproval) {
+      continue;
+    }
+
+    const request = normaliseCapabilityInvokeRequest(buildCapabilityInvokeBodyFromPlanStep(step, task));
+    const decision = recordPolicyDecision(evaluatePolicyIntent(
+      buildCapabilityPolicyInput(capability, request),
+      {
+        stage: "capability_plan.approval",
+        taskId: task.id,
+        type: task.type,
+        goal: task.goal,
+      },
+    ));
+
+    if (!isPolicyExecutionAllowed(decision)) {
+      return {
+        step,
+        capability,
+        decision,
+        reason: decision.decision === "deny" ? "policy_denied" : "policy_requires_approval",
+      };
+    }
+  }
+
+  return null;
 }
 
 function buildExecutionVerification({ targetUrl, options, verifiedScreen, actionResults, workView }) {
@@ -2150,6 +2196,37 @@ async function executeCapabilityPlanTask(task, options = {}) {
       verification: null,
       policy: policy.decision,
       approval: approval ? serialiseApproval(approval) : null,
+    };
+  }
+
+  const approvalGate = buildCapabilityApprovalGate(task, actionSteps);
+  if (approvalGate) {
+    const approval = createApprovalRequestForTask(task, approvalGate.decision);
+    await publishEvent("policy.evaluated", {
+      task: serialiseTask(task),
+      policy: approvalGate.decision,
+      capability: approvalGate.capability,
+    });
+    await setTaskPhase(task, "waiting_for_approval", {
+      status: "queued",
+      details: {
+        executor: "capability-invoke-v1",
+        capabilityId: approvalGate.capability.id,
+        actionKind: approvalGate.step.kind,
+        reason: approvalGate.reason,
+        approvalId: approval.id,
+      },
+    });
+    await publishTaskApprovalIfPending(task);
+    return {
+      task,
+      blocked: true,
+      reason: approvalGate.reason,
+      actions: [],
+      capabilityInvocations: [],
+      verification: null,
+      policy: approvalGate.decision,
+      approval: serialiseApproval(approval),
     };
   }
 
@@ -2460,7 +2537,39 @@ async function runOperatorStep(body = {}) {
     };
   }
 
+  const pendingApproval = task.approval?.requestId ? approvals.get(task.approval.requestId) : null;
+  if (pendingApproval?.status === "pending") {
+    return {
+      ran: false,
+      blocked: true,
+      reason: "policy_requires_approval",
+      dryRun: false,
+      task,
+      execution: null,
+      policy: task.policy?.decision ?? null,
+      approval: serialiseApproval(pendingApproval),
+      summary: buildTaskSummary(),
+      operator: buildOperatorState(),
+    };
+  }
+
   const executionResult = await executeTaskWithRecovery(task, buildOperatorOptions(task, body));
+  const finalExecution = executionResult.finalExecution ?? executionResult;
+  if (finalExecution.blocked === true) {
+    return {
+      ran: false,
+      blocked: true,
+      reason: finalExecution.reason ?? "policy_requires_approval",
+      dryRun: false,
+      task: finalExecution.task,
+      execution: null,
+      policy: finalExecution.policy ?? finalExecution.task?.policy?.decision ?? null,
+      approval: finalExecution.approval ?? finalExecution.task?.approval ?? null,
+      summary: buildTaskSummary(),
+      operator: buildOperatorState(),
+    };
+  }
+
   return {
     ran: true,
     blocked: false,

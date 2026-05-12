@@ -23,6 +23,7 @@ checks=(
   "capability-invoke|dev-capability-invoke-check.sh|Policy-governed capability invocation through core"
   "capability-history|dev-capability-history-check.sh|Persistent capability invocation history and restart recovery"
   "capability-operator|dev-capability-operator-check.sh|Operator execution through governed capability invocation"
+  "capability-approval-operator|dev-capability-approval-operator-check.sh|Operator waits for user approval before high-risk capability execution"
   "event-audit|dev-event-audit-check.sh|Durable event audit ledger, filters, summary, and restart recovery"
   "system-capability|dev-system-capability-check.sh|Conservative filesystem, process, and command dry-run capabilities"
   "system-sense|dev-system-sense-check.sh|Real body vitals, service latency, resources, and alerts"

@@ -35,6 +35,7 @@
     "dev:capability-invoke-check:unix": "bash ./nix/scripts/dev-capability-invoke-check.sh",
     "dev:capability-history-check:unix": "bash ./nix/scripts/dev-capability-history-check.sh",
     "dev:capability-operator-check:unix": "bash ./nix/scripts/dev-capability-operator-check.sh",
+    "dev:capability-approval-operator-check:unix": "bash ./nix/scripts/dev-capability-approval-operator-check.sh",
     "dev:event-audit-check:unix": "bash ./nix/scripts/dev-event-audit-check.sh",
     "dev:system-capability-check:unix": "bash ./nix/scripts/dev-system-capability-check.sh",
     "dev:system-sense-check:unix": "bash ./nix/scripts/dev-system-sense-check.sh",

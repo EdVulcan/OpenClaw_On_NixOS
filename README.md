@@ -169,6 +169,14 @@ npm run dev:capability-operator-check:unix
 
 This verifies system-task plans are executed by the operator through governed capability invocation for process listing and approved command dry-run.
 
+Run the capability approval operator slice directly:
+
+```bash
+npm run dev:capability-approval-operator-check:unix
+```
+
+This verifies high-risk system capability plans wait for user approval, continue after approval through dry-run-only command invocation, and fail cleanly after denial.
+
 Run the Observer capability-plan visibility slice directly:
 
 ```bash
@@ -423,6 +431,7 @@ This is based on real NixOS VM validation:
 - `dev:capability-invoke-check:unix` covers policy-governed capability invocation through core
 - `dev:capability-history-check:unix` covers persistent capability invocation history and restart recovery
 - `dev:capability-operator-check:unix` covers operator execution through governed capability invocation
+- `dev:capability-approval-operator-check:unix` covers operator approval waiting before high-risk capability execution
 - `dev:observer-capability-plan-check:unix` covers Observer visibility for body capability decisions inside plans
 - `dev:observer-capability-invoke-check:unix` covers Observer controls for policy-governed capability invocation
 - `dev:observer-capability-history-check:unix` covers Observer visibility for persistent capability invocation history
