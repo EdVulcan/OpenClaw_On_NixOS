@@ -129,6 +129,14 @@ npm run dev:sovereign-body-policy-check:unix
 
 This verifies `OPENCLAW_AUTONOMY_MODE=sovereign_body`, where body-internal high-risk capability actions run autonomously with audit while cross-boundary and absolute-deny policies remain gated.
 
+Run the sovereign command execution slice directly:
+
+```bash
+npm run dev:sovereign-command-execute-check:unix
+```
+
+This verifies `act.system.command.execute` can run allowlisted body-internal commands in `sovereign_body` mode with cwd limits, timeout/output capture, audit history, and no shell.
+
 Run the approval inbox slice directly:
 
 ```bash
@@ -436,6 +444,7 @@ This is based on real NixOS VM validation:
 - `dev:operator-control-check:unix` covers operator dry-run, pause gating, and resume
 - `dev:policy-check:unix` covers the first policy governance and cross-boundary gate
 - `dev:sovereign-body-policy-check:unix` covers body-internal autonomy under `OPENCLAW_AUTONOMY_MODE=sovereign_body`
+- `dev:sovereign-command-execute-check:unix` covers allowlisted body-internal command execution under sovereign body autonomy
 - `dev:capability-planner-check:unix` covers capability-aware plan metadata and approval-gated body capabilities
 - `dev:capability-invoke-check:unix` covers policy-governed capability invocation through core
 - `dev:capability-history-check:unix` covers persistent capability invocation history and restart recovery

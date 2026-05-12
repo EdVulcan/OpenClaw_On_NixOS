@@ -18,6 +18,7 @@ checks=(
   "operator-control|dev-operator-control-check.sh|Operator state, dry-run, pause gate, and resume control"
   "policy|dev-policy-check.sh|Policy governance, audit, and cross-boundary execution gate"
   "sovereign-body-policy|dev-sovereign-body-policy-check.sh|Sovereign body autonomy for body-internal capability governance"
+  "sovereign-command-execute|dev-sovereign-command-execute-check.sh|Sovereign body execution of allowlisted system commands"
   "approval|dev-approval-check.sh|Approval inbox, user decisions, and operator approval gate"
   "capability|dev-capability-check.sh|Body capability registry, risks, health, and approval boundaries"
   "capability-planner|dev-capability-planner-check.sh|Capability-aware planning with risk and governance metadata"

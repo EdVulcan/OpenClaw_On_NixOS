@@ -22,6 +22,12 @@ const serviceTimeoutMs = Number.parseInt(process.env.OPENCLAW_SYSTEM_SERVICE_TIM
 const maxFileListLimit = Number.parseInt(process.env.OPENCLAW_SYSTEM_FILE_LIST_LIMIT ?? "100", 10);
 const maxSearchLimit = Number.parseInt(process.env.OPENCLAW_SYSTEM_FILE_SEARCH_LIMIT ?? "100", 10);
 const maxSearchDepth = Number.parseInt(process.env.OPENCLAW_SYSTEM_FILE_SEARCH_DEPTH ?? "4", 10);
+const commandAllowlist = (process.env.OPENCLAW_SYSTEM_COMMAND_ALLOWLIST ?? "echo,printf,pwd,whoami,ls,cat,head,tail,wc,find,grep,rg")
+  .split(",")
+  .map((command) => command.trim())
+  .filter(Boolean);
+const commandTimeoutMs = Number.parseInt(process.env.OPENCLAW_SYSTEM_COMMAND_TIMEOUT_MS ?? "3000", 10);
+const commandOutputLimit = Number.parseInt(process.env.OPENCLAW_SYSTEM_COMMAND_OUTPUT_LIMIT ?? "8192", 10);
 const execFileAsync = promisify(execFile);
 
 const serviceTargets = {
@@ -358,6 +364,134 @@ function buildCommandDryRun(body) {
   };
 }
 
+function normaliseCommandArgs(args) {
+  return Array.isArray(args)
+    ? args.filter((arg) => typeof arg === "string")
+    : [];
+}
+
+function assertCommandAllowed(command) {
+  if (typeof command !== "string" || !command.trim()) {
+    throw new Error("Command is required for execution.");
+  }
+  const trimmed = command.trim();
+  if (trimmed.includes("/") || trimmed.includes("\\") || path.basename(trimmed) !== trimmed) {
+    const error = new Error("Command must be an allowlisted executable name, not a path.");
+    error.code = "COMMAND_PATH_NOT_ALLOWED";
+    throw error;
+  }
+  if (!commandAllowlist.includes(trimmed)) {
+    const error = new Error("Command is outside the OpenClaw system command allowlist.");
+    error.code = "COMMAND_NOT_ALLOWLISTED";
+    error.details = { command: trimmed, allowlist: commandAllowlist };
+    throw error;
+  }
+  return trimmed;
+}
+
+function truncateOutput(value) {
+  const text = typeof value === "string" ? value : "";
+  if (text.length <= commandOutputLimit) {
+    return {
+      text,
+      truncated: false,
+      bytes: Buffer.byteLength(text),
+    };
+  }
+  const truncatedText = text.slice(0, commandOutputLimit);
+  return {
+    text: truncatedText,
+    truncated: true,
+    bytes: Buffer.byteLength(text),
+  };
+}
+
+function execFileCaptured(command, args, options) {
+  return new Promise((resolve) => {
+    const startedAt = Date.now();
+    execFile(command, args, options, (error, stdout = "", stderr = "") => {
+      const durationMs = Date.now() - startedAt;
+      const stdoutResult = truncateOutput(stdout);
+      const stderrResult = truncateOutput(stderr);
+      resolve({
+        command,
+        args,
+        cwd: options.cwd,
+        exitCode: Number.isInteger(error?.code) ? error.code : 0,
+        signal: error?.signal ?? null,
+        timedOut: error?.killed === true && error?.signal === "SIGTERM",
+        durationMs,
+        stdout: stdoutResult.text,
+        stderr: stderrResult.text,
+        stdoutBytes: stdoutResult.bytes,
+        stderrBytes: stderrResult.bytes,
+        stdoutTruncated: stdoutResult.truncated,
+        stderrTruncated: stderrResult.truncated,
+        executedAt: new Date().toISOString(),
+      });
+    });
+  });
+}
+
+async function executeCommand(body) {
+  if (typeof process.getuid === "function" && process.getuid() === 0) {
+    const error = new Error("Refusing to execute commands from a root system-sense process.");
+    error.code = "ROOT_EXECUTION_REFUSED";
+    throw error;
+  }
+
+  const command = assertCommandAllowed(body.command);
+  const args = normaliseCommandArgs(body.args);
+  const cwdResult = resolveAllowedPath(body.cwd ?? body.workingDirectory ?? allowedRoots[0]);
+  const dryRun = buildCommandDryRun({
+    command,
+    args,
+    intent: typeof body.intent === "string" && body.intent.trim() ? body.intent.trim() : "system.command.execute",
+  });
+  const timeoutMs = Math.max(100, Math.min(
+    Number.isFinite(body.timeoutMs) ? Number.parseInt(body.timeoutMs, 10) : commandTimeoutMs,
+    commandTimeoutMs,
+  ));
+
+  const result = await execFileCaptured(command, args, {
+    cwd: cwdResult.path,
+    timeout: timeoutMs,
+    maxBuffer: Math.max(commandOutputLimit * 2, 1024),
+    windowsHide: true,
+  });
+
+  return {
+    mode: "execute",
+    wouldExecute: true,
+    command,
+    args,
+    cwd: cwdResult.path,
+    allowedRoot: cwdResult.root,
+    allowlist: commandAllowlist,
+    timeoutMs,
+    risk: dryRun.risk,
+    governance: "audit_only",
+    checks: [
+      {
+        name: "allowlisted_command",
+        passed: true,
+        detail: `${command} is allowlisted for controlled body-internal execution.`,
+      },
+      {
+        name: "allowed_working_directory",
+        passed: true,
+        detail: "Command working directory is inside allowed OpenClaw body roots.",
+      },
+      {
+        name: "non_root_process",
+        passed: true,
+        detail: "Command executor is not running as root.",
+      },
+    ],
+    result,
+  };
+}
+
 function readCpuSnapshot() {
   const cpus = os.cpus();
   const totals = cpus.reduce((acc, cpu) => {
@@ -682,6 +816,28 @@ const server = http.createServer(async (req, res) => {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/system/command/execute") {
+    try {
+      const body = await readJsonBody(req);
+      const execution = await executeCommand(body);
+      await publishEvent("system.command.executed", {
+        command: execution.command,
+        cwd: execution.cwd,
+        exitCode: execution.result.exitCode,
+        timedOut: execution.result.timedOut,
+        durationMs: execution.result.durationMs,
+      });
+      sendJson(res, 200, {
+        ok: true,
+        execution,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message, code: error.code ?? null, details: error.details ?? null });
     }
     return;
   }

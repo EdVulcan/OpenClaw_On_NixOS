@@ -295,6 +295,9 @@ function resolvePlanCapabilityId({ kind, intent, plannerIntent }) {
   if (candidate.startsWith("process.")) {
     return "sense.process.list";
   }
+  if (candidate === "command.execute" || candidate === "system.command.execute") {
+    return "act.system.command.execute";
+  }
   if (candidate === "command.plan" || candidate === "system.command" || candidate.startsWith("system.command.")) {
     return "act.system.command.dry_run";
   }
@@ -817,6 +820,19 @@ function baseCapabilities() {
       description: "Plan command execution conservatively without running it, surfacing risk and approval requirements.",
     },
     {
+      id: "act.system.command.execute",
+      name: "Controlled System Command Execute",
+      kind: "actuator",
+      service: "openclaw-system-sense",
+      endpoint: `${systemSenseUrl}/system/command/execute`,
+      intents: ["system.command.execute", "command.execute"],
+      domains: ["body_internal"],
+      risk: "high",
+      governance: "require_approval",
+      requiresApproval: true,
+      description: "Execute allowlisted body-internal commands without a shell, bounded by cwd, timeout, output limits, and audit.",
+    },
+    {
       id: "memory.event.audit",
       name: "Event Audit Ledger",
       kind: "memory",
@@ -1100,6 +1116,13 @@ async function callCapabilityBackend(capability, request) {
     });
   }
 
+  if (capability.id === "act.system.command.execute") {
+    return postJson(`${systemSenseUrl}/system/command/execute`, {
+      ...request.params,
+      intent: request.intent ?? "system.command.execute",
+    });
+  }
+
   throw new Error(`Capability ${capability.id} is not invokable through core-v0.`);
 }
 
@@ -1134,6 +1157,19 @@ function summariseCapabilityInvocationResult(capability, result) {
       risk: result?.plan?.risk ?? null,
       governance: result?.plan?.governance ?? null,
       wouldExecute: result?.plan?.wouldExecute ?? null,
+    };
+  }
+  if (capability.id === "act.system.command.execute") {
+    return {
+      kind: "command.execute",
+      ok: result?.ok === true,
+      risk: result?.execution?.risk ?? null,
+      governance: result?.execution?.governance ?? null,
+      wouldExecute: result?.execution?.wouldExecute ?? null,
+      exitCode: result?.execution?.result?.exitCode ?? null,
+      timedOut: result?.execution?.result?.timedOut ?? null,
+      stdout: result?.execution?.result?.stdout ?? "",
+      stderr: result?.execution?.result?.stderr ?? "",
     };
   }
   return {
@@ -1851,6 +1887,7 @@ const OPERATOR_INVOKABLE_CAPABILITIES = new Set([
   "sense.filesystem.read",
   "sense.process.list",
   "act.system.command.dry_run",
+  "act.system.command.execute",
 ]);
 
 function planCapabilityActionSteps(task) {
