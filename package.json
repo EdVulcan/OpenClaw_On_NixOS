@@ -58,6 +58,7 @@
     "dev:openclaw-workspace-command-task-check:unix": "bash ./nix/scripts/dev-openclaw-workspace-command-task-check.sh",
     "dev:openclaw-workspace-command-execute-check:unix": "bash ./nix/scripts/dev-openclaw-workspace-command-execute-check.sh",
     "dev:openclaw-workspace-command-failure-check:unix": "bash ./nix/scripts/dev-openclaw-workspace-command-failure-check.sh",
+    "dev:openclaw-workspace-command-recovery-check:unix": "bash ./nix/scripts/dev-openclaw-workspace-command-recovery-check.sh",
     "dev:observer-capability-plan-check:unix": "bash ./nix/scripts/dev-observer-capability-plan-check.sh",
     "dev:observer-capability-invoke-check:unix": "bash ./nix/scripts/dev-observer-capability-invoke-check.sh",
     "dev:observer-capability-history-check:unix": "bash ./nix/scripts/dev-observer-capability-history-check.sh",

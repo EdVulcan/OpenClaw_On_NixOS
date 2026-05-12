@@ -889,10 +889,20 @@ function isActiveTask(task) {
   return ACTIVE_TASK_STATUSES.has(task.status);
 }
 
+function hasRecoverableCapabilityPlan(task) {
+  return task?.type === "system_task" && planCapabilityActionSteps(task).length > 0;
+}
+
 function isRecoverableTask(task) {
-  return ["completed", "failed", "superseded"].includes(task.status)
-    && typeof task.targetUrl === "string"
-    && task.targetUrl.trim().length > 0;
+  if (!["completed", "failed", "superseded"].includes(task.status)) {
+    return false;
+  }
+
+  if (typeof task.targetUrl === "string" && task.targetUrl.trim().length > 0) {
+    return true;
+  }
+
+  return hasRecoverableCapabilityPlan(task);
 }
 
 function compareTasksForDisplay(left, right) {
@@ -3307,23 +3317,65 @@ async function executeCapabilityPlanTask(task, options = {}) {
 
 function recoverTask(sourceTask) {
   const recoveryAttempt = (sourceTask.recovery?.attempt ?? 0) + 1;
-  const recoveredTask = createTask({
+  const recoverableCapabilityPlan = hasRecoverableCapabilityPlan(sourceTask);
+  const recoveryBody = {
     goal: sourceTask.goal,
     type: sourceTask.type,
     targetUrl: sourceTask.targetUrl,
     workViewStrategy: sourceTask.workViewStrategy,
-    includePlan: Boolean(sourceTask.plan),
+    includePlan: Boolean(sourceTask.plan) && !recoverableCapabilityPlan,
     recovery: {
       recoveredFromTaskId: sourceTask.id,
       recoveredFromOutcome: sourceTask.outcome?.kind ?? sourceTask.status,
       attempt: recoveryAttempt,
     },
-  });
+  };
+
+  if (recoverableCapabilityPlan) {
+    recoveryBody.plan = resetRecoveredPlan(sourceTask.plan);
+    recoveryBody.policy = buildRecoveredPolicyRequest(sourceTask);
+  }
+
+  const recoveredTask = createTask(recoveryBody);
 
   sourceTask.recoveredByTaskId = recoveredTask.id;
   sourceTask.updatedAt = new Date().toISOString();
   persistState();
   return recoveredTask;
+}
+
+function clonePlainObject(value) {
+  return value && typeof value === "object" ? JSON.parse(JSON.stringify(value)) : {};
+}
+
+function buildRecoveredPolicyRequest(sourceTask) {
+  const request = clonePlainObject(sourceTask.policy?.request ?? sourceTask.policy ?? {});
+  delete request.approved;
+  return request;
+}
+
+function resetRecoveredPlan(plan) {
+  const now = new Date().toISOString();
+  const recoveredPlan = clonePlainObject(plan);
+  recoveredPlan.planId = `plan-${randomUUID()}`;
+  recoveredPlan.status = "planned";
+  recoveredPlan.createdAt = now;
+  recoveredPlan.updatedAt = now;
+  delete recoveredPlan.failure;
+
+  if (Array.isArray(recoveredPlan.steps)) {
+    recoveredPlan.steps = recoveredPlan.steps.map((step) => {
+      const recoveredStep = {
+        ...step,
+        status: "pending",
+      };
+      delete recoveredStep.completedAt;
+      delete recoveredStep.details;
+      return recoveredStep;
+    });
+  }
+
+  return recoveredPlan;
 }
 
 function buildRecoveryExecuteOptions(options, attempt) {

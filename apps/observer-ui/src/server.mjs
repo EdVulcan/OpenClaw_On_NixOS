@@ -1982,7 +1982,7 @@ async function runOperatorLoopFromUi() {
 }
 
 async function launchTaskIntoWorkView(taskId, targetUrl) {
-  if (!taskId) {
+  if (!taskId || !targetUrl) {
     return;
   }
 
@@ -2001,8 +2001,10 @@ async function recoverLatestFinishedTask() {
     throw new Error("No finished task available to recover.");
   }
 
-  const targetUrl = sourceTask.targetUrl ?? sourceTask.workView?.activeUrl ?? getDesiredWorkViewUrl();
-  setDesiredWorkViewUrl(targetUrl);
+  const targetUrl = sourceTask.targetUrl ?? sourceTask.workView?.activeUrl ?? null;
+  if (targetUrl) {
+    setDesiredWorkViewUrl(targetUrl);
+  }
 
   const result = await fetchJson(\`\${observerConfig.coreUrl}/tasks/\${sourceTask.id}/recover\`, {
     method: "POST",
@@ -2035,8 +2037,10 @@ async function recoverSelectedTask() {
     throw new Error("Selected task is not recoverable.");
   }
 
-  const targetUrl = sourceTask.targetUrl ?? sourceTask.workView?.activeUrl ?? getDesiredWorkViewUrl();
-  setDesiredWorkViewUrl(targetUrl);
+  const targetUrl = sourceTask.targetUrl ?? sourceTask.workView?.activeUrl ?? null;
+  if (targetUrl) {
+    setDesiredWorkViewUrl(targetUrl);
+  }
   const result = await fetchJson(\`\${observerConfig.coreUrl}/tasks/\${sourceTask.id}/recover\`, {
     method: "POST",
   });
