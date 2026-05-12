@@ -1948,6 +1948,8 @@ async function runOperatorStepFromUi() {
   await refreshScreen();
   await refreshOperatorState();
   await refreshPolicyState();
+  await refreshCapabilityHistory();
+  await refreshCommandLedger();
 }
 
 async function runOperatorLoopFromUi() {
@@ -1975,6 +1977,8 @@ async function runOperatorLoopFromUi() {
   await refreshScreen();
   await refreshOperatorState();
   await refreshPolicyState();
+  await refreshCapabilityHistory();
+  await refreshCommandLedger();
 }
 
 async function launchTaskIntoWorkView(taskId, targetUrl) {
@@ -2370,6 +2374,7 @@ function subscribeEvents() {
     "capability.updated",
     "capability.invoked",
     "capability.blocked",
+    "system.command.executed",
     "service.started",
     "browser.started",
     "browser.updated",
@@ -2405,6 +2410,9 @@ function subscribeEvents() {
         }
         if (eventName === "capability.invoked" || eventName === "capability.blocked") {
           await refreshCapabilityHistory();
+        }
+        if (eventName === "system.command.executed" || eventName === "task.completed") {
+          await refreshCommandLedger();
         }
         if (
           eventName === "screen.updated"
