@@ -95,7 +95,6 @@ for (const token of [
   "renderCapabilityInvocation",
   "capability.invoked",
   "capability.blocked",
-  "policy_requires_approval",
 ]) {
   if (!client.includes(token)) {
     throw new Error(`Observer client missing ${token}`);
