@@ -52,6 +52,7 @@ checks=(
   "observer-filesystem-read-ledger|dev-observer-filesystem-read-ledger-check.sh|Observer visibility for sovereign filesystem read access ledger"
   "observer-workspace-detect|dev-observer-workspace-detect-check.sh|Observer visibility for read-only OpenClaw workspace detection"
   "observer-workspace-command-proposals|dev-observer-workspace-command-proposals-check.sh|Observer visibility for OpenClaw workspace command proposals"
+  "observer-workspace-command-plan|dev-observer-workspace-command-plan-check.sh|Observer visibility for OpenClaw workspace command plan drafts"
   "observer-operator|dev-observer-operator-check.sh|Observer UI planner/operator controls and API wiring"
 )
 

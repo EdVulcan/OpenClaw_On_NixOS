@@ -431,6 +431,16 @@ function observerHtml() {
           <pre id="workspace-command-json">Loading workspace command proposals...</pre>
         </section>
         <section class="panel">
+          <h2>Workspace Command Plan Draft</h2>
+          <div class="metric"><span>Registry</span><span id="workspace-command-plan-registry">workspace-command-plan-draft-v0</span></div>
+          <div class="metric"><span>Proposal</span><span id="workspace-command-plan-proposal">openclaw:typecheck</span></div>
+          <div class="metric"><span>Decision</span><span id="workspace-command-plan-decision">require_approval</span></div>
+          <div class="metric"><span>Approval</span><span id="workspace-command-plan-approval">required</span></div>
+          <div class="metric"><span>Creates Task</span><span id="workspace-command-plan-task">false</span></div>
+          <div class="metric"><span>Mode</span><span id="workspace-command-plan-mode">plan-only</span></div>
+          <pre id="workspace-command-plan-json">Loading workspace command plan draft...</pre>
+        </section>
+        <section class="panel">
           <h2>Recent Tasks</h2>
           <div class="metric"><span>Entries</span><span id="task-list-count">0</span></div>
           <div class="task-summary-grid">
@@ -670,6 +680,13 @@ const workspaceCommandBuild = document.querySelector("#workspace-command-build")
 const workspaceCommandRuntime = document.querySelector("#workspace-command-runtime");
 const workspaceCommandMode = document.querySelector("#workspace-command-mode");
 const workspaceCommandJson = document.querySelector("#workspace-command-json");
+const workspaceCommandPlanRegistry = document.querySelector("#workspace-command-plan-registry");
+const workspaceCommandPlanProposal = document.querySelector("#workspace-command-plan-proposal");
+const workspaceCommandPlanDecision = document.querySelector("#workspace-command-plan-decision");
+const workspaceCommandPlanApproval = document.querySelector("#workspace-command-plan-approval");
+const workspaceCommandPlanTask = document.querySelector("#workspace-command-plan-task");
+const workspaceCommandPlanMode = document.querySelector("#workspace-command-plan-mode");
+const workspaceCommandPlanJson = document.querySelector("#workspace-command-plan-json");
 let currentTaskState = null;
 let latestActionState = null;
 let latestHistoryTask = null;
@@ -1100,6 +1117,36 @@ function renderWorkspaceCommandProposals(data) {
   ].join("\\n");
 }
 
+function renderWorkspaceCommandPlanDraft(data) {
+  const draft = data?.draft ?? {};
+  const proposal = data?.proposal ?? {};
+  const governance = draft.governance ?? {};
+  const policyDecision = draft.policy?.decision ?? {};
+  const action = draft.action ?? {};
+  const params = action.params ?? {};
+  const commandShape = [params.command, ...(Array.isArray(params.args) ? params.args : [])].filter(Boolean).join(" ");
+  workspaceCommandPlanRegistry.textContent = data?.registry ?? "workspace-command-plan-draft-v0";
+  workspaceCommandPlanProposal.textContent = proposal.id ?? "none";
+  workspaceCommandPlanDecision.textContent = policyDecision.decision ?? "unknown";
+  workspaceCommandPlanApproval.textContent = governance.requiresExplicitApproval ? "required" : "not required";
+  workspaceCommandPlanTask.textContent = String(governance.createsTask ?? false);
+  workspaceCommandPlanMode.textContent = data?.mode ?? "plan-only";
+
+  workspaceCommandPlanJson.textContent = [
+    "Plan-only draft: no task, approval, or command execution is created.",
+    "Script bodies are not displayed.",
+    \`Registry: \${data?.registry ?? "workspace-command-plan-draft-v0"}\`,
+    \`Mode: \${data?.mode ?? "plan-only"}\`,
+    \`Proposal: \${proposal.id ?? "none"}\`,
+    \`Command: \${commandShape || "none"}\`,
+    \`Cwd: \${params.cwd ?? "unknown"}\`,
+    \`Policy: \${policyDecision.decision ?? "unknown"} reason=\${policyDecision.reason ?? "none"} risk=\${policyDecision.risk ?? proposal.risk ?? "unknown"}\`,
+    \`Governance: createsTask=\${Boolean(governance.createsTask)} createsApproval=\${Boolean(governance.createsApproval)} execute=\${Boolean(governance.canExecute)} explicitApproval=\${Boolean(governance.requiresExplicitApproval)} scriptBody=\${Boolean(governance.exposesScriptBody)}\`,
+    \`Capabilities: \${(draft.plan?.capabilitySummary?.ids ?? []).join(", ") || "none"}\`,
+    \`Approval Gates: \${draft.plan?.capabilitySummary?.approvalGates ?? 0}\`,
+  ].join("\\n");
+}
+
 function renderOperatorPanel(result) {
   if (!result) {
     renderOperatorState(null);
@@ -1277,6 +1324,21 @@ async function refreshWorkspaceCommandProposals() {
     workspaceCommandRuntime.textContent = "0";
     workspaceCommandMode.textContent = "unknown";
     workspaceCommandJson.textContent = "Unable to read workspace command proposals.";
+  }
+}
+
+async function refreshWorkspaceCommandPlanDraft() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/workspaces/command-proposals/plan?proposalId=openclaw:typecheck\`);
+    renderWorkspaceCommandPlanDraft(data);
+  } catch {
+    workspaceCommandPlanRegistry.textContent = "offline";
+    workspaceCommandPlanProposal.textContent = "unknown";
+    workspaceCommandPlanDecision.textContent = "unknown";
+    workspaceCommandPlanApproval.textContent = "unknown";
+    workspaceCommandPlanTask.textContent = "false";
+    workspaceCommandPlanMode.textContent = "unknown";
+    workspaceCommandPlanJson.textContent = "Unable to read workspace command plan draft.";
   }
 }
 
@@ -2643,6 +2705,7 @@ await refreshFilesystemLedger();
 await refreshFilesystemReadLedger();
 await refreshWorkspaceRegistry();
 await refreshWorkspaceCommandProposals();
+await refreshWorkspaceCommandPlanDraft();
 await refreshSystemState();
 await refreshHealState();
 await refreshAuditState();
@@ -2666,6 +2729,7 @@ setInterval(refreshFilesystemLedger, 5000);
 setInterval(refreshFilesystemReadLedger, 5000);
 setInterval(refreshWorkspaceRegistry, 5000);
 setInterval(refreshWorkspaceCommandProposals, 5000);
+setInterval(refreshWorkspaceCommandPlanDraft, 5000);
 setInterval(refreshSystemState, 5000);
 setInterval(refreshHealState, 5000);
 setInterval(refreshAuditState, 5000);`;
