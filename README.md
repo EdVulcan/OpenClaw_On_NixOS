@@ -305,6 +305,14 @@ npm run dev:observer-workspace-command-denial-check:unix
 
 This verifies Observer exposes the controls, approval inbox state, task failure state, command ledger emptiness, capability history emptiness, and audit events for denied workspace command approvals.
 
+Run the observer OpenClaw workspace command denial recovery slice directly:
+
+```bash
+npm run dev:observer-workspace-command-denial-recovery-check:unix
+```
+
+This verifies Observer exposes recovery controls and task detail for denied workspace commands while preserving the fresh approval gate before the recovered command can execute.
+
 Run the observer OpenClaw workspace command recovery slice directly:
 
 ```bash
@@ -727,6 +735,7 @@ This is based on real NixOS VM validation:
 - `dev:observer-workspace-command-execute-check:unix` covers Observer controls and visibility for approved OpenClaw workspace command execution
 - `dev:observer-workspace-command-failure-check:unix` covers Observer visibility for failed OpenClaw workspace command execution
 - `dev:observer-workspace-command-denial-check:unix` covers Observer visibility for denied OpenClaw workspace command approvals
+- `dev:observer-workspace-command-denial-recovery-check:unix` covers Observer visibility for recovered denied OpenClaw workspace commands
 - `dev:observer-workspace-command-recovery-check:unix` covers Observer controls and visibility for recovered OpenClaw workspace commands
 - `dev:observer-workspace-command-recovery-persistence-check:unix` covers Observer visibility for recovered OpenClaw workspace command chains across restarts
 - `dev:capability-planner-check:unix` covers capability-aware plan metadata and approval-gated body capabilities

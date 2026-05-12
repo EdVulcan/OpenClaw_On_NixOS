@@ -76,6 +76,7 @@
     "dev:observer-workspace-command-execute-check:unix": "bash ./nix/scripts/dev-observer-workspace-command-execute-check.sh",
     "dev:observer-workspace-command-failure-check:unix": "bash ./nix/scripts/dev-observer-workspace-command-failure-check.sh",
     "dev:observer-workspace-command-denial-check:unix": "bash ./nix/scripts/dev-observer-workspace-command-denial-check.sh",
+    "dev:observer-workspace-command-denial-recovery-check:unix": "bash ./nix/scripts/dev-observer-workspace-command-denial-recovery-check.sh",
     "dev:observer-workspace-command-recovery-check:unix": "bash ./nix/scripts/dev-observer-workspace-command-recovery-check.sh",
     "dev:observer-workspace-command-recovery-persistence-check:unix": "bash ./nix/scripts/dev-observer-workspace-command-recovery-persistence-check.sh",
     "dev:observer-operator-check:unix": "bash ./nix/scripts/dev-observer-operator-check.sh",
