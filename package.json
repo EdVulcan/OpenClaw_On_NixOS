@@ -37,6 +37,7 @@
     "dev:sovereign-command-ledger-check:unix": "bash ./nix/scripts/dev-sovereign-command-ledger-check.sh",
     "dev:sovereign-filesystem-write-check:unix": "bash ./nix/scripts/dev-sovereign-filesystem-write-check.sh",
     "dev:sovereign-filesystem-workspace-check:unix": "bash ./nix/scripts/dev-sovereign-filesystem-workspace-check.sh",
+    "dev:sovereign-filesystem-ledger-check:unix": "bash ./nix/scripts/dev-sovereign-filesystem-ledger-check.sh",
     "dev:approval-check:unix": "bash ./nix/scripts/dev-approval-check.sh",
     "dev:capability-check:unix": "bash ./nix/scripts/dev-capability-check.sh",
     "dev:capability-planner-check:unix": "bash ./nix/scripts/dev-capability-planner-check.sh",

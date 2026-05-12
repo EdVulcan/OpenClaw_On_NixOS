@@ -185,6 +185,14 @@ npm run dev:sovereign-filesystem-workspace-check:unix
 
 This verifies `act.filesystem.mkdir`, `act.filesystem.write_text`, and filesystem metadata can form an autonomous workspace creation chain inside allowed body roots.
 
+Run the sovereign filesystem ledger slice directly:
+
+```bash
+npm run dev:sovereign-filesystem-ledger-check:unix
+```
+
+This verifies `/filesystem/changes` and `/filesystem/changes/summary` expose mkdir/write changes and survive core restart recovery.
+
 Run the observer command transcript slice directly:
 
 ```bash
@@ -515,6 +523,7 @@ This is based on real NixOS VM validation:
 - `dev:sovereign-command-ledger-check:unix` covers queryable command transcript ledger and restart recovery
 - `dev:sovereign-filesystem-write-check:unix` covers bounded autonomous filesystem text writes under sovereign body autonomy
 - `dev:sovereign-filesystem-workspace-check:unix` covers autonomous directory creation, file write, and metadata verification chains
+- `dev:sovereign-filesystem-ledger-check:unix` covers queryable filesystem change ledger and restart recovery
 - `dev:observer-command-transcript-check:unix` covers Observer visibility for sovereign command transcripts
 - `dev:observer-command-ledger-check:unix` covers Observer visibility for the cross-task command transcript ledger
 - `dev:capability-planner-check:unix` covers capability-aware plan metadata and approval-gated body capabilities

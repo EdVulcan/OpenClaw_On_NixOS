@@ -1065,6 +1065,7 @@ function normaliseCapabilityInvokeRequest(body = {}) {
   const params = body.params && typeof body.params === "object" ? body.params : {};
   return {
     capabilityId,
+    taskId: typeof body.taskId === "string" && body.taskId.trim() ? body.taskId.trim() : null,
     params,
     operation: typeof body.operation === "string" && body.operation.trim() ? body.operation.trim() : null,
     intent: typeof body.intent === "string" && body.intent.trim() ? body.intent.trim() : null,
@@ -1081,6 +1082,7 @@ function buildCapabilityPolicyInput(capability, request) {
     : capability.domains?.[0] ?? "body_internal";
   return {
     type: "capability_invoke",
+    taskId: request.taskId ?? null,
     intent,
     domain: request.policy.domain ?? preferredDomain,
     risk: request.policy.risk ?? capability.risk,
@@ -1259,6 +1261,7 @@ function recordCapabilityInvocation({ capability, request, policy, invoked, bloc
       governance: capability.governance,
     },
     request: {
+      taskId: request.taskId ?? null,
       operation: request.operation ?? request.params?.operation ?? null,
       intent: request.intent ?? capability.intents?.[0] ?? null,
       approved: request.approved === true,
@@ -1992,6 +1995,7 @@ function buildCapabilityInvokeBodyFromPlanStep(step, task) {
   const approved = isTaskPolicyApproved(task);
   return {
     capabilityId: step.capabilityId,
+    taskId: task.id,
     intent: step.intent ?? step.kind,
     operation: inferCapabilityOperation(step),
     approved,
@@ -2166,6 +2170,81 @@ function buildCommandTranscriptSummary() {
 }
 
 function serialiseCommandTranscriptSummary(summary) {
+  return {
+    ...summary,
+    taskIds: [...summary.taskIds],
+    taskCount: summary.taskIds.size,
+  };
+}
+
+const FILESYSTEM_CHANGE_CAPABILITIES = new Set([
+  "act.filesystem.mkdir",
+  "act.filesystem.write_text",
+]);
+
+function classifyFilesystemChange(entry) {
+  if (entry.capability?.id === "act.filesystem.mkdir") {
+    return "mkdir";
+  }
+  if (entry.capability?.id === "act.filesystem.write_text") {
+    return "write_text";
+  }
+  return "unknown";
+}
+
+function buildFilesystemChangeRecords() {
+  return capabilityInvocationLog
+    .filter((entry) => entry.invoked === true && entry.blocked !== true && FILESYSTEM_CHANGE_CAPABILITIES.has(entry.capability?.id))
+    .map((entry) => ({
+      id: entry.id,
+      at: entry.at,
+      taskId: entry.request?.taskId ?? null,
+      capabilityId: entry.capability?.id ?? null,
+      change: classifyFilesystemChange(entry),
+      path: entry.summary?.path ?? entry.request?.path ?? null,
+      contentBytes: entry.summary?.contentBytes ?? null,
+      overwrite: entry.summary?.overwrite ?? null,
+      created: entry.summary?.created ?? null,
+      recursive: entry.summary?.recursive ?? null,
+      policy: entry.policy ?? null,
+      summary: entry.summary ?? null,
+    }))
+    .sort((left, right) => String(right.at).localeCompare(String(left.at)));
+}
+
+function listFilesystemChangeRecords({ limit = 20 } = {}) {
+  const safeLimit = Math.max(1, Math.min(Number.isInteger(limit) ? limit : 20, 100));
+  return buildFilesystemChangeRecords().slice(0, safeLimit);
+}
+
+function buildFilesystemChangeSummary() {
+  return buildFilesystemChangeRecords().reduce((summary, record) => {
+    summary.total += 1;
+    summary[record.change] = (summary[record.change] ?? 0) + 1;
+    if (record.taskId) {
+      summary.taskIds.add(record.taskId);
+    }
+    const capabilityId = record.capabilityId ?? "unknown";
+    summary.byCapability[capabilityId] = (summary.byCapability[capabilityId] ?? 0) + 1;
+    const decision = record.policy?.decision ?? "unknown";
+    summary.byPolicy[decision] = (summary.byPolicy[decision] ?? 0) + 1;
+    if (!summary.latestAt || String(record.at).localeCompare(summary.latestAt) > 0) {
+      summary.latestAt = record.at;
+    }
+    return summary;
+  }, {
+    total: 0,
+    mkdir: 0,
+    write_text: 0,
+    taskIds: new Set(),
+    taskCount: 0,
+    latestAt: null,
+    byCapability: {},
+    byPolicy: {},
+  });
+}
+
+function serialiseFilesystemChangeSummary(summary) {
   return {
     ...summary,
     taskIds: [...summary.taskIds],
@@ -3129,6 +3208,27 @@ const server = http.createServer(async (req, res) => {
     sendJson(res, 200, {
       ok: true,
       summary: serialiseCommandTranscriptSummary(buildCommandTranscriptSummary()),
+    });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/filesystem/changes") {
+    const limit = Number.parseInt(requestUrl.searchParams.get("limit") ?? "20", 10);
+    const safeLimit = Number.isNaN(limit) ? 20 : Math.max(1, Math.min(limit, 100));
+    const items = listFilesystemChangeRecords({ limit: safeLimit });
+    sendJson(res, 200, {
+      ok: true,
+      count: items.length,
+      items,
+      summary: serialiseFilesystemChangeSummary(buildFilesystemChangeSummary()),
+    });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/filesystem/changes/summary") {
+    sendJson(res, 200, {
+      ok: true,
+      summary: serialiseFilesystemChangeSummary(buildFilesystemChangeSummary()),
     });
     return;
   }
