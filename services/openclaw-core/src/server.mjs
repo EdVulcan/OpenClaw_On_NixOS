@@ -984,6 +984,212 @@ function summariseCapabilities(capabilities) {
   });
 }
 
+function normaliseCapabilityInvokeRequest(body = {}) {
+  const capabilityId =
+    typeof body.capabilityId === "string" && body.capabilityId.trim()
+      ? body.capabilityId.trim()
+      : typeof body.id === "string" && body.id.trim()
+        ? body.id.trim()
+        : "";
+  const params = body.params && typeof body.params === "object" ? body.params : {};
+  return {
+    capabilityId,
+    params,
+    operation: typeof body.operation === "string" && body.operation.trim() ? body.operation.trim() : null,
+    intent: typeof body.intent === "string" && body.intent.trim() ? body.intent.trim() : null,
+    approved: body.approved === true || body.policy?.approved === true,
+    policy: body.policy && typeof body.policy === "object" ? body.policy : {},
+  };
+}
+
+function buildCapabilityPolicyInput(capability, request) {
+  const intent = request.intent ?? capability.intents?.[0] ?? "capability.invoke";
+  const preferredDomain = capability.domains?.includes("cross_boundary")
+    && !capability.domains?.includes("body_internal")
+    ? "cross_boundary"
+    : capability.domains?.[0] ?? "body_internal";
+  return {
+    type: "capability_invoke",
+    intent,
+    domain: request.policy.domain ?? preferredDomain,
+    risk: request.policy.risk ?? capability.risk,
+    requiresApproval:
+      request.policy.requiresApproval === true
+      || capability.requiresApproval === true
+      || capability.governance === "require_approval",
+    approved: request.approved,
+    policy: {
+      ...request.policy,
+      intent,
+      domain: request.policy.domain ?? preferredDomain,
+      risk: request.policy.risk ?? capability.risk,
+      requiresApproval:
+        request.policy.requiresApproval === true
+        || capability.requiresApproval === true
+        || capability.governance === "require_approval",
+      approved: request.approved,
+    },
+  };
+}
+
+function buildSystemSenseUrl(pathname, params = {}) {
+  const url = new URL(pathname, systemSenseUrl);
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && String(value).trim() !== "") {
+      url.searchParams.set(key, String(value));
+    }
+  }
+  return url.toString();
+}
+
+async function callCapabilityBackend(capability, request) {
+  if (capability.id === "sense.system.vitals") {
+    return fetchJson(`${systemSenseUrl}/system/health`);
+  }
+
+  if (capability.id === "sense.filesystem.read") {
+    const operation = request.operation ?? request.params.operation ?? "list";
+    if (operation === "metadata") {
+      return fetchJson(buildSystemSenseUrl("/system/files/metadata", {
+        path: request.params.path,
+      }));
+    }
+    if (operation === "search") {
+      return fetchJson(buildSystemSenseUrl("/system/files/search", {
+        path: request.params.path,
+        query: request.params.query ?? request.params.q,
+        limit: request.params.limit,
+      }));
+    }
+    return fetchJson(buildSystemSenseUrl("/system/files/list", {
+      path: request.params.path,
+      limit: request.params.limit,
+    }));
+  }
+
+  if (capability.id === "sense.process.list") {
+    return fetchJson(buildSystemSenseUrl("/system/processes", {
+      query: request.params.query ?? request.params.q,
+      limit: request.params.limit,
+    }));
+  }
+
+  if (capability.id === "act.system.command.dry_run") {
+    return postJson(`${systemSenseUrl}/system/command/dry-run`, {
+      ...request.params,
+      intent: request.intent ?? "system.command",
+    });
+  }
+
+  throw new Error(`Capability ${capability.id} is not invokable through core-v0.`);
+}
+
+function summariseCapabilityInvocationResult(capability, result) {
+  if (capability.id === "sense.system.vitals") {
+    return {
+      kind: "system.vitals",
+      ok: result?.ok === true,
+      alerts: result?.system?.alerts?.length ?? 0,
+      services: Object.keys(result?.system?.services ?? {}).length,
+    };
+  }
+  if (capability.id === "sense.filesystem.read") {
+    return {
+      kind: "filesystem.read",
+      ok: result?.ok === true,
+      count: result?.count ?? (result?.metadata ? 1 : 0),
+      path: result?.path ?? null,
+    };
+  }
+  if (capability.id === "sense.process.list") {
+    return {
+      kind: "process.list",
+      ok: result?.ok === true,
+      count: result?.count ?? 0,
+    };
+  }
+  if (capability.id === "act.system.command.dry_run") {
+    return {
+      kind: "command.dry_run",
+      ok: result?.ok === true,
+      risk: result?.plan?.risk ?? null,
+      governance: result?.plan?.governance ?? null,
+      wouldExecute: result?.plan?.wouldExecute ?? null,
+    };
+  }
+  return {
+    kind: capability.id,
+    ok: result?.ok === true,
+  };
+}
+
+async function invokeCapability(body = {}) {
+  const request = normaliseCapabilityInvokeRequest(body);
+  if (!request.capabilityId) {
+    return {
+      statusCode: 400,
+      response: { ok: false, error: "capabilityId is required." },
+    };
+  }
+
+  const capability = capabilityById(request.capabilityId);
+  if (!capability) {
+    return {
+      statusCode: 404,
+      response: { ok: false, error: "Capability not found." },
+    };
+  }
+
+  const policy = recordPolicyDecision(evaluatePolicyIntent(
+    buildCapabilityPolicyInput(capability, request),
+    {
+      stage: "capability.invoke",
+      type: "capability_invoke",
+      goal: `Invoke ${capability.id}`,
+    },
+  ));
+  await publishEvent("policy.evaluated", { capability, policy });
+
+  if (!isPolicyExecutionAllowed(policy)) {
+    await publishEvent("capability.blocked", {
+      capability,
+      policy,
+      reason: policy.reason,
+    });
+    return {
+      statusCode: 200,
+      response: {
+        ok: true,
+        invoked: false,
+        blocked: true,
+        reason: policy.decision === "deny" ? "policy_denied" : "policy_requires_approval",
+        capability,
+        policy,
+      },
+    };
+  }
+
+  const result = await callCapabilityBackend(capability, request);
+  const summary = summariseCapabilityInvocationResult(capability, result);
+  await publishEvent("capability.invoked", {
+    capability,
+    policy,
+    summary,
+  });
+  return {
+    statusCode: 200,
+    response: {
+      ok: true,
+      invoked: true,
+      blocked: false,
+      capability,
+      policy,
+      summary,
+      result,
+    },
+  };
+}
+
 async function buildCapabilityRegistry() {
   const serviceNames = [...new Set(baseCapabilities().map((capability) => capability.service))];
   const healthEntries = await Promise.all(serviceNames.map(async (service) => [service, await probeServiceHealth(service)]));
@@ -2116,6 +2322,18 @@ const server = http.createServer(async (req, res) => {
       refreshed: true,
       ...registry,
     });
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/capabilities/invoke") {
+    try {
+      const body = await readJsonBody(req);
+      const invocation = await invokeCapability(body);
+      sendJson(res, invocation.statusCode, invocation.response);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
     return;
   }
 
