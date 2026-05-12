@@ -360,7 +360,14 @@ function observerHtml() {
           <div class="metric"><span>Registry</span><span id="capability-registry">capability-v0</span></div>
           <div class="metric"><span>Online</span><span id="capability-online">0</span></div>
           <div class="metric"><span>Approval Gates</span><span id="capability-approval">0</span></div>
+          <div class="actions tight">
+            <button id="invoke-vitals-button" class="secondary">Invoke Vitals</button>
+            <button id="invoke-process-button" class="secondary">Invoke Processes</button>
+            <button id="invoke-command-dry-run-button" class="secondary">Blocked Command Dry Run</button>
+            <button id="invoke-approved-command-dry-run-button" class="secondary">Approved Dry Run</button>
+          </div>
           <pre id="capability-json">Loading body capabilities...</pre>
+          <pre id="capability-invoke-json">No capability invocation yet.</pre>
         </section>
         <section class="panel">
           <h2>Recent Tasks</h2>
@@ -557,6 +564,11 @@ const capabilityRegistry = document.querySelector("#capability-registry");
 const capabilityOnline = document.querySelector("#capability-online");
 const capabilityApproval = document.querySelector("#capability-approval");
 const capabilityJson = document.querySelector("#capability-json");
+const capabilityInvokeJson = document.querySelector("#capability-invoke-json");
+const invokeVitalsButton = document.querySelector("#invoke-vitals-button");
+const invokeProcessButton = document.querySelector("#invoke-process-button");
+const invokeCommandDryRunButton = document.querySelector("#invoke-command-dry-run-button");
+const invokeApprovedCommandDryRunButton = document.querySelector("#invoke-approved-command-dry-run-button");
 let currentTaskState = null;
 let latestActionState = null;
 let latestHistoryTask = null;
@@ -767,6 +779,22 @@ function renderCapabilityState(registry) {
   ].join("\\n");
 }
 
+function renderCapabilityInvocation(result) {
+  if (!result) {
+    capabilityInvokeJson.textContent = "No capability invocation yet.";
+    return;
+  }
+
+  capabilityInvokeJson.textContent = [
+    \`Capability: \${result.capability?.id ?? "unknown"}\`,
+    \`Invoked: \${Boolean(result.invoked)}\`,
+    \`Blocked: \${Boolean(result.blocked)}\`,
+    \`Reason: \${result.reason ?? "none"}\`,
+    \`Policy: \${result.policy?.decision ?? "none"} / \${result.policy?.domain ?? "unknown"} / risk=\${result.policy?.risk ?? "unknown"}\`,
+    \`Summary: \${JSON.stringify(result.summary ?? {}, null, 2)}\`,
+  ].join("\\n");
+}
+
 function renderOperatorPanel(result) {
   if (!result) {
     renderOperatorState(null);
@@ -856,6 +884,48 @@ async function refreshCapabilityState() {
     capabilityApproval.textContent = "unknown";
     capabilityJson.textContent = "Unable to read body capabilities.";
   }
+}
+
+async function invokeCapabilityFromUi(kind) {
+  const requests = {
+    vitals: {
+      capabilityId: "sense.system.vitals",
+      intent: "system.observe",
+    },
+    process: {
+      capabilityId: "sense.process.list",
+      intent: "process.list",
+      params: { limit: 10 },
+    },
+    commandDryRun: {
+      capabilityId: "act.system.command.dry_run",
+      intent: "system.command",
+      params: { command: "rm", args: ["-rf", "/tmp/openclaw-danger"] },
+    },
+    approvedCommandDryRun: {
+      capabilityId: "act.system.command.dry_run",
+      intent: "system.command",
+      approved: true,
+      params: { command: "rm", args: ["-rf", "/tmp/openclaw-danger"] },
+    },
+  };
+  const body = requests[kind];
+  if (!body) {
+    throw new Error(\`Unknown capability invocation kind: \${kind}\`);
+  }
+
+  const result = await fetchJson(\`\${observerConfig.coreUrl}/capabilities/invoke\`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  renderCapabilityInvocation(result);
+  setControlMessage(result.invoked
+    ? \`Capability invoked: \${result.capability?.id ?? body.capabilityId}\`
+    : \`Capability blocked: \${result.reason ?? "unknown"}\`);
+  await refreshCapabilityState();
+  await refreshPolicyState();
+  await refreshAuditState();
 }
 
 async function resolveLatestApproval(action) {
@@ -1810,6 +1880,8 @@ function subscribeEvents() {
     "approval.approved",
     "approval.denied",
     "capability.updated",
+    "capability.invoked",
+    "capability.blocked",
     "service.started",
     "browser.started",
     "browser.updated",
@@ -1834,7 +1906,13 @@ function subscribeEvents() {
         if (eventName === "approval.created" || eventName === "approval.approved" || eventName === "approval.denied") {
           await refreshApprovalState();
         }
-        if (eventName === "capability.updated" || eventName === "service.started" || eventName === "service.failed") {
+        if (
+          eventName === "capability.updated"
+          || eventName === "capability.invoked"
+          || eventName === "capability.blocked"
+          || eventName === "service.started"
+          || eventName === "service.failed"
+        ) {
           await refreshCapabilityState();
         }
         if (
@@ -1895,6 +1973,30 @@ approveLatestButton.addEventListener("click", () => {
 
 denyLatestButton.addEventListener("click", () => {
   resolveLatestApproval("deny").catch((error) => {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  });
+});
+
+invokeVitalsButton.addEventListener("click", () => {
+  invokeCapabilityFromUi("vitals").catch((error) => {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  });
+});
+
+invokeProcessButton.addEventListener("click", () => {
+  invokeCapabilityFromUi("process").catch((error) => {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  });
+});
+
+invokeCommandDryRunButton.addEventListener("click", () => {
+  invokeCapabilityFromUi("commandDryRun").catch((error) => {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  });
+});
+
+invokeApprovedCommandDryRunButton.addEventListener("click", () => {
+  invokeCapabilityFromUi("approvedCommandDryRun").catch((error) => {
     setControlMessage(\`Request failed: \${formatError(error)}\`);
   });
 });

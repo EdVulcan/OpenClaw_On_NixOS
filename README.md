@@ -161,6 +161,14 @@ npm run dev:observer-capability-plan-check:unix
 
 This verifies Observer exposes planner, capability count, approval-gate count, and per-step capability/risk/governance metadata for capability-aware plans.
 
+Run the Observer capability invocation controls slice directly:
+
+```bash
+npm run dev:observer-capability-invoke-check:unix
+```
+
+This verifies Observer exposes capability invocation controls and result visibility for audited vitals/process calls, blocked command dry-run, and approved dry-run.
+
 Run the conservative system capability slice directly:
 
 ```bash
@@ -390,6 +398,7 @@ This is based on real NixOS VM validation:
 - `dev:capability-planner-check:unix` covers capability-aware plan metadata and approval-gated body capabilities
 - `dev:capability-invoke-check:unix` covers policy-governed capability invocation through core
 - `dev:observer-capability-plan-check:unix` covers Observer visibility for body capability decisions inside plans
+- `dev:observer-capability-invoke-check:unix` covers Observer controls for policy-governed capability invocation
 - `dev:system-sense-check:unix` covers real body vitals and service health telemetry
 - `dev:system-heal-check:unix` covers conservative diagnosis, autofix, and heal history
 - direct GNOME/Wayland whole-desktop capture remains inconsistent across:

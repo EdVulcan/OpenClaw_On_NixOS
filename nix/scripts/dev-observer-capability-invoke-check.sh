@@ -1,0 +1,144 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+export OPENCLAW_CORE_PORT="${OPENCLAW_CORE_PORT:-7000}"
+export OPENCLAW_EVENT_HUB_PORT="${OPENCLAW_EVENT_HUB_PORT:-7001}"
+export OPENCLAW_SESSION_MANAGER_PORT="${OPENCLAW_SESSION_MANAGER_PORT:-7002}"
+export OPENCLAW_BROWSER_RUNTIME_PORT="${OPENCLAW_BROWSER_RUNTIME_PORT:-7003}"
+export OPENCLAW_SCREEN_SENSE_PORT="${OPENCLAW_SCREEN_SENSE_PORT:-7004}"
+export OPENCLAW_SCREEN_ACT_PORT="${OPENCLAW_SCREEN_ACT_PORT:-7005}"
+export OPENCLAW_SYSTEM_SENSE_PORT="${OPENCLAW_SYSTEM_SENSE_PORT:-7006}"
+export OPENCLAW_SYSTEM_HEAL_PORT="${OPENCLAW_SYSTEM_HEAL_PORT:-7007}"
+export OBSERVER_UI_PORT="${OBSERVER_UI_PORT:-7070}"
+export OPENCLAW_CORE_STATE_FILE="${OPENCLAW_CORE_STATE_FILE:-$REPO_ROOT/.artifacts/openclaw-core-observer-capability-invoke-check.json}"
+export OPENCLAW_EVENT_LOG_FILE="${OPENCLAW_EVENT_LOG_FILE:-$REPO_ROOT/.artifacts/openclaw-observer-capability-invoke-check-events.jsonl}"
+
+CORE_URL="http://127.0.0.1:$OPENCLAW_CORE_PORT"
+EVENT_HUB_URL="http://127.0.0.1:$OPENCLAW_EVENT_HUB_PORT"
+OBSERVER_URL="http://127.0.0.1:$OBSERVER_UI_PORT"
+
+"$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
+rm -f "$OPENCLAW_CORE_STATE_FILE" "$OPENCLAW_CORE_STATE_FILE.tmp" "$OPENCLAW_EVENT_LOG_FILE"
+
+cleanup() {
+  rm -f \
+    "${HTML_FILE:-}" \
+    "${CLIENT_FILE:-}" \
+    "${VITALS_FILE:-}" \
+    "${PROCESS_FILE:-}" \
+    "${BLOCKED_FILE:-}" \
+    "${APPROVED_FILE:-}" \
+    "${EVENTS_FILE:-}"
+  "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
+}
+trap cleanup EXIT
+
+post_json() {
+  local url="$1"
+  local body="$2"
+  curl --silent --fail -X POST "$url" -H 'content-type: application/json' -d "$body"
+}
+
+"$SCRIPT_DIR/dev-up.sh"
+
+HTML_FILE="$(mktemp)"
+CLIENT_FILE="$(mktemp)"
+VITALS_FILE="$(mktemp)"
+PROCESS_FILE="$(mktemp)"
+BLOCKED_FILE="$(mktemp)"
+APPROVED_FILE="$(mktemp)"
+EVENTS_FILE="$(mktemp)"
+
+curl --silent --fail "$OBSERVER_URL/" > "$HTML_FILE"
+curl --silent --fail "$OBSERVER_URL/client-v5.js" > "$CLIENT_FILE"
+post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"sense.system.vitals","intent":"system.observe"}' > "$VITALS_FILE"
+post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"sense.process.list","intent":"process.list","params":{"limit":10}}' > "$PROCESS_FILE"
+post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"act.system.command.dry_run","intent":"system.command","params":{"command":"rm","args":["-rf","/tmp/openclaw-danger"]}}' > "$BLOCKED_FILE"
+post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"act.system.command.dry_run","intent":"system.command","approved":true,"params":{"command":"rm","args":["-rf","/tmp/openclaw-danger"]}}' > "$APPROVED_FILE"
+curl --silent --fail "$EVENT_HUB_URL/events/audit?source=openclaw-core&limit=80" > "$EVENTS_FILE"
+
+node - <<'EOF' \
+  "$HTML_FILE" \
+  "$CLIENT_FILE" \
+  "$VITALS_FILE" \
+  "$PROCESS_FILE" \
+  "$BLOCKED_FILE" \
+  "$APPROVED_FILE" \
+  "$EVENTS_FILE"
+const fs = require("node:fs");
+const html = fs.readFileSync(process.argv[2], "utf8");
+const client = fs.readFileSync(process.argv[3], "utf8");
+const vitals = JSON.parse(fs.readFileSync(process.argv[4], "utf8"));
+const processes = JSON.parse(fs.readFileSync(process.argv[5], "utf8"));
+const blocked = JSON.parse(fs.readFileSync(process.argv[6], "utf8"));
+const approved = JSON.parse(fs.readFileSync(process.argv[7], "utf8"));
+const events = JSON.parse(fs.readFileSync(process.argv[8], "utf8"));
+
+for (const token of [
+  "invoke-vitals-button",
+  "invoke-process-button",
+  "invoke-command-dry-run-button",
+  "invoke-approved-command-dry-run-button",
+  "capability-invoke-json",
+]) {
+  if (!html.includes(token)) {
+    throw new Error(`Observer HTML missing ${token}`);
+  }
+}
+
+for (const token of [
+  "/capabilities/invoke",
+  "invokeCapabilityFromUi",
+  "renderCapabilityInvocation",
+  "capability.invoked",
+  "capability.blocked",
+  "policy_requires_approval",
+]) {
+  if (!client.includes(token)) {
+    throw new Error(`Observer client missing ${token}`);
+  }
+}
+
+if (!vitals.ok || vitals.invoked !== true || vitals.policy?.decision !== "audit_only") {
+  throw new Error("Observer vitals invoke path should return an audited invocation");
+}
+if (!processes.ok || processes.invoked !== true || processes.result?.count < 1) {
+  throw new Error("Observer process invoke path should return process summaries");
+}
+if (!blocked.ok || blocked.invoked !== false || blocked.blocked !== true || blocked.reason !== "policy_requires_approval") {
+  throw new Error("Observer blocked dry-run path should expose policy_requires_approval");
+}
+if (!approved.ok || approved.invoked !== true || approved.summary?.wouldExecute !== false) {
+  throw new Error("Observer approved dry-run path should remain dry-run only");
+}
+
+const eventTypes = new Set((events.items ?? []).map((event) => event.type));
+for (const type of ["capability.invoked", "capability.blocked", "policy.evaluated"]) {
+  if (!eventTypes.has(type)) {
+    throw new Error(`audit log missing ${type}`);
+  }
+}
+
+console.log(JSON.stringify({
+  observerCapabilityInvoke: {
+    htmlControls: [
+      "invoke-vitals-button",
+      "invoke-process-button",
+      "invoke-command-dry-run-button",
+      "invoke-approved-command-dry-run-button",
+    ],
+    clientApis: [
+      "/capabilities/invoke",
+      "renderCapabilityInvocation",
+    ],
+    vitalsPolicy: vitals.policy.decision,
+    processCount: processes.result.count,
+    blockedReason: blocked.reason,
+    approvedWouldExecute: approved.summary.wouldExecute,
+  },
+  auditEvents: [...eventTypes].filter((type) => type.startsWith("capability.") || type === "policy.evaluated"),
+}, null, 2));
+EOF
