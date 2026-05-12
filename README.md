@@ -110,7 +110,7 @@ npm run dev:body-config-check:unix
 To run only a subset:
 
 ```bash
-OPENCLAW_MILESTONE_CHECKS=body-config,planner,operator-loop,operator-control,policy,approval,capability,event-audit npm run dev:milestone-check:unix
+OPENCLAW_MILESTONE_CHECKS=body-config,planner,operator-loop,operator-control,policy,approval,capability,event-audit,system-capability npm run dev:milestone-check:unix
 ```
 
 Run the policy governance slice directly:
@@ -136,6 +136,14 @@ npm run dev:capability-check:unix
 ```
 
 This verifies the body capability inventory, service-backed health status, risk/governance metadata, cross-boundary approval boundaries, Observer visibility, and capability refresh events.
+
+Run the conservative system capability slice directly:
+
+```bash
+npm run dev:system-capability-check:unix
+```
+
+This verifies allowed-root filesystem sensing, filename search, process listing, command dry-run risk classification, capability registry exposure, and audit events without executing system commands.
 
 Run the durable event audit ledger slice directly:
 

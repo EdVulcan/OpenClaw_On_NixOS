@@ -1,16 +1,28 @@
 import http from "node:http";
 import { randomUUID } from "node:crypto";
-import { statfsSync } from "node:fs";
+import { execFile } from "node:child_process";
+import { existsSync, readdirSync, statfsSync, statSync } from "node:fs";
 import os from "node:os";
+import path from "node:path";
+import { promisify } from "node:util";
 
 const host = process.env.OPENCLAW_SYSTEM_SENSE_HOST ?? "127.0.0.1";
 const port = Number.parseInt(process.env.OPENCLAW_SYSTEM_SENSE_PORT ?? "4106", 10);
 const eventHubUrl = process.env.OPENCLAW_EVENT_HUB_URL ?? "http://127.0.0.1:4101";
 const stateDir = process.env.OPENCLAW_BODY_STATE_DIR ?? process.cwd();
 const diskPath = process.env.OPENCLAW_SYSTEM_SENSE_DISK_PATH ?? stateDir;
+const allowedRoots = (process.env.OPENCLAW_SYSTEM_ALLOWED_ROOTS ?? `${stateDir}${path.delimiter}${process.cwd()}`)
+  .split(path.delimiter)
+  .map((root) => root.trim())
+  .filter(Boolean)
+  .map((root) => path.resolve(root));
 const memoryWarningPercent = Number.parseInt(process.env.OPENCLAW_SYSTEM_MEMORY_WARNING_PERCENT ?? "90", 10);
 const diskWarningPercent = Number.parseInt(process.env.OPENCLAW_SYSTEM_DISK_WARNING_PERCENT ?? "90", 10);
 const serviceTimeoutMs = Number.parseInt(process.env.OPENCLAW_SYSTEM_SERVICE_TIMEOUT_MS ?? "1500", 10);
+const maxFileListLimit = Number.parseInt(process.env.OPENCLAW_SYSTEM_FILE_LIST_LIMIT ?? "100", 10);
+const maxSearchLimit = Number.parseInt(process.env.OPENCLAW_SYSTEM_FILE_SEARCH_LIMIT ?? "100", 10);
+const maxSearchDepth = Number.parseInt(process.env.OPENCLAW_SYSTEM_FILE_SEARCH_DEPTH ?? "4", 10);
+const execFileAsync = promisify(execFile);
 
 const serviceTargets = {
   core: process.env.OPENCLAW_CORE_URL ?? "http://127.0.0.1:4100",
@@ -54,6 +66,31 @@ function sendJson(res, statusCode, payload) {
   res.end(JSON.stringify(payload, null, 2));
 }
 
+function readJsonBody(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+
+    req.on("data", (chunk) => {
+      chunks.push(chunk);
+    });
+
+    req.on("end", () => {
+      if (chunks.length === 0) {
+        resolve({});
+        return;
+      }
+
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString("utf8")));
+      } catch (error) {
+        reject(error);
+      }
+    });
+
+    req.on("error", reject);
+  });
+}
+
 async function publishEvent(type, payload = {}) {
   try {
     await fetch(`${eventHubUrl}/events`, {
@@ -68,6 +105,257 @@ async function publishEvent(type, payload = {}) {
   } catch (error) {
     console.error("Failed to publish system-sense event:", error);
   }
+}
+
+function normaliseForBoundary(value) {
+  const resolved = path.resolve(value);
+  return process.platform === "win32" ? resolved.toLowerCase() : resolved;
+}
+
+function resolveAllowedPath(inputPath = null) {
+  const rawPath = typeof inputPath === "string" && inputPath.trim()
+    ? inputPath.trim()
+    : allowedRoots[0];
+  const candidate = path.resolve(rawPath);
+  const normalisedCandidate = normaliseForBoundary(candidate);
+  const root = allowedRoots.find((allowedRoot) => {
+    const normalisedRoot = normaliseForBoundary(allowedRoot);
+    return normalisedCandidate === normalisedRoot
+      || normalisedCandidate.startsWith(`${normalisedRoot}${path.sep}`);
+  });
+
+  if (!root) {
+    const error = new Error("Path is outside allowed OpenClaw system-sense roots.");
+    error.code = "PATH_OUTSIDE_ALLOWED_ROOTS";
+    error.details = { path: candidate, allowedRoots };
+    throw error;
+  }
+
+  return {
+    requestedPath: rawPath,
+    path: candidate,
+    root,
+  };
+}
+
+function classifyFile(stats) {
+  if (stats.isDirectory()) {
+    return "directory";
+  }
+  if (stats.isFile()) {
+    return "file";
+  }
+  if (stats.isSymbolicLink()) {
+    return "symlink";
+  }
+  return "other";
+}
+
+function buildFileMetadata(filePath) {
+  const stats = statSync(filePath);
+  return {
+    path: filePath,
+    name: path.basename(filePath),
+    type: classifyFile(stats),
+    sizeBytes: stats.size,
+    mode: stats.mode,
+    modifiedAt: stats.mtime.toISOString(),
+    createdAt: stats.birthtime.toISOString(),
+    readable: true,
+  };
+}
+
+function listFiles(inputPath, limit) {
+  const resolved = resolveAllowedPath(inputPath);
+  if (!existsSync(resolved.path)) {
+    const error = new Error("Path does not exist.");
+    error.code = "PATH_NOT_FOUND";
+    throw error;
+  }
+
+  const metadata = buildFileMetadata(resolved.path);
+  if (metadata.type !== "directory") {
+    return {
+      ...resolved,
+      directory: metadata,
+      entries: [metadata],
+      count: 1,
+    };
+  }
+
+  const safeLimit = Math.max(1, Math.min(Number.isFinite(limit) ? limit : 50, maxFileListLimit));
+  const entries = readdirSync(resolved.path)
+    .slice(0, safeLimit)
+    .map((entryName) => {
+      const entryPath = path.join(resolved.path, entryName);
+      try {
+        return buildFileMetadata(entryPath);
+      } catch {
+        return {
+          path: entryPath,
+          name: entryName,
+          type: "unreadable",
+          readable: false,
+        };
+      }
+    })
+    .sort((left, right) => String(left.type).localeCompare(String(right.type)) || left.name.localeCompare(right.name));
+
+  return {
+    ...resolved,
+    directory: metadata,
+    entries,
+    count: entries.length,
+    limit: safeLimit,
+  };
+}
+
+function searchFiles(inputPath, query, limit) {
+  if (typeof query !== "string" || !query.trim()) {
+    throw new Error("Search query is required.");
+  }
+
+  const resolved = resolveAllowedPath(inputPath);
+  const safeLimit = Math.max(1, Math.min(Number.isFinite(limit) ? limit : 50, maxSearchLimit));
+  const needle = query.trim().toLowerCase();
+  const results = [];
+
+  function visit(currentPath, depth) {
+    if (results.length >= safeLimit || depth > maxSearchDepth) {
+      return;
+    }
+
+    let stats;
+    try {
+      stats = statSync(currentPath);
+    } catch {
+      return;
+    }
+
+    const name = path.basename(currentPath);
+    if (name.toLowerCase().includes(needle)) {
+      results.push(buildFileMetadata(currentPath));
+      if (results.length >= safeLimit) {
+        return;
+      }
+    }
+
+    if (!stats.isDirectory()) {
+      return;
+    }
+
+    for (const entryName of readdirSync(currentPath)) {
+      visit(path.join(currentPath, entryName), depth + 1);
+      if (results.length >= safeLimit) {
+        return;
+      }
+    }
+  }
+
+  visit(resolved.path, 0);
+  return {
+    ...resolved,
+    query: query.trim(),
+    results,
+    count: results.length,
+    limit: safeLimit,
+    maxDepth: maxSearchDepth,
+  };
+}
+
+async function listProcesses({ query = "", limit = 50 } = {}) {
+  const safeLimit = Math.max(1, Math.min(Number.isFinite(limit) ? limit : 50, 200));
+  const needle = typeof query === "string" ? query.trim().toLowerCase() : "";
+
+  if (process.platform === "win32") {
+    const { stdout } = await execFileAsync("powershell", [
+      "-NoProfile",
+      "-Command",
+      "Get-Process | Select-Object -First 200 Id,ProcessName,CPU,WorkingSet64 | ConvertTo-Json -Compress",
+    ]);
+    const rawItems = JSON.parse(stdout || "[]");
+    const items = (Array.isArray(rawItems) ? rawItems : [rawItems])
+      .map((item) => ({
+        pid: item.Id,
+        name: item.ProcessName,
+        cpu: item.CPU ?? null,
+        memoryBytes: item.WorkingSet64 ?? null,
+        command: item.ProcessName,
+      }))
+      .filter((item) => !needle || String(item.name).toLowerCase().includes(needle) || String(item.command).toLowerCase().includes(needle))
+      .slice(0, safeLimit);
+    return { items, count: items.length, limit: safeLimit, query: needle };
+  }
+
+  const { stdout } = await execFileAsync("ps", ["-eo", "pid=,ppid=,stat=,pcpu=,pmem=,comm=,args="]);
+  const items = stdout
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const parts = line.split(/\s+/);
+      const [pid, ppid, state, cpuPercent, memoryPercent, name, ...commandParts] = parts;
+      return {
+        pid: Number.parseInt(pid, 10),
+        ppid: Number.parseInt(ppid, 10),
+        state,
+        cpuPercent: Number.parseFloat(cpuPercent),
+        memoryPercent: Number.parseFloat(memoryPercent),
+        name,
+        command: commandParts.join(" "),
+      };
+    })
+    .filter((item) => Number.isFinite(item.pid))
+    .filter((item) => !needle || String(item.name).toLowerCase().includes(needle) || String(item.command).toLowerCase().includes(needle))
+    .slice(0, safeLimit);
+
+  return { items, count: items.length, limit: safeLimit, query: needle };
+}
+
+function buildCommandDryRun(body) {
+  const command = typeof body.command === "string" && body.command.trim() ? body.command.trim() : null;
+  if (!command) {
+    throw new Error("Command is required for dry-run.");
+  }
+
+  const args = Array.isArray(body.args)
+    ? body.args.filter((arg) => typeof arg === "string")
+    : [];
+  const joined = [command, ...args].join(" ");
+  const destructivePattern = /\b(rm|mkfs|dd|shutdown|reboot|poweroff|chmod|chown|mount|umount|systemctl)\b|--delete|--force|-rf/;
+  const crossBoundaryPattern = /\b(curl|wget|scp|ssh|rsync|git|npm|nix|nixos-rebuild)\b/;
+  const destructive = destructivePattern.test(joined);
+  const crossBoundary = crossBoundaryPattern.test(joined);
+  const risk = destructive ? "high" : crossBoundary ? "medium" : "low";
+  const governance = destructive || crossBoundary ? "require_approval" : "audit_only";
+
+  return {
+    mode: "dry_run",
+    wouldExecute: false,
+    command,
+    args,
+    intent: typeof body.intent === "string" && body.intent.trim() ? body.intent.trim() : "system.command",
+    risk,
+    governance,
+    requiresApproval: governance === "require_approval",
+    checks: [
+      {
+        name: "no_execution",
+        passed: true,
+        detail: "system-sense only produces a dry-run plan.",
+      },
+      {
+        name: "destructive_pattern",
+        passed: !destructive,
+        detail: destructive ? "Command matches a high-risk system mutation pattern." : "No high-risk mutation pattern detected.",
+      },
+      {
+        name: "cross_boundary_pattern",
+        passed: !crossBoundary,
+        detail: crossBoundary ? "Command may cross local body boundaries." : "No cross-boundary pattern detected.",
+      },
+    ],
+  };
 }
 
 function readCpuSnapshot() {
@@ -295,6 +583,106 @@ const server = http.createServer(async (req, res) => {
       ok: true,
       alerts: systemState.alerts,
     });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/system/files/metadata") {
+    try {
+      const result = resolveAllowedPath(requestUrl.searchParams.get("path"));
+      const metadata = buildFileMetadata(result.path);
+      sendJson(res, 200, {
+        ok: true,
+        allowedRoots,
+        ...result,
+        metadata,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message, details: error.details ?? null });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/system/files/list") {
+    try {
+      const limit = Number.parseInt(requestUrl.searchParams.get("limit") ?? "50", 10);
+      const result = listFiles(requestUrl.searchParams.get("path"), limit);
+      await publishEvent("system.files.listed", {
+        path: result.path,
+        count: result.count,
+      });
+      sendJson(res, 200, {
+        ok: true,
+        allowedRoots,
+        ...result,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message, details: error.details ?? null });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/system/files/search") {
+    try {
+      const limit = Number.parseInt(requestUrl.searchParams.get("limit") ?? "50", 10);
+      const result = searchFiles(
+        requestUrl.searchParams.get("path"),
+        requestUrl.searchParams.get("query") ?? requestUrl.searchParams.get("q"),
+        limit,
+      );
+      await publishEvent("system.files.searched", {
+        path: result.path,
+        query: result.query,
+        count: result.count,
+      });
+      sendJson(res, 200, {
+        ok: true,
+        allowedRoots,
+        ...result,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message, details: error.details ?? null });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/system/processes") {
+    try {
+      const limit = Number.parseInt(requestUrl.searchParams.get("limit") ?? "50", 10);
+      const result = await listProcesses({
+        query: requestUrl.searchParams.get("query") ?? requestUrl.searchParams.get("q") ?? "",
+        limit,
+      });
+      await publishEvent("system.processes.listed", {
+        count: result.count,
+        query: result.query,
+      });
+      sendJson(res, 200, {
+        ok: true,
+        ...result,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 500, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/system/command/dry-run") {
+    try {
+      const body = await readJsonBody(req);
+      const plan = buildCommandDryRun(body);
+      await publishEvent("system.command.planned", { plan });
+      sendJson(res, 200, {
+        ok: true,
+        plan,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
     return;
   }
 

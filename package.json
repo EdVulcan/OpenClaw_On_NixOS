@@ -32,6 +32,7 @@
     "dev:approval-check:unix": "bash ./nix/scripts/dev-approval-check.sh",
     "dev:capability-check:unix": "bash ./nix/scripts/dev-capability-check.sh",
     "dev:event-audit-check:unix": "bash ./nix/scripts/dev-event-audit-check.sh",
+    "dev:system-capability-check:unix": "bash ./nix/scripts/dev-system-capability-check.sh",
     "dev:system-sense-check:unix": "bash ./nix/scripts/dev-system-sense-check.sh",
     "dev:system-heal-check:unix": "bash ./nix/scripts/dev-system-heal-check.sh",
     "dev:observer-operator-check:unix": "bash ./nix/scripts/dev-observer-operator-check.sh",
