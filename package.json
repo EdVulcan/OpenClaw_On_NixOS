@@ -81,6 +81,7 @@
     "dev:observer-workspace-detect-check:unix": "bash ./nix/scripts/dev-observer-workspace-detect-check.sh",
     "dev:observer-openclaw-source-migration-map-check:unix": "bash ./nix/scripts/dev-observer-openclaw-source-migration-map-check.sh",
     "dev:observer-openclaw-source-migration-plan-check:unix": "bash ./nix/scripts/dev-observer-openclaw-source-migration-plan-check.sh",
+    "dev:observer-openclaw-plugin-sdk-contract-review-check:unix": "bash ./nix/scripts/dev-observer-openclaw-plugin-sdk-contract-review-check.sh",
     "dev:observer-workspace-command-proposals-check:unix": "bash ./nix/scripts/dev-observer-workspace-command-proposals-check.sh",
     "dev:observer-workspace-command-plan-check:unix": "bash ./nix/scripts/dev-observer-workspace-command-plan-check.sh",
     "dev:observer-workspace-command-task-check:unix": "bash ./nix/scripts/dev-observer-workspace-command-task-check.sh",

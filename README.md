@@ -281,6 +281,14 @@ npm run dev:observer-openclaw-source-migration-plan-check:unix
 
 This verifies Observer surfaces the plan-only first-wave migration draft, including first-wave items, backlog counts, acceptance criteria, blockers, risks, priorities, and governance flags without exposing source file contents, creating tasks or approvals, mutating files, or executing source workspace commands.
 
+Run the observer OpenClaw plugin SDK contract review slice directly:
+
+```bash
+npm run dev:observer-openclaw-plugin-sdk-contract-review-check:unix
+```
+
+This verifies Observer surfaces the read-only plugin SDK contract review, including manifest shape, exports, types, script names, contract surfaces, review blockers, and governance flags without exposing SDK source contents, script bodies, README text, dependency versions, creating tasks or approvals, mutating files, or executing source workspace commands.
+
 Run the observer OpenClaw workspace command plan slice directly:
 
 ```bash
@@ -771,6 +779,7 @@ This is based on real NixOS VM validation:
 - `dev:observer-workspace-detect-check:unix` covers Observer visibility for read-only OpenClaw workspace detection
 - `dev:observer-openclaw-source-migration-map-check:unix` covers Observer visibility for read-only OpenClaw source migration candidates
 - `dev:observer-openclaw-source-migration-plan-check:unix` covers Observer visibility for plan-only OpenClaw source migration drafts
+- `dev:observer-openclaw-plugin-sdk-contract-review-check:unix` covers Observer visibility for read-only OpenClaw plugin SDK contract reviews
 - `dev:observer-workspace-command-proposals-check:unix` covers Observer visibility for OpenClaw workspace command proposals
 - `dev:observer-workspace-command-plan-check:unix` covers Observer visibility for OpenClaw workspace command plan drafts
 - `dev:observer-workspace-command-task-check:unix` covers Observer controls for approval-gated OpenClaw workspace command tasks

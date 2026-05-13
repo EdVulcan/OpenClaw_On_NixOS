@@ -69,6 +69,7 @@ checks=(
   "observer-workspace-detect|dev-observer-workspace-detect-check.sh|Observer visibility for read-only OpenClaw workspace detection"
   "observer-openclaw-source-migration-map|dev-observer-openclaw-source-migration-map-check.sh|Observer visibility for OpenClaw source migration candidates"
   "observer-openclaw-source-migration-plan|dev-observer-openclaw-source-migration-plan-check.sh|Observer visibility for plan-only OpenClaw source migration drafts"
+  "observer-openclaw-plugin-sdk-contract-review|dev-observer-openclaw-plugin-sdk-contract-review-check.sh|Observer visibility for OpenClaw plugin SDK contract reviews"
   "observer-workspace-command-proposals|dev-observer-workspace-command-proposals-check.sh|Observer visibility for OpenClaw workspace command proposals"
   "observer-workspace-command-plan|dev-observer-workspace-command-plan-check.sh|Observer visibility for OpenClaw workspace command plan drafts"
   "observer-workspace-command-task|dev-observer-workspace-command-task-check.sh|Observer controls for approval-gated OpenClaw workspace command tasks"

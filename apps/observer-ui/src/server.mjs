@@ -440,6 +440,16 @@ function observerHtml() {
           <pre id="workspace-migration-plan-json">Loading OpenClaw source migration plan...</pre>
         </section>
         <section class="panel">
+          <h2>OpenClaw Plugin SDK Contract Review</h2>
+          <div class="metric"><span>Registry</span><span id="plugin-sdk-review-registry">openclaw-plugin-sdk-contract-review-v0</span></div>
+          <div class="metric"><span>Reviews</span><span id="plugin-sdk-review-total">0</span></div>
+          <div class="metric"><span>Manifest</span><span id="plugin-sdk-review-manifest">0</span></div>
+          <div class="metric"><span>Types</span><span id="plugin-sdk-review-types">0</span></div>
+          <div class="metric"><span>Exports</span><span id="plugin-sdk-review-exports">0</span></div>
+          <div class="metric"><span>Mode</span><span id="plugin-sdk-review-mode">read-only</span></div>
+          <pre id="plugin-sdk-review-json">Loading plugin SDK contract review...</pre>
+        </section>
+        <section class="panel">
           <h2>Workspace Command Proposals</h2>
           <div class="metric"><span>Registry</span><span id="workspace-command-registry">workspace-command-proposals-v0</span></div>
           <div class="metric"><span>Total</span><span id="workspace-command-total">0</span></div>
@@ -721,6 +731,13 @@ const workspaceMigrationPlanCandidates = document.querySelector("#workspace-migr
 const workspaceMigrationPlanBacklog = document.querySelector("#workspace-migration-plan-backlog");
 const workspaceMigrationPlanMode = document.querySelector("#workspace-migration-plan-mode");
 const workspaceMigrationPlanJson = document.querySelector("#workspace-migration-plan-json");
+const pluginSdkReviewRegistry = document.querySelector("#plugin-sdk-review-registry");
+const pluginSdkReviewTotal = document.querySelector("#plugin-sdk-review-total");
+const pluginSdkReviewManifest = document.querySelector("#plugin-sdk-review-manifest");
+const pluginSdkReviewTypes = document.querySelector("#plugin-sdk-review-types");
+const pluginSdkReviewExports = document.querySelector("#plugin-sdk-review-exports");
+const pluginSdkReviewMode = document.querySelector("#plugin-sdk-review-mode");
+const pluginSdkReviewJson = document.querySelector("#plugin-sdk-review-json");
 const workspaceCommandRegistry = document.querySelector("#workspace-command-registry");
 const workspaceCommandTotal = document.querySelector("#workspace-command-total");
 const workspaceCommandValidation = document.querySelector("#workspace-command-validation");
@@ -1199,6 +1216,39 @@ function renderWorkspaceMigrationPlan(data) {
   ].join("\\n");
 }
 
+function renderPluginSdkContractReview(data) {
+  const summary = data?.summary ?? {};
+  const items = Array.isArray(data?.items) ? data.items : [];
+  pluginSdkReviewRegistry.textContent = data?.registry ?? "openclaw-plugin-sdk-contract-review-v0";
+  pluginSdkReviewTotal.textContent = String(summary.total ?? data?.count ?? 0);
+  pluginSdkReviewManifest.textContent = String(summary.withManifest ?? 0);
+  pluginSdkReviewTypes.textContent = String(summary.withTypes ?? 0);
+  pluginSdkReviewExports.textContent = String(summary.withExports ?? 0);
+  pluginSdkReviewMode.textContent = data?.mode ?? "read-only";
+
+  pluginSdkReviewJson.textContent = [
+    "Read-only contract review: manifest shape and directory markers only.",
+    "Source contents, README text, script bodies, dependency versions, tasks, approvals, and executions stay hidden.",
+    \`Registry: \${data?.registry ?? "openclaw-plugin-sdk-contract-review-v0"}\`,
+    \`Mode: \${data?.mode ?? "read-only"}\`,
+    \`Source Registry: \${data?.sourceRegistry ?? "openclaw-source-migration-plan-v0"}\`,
+    \`Reviews: \${summary.total ?? data?.count ?? 0}\`,
+    \`With Manifest: \${summary.withManifest ?? 0}\`,
+    \`With Types: \${summary.withTypes ?? 0}\`,
+    \`With Exports: \${summary.withExports ?? 0}\`,
+    \`By Verdict: \${Object.entries(summary.byVerdict ?? {}).map(([verdict, count]) => \`\${verdict}=\${count}\`).join(", ") || "none"}\`,
+    "",
+    ...items.slice(0, 8).map((entry) => {
+      const manifest = entry.packageManifest ?? {};
+      const structure = entry.structure ?? {};
+      const governance = entry.governance ?? {};
+      const surfaces = Array.isArray(entry.contractSurfaces) ? entry.contractSurfaces.join(",") : "none";
+      const blockers = Array.isArray(entry.blockers) ? entry.blockers.join("; ") : "none";
+      return \`[\${entry.verdict ?? "unknown"}] \${manifest.name ?? "unknown"} surfaces=\${surfaces} markers=\${(structure.markers ?? []).join(",") || "none"} scripts=\${(manifest.scriptNames ?? []).join(",") || "none"} readSource=\${Boolean(governance.canReadSourceFileContent)} mutate=\${Boolean(governance.canMutate)} execute=\${Boolean(governance.canExecute)} task=\${Boolean(governance.createsTask)} approval=\${Boolean(governance.createsApproval)} blockers=\${blockers}\`;
+    }),
+  ].join("\\n");
+}
+
 function renderWorkspaceCommandProposals(data) {
   const summary = data?.summary ?? {};
   const items = Array.isArray(data?.items) ? data.items : [];
@@ -1463,6 +1513,21 @@ async function refreshWorkspaceMigrationPlan() {
     workspaceMigrationPlanBacklog.textContent = "0";
     workspaceMigrationPlanMode.textContent = "unknown";
     workspaceMigrationPlanJson.textContent = "Unable to read OpenClaw source migration plan.";
+  }
+}
+
+async function refreshPluginSdkContractReview() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/workspaces/openclaw-plugin-sdk-contract-review\`);
+    renderPluginSdkContractReview(data);
+  } catch {
+    pluginSdkReviewRegistry.textContent = "offline";
+    pluginSdkReviewTotal.textContent = "0";
+    pluginSdkReviewManifest.textContent = "0";
+    pluginSdkReviewTypes.textContent = "0";
+    pluginSdkReviewExports.textContent = "0";
+    pluginSdkReviewMode.textContent = "unknown";
+    pluginSdkReviewJson.textContent = "Unable to read plugin SDK contract review.";
   }
 }
 
@@ -2958,6 +3023,7 @@ await refreshFilesystemReadLedger();
 await refreshWorkspaceRegistry();
 await refreshWorkspaceMigrationMap();
 await refreshWorkspaceMigrationPlan();
+await refreshPluginSdkContractReview();
 await refreshWorkspaceCommandProposals();
 await refreshWorkspaceCommandPlanDraft();
 await refreshSystemState();
@@ -2985,6 +3051,7 @@ setInterval(refreshFilesystemReadLedger, 5000);
 setInterval(refreshWorkspaceRegistry, 5000);
 setInterval(refreshWorkspaceMigrationMap, 5000);
 setInterval(refreshWorkspaceMigrationPlan, 5000);
+setInterval(refreshPluginSdkContractReview, 5000);
 setInterval(refreshWorkspaceCommandProposals, 5000);
 setInterval(refreshWorkspaceCommandPlanDraft, 5000);
 setInterval(refreshSystemState, 5000);
