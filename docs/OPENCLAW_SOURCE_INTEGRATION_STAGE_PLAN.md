@@ -331,7 +331,16 @@ Next intended slice after this passes:
 
 ## 11. 2026-05-13 Step 4 Update: Native Tool Catalog Adapter
 
-Status: implemented_waiting_check.
+Status: passed.
+
+Confirmed on NixOS:
+- Started: 2026-05-13 19:53:01 +08:00.
+- Finished: 2026-05-13 19:53:23 +08:00.
+- `openclaw-native-plugin-adapter`: PASS, 6s.
+- `openclaw-native-tool-catalog-adapter`: PASS, 5s.
+- `observer-openclaw-native-plugin-adapter`: PASS, 6s.
+- `observer-openclaw-native-tool-catalog-adapter`: PASS, 5s.
+- Total: 4 passed / 0 failed.
 
 Slice: native adapter invocation for `sense.openclaw.tool_catalog`.
 
@@ -378,4 +387,4 @@ Next intended slice after this passes:
 
 这条线是本阶段的主线。
 
-当前执行焦点：Step 4 `First Real Capability Absorption`，`sense.openclaw.tool_catalog` 已通过 NixOS targeted milestone；native tool catalog adapter 已实现，等待 NixOS targeted milestone 确认。确认后进入第一个 native read-only semantic tool，禁止再新增与真实 adapter 无关的 readiness/checklist 层。
+当前执行焦点：Step 4 `First Real Capability Absorption`，`sense.openclaw.tool_catalog` 与 native tool catalog adapter 均已通过 NixOS targeted milestone。下一步进入第一个 native read-only semantic tool，禁止再新增与真实 adapter 无关的 readiness/checklist 层。
