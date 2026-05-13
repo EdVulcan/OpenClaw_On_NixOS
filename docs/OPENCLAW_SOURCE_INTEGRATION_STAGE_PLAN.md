@@ -1,6 +1,6 @@
 # OpenClaw Source Integration Stage Plan
 
-更新时间：2026-05-13 20:06 +08:00
+更新时间：2026-05-13 20:28 +08:00
 
 本文档用于跟踪当前阶段：把旁路 `openclaw` 增强源码项目中的能力，受控接入 `OpenClawOnNixOS`。后续每推进一个接入切片，都必须同步更新本文件，避免路线漂移、重复准备层、或忘记阶段边界。
 
@@ -387,7 +387,7 @@ Next intended slice after this passes:
 
 ## 12. 2026-05-13 Step 4 Update: Native Workspace Semantic Index
 
-Status: implemented_waiting_check.
+Status: passed.
 
 Slice: `sense.openclaw.workspace_semantic_index`.
 
@@ -420,6 +420,13 @@ Local verification on Windows:
 - Smoke result: `files=20`, `exports=51`, `functions=63`, `policy=audit_only`, `history=1`.
 - Unix milestone scripts still require NixOS/bash.
 
+Confirmed on NixOS:
+- Started: 2026-05-13 20:28:12 +08:00.
+- Finished: 2026-05-13 20:28:23 +08:00.
+- `openclaw-native-workspace-semantic-index`: PASS, 6s.
+- `observer-openclaw-native-workspace-semantic-index`: PASS, 5s.
+- Total: 2 passed / 0 failed.
+
 NixOS targeted milestone command:
 
 ```bash
@@ -428,11 +435,11 @@ git pull origin main && \
 OPENCLAW_MILESTONE_CHECKS=openclaw-native-workspace-semantic-index,observer-openclaw-native-workspace-semantic-index npm run dev:milestone-check:unix
 ```
 
-Next intended slice after this passes:
+Next intended slice:
 - Move from read-only semantic indexing to the first governed executable native adapter.
 - Recommended candidate: a read-only workspace/LSP-style navigation tool or conservative filesystem inspection tool inspired by enhanced OpenClaw.
-- Do not implement mutating file edits, shell execution, or cross-boundary gateway tools until this semantic tool is confirmed on NixOS.
+- Do not implement mutating file edits, shell execution, or cross-boundary gateway tools until a read-only executable adapter has proven the governed execution chain.
 
 这条线是本阶段的主线。
 
-当前执行焦点：Step 4 `First Real Capability Absorption` 已进入第一个 native read-only semantic tool：`sense.openclaw.workspace_semantic_index`。本地实现和 Windows smoke 已通过，等待 NixOS targeted milestone 确认；确认后再进入第一个 governed executable native adapter，禁止再新增与真实 adapter 无关的 readiness/checklist 层。
+当前执行焦点：Step 4 `First Real Capability Absorption` 的第一个 native read-only semantic tool：`sense.openclaw.workspace_semantic_index` 已通过 NixOS targeted milestone。下一步进入第一个 governed executable native adapter，禁止再新增与真实 adapter 无关的 readiness/checklist 层。
