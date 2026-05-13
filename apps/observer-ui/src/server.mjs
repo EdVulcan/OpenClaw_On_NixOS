@@ -496,6 +496,15 @@ function observerHtml() {
           <pre id="native-plugin-preflight-json">Loading native plugin runtime preflight...</pre>
         </section>
         <section class="panel">
+          <h2>OpenClaw Native Runtime Activation Plan</h2>
+          <div class="metric"><span>Registry</span><span id="native-plugin-activation-registry">openclaw-native-plugin-runtime-activation-plan-v0</span></div>
+          <div class="metric"><span>Status</span><span id="native-plugin-activation-status">unknown</span></div>
+          <div class="metric"><span>Required</span><span id="native-plugin-activation-required">0/0</span></div>
+          <div class="metric"><span>Runtime</span><span id="native-plugin-activation-runtime">disabled</span></div>
+          <div class="metric"><span>Mode</span><span id="native-plugin-activation-mode">activation-plan-only</span></div>
+          <pre id="native-plugin-activation-json">Loading native plugin runtime activation plan...</pre>
+        </section>
+        <section class="panel">
           <h2>OpenClaw Native Plugin Invoke Plan</h2>
           <div class="metric"><span>Registry</span><span id="native-plugin-invoke-plan-registry">openclaw-native-plugin-invoke-plan-v0</span></div>
           <div class="metric"><span>Capability</span><span id="native-plugin-invoke-plan-capability">act.plugin.capability.invoke</span></div>
@@ -827,6 +836,12 @@ const nativePluginPreflightApproval = document.querySelector("#native-plugin-pre
 const nativePluginPreflightRuntime = document.querySelector("#native-plugin-preflight-runtime");
 const nativePluginPreflightMode = document.querySelector("#native-plugin-preflight-mode");
 const nativePluginPreflightJson = document.querySelector("#native-plugin-preflight-json");
+const nativePluginActivationRegistry = document.querySelector("#native-plugin-activation-registry");
+const nativePluginActivationStatus = document.querySelector("#native-plugin-activation-status");
+const nativePluginActivationRequired = document.querySelector("#native-plugin-activation-required");
+const nativePluginActivationRuntime = document.querySelector("#native-plugin-activation-runtime");
+const nativePluginActivationMode = document.querySelector("#native-plugin-activation-mode");
+const nativePluginActivationJson = document.querySelector("#native-plugin-activation-json");
 const nativePluginInvokePlanRegistry = document.querySelector("#native-plugin-invoke-plan-registry");
 const nativePluginInvokePlanCapability = document.querySelector("#native-plugin-invoke-plan-capability");
 const nativePluginInvokePlanDecision = document.querySelector("#native-plugin-invoke-plan-decision");
@@ -1509,6 +1524,38 @@ function renderNativePluginPreflight(data) {
   ].join("\\n");
 }
 
+function renderNativePluginActivationPlan(data) {
+  const summary = data?.summary ?? {};
+  const governance = data?.governance ?? {};
+  const gates = Array.isArray(data?.gates) ? data.gates : [];
+  const envelope = data?.executionEnvelope ?? {};
+  nativePluginActivationRegistry.textContent = data?.registry ?? "openclaw-native-plugin-runtime-activation-plan-v0";
+  nativePluginActivationStatus.textContent = data?.status ?? "unknown";
+  nativePluginActivationRequired.textContent = \`\${summary.passedRequired ?? 0}/\${summary.requiredGates ?? 0}\`;
+  nativePluginActivationRuntime.textContent = summary.canActivateRuntime ? "enabled" : "disabled";
+  nativePluginActivationMode.textContent = data?.mode ?? "activation-plan-only";
+
+  nativePluginActivationJson.textContent = [
+    "Runtime activation plan: records the remaining gates before native plugin runtime can be activated.",
+    "This still does not create tasks, create approvals, import modules, execute plugin code, or activate runtime.",
+    \`Registry: \${data?.registry ?? "openclaw-native-plugin-runtime-activation-plan-v0"}\`,
+    \`Mode: \${data?.mode ?? "activation-plan-only"}\`,
+    \`Status: \${data?.status ?? "unknown"} activationReady=\${Boolean(data?.activationReady)}\`,
+    \`Required Gates: \${summary.passedRequired ?? 0}/\${summary.requiredGates ?? 0} blocked=\${summary.blockedRequired ?? 0}\`,
+    \`Envelope: \${envelope.envelopeVersion ?? "unknown"} state=\${envelope.state ?? "unknown"}\`,
+    \`Runtime Activation: \${summary.canActivateRuntime ? "enabled" : "disabled"} importModule=\${Boolean(summary.canImportModule)} executePlugin=\${Boolean(summary.canExecutePluginCode)}\`,
+    \`Governance: createsTask=\${Boolean(governance.createsTask)} createsApproval=\${Boolean(governance.createsApproval)} readSource=\${Boolean(governance.canReadSourceFileContent)} exposesScripts=\${Boolean(governance.exposesScriptBodies)} exposesDeps=\${Boolean(governance.exposesDependencyVersions)}\`,
+    "",
+    ...gates.map((gate) => {
+      const required = gate.required ? "required" : "optional";
+      return \`[\${gate.status ?? "unknown"}/\${required}] \${gate.id ?? "gate"} :: \${gate.evidence ?? "no evidence"}\`;
+    }),
+    "",
+    \`Next Allowed Work: \${(summary.nextAllowedWork ?? []).join("; ") || "none"}\`,
+    \`Forbidden Work: \${(summary.forbiddenWork ?? []).join("; ") || "none"}\`,
+  ].join("\\n");
+}
+
 function renderNativePluginInvokePlan(data) {
   const governance = data?.governance ?? {};
   const policyDecision = data?.policy?.decision ?? {};
@@ -1888,6 +1935,20 @@ async function refreshNativePluginPreflight() {
     nativePluginPreflightRuntime.textContent = "unknown";
     nativePluginPreflightMode.textContent = "unknown";
     nativePluginPreflightJson.textContent = "Unable to read native plugin runtime preflight.";
+  }
+}
+
+async function refreshNativePluginActivationPlan() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/runtime-activation-plan\`);
+    renderNativePluginActivationPlan(data);
+  } catch {
+    nativePluginActivationRegistry.textContent = "offline";
+    nativePluginActivationStatus.textContent = "unknown";
+    nativePluginActivationRequired.textContent = "0/0";
+    nativePluginActivationRuntime.textContent = "unknown";
+    nativePluginActivationMode.textContent = "unknown";
+    nativePluginActivationJson.textContent = "Unable to read native plugin runtime activation plan.";
   }
 }
 
@@ -3432,6 +3493,7 @@ await refreshNativePluginRegistry();
 await refreshFormalIntegrationReadiness();
 await refreshNativePluginAdapter();
 await refreshNativePluginPreflight();
+await refreshNativePluginActivationPlan();
 await refreshNativePluginInvokePlan();
 await refreshWorkspaceCommandProposals();
 await refreshWorkspaceCommandPlanDraft();
@@ -3466,6 +3528,7 @@ setInterval(refreshNativePluginRegistry, 5000);
 setInterval(refreshFormalIntegrationReadiness, 5000);
 setInterval(refreshNativePluginAdapter, 5000);
 setInterval(refreshNativePluginPreflight, 5000);
+setInterval(refreshNativePluginActivationPlan, 5000);
 setInterval(refreshNativePluginInvokePlan, 5000);
 setInterval(refreshWorkspaceCommandProposals, 5000);
 setInterval(refreshWorkspaceCommandPlanDraft, 5000);

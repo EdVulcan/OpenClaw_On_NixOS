@@ -1631,6 +1631,124 @@ function buildNativePluginRuntimePreflight({ packagePath = null, capabilityId = 
   };
 }
 
+function buildNativePluginRuntimeActivationPlan({ packagePath = null, capabilityId = "act.plugin.capability.invoke" } = {}) {
+  const preflight = buildNativePluginRuntimePreflight({ packagePath, capabilityId });
+  const envelope = preflight.executionEnvelope ?? {};
+  const constraints = envelope.constraints ?? {};
+  const gates = [
+    {
+      id: "preflight_envelope_ready",
+      label: "Runtime preflight envelope is available",
+      required: true,
+      status: envelope.envelopeVersion === "native-plugin-execution-envelope-v0" ? "passed" : "blocked",
+      evidence: `envelope=${envelope.envelopeVersion ?? "missing"}`,
+    },
+    {
+      id: "audit_binding_ready",
+      label: "Capability audit ledger is bound",
+      required: true,
+      status: envelope.audit?.required === true && envelope.audit?.ledger === "capability_history" ? "passed" : "blocked",
+      evidence: `ledger=${envelope.audit?.ledger ?? "missing"}`,
+    },
+    {
+      id: "explicit_user_approval_required",
+      label: "High-risk plugin invocation requires explicit user approval",
+      required: true,
+      status: envelope.approval?.required === true ? "passed" : "blocked",
+      evidence: `approvalRequired=${Boolean(envelope.approval?.required)} collected=${Boolean(envelope.approval?.collected)}`,
+    },
+    {
+      id: "source_content_review_required",
+      label: "Source content review must be separately approved before loading modules",
+      required: true,
+      status: "blocked",
+      evidence: "source content review is not approved in this activation plan",
+    },
+    {
+      id: "runtime_loader_adapter_required",
+      label: "Sandboxed runtime loader adapter must be implemented before activation",
+      required: true,
+      status: "blocked",
+      evidence: "no loader/import adapter is active",
+    },
+    {
+      id: "runtime_activation_approval_required",
+      label: "Runtime activation needs a future approval-gated task",
+      required: true,
+      status: "blocked",
+      evidence: "this endpoint is plan-only and creates no approval",
+    },
+  ];
+  const requiredGates = gates.filter((gate) => gate.required);
+  const passedRequired = requiredGates.filter((gate) => gate.status === "passed").length;
+  const blockedRequired = requiredGates.length - passedRequired;
+
+  return {
+    ok: true,
+    registry: "openclaw-native-plugin-runtime-activation-plan-v0",
+    mode: "activation-plan-only",
+    generatedAt: new Date().toISOString(),
+    sourceRegistry: preflight.registry,
+    sourceMode: preflight.mode,
+    runtimeOwner: "openclaw_on_nixos",
+    status: "blocked_pending_runtime_adapter",
+    activationReady: false,
+    plugin: preflight.plugin,
+    capability: preflight.capability,
+    executionEnvelope: {
+      envelopeVersion: envelope.envelopeVersion ?? null,
+      state: envelope.state ?? null,
+      capabilityId: envelope.capabilityId ?? null,
+      policyDecision: envelope.policyDecision ?? null,
+      approval: envelope.approval ?? null,
+      audit: envelope.audit ?? null,
+    },
+    gates,
+    summary: {
+      totalGates: gates.length,
+      requiredGates: requiredGates.length,
+      passedRequired,
+      blockedRequired,
+      activationReady: false,
+      canReadManifestMetadata: constraints.canReadManifestMetadata === true,
+      canReadSourceFileContent: false,
+      canImportModule: false,
+      canExecutePluginCode: false,
+      canActivateRuntime: false,
+      canMutate: false,
+      createsTask: false,
+      createsApproval: false,
+      nextAllowedWork: [
+        "design sandboxed native runtime loader inside OpenClawOnNixOS",
+        "add explicit source-content review gates before module import",
+        "materialize runtime activation only through approval-gated tasks",
+      ],
+      forbiddenWork: [
+        "do not import plugin modules from old OpenClaw in this plan",
+        "do not execute plugin code during activation planning",
+        "do not activate runtime without a future approval-gated task",
+      ],
+    },
+    governance: {
+      mode: "native_plugin_runtime_activation_plan_only",
+      runtimeOwner: "openclaw_on_nixos",
+      createsTask: false,
+      createsApproval: false,
+      canReadManifestMetadata: constraints.canReadManifestMetadata === true,
+      canReadSourceFileContent: false,
+      exposesReadmeContent: false,
+      exposesScriptBodies: false,
+      exposesDependencyVersions: false,
+      canImportModule: false,
+      canExecutePluginCode: false,
+      canActivateRuntime: false,
+      canMutate: false,
+      requiresExplicitApprovalBeforeExecution: true,
+      requiresRuntimeAdapterBeforeExecution: true,
+    },
+  };
+}
+
 function buildNativePluginInvokeTaskPlan(planEnvelope) {
   const now = new Date().toISOString();
   const capability = planEnvelope.capability ?? {};
@@ -5465,6 +5583,19 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "GET" && requestUrl.pathname === "/plugins/native-adapter/runtime-preflight") {
     try {
       sendJson(res, 200, buildNativePluginRuntimePreflight({
+        packagePath: requestUrl.searchParams.get("packagePath"),
+        capabilityId: requestUrl.searchParams.get("capabilityId") ?? "act.plugin.capability.invoke",
+      }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/plugins/native-adapter/runtime-activation-plan") {
+    try {
+      sendJson(res, 200, buildNativePluginRuntimeActivationPlan({
         packagePath: requestUrl.searchParams.get("packagePath"),
         capabilityId: requestUrl.searchParams.get("capabilityId") ?? "act.plugin.capability.invoke",
       }));
