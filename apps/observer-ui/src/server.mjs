@@ -493,6 +493,9 @@ function observerHtml() {
           <div class="metric"><span>Decision</span><span id="native-plugin-invoke-plan-decision">require_approval</span></div>
           <div class="metric"><span>Runtime</span><span id="native-plugin-invoke-plan-runtime">disabled</span></div>
           <div class="metric"><span>Mode</span><span id="native-plugin-invoke-plan-mode">plan-only</span></div>
+          <div class="actions tight">
+            <button id="native-plugin-invoke-task-button" type="button">Create Approval Task</button>
+          </div>
           <pre id="native-plugin-invoke-plan-json">Loading native plugin invoke plan...</pre>
         </section>
         <section class="panel">
@@ -815,6 +818,7 @@ const nativePluginInvokePlanDecision = document.querySelector("#native-plugin-in
 const nativePluginInvokePlanRuntime = document.querySelector("#native-plugin-invoke-plan-runtime");
 const nativePluginInvokePlanMode = document.querySelector("#native-plugin-invoke-plan-mode");
 const nativePluginInvokePlanJson = document.querySelector("#native-plugin-invoke-plan-json");
+const nativePluginInvokeTaskButton = document.querySelector("#native-plugin-invoke-task-button");
 const workspaceCommandRegistry = document.querySelector("#workspace-command-registry");
 const workspaceCommandTotal = document.querySelector("#workspace-command-total");
 const workspaceCommandValidation = document.querySelector("#workspace-command-validation");
@@ -2471,6 +2475,29 @@ async function createWorkspaceCommandApprovalTask() {
   await refreshWorkspaceCommandPlanDraft();
 }
 
+async function createNativePluginInvokeApprovalTask() {
+  const result = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/invoke-tasks\`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      capabilityId: "act.plugin.capability.invoke",
+      confirm: true,
+    }),
+  });
+
+  taskHistoryFocus = "selected-task";
+  selectedHistoryTaskId = result.task?.id ?? null;
+  taskDetailIdInput.value = result.task?.id ?? "";
+  renderPlanPanel(result.task);
+  setControlMessage(\`Created approval-gated native plugin invoke task \${result.task?.id ?? "unknown"}.\`);
+  await refreshRuntime();
+  await refreshTaskList();
+  await refreshTaskHistoryDetail();
+  await refreshApprovalState();
+  await refreshOperatorState();
+  await refreshNativePluginInvokePlan();
+}
+
 async function runOperatorStepFromUi() {
   const result = await fetchJson(\`\${observerConfig.coreUrl}/operator/step\`, {
     method: "POST",
@@ -3036,6 +3063,12 @@ createPlannedTaskButton.addEventListener("click", () => {
 
 workspaceCommandTaskButton.addEventListener("click", () => {
   createWorkspaceCommandApprovalTask().catch((error) => {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  });
+});
+
+nativePluginInvokeTaskButton.addEventListener("click", () => {
+  createNativePluginInvokeApprovalTask().catch((error) => {
     setControlMessage(\`Request failed: \${formatError(error)}\`);
   });
 });

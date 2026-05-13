@@ -1536,6 +1536,139 @@ function buildNativePluginCapabilityInvokePlan({ packagePath = null, capabilityI
   };
 }
 
+function buildNativePluginInvokeTaskPlan(planEnvelope) {
+  const now = new Date().toISOString();
+  const capability = planEnvelope.capability ?? {};
+  const steps = [
+    {
+      id: "step-review-manifest-profile",
+      kind: "plugin.manifest.profile",
+      phase: "reviewing_manifest_profile",
+      title: "Review native plugin manifest profile",
+      status: "pending",
+      capabilityId: "sense.plugin.manifest_profile",
+      risk: "low",
+      governance: "audit_only",
+      requiresApproval: false,
+    },
+    {
+      id: "step-user-approval",
+      kind: "approval.gate",
+      phase: "waiting_for_approval",
+      title: "Wait for explicit user approval",
+      status: "pending",
+      capabilityId: "govern.policy.evaluate",
+      risk: capability.risk ?? "high",
+      governance: "require_approval",
+      requiresApproval: true,
+    },
+    {
+      id: "step-defer-runtime-invoke",
+      kind: "plugin.capability.invoke",
+      phase: "runtime_adapter_deferred",
+      title: "Defer plugin capability execution until runtime adapter exists",
+      status: "pending",
+      capabilityId: capability.id ?? "act.plugin.capability.invoke",
+      risk: capability.risk ?? "high",
+      governance: "require_approval",
+      requiresApproval: true,
+      params: {
+        pluginId: planEnvelope.plugin?.id ?? null,
+        packageName: planEnvelope.plugin?.packageName ?? null,
+      },
+    },
+  ];
+
+  return {
+    planId: `plan-${randomUUID()}`,
+    strategy: "native-plugin-invoke-v0",
+    planner: "native-plugin-invoke-plan-v0",
+    capabilityAware: true,
+    status: "planned",
+    goal: planEnvelope.draft?.goal ?? `Plan governed invocation for ${capability.id ?? "act.plugin.capability.invoke"}`,
+    targetUrl: null,
+    intent: "plugin.capability.invoke",
+    createdAt: now,
+    updatedAt: now,
+    capabilitySummary: {
+      total: 3,
+      approvalGates: 2,
+      ids: [
+        "sense.plugin.manifest_profile",
+        "govern.policy.evaluate",
+        capability.id ?? "act.plugin.capability.invoke",
+      ],
+      byRisk: {
+        low: 1,
+        [capability.risk ?? "high"]: 2,
+      },
+    },
+    steps,
+    governance: {
+      mode: "native_plugin_invoke_task_plan",
+      canExecutePluginCode: false,
+      canActivateRuntime: false,
+      requiresExplicitApproval: true,
+    },
+  };
+}
+
+async function createNativePluginInvokeTask({ packagePath = null, capabilityId = "act.plugin.capability.invoke", confirm = false } = {}) {
+  if (confirm !== true) {
+    throw new Error("Native plugin invoke task creation requires confirm=true.");
+  }
+
+  const planEnvelope = buildNativePluginCapabilityInvokePlan({ packagePath, capabilityId });
+  const task = createTask({
+    goal: planEnvelope.draft.goal,
+    type: "native_plugin_capability",
+    workViewStrategy: "native-plugin-adapter",
+    plan: buildNativePluginInvokeTaskPlan(planEnvelope),
+    policy: planEnvelope.policy.request,
+  }, { skipInitialPolicy: true });
+  task.policy = planEnvelope.policy;
+  const approval = createApprovalRequestForTask(task, planEnvelope.policy.decision);
+  const reclaimedTasks = supersedeOtherActiveTasks(task.id);
+  reconcileRuntimeState();
+  persistState();
+
+  await publishEvent("task.created", { task: serialiseTask(task), planner: "native-plugin-invoke-plan-v0" });
+  await publishTaskApprovalIfPending(task);
+  await publishEvent("task.planned", { task: serialiseTask(task), plan: task.plan });
+  await Promise.all(reclaimedTasks.map((reclaimedTask) => publishEvent("task.phase_changed", {
+    task: serialiseTask(reclaimedTask),
+  })));
+
+  return {
+    registry: "openclaw-native-plugin-invoke-task-v0",
+    mode: "approval-gated",
+    generatedAt: new Date().toISOString(),
+    sourceRegistry: planEnvelope.registry,
+    sourceMode: planEnvelope.mode,
+    plugin: planEnvelope.plugin,
+    capability: planEnvelope.capability,
+    task,
+    approval,
+    governance: {
+      mode: "native_plugin_invoke_task_approval_gated",
+      runtimeOwner: "openclaw_on_nixos",
+      createsTask: true,
+      createsApproval: true,
+      canExecuteWithoutApproval: false,
+      canReadManifestMetadata: true,
+      canReadSourceFileContent: false,
+      exposesReadmeContent: false,
+      exposesScriptBodies: false,
+      exposesDependencyVersions: false,
+      canMutate: false,
+      canExecutePluginCode: false,
+      canActivateRuntime: false,
+      executed: false,
+      requiresRuntimeAdapterBeforeExecution: true,
+    },
+  };
+}
+
 function findWorkspaceCommandProposal({ proposalId = null, workspaceId = null, scriptName = null } = {}) {
   const proposals = buildWorkspaceCommandProposals();
   const match = proposals.items.find((item) => {
@@ -5163,6 +5296,35 @@ const server = http.createServer(async (req, res) => {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       sendJson(res, 404, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/plugins/native-adapter/invoke-tasks") {
+    try {
+      const body = await readJsonBody(req);
+      const result = await createNativePluginInvokeTask({
+        packagePath: typeof body.packagePath === "string" ? body.packagePath : null,
+        capabilityId: typeof body.capabilityId === "string" ? body.capabilityId : "act.plugin.capability.invoke",
+        confirm: body.confirm === true,
+      });
+      sendJson(res, 201, {
+        ok: true,
+        registry: result.registry,
+        mode: result.mode,
+        generatedAt: result.generatedAt,
+        sourceRegistry: result.sourceRegistry,
+        sourceMode: result.sourceMode,
+        plugin: result.plugin,
+        capability: result.capability,
+        task: serialiseTask(result.task),
+        approval: serialiseApproval(result.approval),
+        governance: result.governance,
+        summary: buildTaskSummary(),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
     }
     return;
   }
