@@ -1849,6 +1849,335 @@ function buildOpenClawNativePluginSdkContractImplementation({ packagePath = null
   };
 }
 
+const TOOL_CATALOG_IGNORED_DIRECTORIES = new Set([".git", "node_modules", "dist", "build", ".turbo", ".cache"]);
+const TOOL_CATALOG_SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".mjs", ".cjs"]);
+const TOOL_CATALOG_DOC_EXTENSIONS = new Set([".md", ".mdx"]);
+const TOOL_CATALOG_TEST_MARKERS = [
+  ".test.",
+  ".spec.",
+  ".schema.",
+  ".helpers.",
+  ".support.",
+  ".runtime.",
+  ".model-config.",
+];
+
+function normaliseToolCatalogName(fileName) {
+  return path.basename(fileName, path.extname(fileName))
+    .replace(/\.(test|spec|schema|helpers|support|runtime|model-config)$/u, "")
+    .replace(/-tool$/u, "")
+    .replace(/-commands$/u, "")
+    .replace(/-helpers$/u, "")
+    .replace(/-shared$/u, "")
+    .replace(/-actions$/u, "")
+    .replace(/-background$/u, "")
+    .replace(/-generate$/u, "-generation")
+    .replace(/-native-providers$/u, "")
+    .replace(/-providers$/u, "")
+    .replace(/-config$/u, "");
+}
+
+function classifyToolCatalogEntry(relativePath) {
+  const lower = relativePath.toLowerCase();
+  if (/(image|music|video|tts|pdf|canvas|media)/u.test(lower)) {
+    return "media_generation";
+  }
+  if (/(web|browser|search|fetch|gateway|brave|duckduckgo|exa|firecrawl|tavily|perplexity|searxng|grok|gemini|kimi|ollama)/u.test(lower)) {
+    return "web_and_gateway";
+  }
+  if (/(session|agent|subagent|message|chat|history)/u.test(lower)) {
+    return "session_and_agents";
+  }
+  if (/(cron|schedule|loop|trajectory)/u.test(lower)) {
+    return "automation";
+  }
+  if (/(exec|patch|diff|skill|slash|code|node)/u.test(lower)) {
+    return "workspace_engineering";
+  }
+  return "general_tooling";
+}
+
+function collectToolCatalogFiles(rootPath, {
+  kind,
+  maxDepth = 2,
+  maxFiles = 160,
+  allowedExtensions = TOOL_CATALOG_SOURCE_EXTENSIONS,
+} = {}) {
+  const rootStats = safeStat(rootPath);
+  if (!rootStats?.isDirectory()) {
+    return {
+      root: rootPath,
+      present: false,
+      files: [],
+      summary: {
+        totalFiles: 0,
+        byCategory: {},
+        implementationFiles: 0,
+        testFiles: 0,
+        documentedFiles: 0,
+        totalSizeBytes: 0,
+      },
+    };
+  }
+
+  const files = [];
+  function visit(currentPath, depth) {
+    if (files.length >= maxFiles || depth > maxDepth) {
+      return;
+    }
+    let entries = [];
+    try {
+      entries = readdirSync(currentPath, { withFileTypes: true });
+    } catch {
+      return;
+    }
+
+    for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
+      if (files.length >= maxFiles) {
+        return;
+      }
+      const absolutePath = path.join(currentPath, entry.name);
+      if (entry.isDirectory()) {
+        if (!TOOL_CATALOG_IGNORED_DIRECTORIES.has(entry.name)) {
+          visit(absolutePath, depth + 1);
+        }
+        continue;
+      }
+      if (!entry.isFile()) {
+        continue;
+      }
+      const extension = path.extname(entry.name);
+      if (!allowedExtensions.has(extension)) {
+        continue;
+      }
+      const relativePath = path.relative(rootPath, absolutePath).replaceAll(path.sep, "/");
+      const stats = safeStat(absolutePath);
+      const lowerName = entry.name.toLowerCase();
+      const isTest = TOOL_CATALOG_TEST_MARKERS.some((marker) => lowerName.includes(marker));
+      const isDocumentation = TOOL_CATALOG_DOC_EXTENSIONS.has(extension);
+      const isToolImplementation = !isDocumentation
+        && !isTest
+        && (
+          lowerName.endsWith("-tool.ts")
+          || lowerName.endsWith("-tool.tsx")
+          || lowerName === "web-fetch.ts"
+          || lowerName === "web-search.ts"
+          || lowerName === "gateway.ts"
+          || lowerName.includes("-tool.")
+        );
+      files.push({
+        relativePath,
+        fileName: entry.name,
+        extension,
+        kind,
+        category: classifyToolCatalogEntry(relativePath),
+        sizeBytes: stats?.size ?? null,
+        baseName: normaliseToolCatalogName(entry.name),
+        isToolImplementation,
+        isTest,
+        isDocumentation,
+        contentRead: false,
+        contentExposed: false,
+      });
+    }
+  }
+
+  visit(rootPath, 0);
+  const summary = files.reduce((accumulator, file) => {
+    accumulator.totalFiles += 1;
+    accumulator.totalSizeBytes += file.sizeBytes ?? 0;
+    accumulator.byCategory[file.category] = (accumulator.byCategory[file.category] ?? 0) + 1;
+    if (file.isToolImplementation) {
+      accumulator.implementationFiles += 1;
+    }
+    if (file.isTest) {
+      accumulator.testFiles += 1;
+    }
+    if (file.isDocumentation) {
+      accumulator.documentedFiles += 1;
+    }
+    return accumulator;
+  }, {
+    totalFiles: 0,
+    byCategory: {},
+    implementationFiles: 0,
+    testFiles: 0,
+    documentedFiles: 0,
+    totalSizeBytes: 0,
+  });
+
+  return {
+    root: rootPath,
+    present: true,
+    files,
+    summary,
+  };
+}
+
+function selectOpenClawToolCatalogWorkspace({ workspacePath = null } = {}) {
+  const requestedPath = typeof workspacePath === "string" && workspacePath.trim()
+    ? path.resolve(workspacePath)
+    : null;
+  const registry = buildWorkspaceRegistry();
+  const candidates = registry.items.filter((item) => item.exists && item.readable && item.openclawProfile);
+  const item = requestedPath
+    ? candidates.find((candidate) => path.resolve(candidate.path) === requestedPath)
+    : candidates[0] ?? null;
+
+  if (!item) {
+    throw new Error(requestedPath
+      ? `OpenClaw workspace is not registered or readable: ${requestedPath}`
+      : "No readable OpenClaw workspace is registered.");
+  }
+
+  return { registry, item };
+}
+
+function buildOpenClawToolCatalog({ workspacePath = null } = {}) {
+  const { registry, item } = selectOpenClawToolCatalogWorkspace({ workspacePath });
+  const implementation = buildOpenClawNativePluginSdkContractImplementation({
+    packagePath: path.join(item.path, "packages", "plugin-sdk"),
+  });
+  const capability = implementation.contract?.capabilities?.find((entry) => entry.id === "sense.openclaw.tool_catalog") ?? null;
+  const toolsRoot = path.join(item.path, "src", "agents", "tools");
+  const docsRoot = path.join(item.path, "docs", "tools");
+  const sdkRoot = path.join(item.path, "src", "plugin-sdk");
+  const toolFiles = collectToolCatalogFiles(toolsRoot, {
+    kind: "agent_tool_source",
+    allowedExtensions: TOOL_CATALOG_SOURCE_EXTENSIONS,
+  });
+  const docFiles = collectToolCatalogFiles(docsRoot, {
+    kind: "tool_documentation",
+    maxDepth: 1,
+    allowedExtensions: TOOL_CATALOG_DOC_EXTENSIONS,
+  });
+  const sdkVocabulary = collectToolCatalogFiles(sdkRoot, {
+    kind: "plugin_sdk_vocabulary",
+    maxDepth: 2,
+    maxFiles: 40,
+    allowedExtensions: TOOL_CATALOG_SOURCE_EXTENSIONS,
+  });
+  const implementationFiles = toolFiles.files.filter((file) => file.isToolImplementation);
+  const docBaseNames = new Set(docFiles.files.map((file) => file.baseName));
+  const documentedImplementations = implementationFiles.filter((file) => docBaseNames.has(file.baseName));
+  const docOnly = docFiles.files.filter((file) => !new Set(implementationFiles.map((entry) => entry.baseName)).has(file.baseName));
+  const byCategory = [...toolFiles.files, ...docFiles.files].reduce((accumulator, file) => {
+    accumulator[file.category] = (accumulator[file.category] ?? 0) + 1;
+    return accumulator;
+  }, {});
+  const categorySummaries = Object.entries(byCategory)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([category, count]) => ({
+      category,
+      count,
+      implementationFiles: implementationFiles.filter((file) => file.category === category).length,
+      documentationFiles: docFiles.files.filter((file) => file.category === category).length,
+      recommendedNativeSlot: "sense.openclaw.tool_catalog",
+    }));
+
+  return {
+    ok: toolFiles.present && implementation.summary.readyForFirstReadOnlyAbsorption === true && Boolean(capability),
+    registry: "openclaw-tool-catalog-v0",
+    mode: "read-only-native-absorption",
+    generatedAt: new Date().toISOString(),
+    sourceRegistries: [
+      implementation.registry,
+      registry.registry,
+    ],
+    capability: {
+      id: capability?.id ?? "sense.openclaw.tool_catalog",
+      kind: capability?.kind ?? "sense",
+      risk: capability?.risk ?? "low",
+      approvalRequired: capability?.approval?.required ?? false,
+      runtimeOwner: capability?.runtimeOwner ?? "openclaw_on_nixos",
+    },
+    workspace: {
+      id: item.id,
+      name: item.name,
+      path: item.path,
+    },
+    roots: {
+      tools: toolsRoot,
+      docs: docsRoot,
+      pluginSdkVocabulary: sdkRoot,
+    },
+    catalog: {
+      tools: implementationFiles.map((file) => ({
+        relativePath: file.relativePath,
+        fileName: file.fileName,
+        category: file.category,
+        sizeBytes: file.sizeBytes,
+        documented: docBaseNames.has(file.baseName),
+        nativeSlot: "sense.openclaw.tool_catalog",
+        recommendedAbsorption: "metadata_catalog_now_native_adapter_later",
+        contentRead: false,
+      })),
+      documentation: docFiles.files.map((file) => ({
+        relativePath: file.relativePath,
+        fileName: file.fileName,
+        category: file.category,
+        sizeBytes: file.sizeBytes,
+        matchesToolImplementation: implementationFiles.some((entry) => entry.baseName === file.baseName),
+        contentRead: false,
+      })),
+      categories: categorySummaries,
+      nativeSlotMapping: [
+        {
+          capabilityId: "sense.openclaw.tool_catalog",
+          sourceRoots: ["src/agents/tools", "docs/tools"],
+          status: implementationFiles.length > 0 ? "absorbed_as_metadata_catalog" : "blocked_no_tool_files",
+          runtimeOwner: "openclaw_on_nixos",
+          canExecuteSourceTool: false,
+        },
+      ],
+    },
+    summary: {
+      sourceToolFiles: toolFiles.summary.totalFiles,
+      toolImplementationFiles: implementationFiles.length,
+      toolTestFiles: toolFiles.summary.testFiles,
+      toolDocumentationFiles: docFiles.summary.totalFiles,
+      documentedImplementations: documentedImplementations.length,
+      documentationOnlyFiles: docOnly.length,
+      pluginSdkVocabularyFiles: sdkVocabulary.summary.totalFiles,
+      categoryCount: categorySummaries.length,
+      byCategory,
+      canReadSourceFileContent: false,
+      exposesSourceFileContent: false,
+      exposesDocumentationContent: false,
+      canImportModule: false,
+      canExecutePluginCode: false,
+      canExecuteToolCode: false,
+      canActivateRuntime: false,
+      canMutate: false,
+      createsTask: false,
+      createsApproval: false,
+      nextAllowedWork: [
+        "use this catalog to select the first native read-only tool adapter",
+        "absorb prompt pack metadata as the next read-only catalog only if it directly supports tool execution policy",
+        "keep executable tools behind native policy and approval adapters",
+      ],
+    },
+    governance: {
+      mode: "openclaw_tool_catalog_read_only_absorption",
+      runtimeOwner: "openclaw_on_nixos",
+      sourceRuntimeOwner: "external_openclaw_source_workspace",
+      canReadMetadata: true,
+      canReadSourceFileContent: false,
+      exposesSourceFileContent: false,
+      exposesDocumentationContent: false,
+      canMutate: false,
+      canExecute: false,
+      canImportModule: false,
+      canExecutePluginCode: false,
+      canExecuteToolCode: false,
+      canActivateRuntime: false,
+      createsTask: false,
+      createsApproval: false,
+      absorptionMode: "native_metadata_catalog_only",
+    },
+  };
+}
+
 function buildOpenClawPluginSdkContractReview() {
   const plan = buildOpenClawMigrationPlan();
   const items = plan.items
@@ -6373,6 +6702,40 @@ const server = http.createServer(async (req, res) => {
         sourceRegistries: implementation.sourceRegistries,
         summary: implementation.summary,
         governance: implementation.governance,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/plugins/openclaw-tool-catalog") {
+    try {
+      sendJson(res, 200, buildOpenClawToolCatalog({
+        workspacePath: requestUrl.searchParams.get("workspacePath"),
+      }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/plugins/openclaw-tool-catalog/summary") {
+    try {
+      const catalog = buildOpenClawToolCatalog({
+        workspacePath: requestUrl.searchParams.get("workspacePath"),
+      });
+      sendJson(res, 200, {
+        ok: catalog.ok,
+        registry: catalog.registry,
+        mode: catalog.mode,
+        generatedAt: catalog.generatedAt,
+        sourceRegistries: catalog.sourceRegistries,
+        capability: catalog.capability,
+        summary: catalog.summary,
+        governance: catalog.governance,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";

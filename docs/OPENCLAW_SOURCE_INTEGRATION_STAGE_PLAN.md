@@ -278,6 +278,50 @@ OPENCLAW_MILESTONE_CHECKS=openclaw-plugin-sdk-source-content-review,observer-ope
 SDK derived signals -> native contract tests -> native contract implementation -> first real capability absorption
 ```
 
+## 10. 2026-05-13 Step 4 Update: Tool Catalog Absorption
+
+Status: implemented_waiting_check.
+
+Slice: `sense.openclaw.tool_catalog`.
+
+Purpose: this is the first real read-only absorption of the enhanced `openclaw` workspace, using metadata from `openclaw/src/agents/tools`, `openclaw/docs/tools`, and `openclaw/src/plugin-sdk`.
+
+Implemented artifacts:
+- Core API: `GET /plugins/openclaw-tool-catalog`.
+- Core summary API: `GET /plugins/openclaw-tool-catalog/summary`.
+- Registry: `openclaw-tool-catalog-v0`.
+- Observer panel: `OpenClaw Tool Catalog`.
+- Targeted checks: `openclaw-tool-catalog`, `observer-openclaw-tool-catalog`.
+
+Governance boundaries:
+- No old `openclaw` module import.
+- No old tool execution.
+- No source text exposure.
+- No documentation body exposure.
+- No script body or dependency version exposure.
+- No task or approval creation.
+- Runtime owner remains `openclaw_on_nixos`.
+
+Local verification on Windows:
+- `npm run typecheck`: passed.
+- `git diff --check`: passed.
+- Unix milestone scripts could not run locally because Windows shell has no `bash`.
+- Equivalent Node smoke test for Core tool catalog: passed.
+- Equivalent Node smoke test for Observer visibility: passed.
+
+NixOS targeted milestone command:
+
+```bash
+cd /home/edvulcan/OpenClaw_On_NixOS && \
+git pull origin main && \
+OPENCLAW_MILESTONE_CHECKS=openclaw-tool-catalog,observer-openclaw-tool-catalog npm run dev:milestone-check:unix
+```
+
+Next intended slice after this passes:
+- Select the first native read-only tool adapter from the catalog.
+- Candidate direction: read-only workspace/file semantic inspection or tool metadata lookup.
+- Do not add another readiness/checklist layer unless it directly unlocks that adapter.
+
 这条线是本阶段的主线。
 
-当前执行焦点：Step 4 `First Real Capability Absorption`，优先切片为 `sense.openclaw.tool_catalog`。
+当前执行焦点：Step 4 `First Real Capability Absorption`，`sense.openclaw.tool_catalog` 已实现，状态为 `implemented_waiting_check`，等待 NixOS targeted milestone 确认。

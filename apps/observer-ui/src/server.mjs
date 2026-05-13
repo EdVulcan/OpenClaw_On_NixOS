@@ -486,6 +486,15 @@ function observerHtml() {
           <pre id="native-sdk-implementation-json">Loading native SDK contract implementation...</pre>
         </section>
         <section class="panel">
+          <h2>OpenClaw Tool Catalog</h2>
+          <div class="metric"><span>Registry</span><span id="openclaw-tool-catalog-registry">openclaw-tool-catalog-v0</span></div>
+          <div class="metric"><span>Tools</span><span id="openclaw-tool-catalog-tools">0</span></div>
+          <div class="metric"><span>Docs</span><span id="openclaw-tool-catalog-docs">0</span></div>
+          <div class="metric"><span>Categories</span><span id="openclaw-tool-catalog-categories">0</span></div>
+          <div class="metric"><span>Mode</span><span id="openclaw-tool-catalog-mode">read-only-native-absorption</span></div>
+          <pre id="openclaw-tool-catalog-json">Loading OpenClaw tool catalog...</pre>
+        </section>
+        <section class="panel">
           <h2>OpenClaw Native Plugin Contract</h2>
           <div class="metric"><span>Registry</span><span id="native-plugin-contract-registry">openclaw-native-plugin-contract-v0</span></div>
           <div class="metric"><span>Owner</span><span id="native-plugin-contract-owner">openclaw_on_nixos</span></div>
@@ -865,6 +874,12 @@ const nativeSdkImplementationReadOnly = document.querySelector("#native-sdk-impl
 const nativeSdkImplementationExecutable = document.querySelector("#native-sdk-implementation-executable");
 const nativeSdkImplementationMode = document.querySelector("#native-sdk-implementation-mode");
 const nativeSdkImplementationJson = document.querySelector("#native-sdk-implementation-json");
+const openclawToolCatalogRegistry = document.querySelector("#openclaw-tool-catalog-registry");
+const openclawToolCatalogTools = document.querySelector("#openclaw-tool-catalog-tools");
+const openclawToolCatalogDocs = document.querySelector("#openclaw-tool-catalog-docs");
+const openclawToolCatalogCategories = document.querySelector("#openclaw-tool-catalog-categories");
+const openclawToolCatalogMode = document.querySelector("#openclaw-tool-catalog-mode");
+const openclawToolCatalogJson = document.querySelector("#openclaw-tool-catalog-json");
 const nativePluginContractRegistry = document.querySelector("#native-plugin-contract-registry");
 const nativePluginContractOwner = document.querySelector("#native-plugin-contract-owner");
 const nativePluginContractTotal = document.querySelector("#native-plugin-contract-total");
@@ -1547,6 +1562,41 @@ function renderNativeSdkContractImplementation(data) {
   ].join("\\n");
 }
 
+function renderOpenClawToolCatalog(data) {
+  const summary = data?.summary ?? {};
+  const governance = data?.governance ?? {};
+  const tools = Array.isArray(data?.catalog?.tools) ? data.catalog.tools : [];
+  const docs = Array.isArray(data?.catalog?.documentation) ? data.catalog.documentation : [];
+  const categories = Array.isArray(data?.catalog?.categories) ? data.catalog.categories : [];
+  const mappings = Array.isArray(data?.catalog?.nativeSlotMapping) ? data.catalog.nativeSlotMapping : [];
+  openclawToolCatalogRegistry.textContent = data?.registry ?? "openclaw-tool-catalog-v0";
+  openclawToolCatalogTools.textContent = String(summary.toolImplementationFiles ?? tools.length);
+  openclawToolCatalogDocs.textContent = String(summary.toolDocumentationFiles ?? docs.length);
+  openclawToolCatalogCategories.textContent = String(summary.categoryCount ?? categories.length);
+  openclawToolCatalogMode.textContent = data?.mode ?? "read-only-native-absorption";
+
+  openclawToolCatalogJson.textContent = [
+    "First real read-only absorption: enhanced OpenClaw tool files and docs are visible as metadata catalog entries.",
+    "Source text, documentation bodies, old module imports, old tool execution, runtime activation, tasks, and approvals remain blocked.",
+    \`Registry: \${data?.registry ?? "openclaw-tool-catalog-v0"}\`,
+    \`Mode: \${data?.mode ?? "read-only-native-absorption"}\`,
+    \`Capability: \${data?.capability?.id ?? "sense.openclaw.tool_catalog"} risk=\${data?.capability?.risk ?? "low"} approval=\${Boolean(data?.capability?.approvalRequired)} owner=\${data?.capability?.runtimeOwner ?? "unknown"}\`,
+    \`Workspace: \${data?.workspace?.path ?? "unknown"}\`,
+    \`Roots: tools=\${data?.roots?.tools ?? "unknown"} docs=\${data?.roots?.docs ?? "unknown"} sdk=\${data?.roots?.pluginSdkVocabulary ?? "unknown"}\`,
+    \`Counts: sourceFiles=\${summary.sourceToolFiles ?? 0} implementations=\${summary.toolImplementationFiles ?? tools.length} tests=\${summary.toolTestFiles ?? 0} docs=\${summary.toolDocumentationFiles ?? docs.length} documented=\${summary.documentedImplementations ?? 0} sdkVocabulary=\${summary.pluginSdkVocabularyFiles ?? 0}\`,
+    \`Categories: \${Object.entries(summary.byCategory ?? {}).map(([category, count]) => \`\${category}=\${count}\`).join(", ") || "none"}\`,
+    \`Governance: metadata=\${Boolean(governance.canReadMetadata)} readSource=\${Boolean(governance.canReadSourceFileContent)} exposeSource=\${Boolean(governance.exposesSourceFileContent)} exposeDocs=\${Boolean(governance.exposesDocumentationContent)} importModule=\${Boolean(governance.canImportModule)} executeTool=\${Boolean(governance.canExecuteToolCode)} activateRuntime=\${Boolean(governance.canActivateRuntime)} task=\${Boolean(governance.createsTask)} approval=\${Boolean(governance.createsApproval)}\`,
+    "",
+    ...categories.map((entry) => \`\${entry.category ?? "unknown"} count=\${entry.count ?? 0} tools=\${entry.implementationFiles ?? 0} docs=\${entry.documentationFiles ?? 0} slot=\${entry.recommendedNativeSlot ?? "none"}\`),
+    "",
+    ...mappings.map((mapping) => \`\${mapping.capabilityId ?? "capability"} status=\${mapping.status ?? "unknown"} roots=\${(mapping.sourceRoots ?? []).join(",")} executeSource=\${Boolean(mapping.canExecuteSourceTool)} owner=\${mapping.runtimeOwner ?? "unknown"}\`),
+    "",
+    ...tools.slice(0, 20).map((tool) => \`\${tool.relativePath ?? "unknown"} category=\${tool.category ?? "unknown"} documented=\${Boolean(tool.documented)} size=\${tool.sizeBytes ?? "n/a"} slot=\${tool.nativeSlot ?? "none"} contentRead=\${Boolean(tool.contentRead)}\`),
+    "",
+    \`Next Allowed Work: \${(summary.nextAllowedWork ?? []).join("; ") || "none"}\`,
+  ].join("\\n");
+}
+
 function renderNativePluginContract(data) {
   const summary = data?.summary ?? {};
   const contract = data?.contract ?? {};
@@ -2107,6 +2157,20 @@ async function refreshNativeSdkContractImplementation() {
     nativeSdkImplementationExecutable.textContent = "0";
     nativeSdkImplementationMode.textContent = "unknown";
     nativeSdkImplementationJson.textContent = "Unable to read native SDK contract implementation.";
+  }
+}
+
+async function refreshOpenClawToolCatalog() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/plugins/openclaw-tool-catalog\`);
+    renderOpenClawToolCatalog(data);
+  } catch {
+    openclawToolCatalogRegistry.textContent = "offline";
+    openclawToolCatalogTools.textContent = "0";
+    openclawToolCatalogDocs.textContent = "0";
+    openclawToolCatalogCategories.textContent = "0";
+    openclawToolCatalogMode.textContent = "unknown";
+    openclawToolCatalogJson.textContent = "Unable to read OpenClaw tool catalog.";
   }
 }
 
@@ -3735,6 +3799,7 @@ await refreshPluginSdkSourceReviewScope();
 await refreshPluginSdkSourceContentReview();
 await refreshPluginSdkNativeContractTests();
 await refreshNativeSdkContractImplementation();
+await refreshOpenClawToolCatalog();
 await refreshNativePluginContract();
 await refreshNativePluginRegistry();
 await refreshFormalIntegrationReadiness();
@@ -3774,6 +3839,7 @@ setInterval(refreshPluginSdkSourceReviewScope, 5000);
 setInterval(refreshPluginSdkSourceContentReview, 5000);
 setInterval(refreshPluginSdkNativeContractTests, 5000);
 setInterval(refreshNativeSdkContractImplementation, 5000);
+setInterval(refreshOpenClawToolCatalog, 5000);
 setInterval(refreshNativePluginContract, 5000);
 setInterval(refreshNativePluginRegistry, 5000);
 setInterval(refreshFormalIntegrationReadiness, 5000);
