@@ -422,6 +422,15 @@ function observerHtml() {
           <pre id="workspace-json">Loading OpenClaw workspace registry...</pre>
         </section>
         <section class="panel">
+          <h2>OpenClaw Source Migration Map</h2>
+          <div class="metric"><span>Registry</span><span id="workspace-migration-registry">openclaw-source-migration-map-v0</span></div>
+          <div class="metric"><span>Candidates</span><span id="workspace-migration-total">0</span></div>
+          <div class="metric"><span>Capability Registry</span><span id="workspace-migration-capabilities">0</span></div>
+          <div class="metric"><span>High Priority</span><span id="workspace-migration-high">0</span></div>
+          <div class="metric"><span>Mode</span><span id="workspace-migration-mode">read-only</span></div>
+          <pre id="workspace-migration-json">Loading OpenClaw source migration map...</pre>
+        </section>
+        <section class="panel">
           <h2>Workspace Command Proposals</h2>
           <div class="metric"><span>Registry</span><span id="workspace-command-registry">workspace-command-proposals-v0</span></div>
           <div class="metric"><span>Total</span><span id="workspace-command-total">0</span></div>
@@ -691,6 +700,12 @@ const workspaceMissing = document.querySelector("#workspace-missing");
 const workspaceNode = document.querySelector("#workspace-node");
 const workspaceMode = document.querySelector("#workspace-mode");
 const workspaceJson = document.querySelector("#workspace-json");
+const workspaceMigrationRegistry = document.querySelector("#workspace-migration-registry");
+const workspaceMigrationTotal = document.querySelector("#workspace-migration-total");
+const workspaceMigrationCapabilities = document.querySelector("#workspace-migration-capabilities");
+const workspaceMigrationHigh = document.querySelector("#workspace-migration-high");
+const workspaceMigrationMode = document.querySelector("#workspace-migration-mode");
+const workspaceMigrationJson = document.querySelector("#workspace-migration-json");
 const workspaceCommandRegistry = document.querySelector("#workspace-command-registry");
 const workspaceCommandTotal = document.querySelector("#workspace-command-total");
 const workspaceCommandValidation = document.querySelector("#workspace-command-validation");
@@ -1107,6 +1122,35 @@ function renderWorkspaceRegistry(data) {
   ].join("\\n");
 }
 
+function renderWorkspaceMigrationMap(data) {
+  const summary = data?.summary ?? {};
+  const items = Array.isArray(data?.items) ? data.items : [];
+  workspaceMigrationRegistry.textContent = data?.registry ?? "openclaw-source-migration-map-v0";
+  workspaceMigrationTotal.textContent = String(summary.total ?? data?.count ?? 0);
+  workspaceMigrationCapabilities.textContent = String(summary.byTargetArea?.capability_registry ?? 0);
+  workspaceMigrationHigh.textContent = String(summary.byPriority?.high ?? 0);
+  workspaceMigrationMode.textContent = data?.mode ?? "read-only";
+
+  workspaceMigrationJson.textContent = [
+    "Read-only migration map: candidates are visible, source file contents stay hidden.",
+    "Candidate status is not an import, execution, or mutation grant.",
+    \`Registry: \${data?.registry ?? "openclaw-source-migration-map-v0"}\`,
+    \`Mode: \${data?.mode ?? "read-only"}\`,
+    \`Source Registry: \${data?.sourceRegistry ?? "workspace-detect-v0"}\`,
+    \`Total: \${summary.total ?? data?.count ?? 0}\`,
+    \`Workspaces: \${summary.workspaces ?? 0}\`,
+    \`By Target: \${Object.entries(summary.byTargetArea ?? {}).map(([target, count]) => \`\${target}=\${count}\`).join(", ") || "none"}\`,
+    \`By Migration Kind: \${Object.entries(summary.byMigrationKind ?? {}).map(([kind, count]) => \`\${kind}=\${count}\`).join(", ") || "none"}\`,
+    \`By Risk: \${Object.entries(summary.byRisk ?? {}).map(([risk, count]) => \`\${risk}=\${count}\`).join(", ") || "none"}\`,
+    \`By Priority: \${Object.entries(summary.byPriority ?? {}).map(([priority, count]) => \`\${priority}=\${count}\`).join(", ") || "none"}\`,
+    "",
+    ...items.slice(0, 8).map((entry) => {
+      const governance = entry.governance ?? {};
+      return \`[\${entry.priority ?? "unknown"}/\${entry.risk ?? "unknown"}] \${entry.capability ?? "capability"} from=\${entry.sourceDomain ?? "unknown"} target=\${entry.targetArea ?? "unknown"} kind=\${entry.migrationKind ?? "unknown"} status=\${entry.readiness ?? "unknown"} readContent=\${Boolean(governance.canReadFileContent)} mutate=\${Boolean(governance.canMutate)} execute=\${Boolean(governance.canExecute)} review=\${Boolean(governance.requiresHumanReview)}\`;
+    }),
+  ].join("\\n");
+}
+
 function renderWorkspaceCommandProposals(data) {
   const summary = data?.summary ?? {};
   const items = Array.isArray(data?.items) ? data.items : [];
@@ -1343,6 +1387,20 @@ async function refreshWorkspaceCommandProposals() {
     workspaceCommandRuntime.textContent = "0";
     workspaceCommandMode.textContent = "unknown";
     workspaceCommandJson.textContent = "Unable to read workspace command proposals.";
+  }
+}
+
+async function refreshWorkspaceMigrationMap() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/workspaces/openclaw-migration-map\`);
+    renderWorkspaceMigrationMap(data);
+  } catch {
+    workspaceMigrationRegistry.textContent = "offline";
+    workspaceMigrationTotal.textContent = "0";
+    workspaceMigrationCapabilities.textContent = "0";
+    workspaceMigrationHigh.textContent = "0";
+    workspaceMigrationMode.textContent = "unknown";
+    workspaceMigrationJson.textContent = "Unable to read OpenClaw source migration map.";
   }
 }
 
@@ -2836,6 +2894,7 @@ await refreshCommandLedger();
 await refreshFilesystemLedger();
 await refreshFilesystemReadLedger();
 await refreshWorkspaceRegistry();
+await refreshWorkspaceMigrationMap();
 await refreshWorkspaceCommandProposals();
 await refreshWorkspaceCommandPlanDraft();
 await refreshSystemState();
@@ -2861,6 +2920,7 @@ setInterval(refreshCommandLedger, 5000);
 setInterval(refreshFilesystemLedger, 5000);
 setInterval(refreshFilesystemReadLedger, 5000);
 setInterval(refreshWorkspaceRegistry, 5000);
+setInterval(refreshWorkspaceMigrationMap, 5000);
 setInterval(refreshWorkspaceCommandProposals, 5000);
 setInterval(refreshWorkspaceCommandPlanDraft, 5000);
 setInterval(refreshSystemState, 5000);

@@ -265,6 +265,14 @@ npm run dev:observer-workspace-command-proposals-check:unix
 
 This verifies Observer surfaces proposal-only workspace command shapes, risks, and governance flags without exposing script bodies or enabling execution.
 
+Run the observer OpenClaw source migration map slice directly:
+
+```bash
+npm run dev:observer-openclaw-source-migration-map-check:unix
+```
+
+This verifies Observer surfaces the read-only source migration candidate map, including target areas, migration kinds, risks, priorities, and governance flags without exposing source file contents, mutating files, or executing source workspace commands.
+
 Run the observer OpenClaw workspace command plan slice directly:
 
 ```bash
@@ -737,6 +745,7 @@ This is based on real NixOS VM validation:
 - `dev:observer-filesystem-ledger-check:unix` covers Observer visibility for the cross-task filesystem change ledger
 - `dev:observer-filesystem-read-ledger-check:unix` covers Observer visibility for the cross-task filesystem read access ledger
 - `dev:observer-workspace-detect-check:unix` covers Observer visibility for read-only OpenClaw workspace detection
+- `dev:observer-openclaw-source-migration-map-check:unix` covers Observer visibility for read-only OpenClaw source migration candidates
 - `dev:observer-workspace-command-proposals-check:unix` covers Observer visibility for OpenClaw workspace command proposals
 - `dev:observer-workspace-command-plan-check:unix` covers Observer visibility for OpenClaw workspace command plan drafts
 - `dev:observer-workspace-command-task-check:unix` covers Observer controls for approval-gated OpenClaw workspace command tasks
