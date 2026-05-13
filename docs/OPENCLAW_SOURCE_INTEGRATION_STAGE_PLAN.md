@@ -1,6 +1,6 @@
 # OpenClaw Source Integration Stage Plan
 
-更新时间：2026-05-13 20:49 +08:00
+更新时间：2026-05-13 21:30 +08:00
 
 本文档用于跟踪当前阶段：把旁路 `openclaw` 增强源码项目中的能力，受控接入 `OpenClawOnNixOS`。后续每推进一个接入切片，都必须同步更新本文件，避免路线漂移、重复准备层、或忘记阶段边界。
 
@@ -501,3 +501,48 @@ Next intended slice after this passes:
 这条线是本阶段的主线。
 
 当前执行焦点：Step 5 `First Governed Executable Adapter` 的第一个 read-only executable adapter：`sense.openclaw.workspace_symbol_lookup` 已通过 NixOS targeted milestone。下一步进入第一个 approval-gated workspace mutation adapter，禁止再新增与真实 adapter 无关的 readiness/checklist 层。
+
+## 14. 2026-05-13 Step 5 Update: Native Workspace Text Write
+
+Status: implemented_waiting_check.
+
+Slice: `act.openclaw.workspace_text_write`.
+
+Purpose: implement the first approval-gated native adapter that can affect enhanced `openclaw` workspace state. This is the first controlled mutation slice: the native adapter creates a task and approval, then approved execution reuses the existing `act.filesystem.write_text` capability so policy, capability history, filesystem ledger, event audit, and Observer remain authoritative.
+
+Implemented artifacts:
+- Core draft API: `GET /plugins/native-adapter/workspace-text-write/draft`.
+- Core task API: `POST /plugins/native-adapter/workspace-text-write-tasks`.
+- Native contract capability: `act.openclaw.workspace_text_write`.
+- Capability registry entry: `act.openclaw.workspace_text_write`.
+- Public task plan redaction for content-like params.
+- Observer panel/control: `OpenClaw Workspace Text Write`.
+- Targeted checks: `openclaw-native-workspace-text-write`, `observer-openclaw-native-workspace-text-write`.
+
+Governance boundaries:
+- Does not import or execute old `openclaw` modules.
+- Does not execute old OpenClaw tools.
+- Does not write before explicit approval.
+- Actual mutation runs through `act.filesystem.write_text`.
+- Filesystem change is recorded in the filesystem ledger.
+- Capability execution is recorded in capability history.
+- Public task/approval/Observer responses expose content bytes and sha256, not raw content.
+- Runtime owner remains `openclaw_on_nixos`.
+
+Local verification target:
+- `npm run typecheck`.
+- `git diff --check`.
+- Targeted service smoke via the new milestone scripts on NixOS/bash.
+
+NixOS targeted milestone command:
+
+```bash
+cd /home/edvulcan/OpenClaw_On_NixOS && \
+git pull origin main && \
+OPENCLAW_MILESTONE_CHECKS=openclaw-native-workspace-text-write,observer-openclaw-native-workspace-text-write npm run dev:milestone-check:unix
+```
+
+Next intended slice after this passes:
+- Extend from whole-file text write to a conservative edit proposal/apply chain with diff preview.
+- Keep all writes behind approval and filesystem ledgering.
+- Do not jump to shell/process/web gateway execution until this mutation adapter has passed on NixOS.

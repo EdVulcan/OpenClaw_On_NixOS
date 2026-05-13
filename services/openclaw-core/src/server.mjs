@@ -1,5 +1,5 @@
 import http from "node:http";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
@@ -1774,6 +1774,7 @@ function buildOpenClawNativePluginSdkContractImplementation({ packagePath = null
     "sense.openclaw.tool_catalog",
     "sense.openclaw.workspace_semantic_index",
     "sense.openclaw.workspace_symbol_lookup",
+    "act.openclaw.workspace_text_write",
     "sense.openclaw.prompt_pack",
     "sense.openclaw.plugin_manifest_map",
     "act.plugin.capability.invoke",
@@ -2393,29 +2394,31 @@ function buildOpenClawNativePluginAdapterStatus() {
     generatedAt: new Date().toISOString(),
     sourceRegistry: registry.registry,
     runtimeOwner: "openclaw_on_nixos",
-    status: "read_only_adapters_ready",
+    status: "read_only_and_approval_gated_mutation_adapters_ready",
     implementedCapabilities: [
       "sense.plugin.manifest_profile",
       "sense.openclaw.tool_catalog",
       "sense.openclaw.workspace_semantic_index",
       "sense.openclaw.workspace_symbol_lookup",
+      "act.openclaw.workspace_text_write",
       "plan.plugin.runtime_preflight",
     ],
     pendingCapabilities: ["act.plugin.capability.invoke"],
     summary: {
-      implemented: 5,
+      implemented: 6,
       pending: 1,
       canReadManifestMetadata: true,
       canReadToolCatalogMetadata: true,
       canReadWorkspaceSemanticMetadata: true,
       canExecuteWorkspaceSymbolLookup: true,
+      canCreateApprovalGatedWorkspaceTextWriteTasks: true,
       canReadSourceFileContent: false,
-      canMutate: false,
+      canMutate: true,
       canExecutePluginCode: false,
       canExecuteToolCode: false,
       canActivateRuntime: false,
-      createsTask: false,
-      createsApproval: false,
+      createsTask: true,
+      createsApproval: true,
       requiresPolicyInvocation: true,
     },
     guardrails: [
@@ -3160,6 +3163,210 @@ function buildNativeOpenClawWorkspaceSymbolLookup({
   };
 }
 
+function sha256Hex(value) {
+  return createHash("sha256").update(value, "utf8").digest("hex");
+}
+
+function resolveOpenClawWorkspaceTarget({ workspacePath = null, relativePath = null } = {}) {
+  const { item } = selectOpenClawToolCatalogWorkspace({ workspacePath });
+  const safeRelativePath = typeof relativePath === "string" && relativePath.trim()
+    ? relativePath.trim().replaceAll("\\", "/")
+    : null;
+  if (!safeRelativePath) {
+    throw new Error("relativePath is required for OpenClaw workspace text writes.");
+  }
+  if (safeRelativePath.startsWith("/") || safeRelativePath.includes("..")) {
+    throw new Error("OpenClaw workspace text writes require a bounded relative path inside the workspace.");
+  }
+
+  const absolutePath = path.resolve(item.path, safeRelativePath);
+  const workspaceRoot = path.resolve(item.path);
+  const normalisedTarget = process.platform === "win32" ? absolutePath.toLowerCase() : absolutePath;
+  const normalisedRoot = process.platform === "win32" ? workspaceRoot.toLowerCase() : workspaceRoot;
+  if (normalisedTarget !== normalisedRoot && !normalisedTarget.startsWith(`${normalisedRoot}${path.sep}`)) {
+    throw new Error("OpenClaw workspace text write target is outside the selected workspace.");
+  }
+
+  return {
+    workspace: item,
+    relativePath: safeRelativePath,
+    absolutePath,
+  };
+}
+
+function buildNativeOpenClawWorkspaceTextWriteDraft({
+  workspacePath = null,
+  relativePath = "scratch/native-write.txt",
+  content = "",
+  overwrite = true,
+} = {}) {
+  const target = resolveOpenClawWorkspaceTarget({ workspacePath, relativePath });
+  const safeContent = typeof content === "string" ? content : "";
+  const contentBytes = Buffer.byteLength(safeContent, "utf8");
+  const contentSha256 = sha256Hex(safeContent);
+  const nativeRegistry = createOpenClawNativePluginRegistry();
+  const capability = nativeRegistry.items[0]?.contract?.capabilities
+    ?.find((entry) => entry.id === "act.openclaw.workspace_text_write") ?? null;
+  const now = new Date().toISOString();
+  const goal = `Apply approved OpenClaw workspace text write to ${target.relativePath}`;
+  const policyRequest = {
+    intent: "openclaw.workspace.write_text",
+    domain: "body_internal",
+    risk: "high",
+    requiresApproval: true,
+    tags: ["openclaw_native_adapter", "workspace_mutation", "explicit_approval_required"],
+  };
+  const action = {
+    kind: "filesystem.write_text",
+    intent: "filesystem.write_text",
+    params: {
+      path: target.absolutePath,
+      content: safeContent,
+      encoding: "utf8",
+      overwrite: overwrite !== false,
+    },
+  };
+  const plan = buildRulePlan({
+    goal,
+    type: "system_task",
+    intent: "filesystem.write_text",
+    policy: policyRequest,
+    targetUrl: null,
+    actions: [action],
+  });
+  const policyDecision = {
+    id: randomUUID(),
+    at: now,
+    engine: "openclaw-native-workspace-text-write-v0",
+    stage: "openclaw.native.workspace_text_write.task",
+    subject: {
+      taskId: null,
+      type: "system_task",
+      goal,
+      targetUrl: null,
+      intent: "openclaw.workspace.write_text",
+    },
+    domain: "body_internal",
+    risk: "high",
+    decision: "require_approval",
+    reason: "openclaw_workspace_text_write_requires_explicit_user_approval",
+    approved: false,
+    autonomyMode,
+    autonomous: false,
+  };
+
+  return {
+    registry: "openclaw-native-workspace-text-write-draft-v0",
+    mode: "approval-gated-draft",
+    generatedAt: now,
+    sourceRegistry: "openclaw-native-plugin-adapter-v0",
+    capability: {
+      id: capability?.id ?? "act.openclaw.workspace_text_write",
+      kind: capability?.kind ?? "act",
+      risk: capability?.risk ?? "high",
+      approvalRequired: capability?.approval?.required ?? true,
+      runtimeOwner: capability?.runtimeOwner ?? "openclaw_on_nixos",
+    },
+    workspace: {
+      id: target.workspace.id,
+      name: target.workspace.name,
+      path: target.workspace.path,
+    },
+    target: {
+      relativePath: target.relativePath,
+      path: target.absolutePath,
+      contentBytes,
+      contentSha256,
+      overwrite: overwrite !== false,
+      contentExposed: false,
+    },
+    draft: {
+      goal,
+      type: "system_task",
+      action: {
+        ...action,
+        params: redactPublicParams(action.params),
+      },
+      plan,
+      policy: {
+        request: policyRequest,
+        decision: policyDecision,
+      },
+      governance: {
+        createsTask: false,
+        createsApproval: false,
+        canExecuteWithoutApproval: false,
+        requiresExplicitApproval: true,
+        usesFilesystemWriteCapability: true,
+        exposesContent: false,
+      },
+    },
+  };
+}
+
+async function createNativeOpenClawWorkspaceTextWriteTask({
+  workspacePath = null,
+  relativePath = "scratch/native-write.txt",
+  content = "",
+  overwrite = true,
+  confirm = false,
+} = {}) {
+  if (confirm !== true) {
+    throw new Error("OpenClaw workspace text write task creation requires confirm=true.");
+  }
+
+  const draftEnvelope = buildNativeOpenClawWorkspaceTextWriteDraft({
+    workspacePath,
+    relativePath,
+    content,
+    overwrite,
+  });
+  const draft = draftEnvelope.draft;
+  const task = createTask({
+    goal: draft.goal,
+    type: draft.type,
+    workViewStrategy: "openclaw-native-workspace-text-write",
+    plan: draft.plan,
+    policy: draft.policy.request,
+  }, { skipInitialPolicy: true });
+  task.policy = draft.policy;
+  const approval = createApprovalRequestForTask(task, draft.policy.decision);
+  const reclaimedTasks = supersedeOtherActiveTasks(task.id);
+  reconcileRuntimeState();
+  persistState();
+
+  await publishEvent("task.created", { task: serialiseTask(task), planner: "openclaw-native-workspace-text-write-v0" });
+  await publishTaskApprovalIfPending(task);
+  await publishEvent("task.planned", { task: serialiseTask(task), plan: serialisePlanForPublic(task.plan) });
+  await Promise.all(reclaimedTasks.map((reclaimedTask) => publishEvent("task.phase_changed", {
+    task: serialiseTask(reclaimedTask),
+  })));
+
+  return {
+    registry: "openclaw-native-workspace-text-write-task-v0",
+    mode: "approval-gated",
+    generatedAt: new Date().toISOString(),
+    sourceRegistry: draftEnvelope.registry,
+    capability: draftEnvelope.capability,
+    workspace: draftEnvelope.workspace,
+    target: draftEnvelope.target,
+    task,
+    approval,
+    governance: {
+      mode: "native_workspace_text_write_approval_gated",
+      runtimeOwner: "openclaw_on_nixos",
+      createsTask: true,
+      createsApproval: true,
+      canExecuteWithoutApproval: false,
+      usesFilesystemWriteCapability: true,
+      recordsCapabilityHistory: true,
+      recordsFilesystemLedger: true,
+      exposesContent: false,
+      executed: false,
+    },
+  };
+}
+
 function buildNativePluginCapabilityInvokePlan({ packagePath = null, capabilityId = "act.plugin.capability.invoke" } = {}) {
   const manifestProfile = buildNativePluginManifestProfile({ packagePath });
   const nativeRegistry = createOpenClawNativePluginRegistry();
@@ -3593,7 +3800,7 @@ async function createNativePluginInvokeTask({ packagePath = null, capabilityId =
 
   await publishEvent("task.created", { task: serialiseTask(task), planner: "native-plugin-invoke-plan-v0" });
   await publishTaskApprovalIfPending(task);
-  await publishEvent("task.planned", { task: serialiseTask(task), plan: task.plan });
+  await publishEvent("task.planned", { task: serialiseTask(task), plan: serialisePlanForPublic(task.plan) });
   await Promise.all(reclaimedTasks.map((reclaimedTask) => publishEvent("task.phase_changed", {
     task: serialiseTask(reclaimedTask),
   })));
@@ -3745,7 +3952,7 @@ async function createWorkspaceCommandTask({ proposalId = null, workspaceId = nul
 
   await publishEvent("task.created", { task: serialiseTask(task), planner: draft.plan?.planner ?? "workspace-command-plan-v0" });
   await publishTaskApprovalIfPending(task);
-  await publishEvent("task.planned", { task: serialiseTask(task), plan: task.plan });
+  await publishEvent("task.planned", { task: serialiseTask(task), plan: serialisePlanForPublic(task.plan) });
   await Promise.all(reclaimedTasks.map((reclaimedTask) => publishEvent("task.phase_changed", {
     task: serialiseTask(reclaimedTask),
   })));
@@ -3769,6 +3976,34 @@ async function createWorkspaceCommandTask({ proposalId = null, workspaceId = nul
   };
 }
 
+function redactPublicParams(params) {
+  if (!params || typeof params !== "object" || Array.isArray(params)) {
+    return params ?? {};
+  }
+  const redacted = { ...params };
+  for (const key of ["content", "body", "data"]) {
+    if (typeof redacted[key] === "string") {
+      redacted[key] = `[redacted:${Buffer.byteLength(redacted[key], "utf8")} bytes]`;
+    }
+  }
+  return redacted;
+}
+
+function serialisePlanForPublic(plan) {
+  if (!plan || typeof plan !== "object") {
+    return plan ?? null;
+  }
+  return {
+    ...plan,
+    steps: Array.isArray(plan.steps)
+      ? plan.steps.map((step) => ({
+          ...step,
+          params: redactPublicParams(step.params),
+        }))
+      : plan.steps,
+  };
+}
+
 function serialiseTask(task) {
   const currentTask = getCurrentTask();
   return {
@@ -3778,7 +4013,7 @@ function serialiseTask(task) {
     status: task.status,
     targetUrl: task.targetUrl ?? null,
     workViewStrategy: task.workViewStrategy ?? null,
-    plan: task.plan ?? null,
+    plan: serialisePlanForPublic(task.plan),
     policy: task.policy ?? null,
     approval: task.approval ?? null,
     workView: task.workView ?? null,
@@ -3893,6 +4128,15 @@ function resolvePlanCapabilityId({ kind, intent, plannerIntent }) {
     || candidate === "symbol.lookup"
   ) {
     return "sense.openclaw.workspace_symbol_lookup";
+  }
+  if (
+    candidate === "openclaw.workspace.write_text"
+    || candidate === "openclaw.workspace.write-text"
+    || candidate === "openclaw.workspace_text_write"
+    || candidate === "workspace.write_text"
+    || candidate === "workspace.write-text"
+  ) {
+    return "act.openclaw.workspace_text_write";
   }
   if (candidate === "command.execute" || candidate === "system.command.execute") {
     return "act.system.command.execute";
@@ -4594,6 +4838,25 @@ function baseCapabilities() {
       risk: "low",
       governance: "audit_only",
       description: "Execute a bounded read-only symbol lookup over enhanced OpenClaw workspace files without exposing function bodies or executing legacy code.",
+    },
+    {
+      id: "act.openclaw.workspace_text_write",
+      name: "Native OpenClaw Workspace Text Write",
+      kind: "actuator",
+      service: "openclaw-core",
+      endpoint: `http://${host}:${port}/plugins/native-adapter/workspace-text-write-tasks`,
+      intents: [
+        "openclaw.workspace.write_text",
+        "openclaw.workspace.write-text",
+        "openclaw.workspace_text_write",
+        "workspace.write_text",
+        "workspace.write-text",
+      ],
+      domains: ["body_internal"],
+      risk: "high",
+      governance: "require_approval",
+      requiresApproval: true,
+      description: "Create approval-gated native tasks for bounded OpenClaw workspace text writes using the existing filesystem write capability and ledger.",
     },
     {
       id: "act.system.command.dry_run",
@@ -7664,6 +7927,60 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === "GET" && requestUrl.pathname === "/plugins/native-adapter/workspace-text-write/draft") {
+    try {
+      const draft = buildNativeOpenClawWorkspaceTextWriteDraft({
+        workspacePath: requestUrl.searchParams.get("workspacePath"),
+        relativePath: requestUrl.searchParams.get("relativePath") ?? "scratch/native-write.txt",
+        content: "hello from openclaw native workspace text write\n",
+        overwrite: requestUrl.searchParams.get("overwrite") !== "false",
+      });
+      sendJson(res, 200, {
+        ok: true,
+        ...draft,
+        draft: {
+          ...draft.draft,
+          plan: serialisePlanForPublic(draft.draft.plan),
+        },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/plugins/native-adapter/workspace-text-write-tasks") {
+    try {
+      const body = await readJsonBody(req);
+      const result = await createNativeOpenClawWorkspaceTextWriteTask({
+        workspacePath: typeof body.workspacePath === "string" ? body.workspacePath : null,
+        relativePath: typeof body.relativePath === "string" ? body.relativePath : "scratch/native-write.txt",
+        content: typeof body.content === "string" ? body.content : "",
+        overwrite: body.overwrite !== false,
+        confirm: body.confirm === true,
+      });
+      sendJson(res, 201, {
+        ok: true,
+        registry: result.registry,
+        mode: result.mode,
+        generatedAt: result.generatedAt,
+        sourceRegistry: result.sourceRegistry,
+        capability: result.capability,
+        workspace: result.workspace,
+        target: result.target,
+        task: serialiseTask(result.task),
+        approval: serialiseApproval(result.approval),
+        governance: result.governance,
+        summary: buildTaskSummary(),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
   if (req.method === "GET" && requestUrl.pathname === "/plugins/native-adapter/invoke-plan") {
     try {
       sendJson(res, 200, {
@@ -8192,14 +8509,14 @@ const server = http.createServer(async (req, res) => {
 
       await publishEvent("task.created", { task: serialiseTask(task), planner: "rule-v1" });
       await publishTaskApprovalIfPending(task);
-      await publishEvent("task.planned", { task: serialiseTask(task), plan: task.plan });
+      await publishEvent("task.planned", { task: serialiseTask(task), plan: serialisePlanForPublic(task.plan) });
       await Promise.all(reclaimedTasks.map((reclaimedTask) => publishEvent("task.phase_changed", {
         task: serialiseTask(reclaimedTask),
       })));
       sendJson(res, 201, {
         ok: true,
         task: serialiseTask(task),
-        plan: task.plan,
+        plan: serialisePlanForPublic(task.plan),
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
@@ -8229,7 +8546,7 @@ const server = http.createServer(async (req, res) => {
 
       await publishEvent("task.created", { task: serialiseTask(task), planner: "rule-v1" });
       await publishTaskApprovalIfPending(task);
-      await publishEvent("task.planned", { task: serialiseTask(task), plan: task.plan });
+      await publishEvent("task.planned", { task: serialiseTask(task), plan: serialisePlanForPublic(task.plan) });
       await Promise.all(reclaimedTasks.map((reclaimedTask) => publishEvent("task.phase_changed", {
         task: serialiseTask(reclaimedTask),
       })));
@@ -8244,7 +8561,7 @@ const server = http.createServer(async (req, res) => {
       sendJson(res, 201, {
         ok: true,
         task: serialiseTask(execution.task),
-        plan: execution.task.plan ?? null,
+        plan: serialisePlanForPublic(execution.task.plan),
         runtime: runtimeState,
         execution: serialiseExecutionResult(executionResult),
       });

@@ -522,6 +522,18 @@ function observerHtml() {
           <pre id="symbol-lookup-json">Loading native workspace symbol lookup...</pre>
         </section>
         <section class="panel">
+          <h2>OpenClaw Workspace Text Write</h2>
+          <div class="metric"><span>Registry</span><span id="workspace-text-write-registry">openclaw-native-workspace-text-write-draft-v0</span></div>
+          <div class="metric"><span>Capability</span><span id="workspace-text-write-capability">act.openclaw.workspace_text_write</span></div>
+          <div class="metric"><span>Approval</span><span id="workspace-text-write-approval">required</span></div>
+          <div class="metric"><span>Content</span><span id="workspace-text-write-content">redacted</span></div>
+          <div class="metric"><span>Mode</span><span id="workspace-text-write-mode">approval-gated-draft</span></div>
+          <div class="actions tight">
+            <button id="workspace-text-write-task-button" class="secondary">Create Approval Task</button>
+          </div>
+          <pre id="workspace-text-write-json">Loading native workspace text write draft...</pre>
+        </section>
+        <section class="panel">
           <h2>OpenClaw Native Plugin Contract</h2>
           <div class="metric"><span>Registry</span><span id="native-plugin-contract-registry">openclaw-native-plugin-contract-v0</span></div>
           <div class="metric"><span>Owner</span><span id="native-plugin-contract-owner">openclaw_on_nixos</span></div>
@@ -925,6 +937,13 @@ const symbolLookupFiles = document.querySelector("#symbol-lookup-files");
 const symbolLookupExecution = document.querySelector("#symbol-lookup-execution");
 const symbolLookupMode = document.querySelector("#symbol-lookup-mode");
 const symbolLookupJson = document.querySelector("#symbol-lookup-json");
+const workspaceTextWriteRegistry = document.querySelector("#workspace-text-write-registry");
+const workspaceTextWriteCapability = document.querySelector("#workspace-text-write-capability");
+const workspaceTextWriteApproval = document.querySelector("#workspace-text-write-approval");
+const workspaceTextWriteContent = document.querySelector("#workspace-text-write-content");
+const workspaceTextWriteMode = document.querySelector("#workspace-text-write-mode");
+const workspaceTextWriteJson = document.querySelector("#workspace-text-write-json");
+const workspaceTextWriteTaskButton = document.querySelector("#workspace-text-write-task-button");
 const nativePluginContractRegistry = document.querySelector("#native-plugin-contract-registry");
 const nativePluginContractOwner = document.querySelector("#native-plugin-contract-owner");
 const nativePluginContractTotal = document.querySelector("#native-plugin-contract-total");
@@ -1726,6 +1745,27 @@ function renderSymbolLookup(data) {
   ].join("\\n");
 }
 
+function renderWorkspaceTextWriteDraft(data) {
+  const target = data?.target ?? {};
+  const governance = data?.draft?.governance ?? data?.governance ?? {};
+  workspaceTextWriteRegistry.textContent = data?.registry ?? "openclaw-native-workspace-text-write-draft-v0";
+  workspaceTextWriteCapability.textContent = data?.capability?.id ?? "act.openclaw.workspace_text_write";
+  workspaceTextWriteApproval.textContent = data?.capability?.approvalRequired === false ? "not required" : "required";
+  workspaceTextWriteContent.textContent = target.contentExposed === true ? "exposed" : "redacted";
+  workspaceTextWriteMode.textContent = data?.mode ?? "approval-gated-draft";
+
+  workspaceTextWriteJson.textContent = [
+    "Native approval-gated mutation adapter: creates a task for bounded enhanced OpenClaw workspace text writes.",
+    "Content is represented by byte count and sha256 only; execution reuses act.filesystem.write_text after approval so filesystem ledger/history remain authoritative.",
+    \`Registry: \${data?.registry ?? "openclaw-native-workspace-text-write-draft-v0"}\`,
+    \`Mode: \${data?.mode ?? "approval-gated-draft"}\`,
+    \`Capability: \${data?.capability?.id ?? "act.openclaw.workspace_text_write"} risk=\${data?.capability?.risk ?? "high"} approval=\${Boolean(data?.capability?.approvalRequired ?? true)} owner=\${data?.capability?.runtimeOwner ?? "unknown"}\`,
+    \`Workspace: \${data?.workspace?.name ?? "unknown"} \${data?.workspace?.path ?? ""}\`,
+    \`Target: \${target.relativePath ?? "scratch/native-write.txt"} bytes=\${target.contentBytes ?? 0} sha256=\${target.contentSha256 ?? "unknown"} overwrite=\${Boolean(target.overwrite)} exposed=\${Boolean(target.contentExposed)}\`,
+    \`Governance: createsTask=\${Boolean(governance.createsTask)} createsApproval=\${Boolean(governance.createsApproval)} executeWithoutApproval=\${Boolean(governance.canExecuteWithoutApproval)} filesystemWrite=\${Boolean(governance.usesFilesystemWriteCapability)} exposesContent=\${Boolean(governance.exposesContent)}\`,
+  ].join("\\n");
+}
+
 function renderNativePluginContract(data) {
   const summary = data?.summary ?? {};
   const contract = data?.contract ?? {};
@@ -2342,6 +2382,20 @@ async function refreshSymbolLookup() {
     symbolLookupExecution.textContent = "unknown";
     symbolLookupMode.textContent = "unknown";
     symbolLookupJson.textContent = "Unable to run native workspace symbol lookup.";
+  }
+}
+
+async function refreshWorkspaceTextWriteDraft() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/workspace-text-write/draft?relativePath=scratch/observer-native-write.txt\`);
+    renderWorkspaceTextWriteDraft(data);
+  } catch {
+    workspaceTextWriteRegistry.textContent = "offline";
+    workspaceTextWriteCapability.textContent = "unknown";
+    workspaceTextWriteApproval.textContent = "unknown";
+    workspaceTextWriteContent.textContent = "unknown";
+    workspaceTextWriteMode.textContent = "unknown";
+    workspaceTextWriteJson.textContent = "Unable to read native workspace text write draft.";
   }
 }
 
@@ -3095,6 +3149,31 @@ async function createNativePluginInvokeApprovalTask() {
   await refreshNativePluginInvokePlan();
 }
 
+async function createWorkspaceTextWriteApprovalTask() {
+  const result = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/workspace-text-write-tasks\`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      relativePath: "scratch/observer-native-write.txt",
+      content: "hello from observer native OpenClaw workspace text write\\n",
+      overwrite: true,
+      confirm: true,
+    }),
+  });
+
+  taskHistoryFocus = "selected-task";
+  selectedHistoryTaskId = result.task?.id ?? null;
+  taskDetailIdInput.value = result.task?.id ?? "";
+  renderPlanPanel(result.task);
+  setControlMessage(\`Created approval-gated OpenClaw workspace text write task \${result.task?.id ?? "unknown"}.\`);
+  await refreshRuntime();
+  await refreshTaskList();
+  await refreshTaskHistoryDetail();
+  await refreshApprovalState();
+  await refreshOperatorState();
+  await refreshWorkspaceTextWriteDraft();
+}
+
 async function runOperatorStepFromUi() {
   const result = await fetchJson(\`\${observerConfig.coreUrl}/operator/step\`, {
     method: "POST",
@@ -3670,6 +3749,12 @@ nativePluginInvokeTaskButton.addEventListener("click", () => {
   });
 });
 
+workspaceTextWriteTaskButton.addEventListener("click", () => {
+  createWorkspaceTextWriteApprovalTask().catch((error) => {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  });
+});
+
 operatorStepButton.addEventListener("click", () => {
   runOperatorStepFromUi().catch((error) => {
     setControlMessage(\`Request failed: \${formatError(error)}\`);
@@ -3974,6 +4059,7 @@ await refreshOpenClawToolCatalog();
 await refreshToolCatalogAdapter();
 await refreshSemanticIndex();
 await refreshSymbolLookup();
+await refreshWorkspaceTextWriteDraft();
 await refreshNativePluginContract();
 await refreshNativePluginRegistry();
 await refreshFormalIntegrationReadiness();
@@ -4017,6 +4103,7 @@ setInterval(refreshOpenClawToolCatalog, 5000);
 setInterval(refreshToolCatalogAdapter, 5000);
 setInterval(refreshSemanticIndex, 5000);
 setInterval(refreshSymbolLookup, 5000);
+setInterval(refreshWorkspaceTextWriteDraft, 5000);
 setInterval(refreshNativePluginContract, 5000);
 setInterval(refreshNativePluginRegistry, 5000);
 setInterval(refreshFormalIntegrationReadiness, 5000);

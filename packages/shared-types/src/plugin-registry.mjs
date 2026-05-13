@@ -102,6 +102,25 @@ export function createOpenClawNativePluginRegistry({ generatedAt = new Date().to
         },
       },
       {
+        id: "act.openclaw.workspace_text_write",
+        title: "Apply OpenClaw workspace text write",
+        description: "Materializes a bounded OpenClaw workspace text write only through explicit approval, native filesystem governance, and filesystem ledgering.",
+        kind: "act",
+        domains: ["body_internal"],
+        risk: "high",
+        permissions: {
+          filesystemWrite: true,
+        },
+        approval: {
+          required: true,
+          reason: "Workspace mutations require explicit user approval and filesystem ledgering.",
+        },
+        audit: {
+          required: true,
+          ledger: "filesystem_ledger",
+        },
+      },
+      {
         id: "sense.openclaw.prompt_pack",
         title: "Profile OpenClaw prompt pack",
         description: "Summarizes enhanced OpenClaw prompt and agent-behavior surfaces as native policy metadata without importing runtime modules.",
