@@ -1772,6 +1772,7 @@ function buildOpenClawNativePluginSdkContractImplementation({ packagePath = null
   const requiredSlotIds = [
     "sense.plugin.manifest_profile",
     "sense.openclaw.tool_catalog",
+    "sense.openclaw.workspace_semantic_index",
     "sense.openclaw.prompt_pack",
     "sense.openclaw.plugin_manifest_map",
     "act.plugin.capability.invoke",
@@ -2392,13 +2393,19 @@ function buildOpenClawNativePluginAdapterStatus() {
     sourceRegistry: registry.registry,
     runtimeOwner: "openclaw_on_nixos",
     status: "read_only_adapters_ready",
-    implementedCapabilities: ["sense.plugin.manifest_profile", "sense.openclaw.tool_catalog", "plan.plugin.runtime_preflight"],
+    implementedCapabilities: [
+      "sense.plugin.manifest_profile",
+      "sense.openclaw.tool_catalog",
+      "sense.openclaw.workspace_semantic_index",
+      "plan.plugin.runtime_preflight",
+    ],
     pendingCapabilities: ["act.plugin.capability.invoke"],
     summary: {
-      implemented: 3,
+      implemented: 4,
       pending: 1,
       canReadManifestMetadata: true,
       canReadToolCatalogMetadata: true,
+      canReadWorkspaceSemanticMetadata: true,
       canReadSourceFileContent: false,
       canMutate: false,
       canExecutePluginCode: false,
@@ -2412,6 +2419,7 @@ function buildOpenClawNativePluginAdapterStatus() {
       "adapter shell is native to OpenClawOnNixOS",
       "manifest profile reads only bounded package metadata from reviewed plugin SDK paths",
       "tool catalog adapter reads only bounded enhanced OpenClaw tool metadata and never imports legacy tools",
+      "workspace semantic index emits derived counts only and never exposes file contents",
       "runtime preflight builds a governed execution envelope without loading plugin modules",
       "source contents, README text, script bodies, dependency versions, plugin code execution, and runtime activation remain blocked",
       "mutating plugin invocation remains pending explicit adapter design and approval gates",
@@ -2623,6 +2631,295 @@ function buildNativeOpenClawToolCatalogProfile({
       createsTask: false,
       createsApproval: false,
       requiresPolicyInvocation: true,
+    },
+  };
+}
+
+const SEMANTIC_INDEX_SCOPES = new Map([
+  ["tools", "src/agents/tools"],
+  ["plugin_sdk", "src/plugin-sdk"],
+  ["tool_docs", "docs/tools"],
+]);
+
+function semanticIndexKindForRelativePath(relativePath) {
+  if (relativePath.endsWith(".d.ts")) {
+    return "type_declaration";
+  }
+  const extension = path.extname(relativePath);
+  if ([".ts", ".tsx"].includes(extension)) {
+    return "typescript_source";
+  }
+  if ([".js", ".mjs", ".cjs"].includes(extension)) {
+    return "javascript_source";
+  }
+  if ([".md", ".mdx"].includes(extension)) {
+    return "documentation";
+  }
+  if (extension === ".json") {
+    return "manifest_or_schema";
+  }
+  return "other";
+}
+
+function analyseSemanticIndexFile(rootPath, absolutePath, relativePath) {
+  const stats = safeStat(absolutePath);
+  const kind = semanticIndexKindForRelativePath(relativePath);
+  const maxBytes = 64 * 1024;
+  const base = {
+    relativePath,
+    kind,
+    category: classifyToolCatalogEntry(relativePath),
+    sizeBytes: stats?.size ?? null,
+    contentRead: false,
+    contentExposed: false,
+  };
+  if (!stats?.isFile() || stats.size > maxBytes) {
+    return {
+      ...base,
+      skipped: true,
+      skipReason: stats?.size > maxBytes ? "file_too_large" : "not_readable",
+    };
+  }
+
+  let text = "";
+  try {
+    text = readFileSync(absolutePath, "utf8");
+  } catch {
+    return {
+      ...base,
+      skipped: true,
+      skipReason: "read_failed",
+    };
+  }
+
+  const lower = text.toLowerCase();
+  const lines = text.split(/\r?\n/);
+  const semanticTerms = [
+    "tool",
+    "capability",
+    "policy",
+    "approval",
+    "session",
+    "agent",
+    "workspace",
+    "fetch",
+    "search",
+    "execute",
+  ].filter((term) => lower.includes(term));
+  return {
+    ...base,
+    contentRead: true,
+    skipped: false,
+    lineCount: lines.length,
+    nonEmptyLineCount: lines.filter((line) => line.trim()).length,
+    signals: {
+      exportStatements: text.match(/\bexport\b/g)?.length ?? 0,
+      importStatements: text.match(/\bimport\b/g)?.length ?? 0,
+      interfaceDeclarations: text.match(/\binterface\s+[A-Za-z_$][\w$]*/g)?.length ?? 0,
+      typeDeclarations: text.match(/\btype\s+[A-Za-z_$][\w$]*/g)?.length ?? 0,
+      functionDeclarations: text.match(/\bfunction\s+[A-Za-z_$][\w$]*/g)?.length ?? 0,
+      classDeclarations: text.match(/\bclass\s+[A-Za-z_$][\w$]*/g)?.length ?? 0,
+      constDeclarations: text.match(/\bconst\s+[A-Za-z_$][\w$]*/g)?.length ?? 0,
+      markdownHeadings: kind === "documentation" ? text.match(/^#{1,6}\s+/gm)?.length ?? 0 : 0,
+      fencedCodeBlocks: kind === "documentation" ? text.match(/```/g)?.length ?? 0 : 0,
+      semanticTermCount: semanticTerms.length,
+      hasSemanticVocabulary: semanticTerms.length > 0,
+    },
+  };
+}
+
+function collectWorkspaceSemanticIndexFiles(rootPath, {
+  scope = "tools",
+  query = null,
+  maxDepth = 2,
+  maxFiles = 80,
+} = {}) {
+  const relativeRoot = SEMANTIC_INDEX_SCOPES.get(scope) ?? SEMANTIC_INDEX_SCOPES.get("tools");
+  const sourceRoot = path.join(rootPath, relativeRoot);
+  const rootStats = safeStat(sourceRoot);
+  if (!rootStats?.isDirectory()) {
+    return {
+      scope,
+      root: sourceRoot,
+      relativeRoot,
+      present: false,
+      files: [],
+    };
+  }
+  const safeQuery = typeof query === "string" && query.trim() ? query.trim().toLowerCase() : null;
+  const files = [];
+
+  function visit(currentPath, depth) {
+    if (files.length >= maxFiles || depth > maxDepth) {
+      return;
+    }
+    let entries = [];
+    try {
+      entries = readdirSync(currentPath, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
+      if (files.length >= maxFiles) {
+        return;
+      }
+      const absolutePath = path.join(currentPath, entry.name);
+      if (entry.isDirectory()) {
+        if (!TOOL_CATALOG_IGNORED_DIRECTORIES.has(entry.name)) {
+          visit(absolutePath, depth + 1);
+        }
+        continue;
+      }
+      if (!entry.isFile()) {
+        continue;
+      }
+      const relativePath = path.relative(sourceRoot, absolutePath).replaceAll(path.sep, "/");
+      if (semanticIndexKindForRelativePath(relativePath) === "other") {
+        continue;
+      }
+      if (safeQuery && !relativePath.toLowerCase().includes(safeQuery)) {
+        continue;
+      }
+      files.push(analyseSemanticIndexFile(sourceRoot, absolutePath, relativePath));
+    }
+  }
+
+  visit(sourceRoot, 0);
+  return {
+    scope,
+    root: sourceRoot,
+    relativeRoot,
+    present: true,
+    files,
+  };
+}
+
+function buildNativeOpenClawWorkspaceSemanticIndex({
+  workspacePath = null,
+  scope = "tools",
+  query = null,
+  limit = 40,
+} = {}) {
+  const { item } = selectOpenClawToolCatalogWorkspace({ workspacePath });
+  const safeScope = SEMANTIC_INDEX_SCOPES.has(scope) ? scope : "tools";
+  const safeLimit = normalisePositiveLimit(limit, 40, 100);
+  const collection = collectWorkspaceSemanticIndexFiles(item.path, {
+    scope: safeScope,
+    query,
+    maxFiles: safeLimit,
+  });
+  const totals = collection.files.reduce((accumulator, file) => {
+    accumulator.totalFiles += 1;
+    if (file.contentRead) {
+      accumulator.contentRead += 1;
+      accumulator.lineCount += file.lineCount ?? 0;
+      accumulator.exportStatements += file.signals?.exportStatements ?? 0;
+      accumulator.importStatements += file.signals?.importStatements ?? 0;
+      accumulator.interfaceDeclarations += file.signals?.interfaceDeclarations ?? 0;
+      accumulator.typeDeclarations += file.signals?.typeDeclarations ?? 0;
+      accumulator.functionDeclarations += file.signals?.functionDeclarations ?? 0;
+      accumulator.classDeclarations += file.signals?.classDeclarations ?? 0;
+      accumulator.constDeclarations += file.signals?.constDeclarations ?? 0;
+      accumulator.markdownHeadings += file.signals?.markdownHeadings ?? 0;
+      accumulator.semanticVocabularyFiles += file.signals?.hasSemanticVocabulary ? 1 : 0;
+    } else {
+      accumulator.skipped += 1;
+    }
+    accumulator.byKind[file.kind] = (accumulator.byKind[file.kind] ?? 0) + 1;
+    accumulator.byCategory[file.category] = (accumulator.byCategory[file.category] ?? 0) + 1;
+    return accumulator;
+  }, {
+    totalFiles: 0,
+    contentRead: 0,
+    skipped: 0,
+    lineCount: 0,
+    exportStatements: 0,
+    importStatements: 0,
+    interfaceDeclarations: 0,
+    typeDeclarations: 0,
+    functionDeclarations: 0,
+    classDeclarations: 0,
+    constDeclarations: 0,
+    markdownHeadings: 0,
+    semanticVocabularyFiles: 0,
+    byKind: {},
+    byCategory: {},
+  });
+  const nativeRegistry = createOpenClawNativePluginRegistry();
+  const capability = nativeRegistry.items[0]?.contract?.capabilities
+    ?.find((entry) => entry.id === "sense.openclaw.workspace_semantic_index") ?? null;
+
+  return {
+    ok: collection.present,
+    registry: "openclaw-native-plugin-adapter-v0",
+    mode: "workspace-semantic-index-only",
+    generatedAt: new Date().toISOString(),
+    sourceRegistry: "openclaw-tool-catalog-v0",
+    adapterStatus: "native_shell_active_workspace_semantic_index_only",
+    capability: {
+      id: capability?.id ?? "sense.openclaw.workspace_semantic_index",
+      kind: capability?.kind ?? "sense",
+      risk: capability?.risk ?? "low",
+      approvalRequired: capability?.approval?.required ?? false,
+      runtimeOwner: capability?.runtimeOwner ?? "openclaw_on_nixos",
+    },
+    workspace: {
+      id: item.id,
+      name: item.name,
+      path: item.path,
+    },
+    scope: {
+      id: safeScope,
+      relativeRoot: collection.relativeRoot,
+      root: collection.root,
+      query: typeof query === "string" && query.trim() ? query.trim() : null,
+      limit: safeLimit,
+    },
+    files: collection.files.map((file) => ({
+      relativePath: file.relativePath,
+      kind: file.kind,
+      category: file.category,
+      sizeBytes: file.sizeBytes,
+      contentRead: file.contentRead,
+      contentExposed: false,
+      skipped: file.skipped,
+      skipReason: file.skipReason,
+      lineCount: file.lineCount,
+      nonEmptyLineCount: file.nonEmptyLineCount,
+      signals: file.signals,
+    })),
+    summary: {
+      ...totals,
+      canReadSourceFileContent: true,
+      exposesSourceFileContent: false,
+      exposesDocumentationContent: false,
+      canImportModule: false,
+      canExecutePluginCode: false,
+      canExecuteToolCode: false,
+      canActivateRuntime: false,
+      canMutate: false,
+      createsTask: false,
+      createsApproval: false,
+    },
+    governance: {
+      mode: "native_workspace_semantic_index_read_only",
+      runtimeOwner: "openclaw_on_nixos",
+      canReadMetadata: true,
+      canReadSourceFileContent: true,
+      exposesSourceFileContent: false,
+      exposesDocumentationContent: false,
+      exposesScriptBodies: false,
+      exposesDependencyVersions: false,
+      canMutate: false,
+      canExecute: false,
+      canImportModule: false,
+      canExecutePluginCode: false,
+      canExecuteToolCode: false,
+      canActivateRuntime: false,
+      createsTask: false,
+      createsApproval: false,
+      requiresPolicyInvocation: true,
+      outputMode: "derived_signals_only",
     },
   };
 }
@@ -3343,6 +3640,15 @@ function resolvePlanCapabilityId({ kind, intent, plannerIntent }) {
   ) {
     return "sense.openclaw.tool_catalog";
   }
+  if (
+    candidate === "openclaw.workspace.semantic_index"
+    || candidate === "openclaw.workspace.semantic-index"
+    || candidate === "workspace.semantic_index"
+    || candidate === "workspace.semantic-index"
+    || candidate === "semantic.index"
+  ) {
+    return "sense.openclaw.workspace_semantic_index";
+  }
   if (candidate === "command.execute" || candidate === "system.command.execute") {
     return "act.system.command.execute";
   }
@@ -4009,6 +4315,24 @@ function baseCapabilities() {
       description: "Query absorbed enhanced OpenClaw tool metadata through the native adapter shell without importing or executing legacy tool code.",
     },
     {
+      id: "sense.openclaw.workspace_semantic_index",
+      name: "Native OpenClaw Workspace Semantic Index",
+      kind: "sensor",
+      service: "openclaw-core",
+      endpoint: `http://${host}:${port}/plugins/native-adapter/workspace-semantic-index`,
+      intents: [
+        "openclaw.workspace.semantic_index",
+        "openclaw.workspace.semantic-index",
+        "workspace.semantic_index",
+        "workspace.semantic-index",
+        "semantic.index",
+      ],
+      domains: ["body_internal"],
+      risk: "low",
+      governance: "audit_only",
+      description: "Build a bounded derived semantic index from enhanced OpenClaw files without exposing source text or executing legacy code.",
+    },
+    {
       id: "act.system.command.dry_run",
       name: "System Command Dry Run",
       kind: "actuator",
@@ -4354,6 +4678,15 @@ async function callCapabilityBackend(capability, request) {
     });
   }
 
+  if (capability.id === "sense.openclaw.workspace_semantic_index") {
+    return buildNativeOpenClawWorkspaceSemanticIndex({
+      workspacePath: request.params.workspacePath,
+      scope: request.params.scope,
+      query: request.params.query ?? request.params.q,
+      limit: request.params.limit,
+    });
+  }
+
   if (capability.id === "act.system.command.dry_run") {
     return postJson(`${systemSenseUrl}/system/command/dry-run`, {
       ...request.params,
@@ -4490,6 +4823,20 @@ function summariseCapabilityInvocationResult(capability, result) {
       matchedTools: result?.summary?.matchedTools ?? 0,
       categories: result?.summary?.categoryCount ?? 0,
       filterApplied: result?.summary?.filterApplied === true,
+      canExecuteToolCode: result?.governance?.canExecuteToolCode === true,
+    };
+  }
+  if (capability.id === "sense.openclaw.workspace_semantic_index") {
+    return {
+      kind: "openclaw.workspace_semantic_index",
+      ok: result?.ok === true,
+      scope: result?.scope?.id ?? null,
+      totalFiles: result?.summary?.totalFiles ?? 0,
+      contentRead: result?.summary?.contentRead ?? 0,
+      exportStatements: result?.summary?.exportStatements ?? 0,
+      functionDeclarations: result?.summary?.functionDeclarations ?? 0,
+      semanticVocabularyFiles: result?.summary?.semanticVocabularyFiles ?? 0,
+      exposesSourceFileContent: result?.governance?.exposesSourceFileContent === true,
       canExecuteToolCode: result?.governance?.canExecuteToolCode === true,
     };
   }
@@ -6990,6 +7337,21 @@ const server = http.createServer(async (req, res) => {
       sendJson(res, 200, buildNativeOpenClawToolCatalogProfile({
         workspacePath: requestUrl.searchParams.get("workspacePath"),
         category: requestUrl.searchParams.get("category"),
+        query: requestUrl.searchParams.get("query") ?? requestUrl.searchParams.get("q"),
+        limit: requestUrl.searchParams.get("limit"),
+      }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 404, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/plugins/native-adapter/workspace-semantic-index") {
+    try {
+      sendJson(res, 200, buildNativeOpenClawWorkspaceSemanticIndex({
+        workspacePath: requestUrl.searchParams.get("workspacePath"),
+        scope: requestUrl.searchParams.get("scope") ?? "tools",
         query: requestUrl.searchParams.get("query") ?? requestUrl.searchParams.get("q"),
         limit: requestUrl.searchParams.get("limit"),
       }));

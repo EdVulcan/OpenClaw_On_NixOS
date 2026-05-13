@@ -157,6 +157,7 @@ if (
   || adapter.summary?.canExecuteToolCode !== false
   || !adapter.implementedCapabilities?.includes("sense.plugin.manifest_profile")
   || !adapter.implementedCapabilities?.includes("sense.openclaw.tool_catalog")
+  || !adapter.implementedCapabilities?.includes("sense.openclaw.workspace_semantic_index")
 ) {
   throw new Error(`Observer adapter status mismatch: ${JSON.stringify(adapter)}`);
 }

@@ -64,6 +64,25 @@ export function createOpenClawNativePluginRegistry({ generatedAt = new Date().to
         },
       },
       {
+        id: "sense.openclaw.workspace_semantic_index",
+        title: "Profile OpenClaw workspace semantic index",
+        description: "Builds a bounded derived semantic index from enhanced OpenClaw source and documentation metadata without exposing file contents.",
+        kind: "sense",
+        domains: ["body_internal"],
+        risk: "low",
+        permissions: {
+          filesystemRead: true,
+        },
+        approval: {
+          required: false,
+          reason: "Read-only semantic indexing inside the body boundary.",
+        },
+        audit: {
+          required: true,
+          ledger: "capability_history",
+        },
+      },
+      {
         id: "sense.openclaw.prompt_pack",
         title: "Profile OpenClaw prompt pack",
         description: "Summarizes enhanced OpenClaw prompt and agent-behavior surfaces as native policy metadata without importing runtime modules.",

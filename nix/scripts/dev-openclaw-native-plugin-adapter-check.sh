@@ -158,8 +158,10 @@ if (
   || adapter.status !== "read_only_adapters_ready"
   || !adapter.implementedCapabilities?.includes("sense.plugin.manifest_profile")
   || !adapter.implementedCapabilities?.includes("sense.openclaw.tool_catalog")
+  || !adapter.implementedCapabilities?.includes("sense.openclaw.workspace_semantic_index")
   || adapter.summary?.canReadManifestMetadata !== true
   || adapter.summary?.canReadToolCatalogMetadata !== true
+  || adapter.summary?.canReadWorkspaceSemanticMetadata !== true
   || adapter.summary?.canReadSourceFileContent !== false
   || adapter.summary?.canExecutePluginCode !== false
   || adapter.summary?.canExecuteToolCode !== false

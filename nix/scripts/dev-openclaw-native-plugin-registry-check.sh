@@ -33,11 +33,11 @@ if (
   || validation.ok !== true
   || summary.validationOk !== true
   || summary.totalPlugins !== 1
-  || summary.totalCapabilities !== 5
+  || summary.totalCapabilities !== 6
   || summary.approvalRequired !== 1
   || summary.mutationCapable !== 1
   || summary.executionCapable !== 1
-  || summary.byPlugin?.["openclaw.native.plugin-sdk"]?.totalCapabilities !== 5
+  || summary.byPlugin?.["openclaw.native.plugin-sdk"]?.totalCapabilities !== 6
   || registry.governance.externalRuntimeDependencyAllowed !== false
   || registry.governance.canExecuteDuringRegistration !== false
   || registry.governance.canActivateRuntime !== false

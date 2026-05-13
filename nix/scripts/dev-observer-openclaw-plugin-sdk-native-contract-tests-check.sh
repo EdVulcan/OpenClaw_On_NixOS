@@ -170,7 +170,7 @@ if (
   || report.summary?.requiredTests !== report.summary?.passedRequired
   || report.summary?.failedRequired !== 0
   || report.summary?.enhancedSourceFilesRead < 2
-  || report.summary?.nativeCapabilities !== 5
+  || report.summary?.nativeCapabilities !== 6
   || report.governance?.canImportModule !== false
   || report.governance?.canExecutePluginCode !== false
   || report.governance?.createsTask !== false

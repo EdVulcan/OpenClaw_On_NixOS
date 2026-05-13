@@ -1,6 +1,6 @@
 # OpenClaw Source Integration Stage Plan
 
-更新时间：2026-05-13 15:42 +08:00
+更新时间：2026-05-13 20:06 +08:00
 
 本文档用于跟踪当前阶段：把旁路 `openclaw` 增强源码项目中的能力，受控接入 `OpenClawOnNixOS`。后续每推进一个接入切片，都必须同步更新本文件，避免路线漂移、重复准备层、或忘记阶段边界。
 
@@ -385,6 +385,54 @@ Next intended slice after this passes:
 - Recommended candidate: a bounded workspace/file semantic inspection adapter inspired by enhanced OpenClaw tooling.
 - Do not implement mutating tool execution yet.
 
+## 12. 2026-05-13 Step 4 Update: Native Workspace Semantic Index
+
+Status: implemented_waiting_check.
+
+Slice: `sense.openclaw.workspace_semantic_index`.
+
+Purpose: implement the first native read-only semantic tool selected from the absorbed enhanced `openclaw` tool catalog. This moves beyond catalog visibility into bounded source-aware analysis owned by `OpenClawOnNixOS`: the adapter can read small OpenClaw source/docs files, derive semantic counts and categories, invoke through policy, and show the result in Observer, while still refusing to expose raw source text or execute old OpenClaw modules.
+
+Implemented artifacts:
+- Core native adapter API: `GET /plugins/native-adapter/workspace-semantic-index`.
+- Capability registry entry: `sense.openclaw.workspace_semantic_index`.
+- Capability invoke support: `POST /capabilities/invoke` with `capabilityId=sense.openclaw.workspace_semantic_index`.
+- Invocation history support for `sense.openclaw.workspace_semantic_index`.
+- Observer panel: `OpenClaw Semantic Index`.
+- Targeted checks: `openclaw-native-workspace-semantic-index`, `observer-openclaw-native-workspace-semantic-index`.
+
+Governance boundaries:
+- Reads bounded file content only to derive signals.
+- Does not expose raw source text.
+- Does not expose documentation bodies.
+- Does not expose package versions, dependency versions, or script bodies.
+- Does not import or execute old `openclaw` modules.
+- Does not execute old OpenClaw tools.
+- Does not mutate files.
+- Does not activate runtime.
+- Does not create tasks or approvals.
+- Invocation is audit-only and recorded in capability history.
+
+Local verification on Windows:
+- `npm run typecheck`: passed.
+- `git diff --check`: passed.
+- Local PowerShell service smoke against `D:\OpenclawAndClaudecode\openclaw`: passed.
+- Smoke result: `files=20`, `exports=51`, `functions=63`, `policy=audit_only`, `history=1`.
+- Unix milestone scripts still require NixOS/bash.
+
+NixOS targeted milestone command:
+
+```bash
+cd /home/edvulcan/OpenClaw_On_NixOS && \
+git pull origin main && \
+OPENCLAW_MILESTONE_CHECKS=openclaw-native-workspace-semantic-index,observer-openclaw-native-workspace-semantic-index npm run dev:milestone-check:unix
+```
+
+Next intended slice after this passes:
+- Move from read-only semantic indexing to the first governed executable native adapter.
+- Recommended candidate: a read-only workspace/LSP-style navigation tool or conservative filesystem inspection tool inspired by enhanced OpenClaw.
+- Do not implement mutating file edits, shell execution, or cross-boundary gateway tools until this semantic tool is confirmed on NixOS.
+
 这条线是本阶段的主线。
 
-当前执行焦点：Step 4 `First Real Capability Absorption`，`sense.openclaw.tool_catalog` 与 native tool catalog adapter 均已通过 NixOS targeted milestone。下一步进入第一个 native read-only semantic tool，禁止再新增与真实 adapter 无关的 readiness/checklist 层。
+当前执行焦点：Step 4 `First Real Capability Absorption` 已进入第一个 native read-only semantic tool：`sense.openclaw.workspace_semantic_index`。本地实现和 Windows smoke 已通过，等待 NixOS targeted milestone 确认；确认后再进入第一个 governed executable native adapter，禁止再新增与真实 adapter 无关的 readiness/checklist 层。

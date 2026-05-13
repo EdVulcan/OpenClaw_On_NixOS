@@ -504,6 +504,15 @@ function observerHtml() {
           <pre id="tool-catalog-adapter-json">Loading native tool catalog adapter...</pre>
         </section>
         <section class="panel">
+          <h2>OpenClaw Semantic Index</h2>
+          <div class="metric"><span>Registry</span><span id="semantic-index-registry">openclaw-native-plugin-adapter-v0</span></div>
+          <div class="metric"><span>Files</span><span id="semantic-index-files">0</span></div>
+          <div class="metric"><span>Exports</span><span id="semantic-index-exports">0</span></div>
+          <div class="metric"><span>Source</span><span id="semantic-index-source">hidden</span></div>
+          <div class="metric"><span>Mode</span><span id="semantic-index-mode">workspace-semantic-index-only</span></div>
+          <pre id="semantic-index-json">Loading native workspace semantic index...</pre>
+        </section>
+        <section class="panel">
           <h2>OpenClaw Native Plugin Contract</h2>
           <div class="metric"><span>Registry</span><span id="native-plugin-contract-registry">openclaw-native-plugin-contract-v0</span></div>
           <div class="metric"><span>Owner</span><span id="native-plugin-contract-owner">openclaw_on_nixos</span></div>
@@ -895,6 +904,12 @@ const toolCatalogAdapterCategories = document.querySelector("#tool-catalog-adapt
 const toolCatalogAdapterExecution = document.querySelector("#tool-catalog-adapter-execution");
 const toolCatalogAdapterMode = document.querySelector("#tool-catalog-adapter-mode");
 const toolCatalogAdapterJson = document.querySelector("#tool-catalog-adapter-json");
+const semanticIndexRegistry = document.querySelector("#semantic-index-registry");
+const semanticIndexFiles = document.querySelector("#semantic-index-files");
+const semanticIndexExports = document.querySelector("#semantic-index-exports");
+const semanticIndexSource = document.querySelector("#semantic-index-source");
+const semanticIndexMode = document.querySelector("#semantic-index-mode");
+const semanticIndexJson = document.querySelector("#semantic-index-json");
 const nativePluginContractRegistry = document.querySelector("#native-plugin-contract-registry");
 const nativePluginContractOwner = document.querySelector("#native-plugin-contract-owner");
 const nativePluginContractTotal = document.querySelector("#native-plugin-contract-total");
@@ -1640,6 +1655,37 @@ function renderToolCatalogAdapter(data) {
   ].join("\\n");
 }
 
+function renderSemanticIndex(data) {
+  const summary = data?.summary ?? {};
+  const governance = data?.governance ?? {};
+  const files = Array.isArray(data?.files) ? data.files : [];
+  semanticIndexRegistry.textContent = data?.registry ?? "openclaw-native-plugin-adapter-v0";
+  semanticIndexFiles.textContent = String(summary.totalFiles ?? files.length);
+  semanticIndexExports.textContent = String(summary.exportStatements ?? 0);
+  semanticIndexSource.textContent = governance.exposesSourceFileContent ? "exposed" : "hidden";
+  semanticIndexMode.textContent = data?.mode ?? "workspace-semantic-index-only";
+
+  semanticIndexJson.textContent = [
+    "Native read-only semantic tool: derived signals from enhanced OpenClaw files, with raw source and docs hidden.",
+    "This reads bounded content to count semantics, but does not expose text, import modules, execute tools, mutate files, or activate runtime.",
+    \`Registry: \${data?.registry ?? "openclaw-native-plugin-adapter-v0"}\`,
+    \`Mode: \${data?.mode ?? "workspace-semantic-index-only"}\`,
+    \`Adapter Status: \${data?.adapterStatus ?? "unknown"}\`,
+    \`Capability: \${data?.capability?.id ?? "sense.openclaw.workspace_semantic_index"} risk=\${data?.capability?.risk ?? "low"} approval=\${Boolean(data?.capability?.approvalRequired)} owner=\${data?.capability?.runtimeOwner ?? "unknown"}\`,
+    \`Scope: \${data?.scope?.id ?? "tools"} root=\${data?.scope?.relativeRoot ?? "unknown"} query=\${data?.scope?.query ?? "none"} limit=\${data?.scope?.limit ?? "n/a"}\`,
+    \`Files: total=\${summary.totalFiles ?? files.length} read=\${summary.contentRead ?? 0} skipped=\${summary.skipped ?? 0} lines=\${summary.lineCount ?? 0}\`,
+    \`Signals: exports=\${summary.exportStatements ?? 0} imports=\${summary.importStatements ?? 0} interfaces=\${summary.interfaceDeclarations ?? 0} types=\${summary.typeDeclarations ?? 0} functions=\${summary.functionDeclarations ?? 0} classes=\${summary.classDeclarations ?? 0} semanticFiles=\${summary.semanticVocabularyFiles ?? 0}\`,
+    \`By Kind: \${Object.entries(summary.byKind ?? {}).map(([kind, count]) => \`\${kind}=\${count}\`).join(", ") || "none"}\`,
+    \`By Category: \${Object.entries(summary.byCategory ?? {}).map(([category, count]) => \`\${category}=\${count}\`).join(", ") || "none"}\`,
+    \`Governance: readSource=\${Boolean(governance.canReadSourceFileContent)} exposeSource=\${Boolean(governance.exposesSourceFileContent)} exposeDocs=\${Boolean(governance.exposesDocumentationContent)} importModule=\${Boolean(governance.canImportModule)} executeTool=\${Boolean(governance.canExecuteToolCode)} activateRuntime=\${Boolean(governance.canActivateRuntime)} task=\${Boolean(governance.createsTask)} approval=\${Boolean(governance.createsApproval)}\`,
+    "",
+    ...files.slice(0, 16).map((file) => {
+      const signals = file.signals ?? {};
+      return \`\${file.relativePath ?? "unknown"} kind=\${file.kind ?? "unknown"} category=\${file.category ?? "unknown"} read=\${Boolean(file.contentRead)} exposed=\${Boolean(file.contentExposed)} exports=\${signals.exportStatements ?? 0} functions=\${signals.functionDeclarations ?? 0} terms=\${signals.semanticTermCount ?? 0}\`;
+    }),
+  ].join("\\n");
+}
+
 function renderNativePluginContract(data) {
   const summary = data?.summary ?? {};
   const contract = data?.contract ?? {};
@@ -2228,6 +2274,20 @@ async function refreshToolCatalogAdapter() {
     toolCatalogAdapterExecution.textContent = "unknown";
     toolCatalogAdapterMode.textContent = "unknown";
     toolCatalogAdapterJson.textContent = "Unable to read native tool catalog adapter.";
+  }
+}
+
+async function refreshSemanticIndex() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/workspace-semantic-index?scope=tools&limit=24\`);
+    renderSemanticIndex(data);
+  } catch {
+    semanticIndexRegistry.textContent = "offline";
+    semanticIndexFiles.textContent = "0";
+    semanticIndexExports.textContent = "0";
+    semanticIndexSource.textContent = "unknown";
+    semanticIndexMode.textContent = "unknown";
+    semanticIndexJson.textContent = "Unable to read native workspace semantic index.";
   }
 }
 
@@ -3858,6 +3918,7 @@ await refreshPluginSdkNativeContractTests();
 await refreshNativeSdkContractImplementation();
 await refreshOpenClawToolCatalog();
 await refreshToolCatalogAdapter();
+await refreshSemanticIndex();
 await refreshNativePluginContract();
 await refreshNativePluginRegistry();
 await refreshFormalIntegrationReadiness();
@@ -3899,6 +3960,7 @@ setInterval(refreshPluginSdkNativeContractTests, 5000);
 setInterval(refreshNativeSdkContractImplementation, 5000);
 setInterval(refreshOpenClawToolCatalog, 5000);
 setInterval(refreshToolCatalogAdapter, 5000);
+setInterval(refreshSemanticIndex, 5000);
 setInterval(refreshNativePluginContract, 5000);
 setInterval(refreshNativePluginRegistry, 5000);
 setInterval(refreshFormalIntegrationReadiness, 5000);

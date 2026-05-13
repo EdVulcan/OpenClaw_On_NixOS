@@ -107,7 +107,7 @@ if (
   || governance.requiresHumanReviewBeforeActivation !== true
   || contractResponse.validation?.ok !== true
   || summary.validationOk !== true
-  || summary.totalCapabilities !== 5
+  || summary.totalCapabilities !== 6
   || summary.approvalRequired !== 1
   || summary.mutationCapable !== 1
   || summary.executionCapable !== 1
