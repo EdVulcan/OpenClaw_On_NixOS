@@ -110,7 +110,6 @@ for (const token of [
   "/plugins/native-adapter/runtime-preflight",
   "refreshNativePluginPreflight",
   "renderNativePluginPreflight",
-  "native-plugin-execution-envelope-v0",
 ]) {
   if (!client.includes(token)) {
     throw new Error(`Observer client missing ${token}`);
@@ -119,6 +118,7 @@ for (const token of [
 if (
   !preflight.ok
   || preflight.registry !== "openclaw-native-plugin-runtime-preflight-v0"
+  || preflight.executionEnvelope?.envelopeVersion !== "native-plugin-execution-envelope-v0"
   || preflight.executionEnvelope?.state !== "blocked_pending_runtime_adapter"
   || preflight.executionEnvelope?.constraints?.canExecutePluginCode !== false
   || preflight.executionEnvelope?.constraints?.canActivateRuntime !== false
