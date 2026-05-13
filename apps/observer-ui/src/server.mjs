@@ -431,6 +431,15 @@ function observerHtml() {
           <pre id="workspace-migration-json">Loading OpenClaw source migration map...</pre>
         </section>
         <section class="panel">
+          <h2>OpenClaw Source Migration Plan</h2>
+          <div class="metric"><span>Registry</span><span id="workspace-migration-plan-registry">openclaw-source-migration-plan-v0</span></div>
+          <div class="metric"><span>First Wave</span><span id="workspace-migration-plan-total">0</span></div>
+          <div class="metric"><span>Candidates</span><span id="workspace-migration-plan-candidates">0</span></div>
+          <div class="metric"><span>Backlog</span><span id="workspace-migration-plan-backlog">0</span></div>
+          <div class="metric"><span>Mode</span><span id="workspace-migration-plan-mode">plan-only</span></div>
+          <pre id="workspace-migration-plan-json">Loading OpenClaw source migration plan...</pre>
+        </section>
+        <section class="panel">
           <h2>Workspace Command Proposals</h2>
           <div class="metric"><span>Registry</span><span id="workspace-command-registry">workspace-command-proposals-v0</span></div>
           <div class="metric"><span>Total</span><span id="workspace-command-total">0</span></div>
@@ -706,6 +715,12 @@ const workspaceMigrationCapabilities = document.querySelector("#workspace-migrat
 const workspaceMigrationHigh = document.querySelector("#workspace-migration-high");
 const workspaceMigrationMode = document.querySelector("#workspace-migration-mode");
 const workspaceMigrationJson = document.querySelector("#workspace-migration-json");
+const workspaceMigrationPlanRegistry = document.querySelector("#workspace-migration-plan-registry");
+const workspaceMigrationPlanTotal = document.querySelector("#workspace-migration-plan-total");
+const workspaceMigrationPlanCandidates = document.querySelector("#workspace-migration-plan-candidates");
+const workspaceMigrationPlanBacklog = document.querySelector("#workspace-migration-plan-backlog");
+const workspaceMigrationPlanMode = document.querySelector("#workspace-migration-plan-mode");
+const workspaceMigrationPlanJson = document.querySelector("#workspace-migration-plan-json");
 const workspaceCommandRegistry = document.querySelector("#workspace-command-registry");
 const workspaceCommandTotal = document.querySelector("#workspace-command-total");
 const workspaceCommandValidation = document.querySelector("#workspace-command-validation");
@@ -1151,6 +1166,39 @@ function renderWorkspaceMigrationMap(data) {
   ].join("\\n");
 }
 
+function renderWorkspaceMigrationPlan(data) {
+  const summary = data?.summary ?? {};
+  const items = Array.isArray(data?.items) ? data.items : [];
+  const backlog = Array.isArray(data?.backlog) ? data.backlog : [];
+  workspaceMigrationPlanRegistry.textContent = data?.registry ?? "openclaw-source-migration-plan-v0";
+  workspaceMigrationPlanTotal.textContent = String(summary.total ?? data?.count ?? 0);
+  workspaceMigrationPlanCandidates.textContent = String(summary.candidateCount ?? data?.candidateCount ?? 0);
+  workspaceMigrationPlanBacklog.textContent = String(summary.backlog ?? backlog.length);
+  workspaceMigrationPlanMode.textContent = data?.mode ?? "plan-only";
+
+  workspaceMigrationPlanJson.textContent = [
+    "Plan-only migration draft: no task, approval, import, execution, or source read is created.",
+    "First wave is a review order, not permission to absorb code.",
+    \`Registry: \${data?.registry ?? "openclaw-source-migration-plan-v0"}\`,
+    \`Mode: \${data?.mode ?? "plan-only"}\`,
+    \`Source Registry: \${data?.sourceRegistry ?? "openclaw-source-migration-map-v0"}\`,
+    \`First Wave: \${summary.total ?? data?.count ?? 0}\`,
+    \`Candidates: \${summary.candidateCount ?? data?.candidateCount ?? 0}\`,
+    \`Backlog: \${summary.backlog ?? backlog.length}\`,
+    \`By Target: \${Object.entries(summary.byTargetArea ?? {}).map(([target, count]) => \`\${target}=\${count}\`).join(", ") || "none"}\`,
+    \`By Risk: \${Object.entries(summary.byRisk ?? {}).map(([risk, count]) => \`\${risk}=\${count}\`).join(", ") || "none"}\`,
+    \`By Priority: \${Object.entries(summary.byPriority ?? {}).map(([priority, count]) => \`\${priority}=\${count}\`).join(", ") || "none"}\`,
+    "",
+    ...items.slice(0, 8).map((entry) => {
+      const governance = entry.governance ?? {};
+      const blockers = Array.isArray(entry.blockers) ? entry.blockers.join("; ") : "none";
+      return \`#\${entry.sequence ?? "?"} [\${entry.priority ?? "unknown"}/\${entry.risk ?? "unknown"}] \${entry.capability ?? "capability"} target=\${entry.targetArea ?? "unknown"} kind=\${entry.migrationKind ?? "unknown"} status=\${entry.status ?? "unknown"} task=\${Boolean(governance.createsTask)} approval=\${Boolean(governance.createsApproval)} execute=\${Boolean(governance.canExecute)} blockers=\${blockers}\`;
+    }),
+    "",
+    \`Backlog: \${backlog.map((entry) => \`\${entry.capability}(\${entry.priority}/\${entry.risk})\`).join(", ") || "none"}\`,
+  ].join("\\n");
+}
+
 function renderWorkspaceCommandProposals(data) {
   const summary = data?.summary ?? {};
   const items = Array.isArray(data?.items) ? data.items : [];
@@ -1401,6 +1449,20 @@ async function refreshWorkspaceMigrationMap() {
     workspaceMigrationHigh.textContent = "0";
     workspaceMigrationMode.textContent = "unknown";
     workspaceMigrationJson.textContent = "Unable to read OpenClaw source migration map.";
+  }
+}
+
+async function refreshWorkspaceMigrationPlan() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/workspaces/openclaw-migration-plan\`);
+    renderWorkspaceMigrationPlan(data);
+  } catch {
+    workspaceMigrationPlanRegistry.textContent = "offline";
+    workspaceMigrationPlanTotal.textContent = "0";
+    workspaceMigrationPlanCandidates.textContent = "0";
+    workspaceMigrationPlanBacklog.textContent = "0";
+    workspaceMigrationPlanMode.textContent = "unknown";
+    workspaceMigrationPlanJson.textContent = "Unable to read OpenClaw source migration plan.";
   }
 }
 
@@ -2895,6 +2957,7 @@ await refreshFilesystemLedger();
 await refreshFilesystemReadLedger();
 await refreshWorkspaceRegistry();
 await refreshWorkspaceMigrationMap();
+await refreshWorkspaceMigrationPlan();
 await refreshWorkspaceCommandProposals();
 await refreshWorkspaceCommandPlanDraft();
 await refreshSystemState();
@@ -2921,6 +2984,7 @@ setInterval(refreshFilesystemLedger, 5000);
 setInterval(refreshFilesystemReadLedger, 5000);
 setInterval(refreshWorkspaceRegistry, 5000);
 setInterval(refreshWorkspaceMigrationMap, 5000);
+setInterval(refreshWorkspaceMigrationPlan, 5000);
 setInterval(refreshWorkspaceCommandProposals, 5000);
 setInterval(refreshWorkspaceCommandPlanDraft, 5000);
 setInterval(refreshSystemState, 5000);

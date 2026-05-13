@@ -79,6 +79,7 @@
     "dev:observer-filesystem-read-ledger-check:unix": "bash ./nix/scripts/dev-observer-filesystem-read-ledger-check.sh",
     "dev:observer-workspace-detect-check:unix": "bash ./nix/scripts/dev-observer-workspace-detect-check.sh",
     "dev:observer-openclaw-source-migration-map-check:unix": "bash ./nix/scripts/dev-observer-openclaw-source-migration-map-check.sh",
+    "dev:observer-openclaw-source-migration-plan-check:unix": "bash ./nix/scripts/dev-observer-openclaw-source-migration-plan-check.sh",
     "dev:observer-workspace-command-proposals-check:unix": "bash ./nix/scripts/dev-observer-workspace-command-proposals-check.sh",
     "dev:observer-workspace-command-plan-check:unix": "bash ./nix/scripts/dev-observer-workspace-command-plan-check.sh",
     "dev:observer-workspace-command-task-check:unix": "bash ./nix/scripts/dev-observer-workspace-command-task-check.sh",
