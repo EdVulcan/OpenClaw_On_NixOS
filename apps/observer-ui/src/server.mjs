@@ -450,6 +450,16 @@ function observerHtml() {
           <pre id="plugin-sdk-review-json">Loading plugin SDK contract review...</pre>
         </section>
         <section class="panel">
+          <h2>OpenClaw Native Plugin Contract</h2>
+          <div class="metric"><span>Registry</span><span id="native-plugin-contract-registry">openclaw-native-plugin-contract-v0</span></div>
+          <div class="metric"><span>Owner</span><span id="native-plugin-contract-owner">openclaw_on_nixos</span></div>
+          <div class="metric"><span>Capabilities</span><span id="native-plugin-contract-total">0</span></div>
+          <div class="metric"><span>Approval</span><span id="native-plugin-contract-approval">0</span></div>
+          <div class="metric"><span>Mutation</span><span id="native-plugin-contract-mutation">0</span></div>
+          <div class="metric"><span>Validation</span><span id="native-plugin-contract-validation">unknown</span></div>
+          <pre id="native-plugin-contract-json">Loading native plugin contract...</pre>
+        </section>
+        <section class="panel">
           <h2>Workspace Command Proposals</h2>
           <div class="metric"><span>Registry</span><span id="workspace-command-registry">workspace-command-proposals-v0</span></div>
           <div class="metric"><span>Total</span><span id="workspace-command-total">0</span></div>
@@ -738,6 +748,13 @@ const pluginSdkReviewTypes = document.querySelector("#plugin-sdk-review-types");
 const pluginSdkReviewExports = document.querySelector("#plugin-sdk-review-exports");
 const pluginSdkReviewMode = document.querySelector("#plugin-sdk-review-mode");
 const pluginSdkReviewJson = document.querySelector("#plugin-sdk-review-json");
+const nativePluginContractRegistry = document.querySelector("#native-plugin-contract-registry");
+const nativePluginContractOwner = document.querySelector("#native-plugin-contract-owner");
+const nativePluginContractTotal = document.querySelector("#native-plugin-contract-total");
+const nativePluginContractApproval = document.querySelector("#native-plugin-contract-approval");
+const nativePluginContractMutation = document.querySelector("#native-plugin-contract-mutation");
+const nativePluginContractValidation = document.querySelector("#native-plugin-contract-validation");
+const nativePluginContractJson = document.querySelector("#native-plugin-contract-json");
 const workspaceCommandRegistry = document.querySelector("#workspace-command-registry");
 const workspaceCommandTotal = document.querySelector("#workspace-command-total");
 const workspaceCommandValidation = document.querySelector("#workspace-command-validation");
@@ -1249,6 +1266,45 @@ function renderPluginSdkContractReview(data) {
   ].join("\\n");
 }
 
+function renderNativePluginContract(data) {
+  const summary = data?.summary ?? {};
+  const contract = data?.contract ?? {};
+  const governance = summary.governance ?? contract.governance ?? {};
+  const capabilities = Array.isArray(contract.capabilities) ? contract.capabilities : [];
+  const validation = data?.validation ?? {};
+  nativePluginContractRegistry.textContent = data?.registry ?? "openclaw-native-plugin-contract-v0";
+  nativePluginContractOwner.textContent = summary.runtimeOwner ?? governance.runtimeOwner ?? "unknown";
+  nativePluginContractTotal.textContent = String(summary.totalCapabilities ?? capabilities.length);
+  nativePluginContractApproval.textContent = String(summary.approvalRequired ?? 0);
+  nativePluginContractMutation.textContent = String(summary.mutationCapable ?? 0);
+  nativePluginContractValidation.textContent = validation.ok === true || summary.validationOk === true ? "valid" : "invalid";
+
+  nativePluginContractJson.textContent = [
+    "Contract-only native plugin boundary: no plugin code is imported, registered, activated, or executed here.",
+    "This is the OpenClawOnNixOS-owned shape that absorbed OpenClaw ideas must satisfy before runtime use.",
+    \`Registry: \${data?.registry ?? "openclaw-native-plugin-contract-v0"}\`,
+    \`Mode: \${data?.mode ?? "contract-only"}\`,
+    \`Source Registry: \${data?.sourceRegistry ?? "openclaw-plugin-sdk-contract-review-v0"}\`,
+    \`Runtime Owner: \${summary.runtimeOwner ?? governance.runtimeOwner ?? "unknown"}\`,
+    \`Origin: \${summary.origin ?? governance.origin ?? "unknown"}\`,
+    \`Capabilities: \${summary.totalCapabilities ?? capabilities.length}\`,
+    \`Approval Required: \${summary.approvalRequired ?? 0}\`,
+    \`Mutation Capable: \${summary.mutationCapable ?? 0}\`,
+    \`Execution Capable: \${summary.executionCapable ?? 0}\`,
+    \`Validation: \${validation.ok === true || summary.validationOk === true ? "ok" : "failed"} issues=\${summary.issueCount ?? validation.issues?.length ?? 0}\`,
+    \`Governance: externalRuntimeDependencyAllowed=\${Boolean(governance.externalRuntimeDependencyAllowed)} sourceContentImported=\${Boolean(governance.sourceContentImported)} executeDuringRegistration=\${Boolean(governance.canExecuteDuringRegistration)}\`,
+    \`By Risk: \${Object.entries(summary.byRisk ?? {}).map(([risk, count]) => \`\${risk}=\${count}\`).join(", ") || "none"}\`,
+    \`By Kind: \${Object.entries(summary.byKind ?? {}).map(([kind, count]) => \`\${kind}=\${count}\`).join(", ") || "none"}\`,
+    "",
+    \`Guardrails: \${(summary.guardrails ?? []).join("; ") || "none"}\`,
+    "",
+    ...capabilities.slice(0, 8).map((capability) => {
+      const permissions = capability.permissions ?? {};
+      return \`[\${capability.risk ?? "unknown"}] \${capability.id ?? "capability"} kind=\${capability.kind ?? "unknown"} domains=\${(capability.domains ?? []).join(",") || "none"} approval=\${Boolean(capability.approval?.required)} audit=\${Boolean(capability.audit?.required)} command=\${Boolean(permissions.commandExecution)} mutate=\${Boolean(permissions.filesystemWrite || permissions.browserControl || permissions.screenControl || permissions.systemMutation)} owner=\${capability.runtimeOwner ?? "unknown"}\`;
+    }),
+  ].join("\\n");
+}
+
 function renderWorkspaceCommandProposals(data) {
   const summary = data?.summary ?? {};
   const items = Array.isArray(data?.items) ? data.items : [];
@@ -1528,6 +1584,21 @@ async function refreshPluginSdkContractReview() {
     pluginSdkReviewExports.textContent = "0";
     pluginSdkReviewMode.textContent = "unknown";
     pluginSdkReviewJson.textContent = "Unable to read plugin SDK contract review.";
+  }
+}
+
+async function refreshNativePluginContract() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/plugins/openclaw-native-plugin-contract\`);
+    renderNativePluginContract(data);
+  } catch {
+    nativePluginContractRegistry.textContent = "offline";
+    nativePluginContractOwner.textContent = "unknown";
+    nativePluginContractTotal.textContent = "0";
+    nativePluginContractApproval.textContent = "0";
+    nativePluginContractMutation.textContent = "0";
+    nativePluginContractValidation.textContent = "unknown";
+    nativePluginContractJson.textContent = "Unable to read native plugin contract.";
   }
 }
 
@@ -3024,6 +3095,7 @@ await refreshWorkspaceRegistry();
 await refreshWorkspaceMigrationMap();
 await refreshWorkspaceMigrationPlan();
 await refreshPluginSdkContractReview();
+await refreshNativePluginContract();
 await refreshWorkspaceCommandProposals();
 await refreshWorkspaceCommandPlanDraft();
 await refreshSystemState();
@@ -3052,6 +3124,7 @@ setInterval(refreshWorkspaceRegistry, 5000);
 setInterval(refreshWorkspaceMigrationMap, 5000);
 setInterval(refreshWorkspaceMigrationPlan, 5000);
 setInterval(refreshPluginSdkContractReview, 5000);
+setInterval(refreshNativePluginContract, 5000);
 setInterval(refreshWorkspaceCommandProposals, 5000);
 setInterval(refreshWorkspaceCommandPlanDraft, 5000);
 setInterval(refreshSystemState, 5000);

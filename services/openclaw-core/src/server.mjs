@@ -2,6 +2,12 @@ import http from "node:http";
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import {
+  OPENCLAW_NATIVE_PLUGIN_CONTRACT_VERSION,
+  createOpenClawNativePluginContract,
+  summariseOpenClawNativePluginContract,
+  validateOpenClawNativePluginContract,
+} from "../../../packages/shared-types/src/plugin-contract.mjs";
 
 const host = process.env.OPENCLAW_CORE_HOST ?? "127.0.0.1";
 const port = Number.parseInt(process.env.OPENCLAW_CORE_PORT ?? "4100", 10);
@@ -1108,6 +1114,97 @@ function buildOpenClawPluginSdkContractReview() {
         createsApproval: false,
         migrationStatus: "review_required_before_import",
       },
+    },
+  };
+}
+
+function buildOpenClawNativePluginContractRegistry() {
+  const contract = createOpenClawNativePluginContract({
+    plugin: {
+      id: "openclaw.native.plugin-sdk",
+      name: "OpenClaw Native Plugin SDK",
+      version: "0.1.0",
+      summary: "Native contract surface for governed OpenClaw capabilities.",
+    },
+    governance: {
+      origin: "absorbed_external",
+      sourceContentImported: false,
+      requiresHumanReviewBeforeActivation: true,
+    },
+    capabilities: [
+      {
+        id: "sense.plugin.manifest_profile",
+        title: "Profile plugin manifest metadata",
+        description: "Reads bounded plugin manifest metadata without importing source contents.",
+        kind: "sense",
+        domains: ["body_internal"],
+        risk: "low",
+        permissions: {
+          filesystemRead: true,
+        },
+        approval: {
+          required: false,
+          reason: "Read-only metadata profiling inside the body boundary.",
+        },
+        audit: {
+          required: true,
+          ledger: "capability_history",
+        },
+      },
+      {
+        id: "act.plugin.capability.invoke",
+        title: "Invoke a governed plugin capability",
+        description: "Invokes a registered capability only after policy evaluation and audit binding.",
+        kind: "act",
+        domains: ["user_task", "cross_boundary"],
+        risk: "high",
+        permissions: {
+          commandExecution: true,
+          filesystemWrite: true,
+        },
+        approval: {
+          required: true,
+          reason: "Execution and mutation require explicit user approval.",
+        },
+        audit: {
+          required: true,
+          ledger: "capability_history",
+        },
+      },
+    ],
+  });
+  const validation = validateOpenClawNativePluginContract(contract);
+  const summary = summariseOpenClawNativePluginContract(contract);
+
+  return {
+    registry: OPENCLAW_NATIVE_PLUGIN_CONTRACT_VERSION,
+    mode: "contract-only",
+    generatedAt: new Date().toISOString(),
+    sourceRegistry: "openclaw-plugin-sdk-contract-review-v0",
+    sourceMode: "read-only",
+    contract,
+    validation,
+    summary: {
+      ...summary,
+      validationOk: validation.ok,
+      issueCount: validation.issues.length,
+      governance: {
+        runtimeOwner: contract.governance.runtimeOwner,
+        origin: contract.governance.origin,
+        externalRuntimeDependencyAllowed: contract.governance.externalRuntimeDependencyAllowed,
+        sourceContentImported: contract.governance.sourceContentImported,
+        canCreateTasks: contract.governance.canCreateTasks,
+        canCreateApprovals: contract.governance.canCreateApprovals,
+        canExecuteDuringRegistration: contract.governance.canExecuteDuringRegistration,
+        requiresHumanReviewBeforeActivation: contract.governance.requiresHumanReviewBeforeActivation,
+      },
+      guardrails: [
+        "OpenClawOnNixOS remains runtime owner",
+        "external runtime dependency is rejected",
+        "registration cannot execute plugin code",
+        "high-risk or mutating capabilities require approval",
+        "native capabilities require audit ledgers",
+      ],
     },
   };
 }
@@ -4604,6 +4701,29 @@ const server = http.createServer(async (req, res) => {
       sourceRegistry: review.sourceRegistry,
       roots: review.roots,
       summary: review.summary,
+    });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/plugins/openclaw-native-plugin-contract") {
+    sendJson(res, 200, {
+      ok: true,
+      ...buildOpenClawNativePluginContractRegistry(),
+    });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/plugins/openclaw-native-plugin-contract/summary") {
+    const registry = buildOpenClawNativePluginContractRegistry();
+    sendJson(res, 200, {
+      ok: true,
+      registry: registry.registry,
+      mode: registry.mode,
+      generatedAt: registry.generatedAt,
+      sourceRegistry: registry.sourceRegistry,
+      sourceMode: registry.sourceMode,
+      summary: registry.summary,
+      validation: registry.validation,
     });
     return;
   }
