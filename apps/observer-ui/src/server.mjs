@@ -1797,20 +1797,21 @@ function renderWorkspacePatchApplyDraft(data) {
   workspacePatchApplyMode.textContent = data?.mode ?? "diff-preview-approval-gated-draft";
 
   workspacePatchApplyJson.textContent = [
-    "Native approval-gated patch adapter: reads a bounded file, creates a small diff preview, and applies only after approval.",
+    "Native approval-gated patch adapter: reads a bounded file, creates small single or multi-hunk diff previews, and applies only after approval.",
     "The task stores the full patched content internally for act.filesystem.write_text, but public task/Observer output uses redacted params plus hashes.",
     \`Registry: \${data?.registry ?? "openclaw-native-workspace-patch-apply-draft-v0"}\`,
     \`Mode: \${data?.mode ?? "diff-preview-approval-gated-draft"}\`,
     \`Capability: \${data?.capability?.id ?? "act.openclaw.workspace_patch_apply"} risk=\${data?.capability?.risk ?? "high"} approval=\${Boolean(data?.capability?.approvalRequired ?? true)} owner=\${data?.capability?.runtimeOwner ?? "unknown"}\`,
     \`Workspace: \${data?.workspace?.name ?? "unknown"} \${data?.workspace?.path ?? ""}\`,
-    \`Target: \${target.relativePath ?? "scratch/observer-native-edit.txt"} oldBytes=\${target.originalBytes ?? 0} newBytes=\${target.nextBytes ?? 0} oldSha256=\${target.originalSha256 ?? "unknown"} newSha256=\${target.nextSha256 ?? "unknown"} contentExposed=\${Boolean(target.contentExposed)} diffPreview=\${Boolean(target.diffPreviewExposed)}\`,
-    \`Diff: format=\${diffPreview.format ?? "unknown"} oldStart=\${diffPreview.oldStartLine ?? "?"} newStart=\${diffPreview.newStartLine ?? "?"} lines=\${diffPreview.previewLineCount ?? lines.length} truncated=\${Boolean(diffPreview.truncated)}\`,
+    \`Target: \${target.relativePath ?? "scratch/observer-native-edit.txt"} edits=\${target.editCount ?? 1} changedAt=\${(target.changedAtLines ?? [target.changedAtLine]).filter(Boolean).join(",") || "unknown"} oldBytes=\${target.originalBytes ?? 0} newBytes=\${target.nextBytes ?? 0} oldSha256=\${target.originalSha256 ?? "unknown"} newSha256=\${target.nextSha256 ?? "unknown"} contentExposed=\${Boolean(target.contentExposed)} diffPreview=\${Boolean(target.diffPreviewExposed)}\`,
+    \`Diff: format=\${diffPreview.format ?? "unknown"} hunks=\${diffPreview.hunkCount ?? 1} oldStart=\${diffPreview.oldStartLine ?? "?"} newStart=\${diffPreview.newStartLine ?? "?"} lines=\${diffPreview.previewLineCount ?? lines.length} truncated=\${Boolean(diffPreview.truncated)}\`,
     \`Governance: createsTask=\${Boolean(governance.createsTask)} createsApproval=\${Boolean(governance.createsApproval)} executeWithoutApproval=\${Boolean(governance.canExecuteWithoutApproval)} filesystemWrite=\${Boolean(governance.usesFilesystemWriteCapability)} exposesFullContent=\${Boolean(governance.exposesFullContent)} exposesDiffPreview=\${Boolean(governance.exposesDiffPreview)}\`,
     "",
     ...lines.map((line) => {
       const prefix = line.type === "add" ? "+" : line.type === "remove" ? "-" : " ";
       const number = line.type === "add" ? line.newLine : line.oldLine;
-      return \`\${prefix}\${number ?? "?"}: \${line.text ?? ""}\`;
+      const hunk = line.hunk ? \`h\${line.hunk} \` : "";
+      return \`\${hunk}\${prefix}\${number ?? "?"}: \${line.text ?? ""}\`;
     }),
   ].join("\\n");
 }
@@ -2450,7 +2451,11 @@ async function refreshWorkspaceTextWriteDraft() {
 
 async function refreshWorkspacePatchApplyDraft() {
   try {
-    const data = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/workspace-patch-apply/draft?relativePath=scratch/observer-native-edit.txt&search=before&replacement=after&contextLines=1\`);
+    const edits = encodeURIComponent(JSON.stringify([
+      { search: "before", replacement: "after", occurrence: 1 },
+      { search: "omega", replacement: "zeta", occurrence: 1 },
+    ]));
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/workspace-patch-apply/draft?relativePath=scratch/observer-native-edit.txt&edits=\${edits}&contextLines=0\`);
     renderWorkspacePatchApplyDraft(data);
   } catch {
     workspacePatchApplyRegistry.textContent = "offline";
@@ -3243,10 +3248,11 @@ async function createWorkspacePatchApplyApprovalTask() {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       relativePath: "scratch/observer-native-edit.txt",
-      search: "before",
-      replacement: "after",
-      occurrence: 1,
-      contextLines: 1,
+      edits: [
+        { search: "before", replacement: "after", occurrence: 1 },
+        { search: "omega", replacement: "zeta", occurrence: 1 },
+      ],
+      contextLines: 0,
       confirm: true,
     }),
   });

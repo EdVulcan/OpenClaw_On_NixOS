@@ -1,6 +1,6 @@
 # OpenClaw Source Integration Stage Plan
 
-更新时间：2026-05-13 21:40 +08:00
+更新时间：2026-05-13 21:49 +08:00
 
 本文档用于跟踪当前阶段：把旁路 `openclaw` 增强源码项目中的能力，受控接入 `OpenClawOnNixOS`。后续每推进一个接入切片，都必须同步更新本文件，避免路线漂移、重复准备层、或忘记阶段边界。
 
@@ -600,3 +600,45 @@ Next intended slice after this passes:
 - Expand patch apply from one exact replacement to multi-hunk edit proposals.
 - Keep all edit application behind approval and filesystem ledgering.
 - Do not start shell/process/web gateway execution until multi-hunk edit proposal safety is proven or explicitly deferred.
+
+## 16. 2026-05-13 Step 5 Update: Native Workspace Multi-Patch
+
+Status: implemented_waiting_check.
+
+Slice: `act.openclaw.workspace_patch_apply` multi-hunk mode.
+
+Purpose: extend the approved patch adapter from one exact replacement to multiple bounded exact-replacement hunks in one approval-gated task. This is the first practical bridge toward real code-edit workflows while keeping `OpenClawOnNixOS` as the runtime owner and preserving a single governed filesystem write.
+
+Implemented artifacts:
+- Core draft API now accepts `edits: [{ search, replacement, occurrence }]` via query JSON or POST body.
+- Core task API now materializes multi-hunk patch tasks with one approval and one filesystem write plan.
+- Multi-hunk preview format: `bounded-multi-hunk-line-diff-v0`.
+- Observer patch panel now demonstrates a two-hunk edit proposal and renders hunk labels.
+- Targeted checks: `openclaw-native-workspace-multi-patch`, `observer-openclaw-native-workspace-multi-patch`.
+
+Governance boundaries:
+- Does not import or execute old `openclaw` modules.
+- Does not create a new write channel.
+- Does not apply any hunk before explicit approval.
+- All hunks collapse into one approved `act.filesystem.write_text` execution.
+- Filesystem change remains recorded in the filesystem ledger.
+- Capability execution remains recorded in capability history.
+- Public task/approval/Observer responses expose bounded hunk previews and hashes, not full patched file content.
+- Multi-hunk preview is hunk-local so unrelated content between separated hunks is not exposed by a single spanning diff.
+
+Local verification target:
+- `npm run typecheck`.
+- `git diff --check`.
+- Targeted milestone checks on NixOS.
+
+NixOS targeted milestone command:
+
+```bash
+cd /home/edvulcan/OpenClaw_On_NixOS && \
+git pull origin main && \
+OPENCLAW_MILESTONE_CHECKS=openclaw-native-workspace-multi-patch,observer-openclaw-native-workspace-multi-patch npm run dev:milestone-check:unix
+```
+
+Next intended slice after this passes:
+- Add structured patch validation around overlapping edits, missing matches, and preview limits before moving toward richer code-edit operations.
+- Keep shell/process/web gateway execution deferred until edit safety is stable.

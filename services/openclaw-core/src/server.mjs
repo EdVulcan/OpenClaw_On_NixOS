@@ -3419,6 +3419,57 @@ function replaceNthOccurrence(text, search, replacement, occurrence = 1) {
   return null;
 }
 
+function normaliseWorkspacePatchEdits({ edits = null, search = "", replacement = "", occurrence = 1 } = {}) {
+  const rawEdits = Array.isArray(edits) && edits.length > 0
+    ? edits
+    : [{ search, replacement, occurrence }];
+  if (rawEdits.length > 8) {
+    throw new Error("OpenClaw workspace patch drafts are limited to 8 edit hunks.");
+  }
+  return rawEdits.map((edit, index) => {
+    const safeSearch = typeof edit?.search === "string" ? edit.search : "";
+    if (!safeSearch) {
+      throw new Error(`search text is required for OpenClaw workspace patch edit ${index + 1}.`);
+    }
+    const safeReplacement = typeof edit?.replacement === "string" ? edit.replacement : "";
+    if (Buffer.byteLength(safeSearch, "utf8") > 16 * 1024 || Buffer.byteLength(safeReplacement, "utf8") > 16 * 1024) {
+      throw new Error(`OpenClaw workspace patch edit ${index + 1} exceeds the per-hunk size limit.`);
+    }
+    return {
+      search: safeSearch,
+      replacement: safeReplacement,
+      occurrence: Number.isInteger(edit?.occurrence) && edit.occurrence > 0 ? edit.occurrence : 1,
+    };
+  });
+}
+
+function applyWorkspacePatchEdits(originalContent, edits) {
+  let currentContent = originalContent;
+  const appliedEdits = [];
+  for (const [index, edit] of edits.entries()) {
+    const beforeText = currentContent;
+    const replacementsAvailable = countOccurrences(beforeText, edit.search);
+    const patched = replaceNthOccurrence(beforeText, edit.search, edit.replacement, edit.occurrence);
+    if (!patched) {
+      throw new Error(`OpenClaw workspace patch search text was not found for edit ${index + 1}.`);
+    }
+    currentContent = patched.text;
+    appliedEdits.push({
+      index: index + 1,
+      occurrence: edit.occurrence,
+      replacementsAvailable,
+      replacementBytes: Buffer.byteLength(edit.replacement, "utf8"),
+      changedAtLine: lineNumberForIndex(beforeText, patched.index),
+      beforeText,
+      afterText: currentContent,
+    });
+  }
+  return {
+    nextContent: currentContent,
+    appliedEdits,
+  };
+}
+
 function lineNumberForIndex(text, index) {
   return text.slice(0, index).split(/\r?\n/).length;
 }
@@ -3480,30 +3531,46 @@ function buildDiffPreview(oldText, newText, { contextLines = 1, maxPreviewLines 
   };
 }
 
+function buildWorkspacePatchDiffPreview(originalContent, nextContent, appliedEdits, { contextLines = 1 } = {}) {
+  if (appliedEdits.length <= 1) {
+    return buildDiffPreview(originalContent, nextContent, { contextLines });
+  }
+
+  const hunks = appliedEdits.map((edit) => ({
+    editIndex: edit.index,
+    ...buildDiffPreview(edit.beforeText, edit.afterText, { contextLines, maxPreviewLines: 16 }),
+  }));
+  const lines = hunks.flatMap((hunk) => hunk.lines.map((line) => ({
+    ...line,
+    hunk: hunk.editIndex,
+  })));
+
+  return {
+    format: "bounded-multi-hunk-line-diff-v0",
+    hunkCount: hunks.length,
+    contextLines: hunks[0]?.contextLines ?? 0,
+    previewLineCount: lines.length,
+    truncated: hunks.some((hunk) => hunk.truncated),
+    hunks,
+    lines,
+  };
+}
+
 function buildNativeOpenClawWorkspacePatchApplyDraft({
   workspacePath = null,
   relativePath = "scratch/native-edit.txt",
   search = "",
   replacement = "",
   occurrence = 1,
+  edits = null,
   contextLines = 1,
 } = {}) {
   const target = resolveOpenClawWorkspaceTarget({ workspacePath, relativePath });
-  const safeSearch = typeof search === "string" ? search : "";
-  if (!safeSearch) {
-    throw new Error("search text is required for OpenClaw workspace patch drafts.");
-  }
-  const safeReplacement = typeof replacement === "string" ? replacement : "";
-  const safeOccurrence = Number.isInteger(occurrence) && occurrence > 0 ? occurrence : 1;
+  const safeEdits = normaliseWorkspacePatchEdits({ edits, search, replacement, occurrence });
   const originalContent = readBoundedWorkspaceTextFile(target);
-  const replacementsAvailable = countOccurrences(originalContent, safeSearch);
-  const patched = replaceNthOccurrence(originalContent, safeSearch, safeReplacement, safeOccurrence);
-  if (!patched) {
-    throw new Error("OpenClaw workspace patch search text was not found.");
-  }
-  const nextContent = patched.text;
+  const { nextContent, appliedEdits } = applyWorkspacePatchEdits(originalContent, safeEdits);
   const originalBytes = Buffer.byteLength(originalContent, "utf8");
-  const replacementBytes = Buffer.byteLength(safeReplacement, "utf8");
+  const replacementBytes = appliedEdits.reduce((total, edit) => total + edit.replacementBytes, 0);
   const nextBytes = Buffer.byteLength(nextContent, "utf8");
   const nativeRegistry = createOpenClawNativePluginRegistry();
   const capability = nativeRegistry.items[0]?.contract?.capabilities
@@ -3581,13 +3648,24 @@ function buildNativeOpenClawWorkspacePatchApplyDraft({
       replacementBytes,
       originalSha256: sha256Hex(originalContent),
       nextSha256: sha256Hex(nextContent),
-      replacementsAvailable,
-      occurrence: safeOccurrence,
-      changedAtLine: lineNumberForIndex(originalContent, patched.index),
+      editCount: safeEdits.length,
+      replacementsAvailable: appliedEdits.reduce((total, edit) => total + edit.replacementsAvailable, 0),
+      occurrence: safeEdits.length === 1 ? safeEdits[0].occurrence : null,
+      changedAtLine: appliedEdits[0]?.changedAtLine ?? null,
+      changedAtLines: appliedEdits.map((edit) => edit.changedAtLine),
       contentExposed: false,
       diffPreviewExposed: true,
     },
-    diffPreview: buildDiffPreview(originalContent, nextContent, { contextLines }),
+    edits: appliedEdits.map((edit) => ({
+      index: edit.index,
+      occurrence: edit.occurrence,
+      replacementsAvailable: edit.replacementsAvailable,
+      replacementBytes: edit.replacementBytes,
+      changedAtLine: edit.changedAtLine,
+      searchExposed: false,
+      replacementExposed: false,
+    })),
+    diffPreview: buildWorkspacePatchDiffPreview(originalContent, nextContent, appliedEdits, { contextLines }),
     draft: {
       goal,
       type: "system_task",
@@ -3619,6 +3697,7 @@ async function createNativeOpenClawWorkspacePatchApplyTask({
   search = "",
   replacement = "",
   occurrence = 1,
+  edits = null,
   contextLines = 1,
   confirm = false,
 } = {}) {
@@ -3632,6 +3711,7 @@ async function createNativeOpenClawWorkspacePatchApplyTask({
     search,
     replacement,
     occurrence,
+    edits,
     contextLines,
   });
   const draft = draftEnvelope.draft;
@@ -8328,12 +8408,15 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === "GET" && requestUrl.pathname === "/plugins/native-adapter/workspace-patch-apply/draft") {
     try {
+      const editsParam = requestUrl.searchParams.get("edits");
+      const edits = editsParam ? JSON.parse(editsParam) : null;
       const draft = buildNativeOpenClawWorkspacePatchApplyDraft({
         workspacePath: requestUrl.searchParams.get("workspacePath"),
         relativePath: requestUrl.searchParams.get("relativePath") ?? "scratch/native-edit.txt",
         search: requestUrl.searchParams.get("search") ?? "before",
         replacement: requestUrl.searchParams.get("replacement") ?? "after",
         occurrence: Number.parseInt(requestUrl.searchParams.get("occurrence") ?? "1", 10),
+        edits,
         contextLines: Number.parseInt(requestUrl.searchParams.get("contextLines") ?? "1", 10),
       });
       sendJson(res, 200, {
@@ -8360,6 +8443,7 @@ const server = http.createServer(async (req, res) => {
         search: typeof body.search === "string" ? body.search : "",
         replacement: typeof body.replacement === "string" ? body.replacement : "",
         occurrence: Number.isInteger(body.occurrence) ? body.occurrence : 1,
+        edits: Array.isArray(body.edits) ? body.edits : null,
         contextLines: Number.isInteger(body.contextLines) ? body.contextLines : 1,
         confirm: body.confirm === true,
       });

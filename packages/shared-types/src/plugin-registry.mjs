@@ -123,7 +123,7 @@ export function createOpenClawNativePluginRegistry({ generatedAt = new Date().to
       {
         id: "act.openclaw.workspace_patch_apply",
         title: "Apply OpenClaw workspace patch",
-        description: "Creates a bounded diff preview for an OpenClaw workspace edit and applies it only after explicit approval through native filesystem governance.",
+        description: "Creates bounded single or multi-hunk diff previews for OpenClaw workspace edits and applies them only after explicit approval through native filesystem governance.",
         kind: "act",
         domains: ["body_internal"],
         risk: "high",
