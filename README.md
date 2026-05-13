@@ -457,6 +457,14 @@ npm run dev:openclaw-workspace-command-proposals-check:unix
 
 This verifies core can derive proposal-only `pnpm run <script>` command shapes from detected OpenClaw workspace scripts without exposing script bodies or executing commands.
 
+Run the OpenClaw source migration map slice directly:
+
+```bash
+npm run dev:openclaw-source-migration-map-check:unix
+```
+
+This verifies core can turn a profiled OpenClaw source workspace into read-only migration candidates for extension catalogs, SDKs, UI patterns, core source patterns, docs, skills, and verification assets without reading file contents, mutating files, or executing source workspace commands.
+
 Run the OpenClaw workspace command plan slice directly:
 
 ```bash
@@ -748,6 +756,7 @@ This is based on real NixOS VM validation:
 - `dev:observer-capability-history-check:unix` covers Observer visibility for persistent capability invocation history
 - `dev:system-sense-check:unix` covers real body vitals and service health telemetry
 - `dev:system-heal-check:unix` covers conservative diagnosis, autofix, and heal history
+- `dev:openclaw-source-migration-map-check:unix` covers read-only migration candidate maps for profiled OpenClaw source capabilities
 - `dev:openclaw-workspace-command-proposals-check:unix` covers proposal-only command shapes for detected OpenClaw workspaces
 - `dev:openclaw-workspace-command-plan-check:unix` covers plan-only execution drafts for selected OpenClaw workspace commands
 - `dev:openclaw-workspace-command-task-check:unix` covers approval-gated task materialization for selected OpenClaw workspace commands

@@ -579,6 +579,228 @@ function buildWorkspaceCommandProposals() {
   };
 }
 
+function buildOpenClawMigrationCandidatesForWorkspace(workspace) {
+  const profile = workspace.openclawProfile;
+  if (!profile) {
+    return [];
+  }
+
+  const candidates = [];
+  const addCandidate = ({
+    id,
+    capability,
+    sourceDomain,
+    targetArea,
+    migrationKind,
+    risk,
+    priority,
+    evidence,
+    rationale,
+  }) => {
+    candidates.push({
+      id: `${workspace.id}:${id}`,
+      workspaceId: workspace.id,
+      workspaceName: workspace.name,
+      workspacePath: workspace.path,
+      capability,
+      sourceDomain,
+      targetArea,
+      migrationKind,
+      risk,
+      priority,
+      readiness: "profiled",
+      evidence,
+      rationale,
+      governance: {
+        mode: "migration_candidate_read_only",
+        canReadFileContent: false,
+        canMutate: false,
+        canExecute: false,
+        requiresHumanReview: true,
+        migrationStatus: "candidate_only",
+        integrationIntent: "absorb_after_plan",
+      },
+    });
+  };
+
+  if (profile.hasExtensionCatalog) {
+    addCandidate({
+      id: "extension-catalog",
+      capability: "extension_catalog",
+      sourceDomain: "extensions",
+      targetArea: "capability_registry",
+      migrationKind: "inventory_then_adapter",
+      risk: "medium",
+      priority: "high",
+      evidence: {
+        domainPresent: true,
+        approximateEntries: profile.domainCounts?.extensions ?? 0,
+      },
+      rationale: "Extensions look like reusable capability providers, but they need adapter and policy review before import.",
+    });
+  }
+
+  if (profile.hasPluginSdk) {
+    addCandidate({
+      id: "plugin-sdk",
+      capability: "plugin_sdk",
+      sourceDomain: "packages/plugin-sdk",
+      targetArea: "capability_contracts",
+      migrationKind: "contract_review",
+      risk: "low",
+      priority: "high",
+      evidence: {
+        packagePresent: true,
+      },
+      rationale: "A plugin SDK can harden OpenClaw's native capability boundary without making the old repo the runtime owner.",
+    });
+  }
+
+  if (profile.hasMemoryHostSdk) {
+    addCandidate({
+      id: "memory-host-sdk",
+      capability: "memory_host_sdk",
+      sourceDomain: "packages/memory-host-sdk",
+      targetArea: "long_term_memory",
+      migrationKind: "contract_review",
+      risk: "medium",
+      priority: "medium",
+      evidence: {
+        packagePresent: true,
+      },
+      rationale: "Memory-related APIs are valuable, but need sovereignty and privacy review before becoming native state.",
+    });
+  }
+
+  if (profile.hasUiWorkspace) {
+    addCandidate({
+      id: "ui-workspace",
+      capability: "ui_workspace",
+      sourceDomain: "ui",
+      targetArea: "observer_ui",
+      migrationKind: "pattern_absorption",
+      risk: "low",
+      priority: "medium",
+      evidence: {
+        packagePresent: true,
+      },
+      rationale: "UI patterns can inform Observer without copying runtime ownership from the source workspace.",
+    });
+  }
+
+  if (profile.presentDomains?.includes("src")) {
+    addCandidate({
+      id: "core-source",
+      capability: "core_source_patterns",
+      sourceDomain: "src",
+      targetArea: "openclaw_core",
+      migrationKind: "design_review",
+      risk: "medium",
+      priority: "high",
+      evidence: {
+        approximateEntries: profile.domainCounts?.src ?? 0,
+      },
+      rationale: "Core source patterns should be reviewed as design input before any native reimplementation.",
+    });
+  }
+
+  if (profile.presentDomains?.includes("docs")) {
+    addCandidate({
+      id: "documentation-canon",
+      capability: "documentation_canon",
+      sourceDomain: "docs",
+      targetArea: "project_memory",
+      migrationKind: "canon_reconcile",
+      risk: "low",
+      priority: "medium",
+      evidence: {
+        approximateEntries: profile.domainCounts?.docs ?? 0,
+      },
+      rationale: "Existing docs can preserve intent and constraints while the NixOS body evolves independently.",
+    });
+  }
+
+  if (profile.presentDomains?.includes("skills")) {
+    addCandidate({
+      id: "agent-skills",
+      capability: "agent_skills",
+      sourceDomain: "skills",
+      targetArea: "capability_registry",
+      migrationKind: "policy_wrap",
+      risk: "medium",
+      priority: "medium",
+      evidence: {
+        approximateEntries: profile.domainCounts?.skills ?? 0,
+      },
+      rationale: "Skills are likely useful but must be wrapped by OpenClaw governance before use.",
+    });
+  }
+
+  if (profile.presentDomains?.includes("qa") || profile.presentDomains?.includes("test")) {
+    addCandidate({
+      id: "verification-assets",
+      capability: "verification_assets",
+      sourceDomain: profile.presentDomains.includes("qa") ? "qa" : "test",
+      targetArea: "milestone_checks",
+      migrationKind: "test_port",
+      risk: "low",
+      priority: "medium",
+      evidence: {
+        qaEntries: profile.domainCounts?.qa ?? 0,
+        testEntries: profile.domainCounts?.test ?? 0,
+      },
+      rationale: "Existing verification assets can strengthen milestone checks without importing runtime behavior.",
+    });
+  }
+
+  return candidates;
+}
+
+function buildOpenClawMigrationMap() {
+  const registry = buildWorkspaceRegistry();
+  const items = registry.items.flatMap((workspace) => buildOpenClawMigrationCandidatesForWorkspace(workspace));
+  return {
+    registry: "openclaw-source-migration-map-v0",
+    mode: "read-only",
+    generatedAt: registry.generatedAt,
+    sourceRegistry: registry.registry,
+    roots: registry.roots,
+    count: items.length,
+    items,
+    summary: {
+      total: items.length,
+      workspaces: new Set(items.map((item) => item.workspaceId)).size,
+      byWorkspace: items.reduce((accumulator, item) => {
+        accumulator[item.workspaceName] = (accumulator[item.workspaceName] ?? 0) + 1;
+        return accumulator;
+      }, {}),
+      byTargetArea: items.reduce((accumulator, item) => {
+        accumulator[item.targetArea] = (accumulator[item.targetArea] ?? 0) + 1;
+        return accumulator;
+      }, {}),
+      byMigrationKind: items.reduce((accumulator, item) => {
+        accumulator[item.migrationKind] = (accumulator[item.migrationKind] ?? 0) + 1;
+        return accumulator;
+      }, {}),
+      byRisk: items.reduce((accumulator, item) => {
+        accumulator[item.risk] = (accumulator[item.risk] ?? 0) + 1;
+        return accumulator;
+      }, {}),
+      byPriority: items.reduce((accumulator, item) => {
+        accumulator[item.priority] = (accumulator[item.priority] ?? 0) + 1;
+        return accumulator;
+      }, {}),
+      governance: {
+        mode: "migration_candidate_read_only",
+        canReadFileContent: false,
+        canMutate: false,
+        canExecute: false,
+        migrationStatus: "candidate_only",
+      },
+    },
+  };
+}
+
 function findWorkspaceCommandProposal({ proposalId = null, workspaceId = null, scriptName = null } = {}) {
   const proposals = buildWorkspaceCommandProposals();
   const match = proposals.items.find((item) => {
@@ -4005,6 +4227,28 @@ const server = http.createServer(async (req, res) => {
       generatedAt: proposals.generatedAt,
       roots: proposals.roots,
       summary: proposals.summary,
+    });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/workspaces/openclaw-migration-map") {
+    sendJson(res, 200, {
+      ok: true,
+      ...buildOpenClawMigrationMap(),
+    });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/workspaces/openclaw-migration-map/summary") {
+    const map = buildOpenClawMigrationMap();
+    sendJson(res, 200, {
+      ok: true,
+      registry: map.registry,
+      mode: map.mode,
+      generatedAt: map.generatedAt,
+      sourceRegistry: map.sourceRegistry,
+      roots: map.roots,
+      summary: map.summary,
     });
     return;
   }
