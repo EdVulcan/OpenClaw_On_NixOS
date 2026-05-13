@@ -251,6 +251,38 @@ function readJsonFileIfPresent(filePath) {
   }
 }
 
+function readPnpmWorkspacePackages(rootPath) {
+  const filePath = path.join(rootPath, "pnpm-workspace.yaml");
+  if (!existsSync(filePath)) {
+    return [];
+  }
+
+  try {
+    const lines = readFileSync(filePath, "utf8").split(/\r?\n/);
+    const packages = [];
+    let inPackages = false;
+    for (const line of lines) {
+      if (/^\s*packages\s*:/.test(line)) {
+        inPackages = true;
+        continue;
+      }
+      if (!inPackages) {
+        continue;
+      }
+      if (/^\S/.test(line) && !/^\s*-/.test(line)) {
+        break;
+      }
+      const match = line.match(/^\s*-\s*["']?([^"']+)["']?\s*$/);
+      if (match?.[1]) {
+        packages.push(match[1]);
+      }
+    }
+    return packages;
+  } catch {
+    return [];
+  }
+}
+
 function detectWorkspacePackageManager(rootPath) {
   if (existsSync(path.join(rootPath, "pnpm-lock.yaml")) || existsSync(path.join(rootPath, "pnpm-workspace.yaml"))) {
     return "pnpm";
@@ -279,6 +311,64 @@ function safeDirectoryEntries(rootPath) {
   }
 }
 
+function safeDirectoryCount(rootPath) {
+  try {
+    return readdirSync(rootPath, { withFileTypes: true })
+      .filter((entry) => !entry.name.startsWith(".") && entry.isDirectory())
+      .length;
+  } catch {
+    return 0;
+  }
+}
+
+function buildOpenClawWorkspaceProfile(rootPath, packageJson, topLevelDirectories) {
+  const domainNames = [
+    "apps",
+    "packages",
+    "extensions",
+    "src",
+    "ui",
+    "docs",
+    "skills",
+    "scripts",
+    "test",
+    "qa",
+  ];
+  const presentDomains = domainNames.filter((name) => topLevelDirectories.includes(name));
+  const looksLikeOpenClaw =
+    packageJson?.name === "openclaw"
+    || topLevelDirectories.includes("extensions")
+    || existsSync(path.join(rootPath, ".openclaw"));
+
+  if (!looksLikeOpenClaw) {
+    return null;
+  }
+
+  const domainCounts = Object.fromEntries(presentDomains.map((name) => [
+    name,
+    safeDirectoryCount(path.join(rootPath, name)),
+  ]));
+  return {
+    profile: "openclaw-source-workspace-v0",
+    role: "external_source_workspace",
+    presentDomains,
+    domainCount: presentDomains.length,
+    domainCounts,
+    hasPluginSdk: existsSync(path.join(rootPath, "packages", "plugin-sdk")),
+    hasMemoryHostSdk: existsSync(path.join(rootPath, "packages", "memory-host-sdk")),
+    hasUiWorkspace: existsSync(path.join(rootPath, "ui", "package.json")),
+    hasExtensionCatalog: existsSync(path.join(rootPath, "extensions")),
+    governance: {
+      mode: "source_profile_read_only",
+      canReadFileContent: false,
+      canMutate: false,
+      canExecute: false,
+      migrationStatus: "not_imported",
+      integrationIntent: "inventory_before_absorb",
+    },
+  };
+}
+
 function safeStat(rootPath) {
   try {
     return statSync(rootPath);
@@ -300,6 +390,7 @@ function detectWorkspace(rootPath) {
         "README.md",
         "AGENTS.md",
         "CLAUDE.md",
+        ".openclaw",
         ".git",
       ].filter((marker) => existsSync(path.join(resolvedPath, marker)))
     : [];
@@ -310,7 +401,13 @@ function detectWorkspace(rootPath) {
     ? packageJson.workspaces
     : Array.isArray(packageJson?.workspaces?.packages)
       ? packageJson.workspaces.packages
-      : [];
+      : isDirectory
+        ? readPnpmWorkspacePackages(resolvedPath)
+        : [];
+  const topLevelDirectories = isDirectory ? safeDirectoryEntries(resolvedPath) : [];
+  const openclawProfile = isDirectory
+    ? buildOpenClawWorkspaceProfile(resolvedPath, packageJson, topLevelDirectories)
+    : null;
 
   return {
     id: path.basename(resolvedPath) || "workspace",
@@ -327,7 +424,8 @@ function detectWorkspace(rootPath) {
     workspaces,
     workspaceCount: workspaces.length,
     markers,
-    topLevelDirectories: isDirectory ? safeDirectoryEntries(resolvedPath) : [],
+    topLevelDirectories,
+    openclawProfile,
     governance: {
       mode: "read_only_detect",
       canReadMetadata: true,
