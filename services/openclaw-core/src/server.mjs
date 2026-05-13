@@ -3419,6 +3419,27 @@ function replaceNthOccurrence(text, search, replacement, occurrence = 1) {
   return null;
 }
 
+function findNthOccurrenceRange(text, search, occurrence = 1) {
+  const safeOccurrence = Number.isInteger(occurrence) && occurrence > 0 ? occurrence : 1;
+  let seen = 0;
+  let position = 0;
+  while (position <= text.length) {
+    const next = text.indexOf(search, position);
+    if (next === -1) {
+      return null;
+    }
+    seen += 1;
+    if (seen === safeOccurrence) {
+      return {
+        start: next,
+        end: next + search.length,
+      };
+    }
+    position = next + search.length;
+  }
+  return null;
+}
+
 function normaliseWorkspacePatchEdits({ edits = null, search = "", replacement = "", occurrence = 1 } = {}) {
   const rawEdits = Array.isArray(edits) && edits.length > 0
     ? edits
@@ -3444,29 +3465,74 @@ function normaliseWorkspacePatchEdits({ edits = null, search = "", replacement =
 }
 
 function applyWorkspacePatchEdits(originalContent, edits) {
-  let currentContent = originalContent;
-  const appliedEdits = [];
-  for (const [index, edit] of edits.entries()) {
-    const beforeText = currentContent;
-    const replacementsAvailable = countOccurrences(beforeText, edit.search);
-    const patched = replaceNthOccurrence(beforeText, edit.search, edit.replacement, edit.occurrence);
-    if (!patched) {
+  const ranges = edits.map((edit, index) => {
+    const replacementsAvailable = countOccurrences(originalContent, edit.search);
+    const range = findNthOccurrenceRange(originalContent, edit.search, edit.occurrence);
+    if (!range) {
       throw new Error(`OpenClaw workspace patch search text was not found for edit ${index + 1}.`);
     }
-    currentContent = patched.text;
-    appliedEdits.push({
+    return {
       index: index + 1,
-      occurrence: edit.occurrence,
+      edit,
       replacementsAvailable,
-      replacementBytes: Buffer.byteLength(edit.replacement, "utf8"),
-      changedAtLine: lineNumberForIndex(beforeText, patched.index),
-      beforeText,
-      afterText: currentContent,
-    });
+      ...range,
+    };
+  });
+  const sortedRanges = [...ranges].sort((left, right) => left.start - right.start || left.end - right.end);
+  for (let index = 1; index < sortedRanges.length; index += 1) {
+    const previous = sortedRanges[index - 1];
+    const current = sortedRanges[index];
+    if (current.start < previous.end) {
+      throw new Error(`OpenClaw workspace patch edit ${current.index} overlaps edit ${previous.index}; overlapping hunks are not allowed.`);
+    }
   }
+
+  let cursor = 0;
+  let nextContent = "";
+  for (const range of sortedRanges) {
+    nextContent += originalContent.slice(cursor, range.start);
+    nextContent += range.edit.replacement;
+    cursor = range.end;
+  }
+  nextContent += originalContent.slice(cursor);
+
+  const appliedEdits = ranges.map((range) => {
+    const singleEditContent = `${originalContent.slice(0, range.start)}${range.edit.replacement}${originalContent.slice(range.end)}`;
+    return {
+      index: range.index,
+      occurrence: range.edit.occurrence,
+      originalStart: range.start,
+      originalEnd: range.end,
+      searchBytes: Buffer.byteLength(range.edit.search, "utf8"),
+      replacementsAvailable: range.replacementsAvailable,
+      replacementBytes: Buffer.byteLength(range.edit.replacement, "utf8"),
+      changedAtLine: lineNumberForIndex(originalContent, range.start),
+      beforeText: originalContent,
+      afterText: singleEditContent,
+    };
+  });
+
   return {
-    nextContent: currentContent,
+    nextContent,
     appliedEdits,
+    validation: {
+      ok: true,
+      engine: "openclaw-native-workspace-patch-validation-v0",
+      editCount: edits.length,
+      checks: {
+        allMatchesFound: true,
+        originalRangesResolved: true,
+        overlappingEditsRejected: true,
+        appliesAgainstOriginalContent: true,
+      },
+      ranges: appliedEdits.map((edit) => ({
+        index: edit.index,
+        start: edit.originalStart,
+        end: edit.originalEnd,
+        occurrence: edit.occurrence,
+        changedAtLine: edit.changedAtLine,
+      })),
+    },
   };
 }
 
@@ -3533,7 +3599,7 @@ function buildDiffPreview(oldText, newText, { contextLines = 1, maxPreviewLines 
 
 function buildWorkspacePatchDiffPreview(originalContent, nextContent, appliedEdits, { contextLines = 1 } = {}) {
   if (appliedEdits.length <= 1) {
-    return buildDiffPreview(originalContent, nextContent, { contextLines });
+    return buildDiffPreview(originalContent, nextContent, { contextLines, maxPreviewLines: 40 });
   }
 
   const hunks = appliedEdits.map((edit) => ({
@@ -3556,6 +3622,23 @@ function buildWorkspacePatchDiffPreview(originalContent, nextContent, appliedEdi
   };
 }
 
+function validateWorkspacePatchDiffPreview(diffPreview, { maxPreviewLines = 64 } = {}) {
+  if (diffPreview.truncated) {
+    throw new Error("OpenClaw workspace patch diff preview exceeds the bounded per-hunk preview limit.");
+  }
+  if ((diffPreview.previewLineCount ?? 0) > maxPreviewLines) {
+    throw new Error("OpenClaw workspace patch diff preview exceeds the bounded total preview limit.");
+  }
+  return {
+    ok: true,
+    engine: "openclaw-native-workspace-patch-preview-validation-v0",
+    format: diffPreview.format,
+    previewLineCount: diffPreview.previewLineCount ?? 0,
+    maxPreviewLines,
+    truncated: false,
+  };
+}
+
 function buildNativeOpenClawWorkspacePatchApplyDraft({
   workspacePath = null,
   relativePath = "scratch/native-edit.txt",
@@ -3568,7 +3651,9 @@ function buildNativeOpenClawWorkspacePatchApplyDraft({
   const target = resolveOpenClawWorkspaceTarget({ workspacePath, relativePath });
   const safeEdits = normaliseWorkspacePatchEdits({ edits, search, replacement, occurrence });
   const originalContent = readBoundedWorkspaceTextFile(target);
-  const { nextContent, appliedEdits } = applyWorkspacePatchEdits(originalContent, safeEdits);
+  const { nextContent, appliedEdits, validation } = applyWorkspacePatchEdits(originalContent, safeEdits);
+  const diffPreview = buildWorkspacePatchDiffPreview(originalContent, nextContent, appliedEdits, { contextLines });
+  const previewValidation = validateWorkspacePatchDiffPreview(diffPreview);
   const originalBytes = Buffer.byteLength(originalContent, "utf8");
   const replacementBytes = appliedEdits.reduce((total, edit) => total + edit.replacementBytes, 0);
   const nextBytes = Buffer.byteLength(nextContent, "utf8");
@@ -3656,16 +3741,24 @@ function buildNativeOpenClawWorkspacePatchApplyDraft({
       contentExposed: false,
       diffPreviewExposed: true,
     },
+    validation: {
+      ok: true,
+      structuredPatch: validation,
+      preview: previewValidation,
+    },
     edits: appliedEdits.map((edit) => ({
       index: edit.index,
       occurrence: edit.occurrence,
+      originalStart: edit.originalStart,
+      originalEnd: edit.originalEnd,
+      searchBytes: edit.searchBytes,
       replacementsAvailable: edit.replacementsAvailable,
       replacementBytes: edit.replacementBytes,
       changedAtLine: edit.changedAtLine,
       searchExposed: false,
       replacementExposed: false,
     })),
-    diffPreview: buildWorkspacePatchDiffPreview(originalContent, nextContent, appliedEdits, { contextLines }),
+    diffPreview,
     draft: {
       goal,
       type: "system_task",
@@ -3743,6 +3836,7 @@ async function createNativeOpenClawWorkspacePatchApplyTask({
     capability: draftEnvelope.capability,
     workspace: draftEnvelope.workspace,
     target: draftEnvelope.target,
+    validation: draftEnvelope.validation,
     diffPreview: draftEnvelope.diffPreview,
     task,
     approval,
@@ -8456,6 +8550,7 @@ const server = http.createServer(async (req, res) => {
         capability: result.capability,
         workspace: result.workspace,
         target: result.target,
+        validation: result.validation,
         diffPreview: result.diffPreview,
         task: serialiseTask(result.task),
         approval: serialiseApproval(result.approval),

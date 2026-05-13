@@ -1,6 +1,6 @@
 # OpenClaw Source Integration Stage Plan
 
-更新时间：2026-05-13 21:52 +08:00
+更新时间：2026-05-13 21:56 +08:00
 
 本文档用于跟踪当前阶段：把旁路 `openclaw` 增强源码项目中的能力，受控接入 `OpenClawOnNixOS`。后续每推进一个接入切片，都必须同步更新本文件，避免路线漂移、重复准备层、或忘记阶段边界。
 
@@ -642,3 +642,44 @@ OPENCLAW_MILESTONE_CHECKS=openclaw-native-workspace-multi-patch,observer-opencla
 Next intended slice after this passes:
 - Add structured patch validation around overlapping edits, missing matches, and preview limits before moving toward richer code-edit operations.
 - Keep shell/process/web gateway execution deferred until edit safety is stable.
+
+## 17. 2026-05-13 Step 5 Update: Native Workspace Patch Validation
+
+Status: implemented_waiting_check.
+
+Slice: `act.openclaw.workspace_patch_apply` structured validation.
+
+Purpose: harden the multi-hunk patch adapter before richer code-edit operations. This slice validates every hunk against the original file, rejects missing matches and overlapping original ranges, rejects previews that would be truncated or exceed total preview limits, and only then allows an approval-gated task to be created.
+
+Implemented artifacts:
+- Original-file range resolver for every patch hunk.
+- Overlap rejection for hunks targeting the same or intersecting source range.
+- Preview validation for truncated or oversized bounded previews.
+- Top-level validation envelope on patch drafts/tasks.
+- Observer visibility for structured and preview validation engines.
+- Targeted checks: `openclaw-native-workspace-patch-validation`, `observer-openclaw-native-workspace-patch-validation`.
+
+Governance boundaries:
+- Does not import or execute old `openclaw` modules.
+- Does not create a new write channel.
+- Does not create approval tasks for invalid patch proposals.
+- Valid proposals still require explicit approval before execution.
+- Valid proposals still execute through `act.filesystem.write_text`.
+- Public responses expose validation metadata, bounded diff previews, ranges, byte counts, and hashes, not full patched file content.
+
+Local verification target:
+- `npm run typecheck`.
+- `git diff --check`.
+- Targeted milestone checks on NixOS.
+
+NixOS targeted milestone command:
+
+```bash
+cd /home/edvulcan/OpenClaw_On_NixOS && \
+git pull origin main && \
+OPENCLAW_MILESTONE_CHECKS=openclaw-native-workspace-patch-validation,observer-openclaw-native-workspace-patch-validation npm run dev:milestone-check:unix
+```
+
+Next intended slice after this passes:
+- Move from exact text replacement toward a richer structured edit proposal format, but only within the same approval/ledger execution chain.
+- Keep shell/process/web gateway execution deferred until code-edit safety is stable.
