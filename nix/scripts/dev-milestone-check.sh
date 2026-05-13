@@ -47,6 +47,7 @@ checks=(
   "openclaw-source-migration-map|dev-openclaw-source-migration-map-check.sh|Read-only migration candidate map for OpenClaw source capabilities"
   "openclaw-source-migration-plan|dev-openclaw-source-migration-plan-check.sh|Plan-only first-wave migration draft for OpenClaw source capabilities"
   "openclaw-plugin-sdk-contract-review|dev-openclaw-plugin-sdk-contract-review-check.sh|Read-only contract review draft for the OpenClaw plugin SDK"
+  "openclaw-native-plugin-contract|dev-openclaw-native-plugin-contract-check.sh|Native OpenClaw plugin and capability contract skeleton"
   "openclaw-workspace-command-proposals|dev-openclaw-workspace-command-proposals-check.sh|Proposal-only command shapes for detected OpenClaw workspaces"
   "openclaw-workspace-command-plan|dev-openclaw-workspace-command-plan-check.sh|Plan-only execution drafts for OpenClaw workspace command proposals"
   "openclaw-workspace-command-task|dev-openclaw-workspace-command-task-check.sh|Approval-gated task materialization for OpenClaw workspace commands"

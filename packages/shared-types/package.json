@@ -3,9 +3,14 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "exports": {
+    "./plugin-contract": {
+      "types": "./src/plugin-contract.ts",
+      "default": "./src/plugin-contract.mjs"
+    }
+  },
   "scripts": {
     "build": "node -e \"console.log('shared-types build placeholder')\"",
-    "typecheck": "node -e \"console.log('shared-types typecheck placeholder')\""
+    "typecheck": "node --check src/plugin-contract.mjs"
   }
 }
-
