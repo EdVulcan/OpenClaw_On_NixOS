@@ -3804,6 +3804,61 @@ function shouldExecuteCapabilityPlan(task) {
   return task?.type === "system_task" && planCapabilityActionSteps(task).length > 0;
 }
 
+function isNativePluginCapabilityTask(task) {
+  return task?.type === "native_plugin_capability";
+}
+
+async function deferNativePluginCapabilityExecution(task) {
+  if (!isActiveTask(task)) {
+    throw new Error("Task is not active and cannot be deferred.");
+  }
+
+  const policy = ensureTaskPolicy(task, { stage: "native_plugin.invoke.deferred" });
+  await publishEvent("policy.evaluated", { task: serialiseTask(task), policy: policy.decision });
+  const approval = task.approval?.requestId ? approvals.get(task.approval.requestId) : null;
+  const capabilityStep = (task.plan?.steps ?? []).find((step) => step.kind === "plugin.capability.invoke") ?? null;
+  const reason = "runtime_adapter_deferred";
+  const deferredTask = await setTaskPhase(task, reason, {
+    status: "queued",
+    details: {
+      executor: "native-plugin-adapter-v0",
+      reason,
+      capabilityId: capabilityStep?.capabilityId ?? "act.plugin.capability.invoke",
+      pluginId: capabilityStep?.params?.pluginId ?? null,
+      packageName: capabilityStep?.params?.packageName ?? null,
+      canExecutePluginCode: false,
+      canActivateRuntime: false,
+      requiresRuntimeAdapterBeforeExecution: true,
+    },
+  });
+
+  await publishEvent("task.blocked", {
+    task: serialiseTask(deferredTask),
+    reason,
+    executor: "native-plugin-adapter-v0",
+  });
+
+  return {
+    task: deferredTask,
+    blocked: true,
+    reason,
+    actions: [],
+    capabilityInvocations: [],
+    commandTranscript: [],
+    verification: null,
+    policy: policy.decision,
+    approval: approval ? serialiseApproval(approval) : null,
+    governance: {
+      mode: "native_plugin_runtime_adapter_deferred",
+      runtimeOwner: "openclaw_on_nixos",
+      canExecutePluginCode: false,
+      canActivateRuntime: false,
+      executed: false,
+      requiresRuntimeAdapterBeforeExecution: true,
+    },
+  };
+}
+
 function inferCapabilityOperation(step) {
   if (typeof step.params?.operation === "string" && step.params.operation.trim()) {
     return step.params.operation.trim();
@@ -4779,6 +4834,18 @@ function serialiseExecutionResult(executionResult) {
 }
 
 async function executeTaskWithRecovery(task, options = {}) {
+  if (isNativePluginCapabilityTask(task)) {
+    const deferredExecution = await deferNativePluginCapabilityExecution(task);
+    return {
+      finalExecution: deferredExecution,
+      attempts: [deferredExecution],
+      recovery: {
+        attempted: false,
+        maxAttempts: 0,
+      },
+    };
+  }
+
   if (shouldExecuteCapabilityPlan(task)) {
     const capabilityExecution = await executeCapabilityPlanTask(task, options);
     return {

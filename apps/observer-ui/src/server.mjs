@@ -1586,7 +1586,7 @@ function renderOperatorPanel(result) {
     ...steps.map((step, index) => {
       const task = step.task ?? null;
       const verification = step.execution?.verification ?? null;
-      return \`\${index + 1}. \${task?.id ?? "no-task"} \${task?.status ?? "idle"} \${task?.targetUrl ?? ""} verification=\${verification?.ok ?? "n/a"}\`;
+      return \`\${index + 1}. \${task?.id ?? "no-task"} \${task?.status ?? "idle"} phase=\${task?.executionPhase ?? "none"} \${task?.targetUrl ?? ""} verification=\${verification?.ok ?? "n/a"}\`;
     }),
   ].join("\\n");
   if (latestCommandTranscript) {
