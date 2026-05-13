@@ -1775,6 +1775,7 @@ function buildOpenClawNativePluginSdkContractImplementation({ packagePath = null
     "sense.openclaw.workspace_semantic_index",
     "sense.openclaw.workspace_symbol_lookup",
     "act.openclaw.workspace_text_write",
+    "act.openclaw.workspace_patch_apply",
     "sense.openclaw.prompt_pack",
     "sense.openclaw.plugin_manifest_map",
     "act.plugin.capability.invoke",
@@ -2401,17 +2402,19 @@ function buildOpenClawNativePluginAdapterStatus() {
       "sense.openclaw.workspace_semantic_index",
       "sense.openclaw.workspace_symbol_lookup",
       "act.openclaw.workspace_text_write",
+      "act.openclaw.workspace_patch_apply",
       "plan.plugin.runtime_preflight",
     ],
     pendingCapabilities: ["act.plugin.capability.invoke"],
     summary: {
-      implemented: 6,
+      implemented: 7,
       pending: 1,
       canReadManifestMetadata: true,
       canReadToolCatalogMetadata: true,
       canReadWorkspaceSemanticMetadata: true,
       canExecuteWorkspaceSymbolLookup: true,
       canCreateApprovalGatedWorkspaceTextWriteTasks: true,
+      canCreateApprovalGatedWorkspacePatchTasks: true,
       canReadSourceFileContent: false,
       canMutate: true,
       canExecutePluginCode: false,
@@ -3367,6 +3370,318 @@ async function createNativeOpenClawWorkspaceTextWriteTask({
   };
 }
 
+function readBoundedWorkspaceTextFile(target, { maxBytes = 64 * 1024 } = {}) {
+  const stats = safeStat(target.absolutePath);
+  if (!stats?.isFile()) {
+    throw new Error("OpenClaw workspace patch target must be an existing regular file.");
+  }
+  if (stats.size > maxBytes) {
+    throw new Error("OpenClaw workspace patch target exceeds the bounded read limit.");
+  }
+  return readFileSync(target.absolutePath, "utf8");
+}
+
+function countOccurrences(text, search) {
+  if (!search) {
+    return 0;
+  }
+  let count = 0;
+  let position = 0;
+  while (position <= text.length) {
+    const next = text.indexOf(search, position);
+    if (next === -1) {
+      break;
+    }
+    count += 1;
+    position = next + search.length;
+  }
+  return count;
+}
+
+function replaceNthOccurrence(text, search, replacement, occurrence = 1) {
+  const safeOccurrence = Number.isInteger(occurrence) && occurrence > 0 ? occurrence : 1;
+  let seen = 0;
+  let position = 0;
+  while (position <= text.length) {
+    const next = text.indexOf(search, position);
+    if (next === -1) {
+      return null;
+    }
+    seen += 1;
+    if (seen === safeOccurrence) {
+      return {
+        text: `${text.slice(0, next)}${replacement}${text.slice(next + search.length)}`,
+        index: next,
+      };
+    }
+    position = next + search.length;
+  }
+  return null;
+}
+
+function lineNumberForIndex(text, index) {
+  return text.slice(0, index).split(/\r?\n/).length;
+}
+
+function sanitiseDiffLine(line) {
+  const text = typeof line === "string" ? line : "";
+  return text.length > 220 ? `${text.slice(0, 217)}...` : text;
+}
+
+function buildDiffPreview(oldText, newText, { contextLines = 1, maxPreviewLines = 40 } = {}) {
+  const oldLines = oldText.split(/\r?\n/);
+  const newLines = newText.split(/\r?\n/);
+  let prefix = 0;
+  while (prefix < oldLines.length && prefix < newLines.length && oldLines[prefix] === newLines[prefix]) {
+    prefix += 1;
+  }
+
+  let suffix = 0;
+  while (
+    suffix < oldLines.length - prefix
+    && suffix < newLines.length - prefix
+    && oldLines[oldLines.length - 1 - suffix] === newLines[newLines.length - 1 - suffix]
+  ) {
+    suffix += 1;
+  }
+
+  const oldChangedEnd = oldLines.length - suffix;
+  const newChangedEnd = newLines.length - suffix;
+  const safeContext = Math.max(0, Math.min(Number.isInteger(contextLines) ? contextLines : 1, 3));
+  const oldStart = Math.max(0, prefix - safeContext);
+  const newStart = Math.max(0, prefix - safeContext);
+  const oldEnd = Math.min(oldLines.length, oldChangedEnd + safeContext);
+  const newEnd = Math.min(newLines.length, newChangedEnd + safeContext);
+  const lines = [];
+
+  for (let index = oldStart; index < prefix; index += 1) {
+    lines.push({ type: "context", oldLine: index + 1, newLine: newStart + (index - oldStart) + 1, text: sanitiseDiffLine(oldLines[index]) });
+  }
+  for (let index = prefix; index < oldChangedEnd; index += 1) {
+    lines.push({ type: "remove", oldLine: index + 1, text: sanitiseDiffLine(oldLines[index]) });
+  }
+  for (let index = prefix; index < newChangedEnd; index += 1) {
+    lines.push({ type: "add", newLine: index + 1, text: sanitiseDiffLine(newLines[index]) });
+  }
+  for (let oldIndex = oldChangedEnd, newIndex = newChangedEnd; oldIndex < oldEnd && newIndex < newEnd; oldIndex += 1, newIndex += 1) {
+    lines.push({ type: "context", oldLine: oldIndex + 1, newLine: newIndex + 1, text: sanitiseDiffLine(oldLines[oldIndex]) });
+  }
+
+  return {
+    format: "bounded-line-diff-v0",
+    oldStartLine: oldStart + 1,
+    newStartLine: newStart + 1,
+    oldLineCount: Math.max(0, oldChangedEnd - prefix),
+    newLineCount: Math.max(0, newChangedEnd - prefix),
+    contextLines: safeContext,
+    previewLineCount: Math.min(lines.length, maxPreviewLines),
+    truncated: lines.length > maxPreviewLines,
+    lines: lines.slice(0, maxPreviewLines),
+  };
+}
+
+function buildNativeOpenClawWorkspacePatchApplyDraft({
+  workspacePath = null,
+  relativePath = "scratch/native-edit.txt",
+  search = "",
+  replacement = "",
+  occurrence = 1,
+  contextLines = 1,
+} = {}) {
+  const target = resolveOpenClawWorkspaceTarget({ workspacePath, relativePath });
+  const safeSearch = typeof search === "string" ? search : "";
+  if (!safeSearch) {
+    throw new Error("search text is required for OpenClaw workspace patch drafts.");
+  }
+  const safeReplacement = typeof replacement === "string" ? replacement : "";
+  const safeOccurrence = Number.isInteger(occurrence) && occurrence > 0 ? occurrence : 1;
+  const originalContent = readBoundedWorkspaceTextFile(target);
+  const replacementsAvailable = countOccurrences(originalContent, safeSearch);
+  const patched = replaceNthOccurrence(originalContent, safeSearch, safeReplacement, safeOccurrence);
+  if (!patched) {
+    throw new Error("OpenClaw workspace patch search text was not found.");
+  }
+  const nextContent = patched.text;
+  const originalBytes = Buffer.byteLength(originalContent, "utf8");
+  const replacementBytes = Buffer.byteLength(safeReplacement, "utf8");
+  const nextBytes = Buffer.byteLength(nextContent, "utf8");
+  const nativeRegistry = createOpenClawNativePluginRegistry();
+  const capability = nativeRegistry.items[0]?.contract?.capabilities
+    ?.find((entry) => entry.id === "act.openclaw.workspace_patch_apply") ?? null;
+  const now = new Date().toISOString();
+  const goal = `Apply approved OpenClaw workspace patch to ${target.relativePath}`;
+  const policyRequest = {
+    intent: "openclaw.workspace.patch_apply",
+    domain: "body_internal",
+    risk: "high",
+    requiresApproval: true,
+    tags: ["openclaw_native_adapter", "workspace_patch", "workspace_mutation", "explicit_approval_required"],
+  };
+  const action = {
+    kind: "filesystem.write_text",
+    intent: "filesystem.write_text",
+    params: {
+      path: target.absolutePath,
+      content: nextContent,
+      encoding: "utf8",
+      overwrite: true,
+    },
+  };
+  const plan = buildRulePlan({
+    goal,
+    type: "system_task",
+    intent: "filesystem.write_text",
+    policy: policyRequest,
+    targetUrl: null,
+    actions: [action],
+  });
+  const policyDecision = {
+    id: randomUUID(),
+    at: now,
+    engine: "openclaw-native-workspace-patch-apply-v0",
+    stage: "openclaw.native.workspace_patch_apply.task",
+    subject: {
+      taskId: null,
+      type: "system_task",
+      goal,
+      targetUrl: null,
+      intent: "openclaw.workspace.patch_apply",
+    },
+    domain: "body_internal",
+    risk: "high",
+    decision: "require_approval",
+    reason: "openclaw_workspace_patch_apply_requires_explicit_user_approval",
+    approved: false,
+    autonomyMode,
+    autonomous: false,
+  };
+
+  return {
+    registry: "openclaw-native-workspace-patch-apply-draft-v0",
+    mode: "diff-preview-approval-gated-draft",
+    generatedAt: now,
+    sourceRegistry: "openclaw-native-plugin-adapter-v0",
+    capability: {
+      id: capability?.id ?? "act.openclaw.workspace_patch_apply",
+      kind: capability?.kind ?? "act",
+      risk: capability?.risk ?? "high",
+      approvalRequired: capability?.approval?.required ?? true,
+      runtimeOwner: capability?.runtimeOwner ?? "openclaw_on_nixos",
+    },
+    workspace: {
+      id: target.workspace.id,
+      name: target.workspace.name,
+      path: target.workspace.path,
+    },
+    target: {
+      relativePath: target.relativePath,
+      path: target.absolutePath,
+      originalBytes,
+      nextBytes,
+      replacementBytes,
+      originalSha256: sha256Hex(originalContent),
+      nextSha256: sha256Hex(nextContent),
+      replacementsAvailable,
+      occurrence: safeOccurrence,
+      changedAtLine: lineNumberForIndex(originalContent, patched.index),
+      contentExposed: false,
+      diffPreviewExposed: true,
+    },
+    diffPreview: buildDiffPreview(originalContent, nextContent, { contextLines }),
+    draft: {
+      goal,
+      type: "system_task",
+      action: {
+        ...action,
+        params: redactPublicParams(action.params),
+      },
+      plan,
+      policy: {
+        request: policyRequest,
+        decision: policyDecision,
+      },
+      governance: {
+        createsTask: false,
+        createsApproval: false,
+        canExecuteWithoutApproval: false,
+        requiresExplicitApproval: true,
+        usesFilesystemWriteCapability: true,
+        exposesFullContent: false,
+        exposesDiffPreview: true,
+      },
+    },
+  };
+}
+
+async function createNativeOpenClawWorkspacePatchApplyTask({
+  workspacePath = null,
+  relativePath = "scratch/native-edit.txt",
+  search = "",
+  replacement = "",
+  occurrence = 1,
+  contextLines = 1,
+  confirm = false,
+} = {}) {
+  if (confirm !== true) {
+    throw new Error("OpenClaw workspace patch apply task creation requires confirm=true.");
+  }
+
+  const draftEnvelope = buildNativeOpenClawWorkspacePatchApplyDraft({
+    workspacePath,
+    relativePath,
+    search,
+    replacement,
+    occurrence,
+    contextLines,
+  });
+  const draft = draftEnvelope.draft;
+  const task = createTask({
+    goal: draft.goal,
+    type: draft.type,
+    workViewStrategy: "openclaw-native-workspace-patch-apply",
+    plan: draft.plan,
+    policy: draft.policy.request,
+  }, { skipInitialPolicy: true });
+  task.policy = draft.policy;
+  const approval = createApprovalRequestForTask(task, draft.policy.decision);
+  const reclaimedTasks = supersedeOtherActiveTasks(task.id);
+  reconcileRuntimeState();
+  persistState();
+
+  await publishEvent("task.created", { task: serialiseTask(task), planner: "openclaw-native-workspace-patch-apply-v0" });
+  await publishTaskApprovalIfPending(task);
+  await publishEvent("task.planned", { task: serialiseTask(task), plan: serialisePlanForPublic(task.plan) });
+  await Promise.all(reclaimedTasks.map((reclaimedTask) => publishEvent("task.phase_changed", {
+    task: serialiseTask(reclaimedTask),
+  })));
+
+  return {
+    registry: "openclaw-native-workspace-patch-apply-task-v0",
+    mode: "diff-preview-approval-gated",
+    generatedAt: new Date().toISOString(),
+    sourceRegistry: draftEnvelope.registry,
+    capability: draftEnvelope.capability,
+    workspace: draftEnvelope.workspace,
+    target: draftEnvelope.target,
+    diffPreview: draftEnvelope.diffPreview,
+    task,
+    approval,
+    governance: {
+      mode: "native_workspace_patch_apply_approval_gated",
+      runtimeOwner: "openclaw_on_nixos",
+      createsTask: true,
+      createsApproval: true,
+      canExecuteWithoutApproval: false,
+      usesFilesystemWriteCapability: true,
+      recordsCapabilityHistory: true,
+      recordsFilesystemLedger: true,
+      exposesFullContent: false,
+      exposesDiffPreview: true,
+      executed: false,
+    },
+  };
+}
+
 function buildNativePluginCapabilityInvokePlan({ packagePath = null, capabilityId = "act.plugin.capability.invoke" } = {}) {
   const manifestProfile = buildNativePluginManifestProfile({ packagePath });
   const nativeRegistry = createOpenClawNativePluginRegistry();
@@ -4138,6 +4453,16 @@ function resolvePlanCapabilityId({ kind, intent, plannerIntent }) {
   ) {
     return "act.openclaw.workspace_text_write";
   }
+  if (
+    candidate === "openclaw.workspace.patch_apply"
+    || candidate === "openclaw.workspace.patch-apply"
+    || candidate === "openclaw.workspace_patch_apply"
+    || candidate === "workspace.patch_apply"
+    || candidate === "workspace.patch-apply"
+    || candidate === "workspace.edit_apply"
+  ) {
+    return "act.openclaw.workspace_patch_apply";
+  }
   if (candidate === "command.execute" || candidate === "system.command.execute") {
     return "act.system.command.execute";
   }
@@ -4857,6 +5182,26 @@ function baseCapabilities() {
       governance: "require_approval",
       requiresApproval: true,
       description: "Create approval-gated native tasks for bounded OpenClaw workspace text writes using the existing filesystem write capability and ledger.",
+    },
+    {
+      id: "act.openclaw.workspace_patch_apply",
+      name: "Native OpenClaw Workspace Patch Apply",
+      kind: "actuator",
+      service: "openclaw-core",
+      endpoint: `http://${host}:${port}/plugins/native-adapter/workspace-patch-apply-tasks`,
+      intents: [
+        "openclaw.workspace.patch_apply",
+        "openclaw.workspace.patch-apply",
+        "openclaw.workspace_patch_apply",
+        "workspace.patch_apply",
+        "workspace.patch-apply",
+        "workspace.edit_apply",
+      ],
+      domains: ["body_internal"],
+      risk: "high",
+      governance: "require_approval",
+      requiresApproval: true,
+      description: "Create approval-gated native tasks for bounded OpenClaw workspace patch application with diff preview, using the existing filesystem write capability and ledger.",
     },
     {
       id: "act.system.command.dry_run",
@@ -7969,6 +8314,65 @@ const server = http.createServer(async (req, res) => {
         capability: result.capability,
         workspace: result.workspace,
         target: result.target,
+        task: serialiseTask(result.task),
+        approval: serialiseApproval(result.approval),
+        governance: result.governance,
+        summary: buildTaskSummary(),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/plugins/native-adapter/workspace-patch-apply/draft") {
+    try {
+      const draft = buildNativeOpenClawWorkspacePatchApplyDraft({
+        workspacePath: requestUrl.searchParams.get("workspacePath"),
+        relativePath: requestUrl.searchParams.get("relativePath") ?? "scratch/native-edit.txt",
+        search: requestUrl.searchParams.get("search") ?? "before",
+        replacement: requestUrl.searchParams.get("replacement") ?? "after",
+        occurrence: Number.parseInt(requestUrl.searchParams.get("occurrence") ?? "1", 10),
+        contextLines: Number.parseInt(requestUrl.searchParams.get("contextLines") ?? "1", 10),
+      });
+      sendJson(res, 200, {
+        ok: true,
+        ...draft,
+        draft: {
+          ...draft.draft,
+          plan: serialisePlanForPublic(draft.draft.plan),
+        },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/plugins/native-adapter/workspace-patch-apply-tasks") {
+    try {
+      const body = await readJsonBody(req);
+      const result = await createNativeOpenClawWorkspacePatchApplyTask({
+        workspacePath: typeof body.workspacePath === "string" ? body.workspacePath : null,
+        relativePath: typeof body.relativePath === "string" ? body.relativePath : "scratch/native-edit.txt",
+        search: typeof body.search === "string" ? body.search : "",
+        replacement: typeof body.replacement === "string" ? body.replacement : "",
+        occurrence: Number.isInteger(body.occurrence) ? body.occurrence : 1,
+        contextLines: Number.isInteger(body.contextLines) ? body.contextLines : 1,
+        confirm: body.confirm === true,
+      });
+      sendJson(res, 201, {
+        ok: true,
+        registry: result.registry,
+        mode: result.mode,
+        generatedAt: result.generatedAt,
+        sourceRegistry: result.sourceRegistry,
+        capability: result.capability,
+        workspace: result.workspace,
+        target: result.target,
+        diffPreview: result.diffPreview,
         task: serialiseTask(result.task),
         approval: serialiseApproval(result.approval),
         governance: result.governance,

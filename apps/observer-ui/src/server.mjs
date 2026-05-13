@@ -534,6 +534,18 @@ function observerHtml() {
           <pre id="workspace-text-write-json">Loading native workspace text write draft...</pre>
         </section>
         <section class="panel">
+          <h2>OpenClaw Workspace Patch Apply</h2>
+          <div class="metric"><span>Registry</span><span id="workspace-patch-apply-registry">openclaw-native-workspace-patch-apply-draft-v0</span></div>
+          <div class="metric"><span>Capability</span><span id="workspace-patch-apply-capability">act.openclaw.workspace_patch_apply</span></div>
+          <div class="metric"><span>Approval</span><span id="workspace-patch-apply-approval">required</span></div>
+          <div class="metric"><span>Preview</span><span id="workspace-patch-apply-preview">bounded diff</span></div>
+          <div class="metric"><span>Mode</span><span id="workspace-patch-apply-mode">diff-preview-approval-gated-draft</span></div>
+          <div class="actions tight">
+            <button id="workspace-patch-apply-task-button" class="secondary">Create Approval Task</button>
+          </div>
+          <pre id="workspace-patch-apply-json">Loading native workspace patch draft...</pre>
+        </section>
+        <section class="panel">
           <h2>OpenClaw Native Plugin Contract</h2>
           <div class="metric"><span>Registry</span><span id="native-plugin-contract-registry">openclaw-native-plugin-contract-v0</span></div>
           <div class="metric"><span>Owner</span><span id="native-plugin-contract-owner">openclaw_on_nixos</span></div>
@@ -944,6 +956,13 @@ const workspaceTextWriteContent = document.querySelector("#workspace-text-write-
 const workspaceTextWriteMode = document.querySelector("#workspace-text-write-mode");
 const workspaceTextWriteJson = document.querySelector("#workspace-text-write-json");
 const workspaceTextWriteTaskButton = document.querySelector("#workspace-text-write-task-button");
+const workspacePatchApplyRegistry = document.querySelector("#workspace-patch-apply-registry");
+const workspacePatchApplyCapability = document.querySelector("#workspace-patch-apply-capability");
+const workspacePatchApplyApproval = document.querySelector("#workspace-patch-apply-approval");
+const workspacePatchApplyPreview = document.querySelector("#workspace-patch-apply-preview");
+const workspacePatchApplyMode = document.querySelector("#workspace-patch-apply-mode");
+const workspacePatchApplyJson = document.querySelector("#workspace-patch-apply-json");
+const workspacePatchApplyTaskButton = document.querySelector("#workspace-patch-apply-task-button");
 const nativePluginContractRegistry = document.querySelector("#native-plugin-contract-registry");
 const nativePluginContractOwner = document.querySelector("#native-plugin-contract-owner");
 const nativePluginContractTotal = document.querySelector("#native-plugin-contract-total");
@@ -1766,6 +1785,36 @@ function renderWorkspaceTextWriteDraft(data) {
   ].join("\\n");
 }
 
+function renderWorkspacePatchApplyDraft(data) {
+  const target = data?.target ?? {};
+  const governance = data?.draft?.governance ?? data?.governance ?? {};
+  const diffPreview = data?.diffPreview ?? {};
+  const lines = Array.isArray(diffPreview.lines) ? diffPreview.lines : [];
+  workspacePatchApplyRegistry.textContent = data?.registry ?? "openclaw-native-workspace-patch-apply-draft-v0";
+  workspacePatchApplyCapability.textContent = data?.capability?.id ?? "act.openclaw.workspace_patch_apply";
+  workspacePatchApplyApproval.textContent = data?.capability?.approvalRequired === false ? "not required" : "required";
+  workspacePatchApplyPreview.textContent = target.diffPreviewExposed === false ? "hidden" : \`\${diffPreview.previewLineCount ?? lines.length} lines\`;
+  workspacePatchApplyMode.textContent = data?.mode ?? "diff-preview-approval-gated-draft";
+
+  workspacePatchApplyJson.textContent = [
+    "Native approval-gated patch adapter: reads a bounded file, creates a small diff preview, and applies only after approval.",
+    "The task stores the full patched content internally for act.filesystem.write_text, but public task/Observer output uses redacted params plus hashes.",
+    \`Registry: \${data?.registry ?? "openclaw-native-workspace-patch-apply-draft-v0"}\`,
+    \`Mode: \${data?.mode ?? "diff-preview-approval-gated-draft"}\`,
+    \`Capability: \${data?.capability?.id ?? "act.openclaw.workspace_patch_apply"} risk=\${data?.capability?.risk ?? "high"} approval=\${Boolean(data?.capability?.approvalRequired ?? true)} owner=\${data?.capability?.runtimeOwner ?? "unknown"}\`,
+    \`Workspace: \${data?.workspace?.name ?? "unknown"} \${data?.workspace?.path ?? ""}\`,
+    \`Target: \${target.relativePath ?? "scratch/observer-native-edit.txt"} oldBytes=\${target.originalBytes ?? 0} newBytes=\${target.nextBytes ?? 0} oldSha256=\${target.originalSha256 ?? "unknown"} newSha256=\${target.nextSha256 ?? "unknown"} contentExposed=\${Boolean(target.contentExposed)} diffPreview=\${Boolean(target.diffPreviewExposed)}\`,
+    \`Diff: format=\${diffPreview.format ?? "unknown"} oldStart=\${diffPreview.oldStartLine ?? "?"} newStart=\${diffPreview.newStartLine ?? "?"} lines=\${diffPreview.previewLineCount ?? lines.length} truncated=\${Boolean(diffPreview.truncated)}\`,
+    \`Governance: createsTask=\${Boolean(governance.createsTask)} createsApproval=\${Boolean(governance.createsApproval)} executeWithoutApproval=\${Boolean(governance.canExecuteWithoutApproval)} filesystemWrite=\${Boolean(governance.usesFilesystemWriteCapability)} exposesFullContent=\${Boolean(governance.exposesFullContent)} exposesDiffPreview=\${Boolean(governance.exposesDiffPreview)}\`,
+    "",
+    ...lines.map((line) => {
+      const prefix = line.type === "add" ? "+" : line.type === "remove" ? "-" : " ";
+      const number = line.type === "add" ? line.newLine : line.oldLine;
+      return \`\${prefix}\${number ?? "?"}: \${line.text ?? ""}\`;
+    }),
+  ].join("\\n");
+}
+
 function renderNativePluginContract(data) {
   const summary = data?.summary ?? {};
   const contract = data?.contract ?? {};
@@ -2396,6 +2445,20 @@ async function refreshWorkspaceTextWriteDraft() {
     workspaceTextWriteContent.textContent = "unknown";
     workspaceTextWriteMode.textContent = "unknown";
     workspaceTextWriteJson.textContent = "Unable to read native workspace text write draft.";
+  }
+}
+
+async function refreshWorkspacePatchApplyDraft() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/workspace-patch-apply/draft?relativePath=scratch/observer-native-edit.txt&search=before&replacement=after&contextLines=1\`);
+    renderWorkspacePatchApplyDraft(data);
+  } catch {
+    workspacePatchApplyRegistry.textContent = "offline";
+    workspacePatchApplyCapability.textContent = "unknown";
+    workspacePatchApplyApproval.textContent = "unknown";
+    workspacePatchApplyPreview.textContent = "unknown";
+    workspacePatchApplyMode.textContent = "unknown";
+    workspacePatchApplyJson.textContent = "Unable to read native workspace patch apply draft.";
   }
 }
 
@@ -3174,6 +3237,33 @@ async function createWorkspaceTextWriteApprovalTask() {
   await refreshWorkspaceTextWriteDraft();
 }
 
+async function createWorkspacePatchApplyApprovalTask() {
+  const result = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/workspace-patch-apply-tasks\`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      relativePath: "scratch/observer-native-edit.txt",
+      search: "before",
+      replacement: "after",
+      occurrence: 1,
+      contextLines: 1,
+      confirm: true,
+    }),
+  });
+
+  taskHistoryFocus = "selected-task";
+  selectedHistoryTaskId = result.task?.id ?? null;
+  taskDetailIdInput.value = result.task?.id ?? "";
+  renderPlanPanel(result.task);
+  setControlMessage(\`Created approval-gated OpenClaw workspace patch apply task \${result.task?.id ?? "unknown"}.\`);
+  await refreshRuntime();
+  await refreshTaskList();
+  await refreshTaskHistoryDetail();
+  await refreshApprovalState();
+  await refreshOperatorState();
+  await refreshWorkspacePatchApplyDraft();
+}
+
 async function runOperatorStepFromUi() {
   const result = await fetchJson(\`\${observerConfig.coreUrl}/operator/step\`, {
     method: "POST",
@@ -3755,6 +3845,12 @@ workspaceTextWriteTaskButton.addEventListener("click", () => {
   });
 });
 
+workspacePatchApplyTaskButton.addEventListener("click", () => {
+  createWorkspacePatchApplyApprovalTask().catch((error) => {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  });
+});
+
 operatorStepButton.addEventListener("click", () => {
   runOperatorStepFromUi().catch((error) => {
     setControlMessage(\`Request failed: \${formatError(error)}\`);
@@ -4060,6 +4156,7 @@ await refreshToolCatalogAdapter();
 await refreshSemanticIndex();
 await refreshSymbolLookup();
 await refreshWorkspaceTextWriteDraft();
+await refreshWorkspacePatchApplyDraft();
 await refreshNativePluginContract();
 await refreshNativePluginRegistry();
 await refreshFormalIntegrationReadiness();
@@ -4104,6 +4201,7 @@ setInterval(refreshToolCatalogAdapter, 5000);
 setInterval(refreshSemanticIndex, 5000);
 setInterval(refreshSymbolLookup, 5000);
 setInterval(refreshWorkspaceTextWriteDraft, 5000);
+setInterval(refreshWorkspacePatchApplyDraft, 5000);
 setInterval(refreshNativePluginContract, 5000);
 setInterval(refreshNativePluginRegistry, 5000);
 setInterval(refreshFormalIntegrationReadiness, 5000);

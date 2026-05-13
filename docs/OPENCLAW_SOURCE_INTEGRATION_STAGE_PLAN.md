@@ -1,6 +1,6 @@
 # OpenClaw Source Integration Stage Plan
 
-更新时间：2026-05-13 21:20 +08:00
+更新时间：2026-05-13 21:45 +08:00
 
 本文档用于跟踪当前阶段：把旁路 `openclaw` 增强源码项目中的能力，受控接入 `OpenClawOnNixOS`。后续每推进一个接入切片，都必须同步更新本文件，避免路线漂移、重复准备层、或忘记阶段边界。
 
@@ -554,3 +554,49 @@ Next intended slice:
 - Extend from whole-file text write to a conservative edit proposal/apply chain with diff preview.
 - Keep all writes behind approval and filesystem ledgering.
 - Do not jump to shell/process/web gateway execution until the diff-preview edit chain is proven.
+
+## 15. 2026-05-13 Step 5 Update: Native Workspace Patch Apply
+
+Status: implemented_waiting_check.
+
+Slice: `act.openclaw.workspace_patch_apply`.
+
+Purpose: extend the first workspace mutation adapter from whole-file writes into a conservative edit proposal/apply chain. This slice reads a bounded target file, creates a small diff preview for a single `search -> replacement` edit, creates an approval-gated task, and applies only after approval through `act.filesystem.write_text`.
+
+Implemented artifacts:
+- Core draft API: `GET /plugins/native-adapter/workspace-patch-apply/draft`.
+- Core task API: `POST /plugins/native-adapter/workspace-patch-apply-tasks`.
+- Native contract capability: `act.openclaw.workspace_patch_apply`.
+- Capability registry entry: `act.openclaw.workspace_patch_apply`.
+- Bounded line diff preview format: `bounded-line-diff-v0`.
+- Observer panel/control: `OpenClaw Workspace Patch Apply`.
+- Targeted checks: `openclaw-native-workspace-patch-apply`, `observer-openclaw-native-workspace-patch-apply`.
+
+Governance boundaries:
+- Does not import or execute old `openclaw` modules.
+- Does not execute old OpenClaw tools.
+- Does not apply a patch before explicit approval.
+- Actual mutation runs through `act.filesystem.write_text`.
+- Filesystem change is recorded in the filesystem ledger.
+- Capability execution is recorded in capability history.
+- Public task/approval/Observer responses expose bounded diff preview and hashes, not full patched file content.
+- Runtime owner remains `openclaw_on_nixos`.
+
+Local verification target:
+- `npm run typecheck`.
+- `git diff --check`.
+- PowerShell service smoke.
+- NixOS targeted milestone.
+
+NixOS targeted milestone command:
+
+```bash
+cd /home/edvulcan/OpenClaw_On_NixOS && \
+git pull origin main && \
+OPENCLAW_MILESTONE_CHECKS=openclaw-native-workspace-patch-apply,observer-openclaw-native-workspace-patch-apply npm run dev:milestone-check:unix
+```
+
+Next intended slice after this passes:
+- Expand patch apply from one exact replacement to multi-hunk edit proposals.
+- Keep all edit application behind approval and filesystem ledgering.
+- Do not start shell/process/web gateway execution until multi-hunk edit proposal safety is proven or explicitly deferred.

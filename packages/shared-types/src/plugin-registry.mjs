@@ -121,6 +121,26 @@ export function createOpenClawNativePluginRegistry({ generatedAt = new Date().to
         },
       },
       {
+        id: "act.openclaw.workspace_patch_apply",
+        title: "Apply OpenClaw workspace patch",
+        description: "Creates a bounded diff preview for an OpenClaw workspace edit and applies it only after explicit approval through native filesystem governance.",
+        kind: "act",
+        domains: ["body_internal"],
+        risk: "high",
+        permissions: {
+          filesystemRead: true,
+          filesystemWrite: true,
+        },
+        approval: {
+          required: true,
+          reason: "Workspace patch application requires explicit user approval and filesystem ledgering.",
+        },
+        audit: {
+          required: true,
+          ledger: "filesystem_ledger",
+        },
+      },
+      {
         id: "sense.openclaw.prompt_pack",
         title: "Profile OpenClaw prompt pack",
         description: "Summarizes enhanced OpenClaw prompt and agent-behavior surfaces as native policy metadata without importing runtime modules.",
