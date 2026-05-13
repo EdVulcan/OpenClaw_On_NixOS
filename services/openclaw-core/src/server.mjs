@@ -1763,6 +1763,92 @@ function buildOpenClawPluginSdkNativeContractTests({ packagePath = null } = {}) 
   };
 }
 
+function buildOpenClawNativePluginSdkContractImplementation({ packagePath = null } = {}) {
+  const testReport = buildOpenClawPluginSdkNativeContractTests({ packagePath });
+  const nativeRegistry = buildOpenClawNativePluginRegistryResponse();
+  const pluginItem = nativeRegistry.items.find((item) => item.id === "openclaw.native.plugin-sdk") ?? null;
+  const contract = pluginItem?.contract ?? null;
+  const capabilities = Array.isArray(contract?.capabilities) ? contract.capabilities : [];
+  const requiredSlotIds = [
+    "sense.plugin.manifest_profile",
+    "sense.openclaw.tool_catalog",
+    "sense.openclaw.prompt_pack",
+    "sense.openclaw.plugin_manifest_map",
+    "act.plugin.capability.invoke",
+  ];
+  const implementationSlots = requiredSlotIds.map((capabilityId) => {
+    const capability = capabilities.find((entry) => entry.id === capabilityId) ?? null;
+    return {
+      id: capabilityId,
+      status: capability ? "implemented" : "missing",
+      kind: capability?.kind ?? null,
+      risk: capability?.risk ?? null,
+      domains: capability?.domains ?? [],
+      approvalRequired: capability?.approval?.required ?? null,
+      auditLedger: capability?.audit?.ledger ?? null,
+      runtimeOwner: capability?.runtimeOwner ?? null,
+      adapterState: capabilityId.startsWith("sense.")
+        ? "read_only_native_adapter_pending"
+        : "approval_gated_runtime_adapter_pending",
+    };
+  });
+  const missingSlots = implementationSlots.filter((slot) => slot.status !== "implemented");
+  const readOnlySlots = implementationSlots.filter((slot) => slot.id.startsWith("sense."));
+  const executableSlots = implementationSlots.filter((slot) => slot.id.startsWith("act."));
+
+  return {
+    ok: nativeRegistry.validation.ok === true && missingSlots.length === 0 && testReport.ok === true,
+    registry: "openclaw-native-plugin-sdk-contract-implementation-v0",
+    mode: "native-sdk-contract-implementation",
+    generatedAt: new Date().toISOString(),
+    sourceRegistries: [
+      testReport.registry,
+      nativeRegistry.registry,
+      contract?.contractVersion ?? "openclaw-native-plugin-contract-v0",
+    ],
+    runtimeOwner: "openclaw_on_nixos",
+    plugin: contract?.plugin ?? null,
+    implementationSlots,
+    contract,
+    validation: nativeRegistry.validation,
+    summary: {
+      totalSlots: implementationSlots.length,
+      implementedSlots: implementationSlots.length - missingSlots.length,
+      missingSlots: missingSlots.length,
+      readOnlySlots: readOnlySlots.length,
+      executableSlots: executableSlots.length,
+      nativeCapabilities: capabilities.length,
+      nativeContractTestsPassed: testReport.ok === true,
+      validationOk: nativeRegistry.validation.ok === true,
+      readyForFirstReadOnlyAbsorption: missingSlots.length === 0 && testReport.ok === true,
+      canImportModule: false,
+      canExecutePluginCode: false,
+      canActivateRuntime: false,
+      createsTask: false,
+      createsApproval: false,
+      nextAllowedWork: [
+        "implement sense.openclaw.tool_catalog as the first real read-only absorption slice",
+        "keep prompt pack and plugin manifest map read-only until their adapters are implemented",
+        "defer act.plugin.capability.invoke until approval-gated runtime adapter exists",
+      ],
+    },
+    governance: {
+      mode: "native_plugin_sdk_contract_implementation",
+      runtimeOwner: "openclaw_on_nixos",
+      externalRuntimeDependencyAllowed: false,
+      sourceContentImported: false,
+      canReadSourceFileContent: true,
+      exposesSourceFileContent: false,
+      canImportModule: false,
+      canExecutePluginCode: false,
+      canActivateRuntime: false,
+      canMutate: false,
+      createsTask: false,
+      createsApproval: false,
+    },
+  };
+}
+
 function buildOpenClawPluginSdkContractReview() {
   const plan = buildOpenClawMigrationPlan();
   const items = plan.items
@@ -6254,6 +6340,39 @@ const server = http.createServer(async (req, res) => {
         sourceRegistries: report.sourceRegistries,
         summary: report.summary,
         governance: report.governance,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/plugins/openclaw-native-plugin-sdk-contract-implementation") {
+    try {
+      sendJson(res, 200, buildOpenClawNativePluginSdkContractImplementation({
+        packagePath: requestUrl.searchParams.get("packagePath"),
+      }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/plugins/openclaw-native-plugin-sdk-contract-implementation/summary") {
+    try {
+      const implementation = buildOpenClawNativePluginSdkContractImplementation({
+        packagePath: requestUrl.searchParams.get("packagePath"),
+      });
+      sendJson(res, 200, {
+        ok: implementation.ok,
+        registry: implementation.registry,
+        mode: implementation.mode,
+        generatedAt: implementation.generatedAt,
+        sourceRegistries: implementation.sourceRegistries,
+        summary: implementation.summary,
+        governance: implementation.governance,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";

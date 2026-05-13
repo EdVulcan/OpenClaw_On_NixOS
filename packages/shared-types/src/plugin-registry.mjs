@@ -45,6 +45,63 @@ export function createOpenClawNativePluginRegistry({ generatedAt = new Date().to
         },
       },
       {
+        id: "sense.openclaw.tool_catalog",
+        title: "Profile OpenClaw tool catalog",
+        description: "Summarizes enhanced OpenClaw tool surfaces as native capability metadata without executing legacy tools.",
+        kind: "sense",
+        domains: ["body_internal"],
+        risk: "low",
+        permissions: {
+          filesystemRead: true,
+        },
+        approval: {
+          required: false,
+          reason: "Read-only capability catalog profiling inside the body boundary.",
+        },
+        audit: {
+          required: true,
+          ledger: "capability_history",
+        },
+      },
+      {
+        id: "sense.openclaw.prompt_pack",
+        title: "Profile OpenClaw prompt pack",
+        description: "Summarizes enhanced OpenClaw prompt and agent-behavior surfaces as native policy metadata without importing runtime modules.",
+        kind: "sense",
+        domains: ["body_internal"],
+        risk: "low",
+        permissions: {
+          filesystemRead: true,
+        },
+        approval: {
+          required: false,
+          reason: "Read-only prompt and behavior metadata profiling inside the body boundary.",
+        },
+        audit: {
+          required: true,
+          ledger: "capability_history",
+        },
+      },
+      {
+        id: "sense.openclaw.plugin_manifest_map",
+        title: "Profile OpenClaw plugin manifest map",
+        description: "Maps enhanced OpenClaw plugin manifests into OpenClawOnNixOS native registry candidates without activation.",
+        kind: "sense",
+        domains: ["body_internal"],
+        risk: "low",
+        permissions: {
+          filesystemRead: true,
+        },
+        approval: {
+          required: false,
+          reason: "Read-only plugin manifest mapping inside the body boundary.",
+        },
+        audit: {
+          required: true,
+          ledger: "capability_history",
+        },
+      },
+      {
         id: "act.plugin.capability.invoke",
         title: "Invoke a governed plugin capability",
         description: "Invokes a registered capability only after policy evaluation and audit binding.",

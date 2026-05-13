@@ -477,6 +477,15 @@ function observerHtml() {
           <pre id="plugin-sdk-native-tests-json">Loading plugin SDK native contract tests...</pre>
         </section>
         <section class="panel">
+          <h2>OpenClaw Native SDK Contract Implementation</h2>
+          <div class="metric"><span>Registry</span><span id="native-sdk-implementation-registry">openclaw-native-plugin-sdk-contract-implementation-v0</span></div>
+          <div class="metric"><span>Slots</span><span id="native-sdk-implementation-slots">0/0</span></div>
+          <div class="metric"><span>Read-only</span><span id="native-sdk-implementation-readonly">0</span></div>
+          <div class="metric"><span>Executable</span><span id="native-sdk-implementation-executable">0</span></div>
+          <div class="metric"><span>Mode</span><span id="native-sdk-implementation-mode">native-sdk-contract-implementation</span></div>
+          <pre id="native-sdk-implementation-json">Loading native SDK contract implementation...</pre>
+        </section>
+        <section class="panel">
           <h2>OpenClaw Native Plugin Contract</h2>
           <div class="metric"><span>Registry</span><span id="native-plugin-contract-registry">openclaw-native-plugin-contract-v0</span></div>
           <div class="metric"><span>Owner</span><span id="native-plugin-contract-owner">openclaw_on_nixos</span></div>
@@ -850,6 +859,12 @@ const pluginSdkNativeTestsSource = document.querySelector("#plugin-sdk-native-te
 const pluginSdkNativeTestsCaps = document.querySelector("#plugin-sdk-native-tests-caps");
 const pluginSdkNativeTestsMode = document.querySelector("#plugin-sdk-native-tests-mode");
 const pluginSdkNativeTestsJson = document.querySelector("#plugin-sdk-native-tests-json");
+const nativeSdkImplementationRegistry = document.querySelector("#native-sdk-implementation-registry");
+const nativeSdkImplementationSlots = document.querySelector("#native-sdk-implementation-slots");
+const nativeSdkImplementationReadOnly = document.querySelector("#native-sdk-implementation-readonly");
+const nativeSdkImplementationExecutable = document.querySelector("#native-sdk-implementation-executable");
+const nativeSdkImplementationMode = document.querySelector("#native-sdk-implementation-mode");
+const nativeSdkImplementationJson = document.querySelector("#native-sdk-implementation-json");
 const nativePluginContractRegistry = document.querySelector("#native-plugin-contract-registry");
 const nativePluginContractOwner = document.querySelector("#native-plugin-contract-owner");
 const nativePluginContractTotal = document.querySelector("#native-plugin-contract-total");
@@ -1503,6 +1518,35 @@ function renderPluginSdkNativeContractTests(data) {
   ].join("\\n");
 }
 
+function renderNativeSdkContractImplementation(data) {
+  const summary = data?.summary ?? {};
+  const governance = data?.governance ?? {};
+  const slots = Array.isArray(data?.implementationSlots) ? data.implementationSlots : [];
+  const capabilities = Array.isArray(data?.contract?.capabilities) ? data.contract.capabilities : [];
+  nativeSdkImplementationRegistry.textContent = data?.registry ?? "openclaw-native-plugin-sdk-contract-implementation-v0";
+  nativeSdkImplementationSlots.textContent = \`\${summary.implementedSlots ?? 0}/\${summary.totalSlots ?? slots.length}\`;
+  nativeSdkImplementationReadOnly.textContent = String(summary.readOnlySlots ?? 0);
+  nativeSdkImplementationExecutable.textContent = String(summary.executableSlots ?? 0);
+  nativeSdkImplementationMode.textContent = data?.mode ?? "native-sdk-contract-implementation";
+
+  nativeSdkImplementationJson.textContent = [
+    "Native SDK contract implementation: stable OpenClawOnNixOS-owned absorption slots for enhanced OpenClaw tools, prompts, manifests, and governed execution.",
+    "Read-only slots are contract-ready for adapter implementation; executable slots remain approval-gated and inactive.",
+    \`Registry: \${data?.registry ?? "openclaw-native-plugin-sdk-contract-implementation-v0"}\`,
+    \`Mode: \${data?.mode ?? "native-sdk-contract-implementation"}\`,
+    \`Runtime Owner: \${data?.runtimeOwner ?? "unknown"}\`,
+    \`Source Registries: \${(data?.sourceRegistries ?? []).join(", ") || "none"}\`,
+    \`Slots: implemented=\${summary.implementedSlots ?? 0}/\${summary.totalSlots ?? slots.length} missing=\${summary.missingSlots ?? 0}\`,
+    \`Capabilities: native=\${summary.nativeCapabilities ?? capabilities.length} readOnly=\${summary.readOnlySlots ?? 0} executable=\${summary.executableSlots ?? 0}\`,
+    \`Ready For First Read-only Absorption: \${Boolean(summary.readyForFirstReadOnlyAbsorption)}\`,
+    \`Governance: externalRuntime=\${Boolean(governance.externalRuntimeDependencyAllowed)} sourceImported=\${Boolean(governance.sourceContentImported)} exposeSource=\${Boolean(governance.exposesSourceFileContent)} importModule=\${Boolean(governance.canImportModule)} executePlugin=\${Boolean(governance.canExecutePluginCode)} activateRuntime=\${Boolean(governance.canActivateRuntime)} task=\${Boolean(governance.createsTask)} approval=\${Boolean(governance.createsApproval)}\`,
+    "",
+    ...slots.map((slot) => \`\${slot.id ?? "unknown"} status=\${slot.status ?? "unknown"} kind=\${slot.kind ?? "unknown"} risk=\${slot.risk ?? "unknown"} approval=\${Boolean(slot.approvalRequired)} adapter=\${slot.adapterState ?? "unknown"} owner=\${slot.runtimeOwner ?? "unknown"}\`),
+    "",
+    \`Next Allowed Work: \${(summary.nextAllowedWork ?? []).join("; ") || "none"}\`,
+  ].join("\\n");
+}
+
 function renderNativePluginContract(data) {
   const summary = data?.summary ?? {};
   const contract = data?.contract ?? {};
@@ -2049,6 +2093,20 @@ async function refreshPluginSdkNativeContractTests() {
     pluginSdkNativeTestsCaps.textContent = "0";
     pluginSdkNativeTestsMode.textContent = "unknown";
     pluginSdkNativeTestsJson.textContent = "Unable to read plugin SDK native contract tests.";
+  }
+}
+
+async function refreshNativeSdkContractImplementation() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/plugins/openclaw-native-plugin-sdk-contract-implementation\`);
+    renderNativeSdkContractImplementation(data);
+  } catch {
+    nativeSdkImplementationRegistry.textContent = "offline";
+    nativeSdkImplementationSlots.textContent = "0/0";
+    nativeSdkImplementationReadOnly.textContent = "0";
+    nativeSdkImplementationExecutable.textContent = "0";
+    nativeSdkImplementationMode.textContent = "unknown";
+    nativeSdkImplementationJson.textContent = "Unable to read native SDK contract implementation.";
   }
 }
 
@@ -3676,6 +3734,7 @@ await refreshPluginSdkContractReview();
 await refreshPluginSdkSourceReviewScope();
 await refreshPluginSdkSourceContentReview();
 await refreshPluginSdkNativeContractTests();
+await refreshNativeSdkContractImplementation();
 await refreshNativePluginContract();
 await refreshNativePluginRegistry();
 await refreshFormalIntegrationReadiness();
@@ -3714,6 +3773,7 @@ setInterval(refreshPluginSdkContractReview, 5000);
 setInterval(refreshPluginSdkSourceReviewScope, 5000);
 setInterval(refreshPluginSdkSourceContentReview, 5000);
 setInterval(refreshPluginSdkNativeContractTests, 5000);
+setInterval(refreshNativeSdkContractImplementation, 5000);
 setInterval(refreshNativePluginContract, 5000);
 setInterval(refreshNativePluginRegistry, 5000);
 setInterval(refreshFormalIntegrationReadiness, 5000);

@@ -87,8 +87,8 @@ if (
   !contractResponse.ok
   || contractResponse.registry !== "openclaw-native-plugin-contract-v0"
   || contractResponse.mode !== "contract-only"
-  || contractResponse.sourceRegistry !== "openclaw-plugin-sdk-contract-review-v0"
-  || contractResponse.sourceMode !== "read-only"
+  || contractResponse.sourceRegistry !== "openclaw-native-plugin-registry-v0"
+  || contractResponse.sourceMode !== "native-contract-registry"
 ) {
   throw new Error(`native plugin contract response mismatch: ${JSON.stringify(contractResponse)}`);
 }
@@ -107,7 +107,7 @@ if (
   || governance.requiresHumanReviewBeforeActivation !== true
   || contractResponse.validation?.ok !== true
   || summary.validationOk !== true
-  || summary.totalCapabilities !== 2
+  || summary.totalCapabilities !== 5
   || summary.approvalRequired !== 1
   || summary.mutationCapable !== 1
   || summary.executionCapable !== 1
@@ -120,8 +120,11 @@ if (
 
 const capabilities = contract.capabilities ?? [];
 if (
-  capabilities.length !== 2
+  capabilities.length !== 5
   || !capabilities.some((capability) => capability.id === "sense.plugin.manifest_profile" && capability.risk === "low" && capability.approval?.required === false)
+  || !capabilities.some((capability) => capability.id === "sense.openclaw.tool_catalog" && capability.risk === "low" && capability.approval?.required === false)
+  || !capabilities.some((capability) => capability.id === "sense.openclaw.prompt_pack" && capability.risk === "low" && capability.approval?.required === false)
+  || !capabilities.some((capability) => capability.id === "sense.openclaw.plugin_manifest_map" && capability.risk === "low" && capability.approval?.required === false)
   || !capabilities.some((capability) => capability.id === "act.plugin.capability.invoke" && capability.risk === "high" && capability.approval?.required === true && capability.permissions?.commandExecution === true)
 ) {
   throw new Error(`native plugin contract capabilities mismatch: ${JSON.stringify(capabilities)}`);
