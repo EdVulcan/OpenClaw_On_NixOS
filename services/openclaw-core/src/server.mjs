@@ -1413,6 +1413,129 @@ function buildNativePluginManifestProfile({ packagePath = null } = {}) {
   };
 }
 
+function buildNativePluginCapabilityInvokePlan({ packagePath = null, capabilityId = "act.plugin.capability.invoke" } = {}) {
+  const manifestProfile = buildNativePluginManifestProfile({ packagePath });
+  const nativeRegistry = createOpenClawNativePluginRegistry();
+  const pluginItem = nativeRegistry.items.find((entry) => entry.id === manifestProfile.plugin.id) ?? null;
+  const capability = pluginItem?.contract?.capabilities?.find((entry) => entry.id === capabilityId) ?? null;
+  if (!capability) {
+    throw new Error(`Native plugin capability ${capabilityId} is not registered in the OpenClaw native plugin registry.`);
+  }
+
+  const now = new Date().toISOString();
+  const policyRequest = {
+    intent: "plugin.capability.invoke",
+    domain: capability.domains?.includes("cross_boundary") ? "cross_boundary" : capability.domains?.[0] ?? "body_internal",
+    risk: capability.risk,
+    requiresApproval: true,
+    tags: ["native_plugin_adapter", "plugin_capability_invoke", "explicit_approval_required"],
+  };
+  const policyDecision = {
+    id: randomUUID(),
+    at: now,
+    engine: "native-plugin-invoke-plan-v0",
+    stage: "native_plugin.invoke.plan",
+    subject: {
+      taskId: null,
+      type: "native_plugin_capability",
+      goal: `Plan governed invocation for ${capability.id}`,
+      targetUrl: null,
+      intent: policyRequest.intent,
+    },
+    domain: policyRequest.domain,
+    risk: capability.risk,
+    decision: "require_approval",
+    reason: "native_plugin_capability_invoke_requires_explicit_user_approval",
+    approved: false,
+    autonomyMode,
+    autonomous: false,
+  };
+
+  return {
+    registry: "openclaw-native-plugin-invoke-plan-v0",
+    mode: "plan-only",
+    generatedAt: now,
+    sourceRegistry: manifestProfile.registry,
+    sourceMode: manifestProfile.mode,
+    plugin: {
+      id: manifestProfile.plugin.id,
+      packageName: manifestProfile.plugin.packageName,
+      hasTypes: manifestProfile.plugin.hasTypes,
+      hasExports: manifestProfile.plugin.hasExports,
+      exportKeys: manifestProfile.plugin.exportKeys,
+      scriptNames: manifestProfile.plugin.scriptNames,
+      dependencySummary: manifestProfile.plugin.dependencySummary,
+    },
+    capability: {
+      id: capability.id,
+      kind: capability.kind,
+      risk: capability.risk,
+      domains: capability.domains,
+      runtimeOwner: capability.runtimeOwner,
+      approvalRequired: capability.approval?.required === true,
+      approvalReason: capability.approval?.reason ?? null,
+      audit: capability.audit,
+      permissions: capability.permissions,
+    },
+    policy: {
+      request: policyRequest,
+      decision: policyDecision,
+    },
+    draft: {
+      goal: `Plan governed invocation for ${capability.id}`,
+      type: "native_plugin_capability",
+      steps: [
+        {
+          id: "review_manifest_profile",
+          title: "Review manifest profile",
+          status: "planned",
+          canExecute: false,
+          evidence: {
+            packageName: manifestProfile.plugin.packageName,
+            hasExports: manifestProfile.plugin.hasExports,
+            hasTypes: manifestProfile.plugin.hasTypes,
+          },
+        },
+        {
+          id: "require_user_approval",
+          title: "Require explicit user approval before runtime adapter activation",
+          status: "blocked_until_future_task_materialization",
+          canExecute: false,
+          policyDecision: policyDecision.decision,
+        },
+        {
+          id: "defer_runtime_invoke",
+          title: "Defer plugin code execution until a separately approved runtime adapter exists",
+          status: "deferred",
+          canExecute: false,
+        },
+      ],
+    },
+    governance: {
+      mode: "native_plugin_invoke_plan_only",
+      runtimeOwner: "openclaw_on_nixos",
+      createsTask: false,
+      createsApproval: false,
+      canReadManifestMetadata: true,
+      canReadSourceFileContent: false,
+      exposesReadmeContent: false,
+      exposesScriptBodies: false,
+      exposesDependencyVersions: false,
+      canMutate: false,
+      canExecutePluginCode: false,
+      canActivateRuntime: false,
+      requiresExplicitApprovalBeforeTask: true,
+      requiresRuntimeAdapterBeforeExecution: true,
+    },
+    blockers: [
+      "runtime adapter implementation not approved",
+      "task materialization not implemented for plugin capability invocation",
+      "explicit user approval not collected",
+      "source content review not explicitly approved",
+    ],
+  };
+}
+
 function findWorkspaceCommandProposal({ proposalId = null, workspaceId = null, scriptName = null } = {}) {
   const proposals = buildWorkspaceCommandProposals();
   const match = proposals.items.find((item) => {
@@ -5021,6 +5144,22 @@ const server = http.createServer(async (req, res) => {
       sendJson(res, 200, buildNativePluginManifestProfile({
         packagePath: requestUrl.searchParams.get("packagePath"),
       }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 404, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/plugins/native-adapter/invoke-plan") {
+    try {
+      sendJson(res, 200, {
+        ok: true,
+        ...buildNativePluginCapabilityInvokePlan({
+          packagePath: requestUrl.searchParams.get("packagePath"),
+          capabilityId: requestUrl.searchParams.get("capabilityId") ?? "act.plugin.capability.invoke",
+        }),
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       sendJson(res, 404, { ok: false, error: message });

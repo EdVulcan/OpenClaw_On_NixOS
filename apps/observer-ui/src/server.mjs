@@ -487,6 +487,15 @@ function observerHtml() {
           <pre id="native-plugin-adapter-json">Loading native plugin adapter...</pre>
         </section>
         <section class="panel">
+          <h2>OpenClaw Native Plugin Invoke Plan</h2>
+          <div class="metric"><span>Registry</span><span id="native-plugin-invoke-plan-registry">openclaw-native-plugin-invoke-plan-v0</span></div>
+          <div class="metric"><span>Capability</span><span id="native-plugin-invoke-plan-capability">act.plugin.capability.invoke</span></div>
+          <div class="metric"><span>Decision</span><span id="native-plugin-invoke-plan-decision">require_approval</span></div>
+          <div class="metric"><span>Runtime</span><span id="native-plugin-invoke-plan-runtime">disabled</span></div>
+          <div class="metric"><span>Mode</span><span id="native-plugin-invoke-plan-mode">plan-only</span></div>
+          <pre id="native-plugin-invoke-plan-json">Loading native plugin invoke plan...</pre>
+        </section>
+        <section class="panel">
           <h2>Workspace Command Proposals</h2>
           <div class="metric"><span>Registry</span><span id="workspace-command-registry">workspace-command-proposals-v0</span></div>
           <div class="metric"><span>Total</span><span id="workspace-command-total">0</span></div>
@@ -800,6 +809,12 @@ const nativePluginAdapterImplemented = document.querySelector("#native-plugin-ad
 const nativePluginAdapterRuntime = document.querySelector("#native-plugin-adapter-runtime");
 const nativePluginAdapterMode = document.querySelector("#native-plugin-adapter-mode");
 const nativePluginAdapterJson = document.querySelector("#native-plugin-adapter-json");
+const nativePluginInvokePlanRegistry = document.querySelector("#native-plugin-invoke-plan-registry");
+const nativePluginInvokePlanCapability = document.querySelector("#native-plugin-invoke-plan-capability");
+const nativePluginInvokePlanDecision = document.querySelector("#native-plugin-invoke-plan-decision");
+const nativePluginInvokePlanRuntime = document.querySelector("#native-plugin-invoke-plan-runtime");
+const nativePluginInvokePlanMode = document.querySelector("#native-plugin-invoke-plan-mode");
+const nativePluginInvokePlanJson = document.querySelector("#native-plugin-invoke-plan-json");
 const workspaceCommandRegistry = document.querySelector("#workspace-command-registry");
 const workspaceCommandTotal = document.querySelector("#workspace-command-total");
 const workspaceCommandValidation = document.querySelector("#workspace-command-validation");
@@ -1446,6 +1461,35 @@ function renderNativePluginAdapter(data) {
   ].join("\\n");
 }
 
+function renderNativePluginInvokePlan(data) {
+  const governance = data?.governance ?? {};
+  const policyDecision = data?.policy?.decision ?? {};
+  const capability = data?.capability ?? {};
+  const plugin = data?.plugin ?? {};
+  const steps = Array.isArray(data?.draft?.steps) ? data.draft.steps : [];
+  nativePluginInvokePlanRegistry.textContent = data?.registry ?? "openclaw-native-plugin-invoke-plan-v0";
+  nativePluginInvokePlanCapability.textContent = capability.id ?? "act.plugin.capability.invoke";
+  nativePluginInvokePlanDecision.textContent = policyDecision.decision ?? "unknown";
+  nativePluginInvokePlanRuntime.textContent = governance.canActivateRuntime ? "enabled" : "disabled";
+  nativePluginInvokePlanMode.textContent = data?.mode ?? "plan-only";
+
+  nativePluginInvokePlanJson.textContent = [
+    "Plan-only draft for high-risk plugin capability invocation; no task, approval, runtime activation, or plugin execution is created here.",
+    "This is the approval-gate shape that future runtime adapter work must pass through.",
+    \`Registry: \${data?.registry ?? "openclaw-native-plugin-invoke-plan-v0"}\`,
+    \`Mode: \${data?.mode ?? "plan-only"}\`,
+    \`Plugin: \${plugin.id ?? "unknown"} package=\${plugin.packageName ?? "unknown"}\`,
+    \`Capability: \${capability.id ?? "unknown"} risk=\${capability.risk ?? "unknown"} approval=\${Boolean(capability.approvalRequired)}\`,
+    \`Policy: \${policyDecision.decision ?? "unknown"} reason=\${policyDecision.reason ?? "none"} domain=\${policyDecision.domain ?? "unknown"}\`,
+    \`Governance: createsTask=\${Boolean(governance.createsTask)} createsApproval=\${Boolean(governance.createsApproval)} executePlugin=\${Boolean(governance.canExecutePluginCode)} activateRuntime=\${Boolean(governance.canActivateRuntime)} readSource=\${Boolean(governance.canReadSourceFileContent)}\`,
+    \`Manifest Metadata: exports=\${(plugin.exportKeys ?? []).join(",") || "none"} scripts=\${(plugin.scriptNames ?? []).join(",") || "none"} deps=\${plugin.dependencySummary?.dependencies ?? 0}\`,
+    "",
+    ...steps.map((step) => \`[\${step.status ?? "unknown"}] \${step.id ?? "step"} execute=\${Boolean(step.canExecute)}\`),
+    "",
+    \`Blockers: \${(data?.blockers ?? []).join("; ") || "none"}\`,
+  ].join("\\n");
+}
+
 function renderWorkspaceCommandProposals(data) {
   const summary = data?.summary ?? {};
   const items = Array.isArray(data?.items) ? data.items : [];
@@ -1782,6 +1826,20 @@ async function refreshNativePluginAdapter() {
     nativePluginAdapterRuntime.textContent = "unknown";
     nativePluginAdapterMode.textContent = "unknown";
     nativePluginAdapterJson.textContent = "Unable to read native plugin adapter.";
+  }
+}
+
+async function refreshNativePluginInvokePlan() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/invoke-plan\`);
+    renderNativePluginInvokePlan(data);
+  } catch {
+    nativePluginInvokePlanRegistry.textContent = "offline";
+    nativePluginInvokePlanCapability.textContent = "unknown";
+    nativePluginInvokePlanDecision.textContent = "unknown";
+    nativePluginInvokePlanRuntime.textContent = "unknown";
+    nativePluginInvokePlanMode.textContent = "unknown";
+    nativePluginInvokePlanJson.textContent = "Unable to read native plugin invoke plan.";
   }
 }
 
@@ -3282,6 +3340,7 @@ await refreshNativePluginContract();
 await refreshNativePluginRegistry();
 await refreshFormalIntegrationReadiness();
 await refreshNativePluginAdapter();
+await refreshNativePluginInvokePlan();
 await refreshWorkspaceCommandProposals();
 await refreshWorkspaceCommandPlanDraft();
 await refreshSystemState();
@@ -3314,6 +3373,7 @@ setInterval(refreshNativePluginContract, 5000);
 setInterval(refreshNativePluginRegistry, 5000);
 setInterval(refreshFormalIntegrationReadiness, 5000);
 setInterval(refreshNativePluginAdapter, 5000);
+setInterval(refreshNativePluginInvokePlan, 5000);
 setInterval(refreshWorkspaceCommandProposals, 5000);
 setInterval(refreshWorkspaceCommandPlanDraft, 5000);
 setInterval(refreshSystemState, 5000);
