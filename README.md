@@ -473,6 +473,14 @@ npm run dev:openclaw-source-migration-map-check:unix
 
 This verifies core can turn a profiled OpenClaw source workspace into read-only migration candidates for extension catalogs, SDKs, UI patterns, core source patterns, docs, skills, and verification assets without reading file contents, mutating files, or executing source workspace commands.
 
+Run the OpenClaw source migration plan slice directly:
+
+```bash
+npm run dev:openclaw-source-migration-plan-check:unix
+```
+
+This verifies core can turn read-only migration candidates into a plan-only first-wave migration draft, including recommended next steps, acceptance criteria, blockers, and backlog items without creating tasks, approvals, imports, source reads, mutations, or executions.
+
 Run the OpenClaw workspace command plan slice directly:
 
 ```bash
@@ -766,6 +774,7 @@ This is based on real NixOS VM validation:
 - `dev:system-sense-check:unix` covers real body vitals and service health telemetry
 - `dev:system-heal-check:unix` covers conservative diagnosis, autofix, and heal history
 - `dev:openclaw-source-migration-map-check:unix` covers read-only migration candidate maps for profiled OpenClaw source capabilities
+- `dev:openclaw-source-migration-plan-check:unix` covers plan-only first-wave migration drafts for OpenClaw source capabilities
 - `dev:openclaw-workspace-command-proposals-check:unix` covers proposal-only command shapes for detected OpenClaw workspaces
 - `dev:openclaw-workspace-command-plan-check:unix` covers plan-only execution drafts for selected OpenClaw workspace commands
 - `dev:openclaw-workspace-command-task-check:unix` covers approval-gated task materialization for selected OpenClaw workspace commands

@@ -801,6 +801,185 @@ function buildOpenClawMigrationMap() {
   };
 }
 
+const OPENCLAW_MIGRATION_PRIORITY_ORDER = {
+  high: 0,
+  medium: 1,
+  low: 2,
+};
+const OPENCLAW_MIGRATION_RISK_ORDER = {
+  low: 0,
+  medium: 1,
+  high: 2,
+};
+const OPENCLAW_FIRST_WAVE_CAPABILITIES = new Set([
+  "plugin_sdk",
+  "core_source_patterns",
+  "extension_catalog",
+  "verification_assets",
+]);
+
+function migrationPlanActionForCandidate(candidate) {
+  const actions = {
+    extension_catalog: "Inventory extension entry points, design governed adapters, then register safe capability wrappers.",
+    plugin_sdk: "Review SDK contracts, extract stable capability boundaries, then reimplement native OpenClaw contracts.",
+    memory_host_sdk: "Review privacy and sovereignty boundaries before designing any native long-term-memory adapter.",
+    ui_workspace: "Compare UI patterns with Observer needs, then absorb presentation ideas without importing runtime ownership.",
+    core_source_patterns: "Review core orchestration patterns as design input, then reimplement compatible patterns natively.",
+    documentation_canon: "Reconcile old source docs with the NixOS body canon and capture retained decisions.",
+    agent_skills: "Classify skills by risk, wrap candidates behind policy, then expose only approved native capabilities.",
+    verification_assets: "Port useful checks into milestone slices before migrating the matching runtime behavior.",
+  };
+  return actions[candidate.capability] ?? "Review candidate, document fit, then create a separately governed migration slice.";
+}
+
+function migrationAcceptanceForCandidate(candidate) {
+  const base = [
+    "source file contents remain hidden until a later explicit review step",
+    "no source workspace mutation or command execution occurs during planning",
+    "native OpenClaw governance remains the runtime owner",
+  ];
+  const byCapability = {
+    extension_catalog: [
+      "adapter design lists allowed capability IDs, risks, and approval gates",
+      "Observer can show imported capability metadata before any execution path exists",
+    ],
+    plugin_sdk: [
+      "contract review identifies stable interfaces and rejected external ownership assumptions",
+      "native capability contract tests pass without depending on the source workspace at runtime",
+    ],
+    memory_host_sdk: [
+      "privacy boundary and retention policy are documented before any state import",
+      "memory access is gated by explicit OpenClaw governance",
+    ],
+    ui_workspace: [
+      "Observer UX changes preserve current control and audit visibility",
+      "UI code remains owned by this repository after absorption",
+    ],
+    core_source_patterns: [
+      "design review records which orchestration patterns are accepted or rejected",
+      "new core behavior ships behind targeted milestone checks",
+    ],
+    documentation_canon: [
+      "conflicting terminology is reconciled into current project docs",
+      "retained decisions are traceable to OpenClaw body sovereignty goals",
+    ],
+    agent_skills: [
+      "each skill has a risk classification and policy wrapper before exposure",
+      "no skill can execute outside OpenClaw governance",
+    ],
+    verification_assets: [
+      "ported checks run as targeted milestone slices",
+      "checks fail before the migrated behavior is implemented",
+    ],
+  };
+  return [...base, ...(byCapability[candidate.capability] ?? [])];
+}
+
+function buildOpenClawMigrationPlan() {
+  const map = buildOpenClawMigrationMap();
+  const sortedCandidates = [...map.items].sort((left, right) => {
+    const priorityDelta =
+      (OPENCLAW_MIGRATION_PRIORITY_ORDER[left.priority] ?? 99)
+      - (OPENCLAW_MIGRATION_PRIORITY_ORDER[right.priority] ?? 99);
+    if (priorityDelta !== 0) {
+      return priorityDelta;
+    }
+    const riskDelta =
+      (OPENCLAW_MIGRATION_RISK_ORDER[left.risk] ?? 99)
+      - (OPENCLAW_MIGRATION_RISK_ORDER[right.risk] ?? 99);
+    if (riskDelta !== 0) {
+      return riskDelta;
+    }
+    return left.capability.localeCompare(right.capability);
+  });
+  const firstWave = sortedCandidates
+    .filter((candidate) => OPENCLAW_FIRST_WAVE_CAPABILITIES.has(candidate.capability))
+    .map((candidate, index) => ({
+      sequence: index + 1,
+      candidateId: candidate.id,
+      workspaceId: candidate.workspaceId,
+      workspaceName: candidate.workspaceName,
+      workspacePath: candidate.workspacePath,
+      capability: candidate.capability,
+      sourceDomain: candidate.sourceDomain,
+      targetArea: candidate.targetArea,
+      migrationKind: candidate.migrationKind,
+      risk: candidate.risk,
+      priority: candidate.priority,
+      status: "planned_not_imported",
+      recommendedNextStep: migrationPlanActionForCandidate(candidate),
+      acceptanceCriteria: migrationAcceptanceForCandidate(candidate),
+      blockers: [
+        "human design review not completed",
+        "targeted milestone check not written",
+        "source content review not explicitly approved",
+      ],
+      governance: {
+        mode: "migration_plan_only",
+        canReadFileContent: false,
+        canMutate: false,
+        canExecute: false,
+        createsTask: false,
+        createsApproval: false,
+        requiresHumanApprovalBeforeImport: true,
+        migrationStatus: "planned_not_imported",
+      },
+    }));
+
+  return {
+    registry: "openclaw-source-migration-plan-v0",
+    mode: "plan-only",
+    generatedAt: map.generatedAt,
+    sourceRegistry: map.registry,
+    sourceMode: map.mode,
+    roots: map.roots,
+    candidateCount: map.count,
+    count: firstWave.length,
+    items: firstWave,
+    backlog: sortedCandidates
+      .filter((candidate) => !OPENCLAW_FIRST_WAVE_CAPABILITIES.has(candidate.capability))
+      .map((candidate) => ({
+        candidateId: candidate.id,
+        capability: candidate.capability,
+        sourceDomain: candidate.sourceDomain,
+        targetArea: candidate.targetArea,
+        risk: candidate.risk,
+        priority: candidate.priority,
+        status: "candidate_only",
+      })),
+    summary: {
+      total: firstWave.length,
+      candidateCount: map.count,
+      backlog: map.count - firstWave.length,
+      byTargetArea: firstWave.reduce((accumulator, item) => {
+        accumulator[item.targetArea] = (accumulator[item.targetArea] ?? 0) + 1;
+        return accumulator;
+      }, {}),
+      byMigrationKind: firstWave.reduce((accumulator, item) => {
+        accumulator[item.migrationKind] = (accumulator[item.migrationKind] ?? 0) + 1;
+        return accumulator;
+      }, {}),
+      byRisk: firstWave.reduce((accumulator, item) => {
+        accumulator[item.risk] = (accumulator[item.risk] ?? 0) + 1;
+        return accumulator;
+      }, {}),
+      byPriority: firstWave.reduce((accumulator, item) => {
+        accumulator[item.priority] = (accumulator[item.priority] ?? 0) + 1;
+        return accumulator;
+      }, {}),
+      governance: {
+        mode: "migration_plan_only",
+        canReadFileContent: false,
+        canMutate: false,
+        canExecute: false,
+        createsTask: false,
+        createsApproval: false,
+        migrationStatus: "planned_not_imported",
+      },
+    },
+  };
+}
+
 function findWorkspaceCommandProposal({ proposalId = null, workspaceId = null, scriptName = null } = {}) {
   const proposals = buildWorkspaceCommandProposals();
   const match = proposals.items.find((item) => {
@@ -4249,6 +4428,28 @@ const server = http.createServer(async (req, res) => {
       sourceRegistry: map.sourceRegistry,
       roots: map.roots,
       summary: map.summary,
+    });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/workspaces/openclaw-migration-plan") {
+    sendJson(res, 200, {
+      ok: true,
+      ...buildOpenClawMigrationPlan(),
+    });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/workspaces/openclaw-migration-plan/summary") {
+    const plan = buildOpenClawMigrationPlan();
+    sendJson(res, 200, {
+      ok: true,
+      registry: plan.registry,
+      mode: plan.mode,
+      generatedAt: plan.generatedAt,
+      sourceRegistry: plan.sourceRegistry,
+      roots: plan.roots,
+      summary: plan.summary,
     });
     return;
   }

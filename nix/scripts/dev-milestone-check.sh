@@ -45,6 +45,7 @@ checks=(
   "openclaw-workspace-detect|dev-openclaw-workspace-detect-check.sh|Read-only detection of configured OpenClaw workspaces"
   "openclaw-real-workspace-profile|dev-openclaw-real-workspace-profile-check.sh|Read-only profile of the real OpenClaw source workspace"
   "openclaw-source-migration-map|dev-openclaw-source-migration-map-check.sh|Read-only migration candidate map for OpenClaw source capabilities"
+  "openclaw-source-migration-plan|dev-openclaw-source-migration-plan-check.sh|Plan-only first-wave migration draft for OpenClaw source capabilities"
   "openclaw-workspace-command-proposals|dev-openclaw-workspace-command-proposals-check.sh|Proposal-only command shapes for detected OpenClaw workspaces"
   "openclaw-workspace-command-plan|dev-openclaw-workspace-command-plan-check.sh|Plan-only execution drafts for OpenClaw workspace command proposals"
   "openclaw-workspace-command-task|dev-openclaw-workspace-command-task-check.sh|Approval-gated task materialization for OpenClaw workspace commands"
