@@ -1,6 +1,6 @@
 # OpenClaw Source Integration Stage Plan
 
-更新时间：2026-05-13 12:27 +08:00
+更新时间：2026-05-13
 
 本文档用于跟踪当前阶段：把旁路 `openclaw` 增强源码项目中的能力，受控接入 `OpenClawOnNixOS`。后续每推进一个接入切片，都必须同步更新本文件，避免路线漂移、重复准备层、或忘记阶段边界。
 
@@ -120,7 +120,7 @@ OPENCLAW_MILESTONE_CHECKS=openclaw-plugin-sdk-source-content-review,observer-ope
 
 ### Step 2: SDK Derived Signals -> Native Contract Tests
 
-状态：planned，下一步执行焦点。
+状态：implemented_waiting_check。
 
 目标：把 Step 1 读出的 SDK 派生信号，转成 `OpenClawOnNixOS` 原生合同测试。
 
@@ -260,4 +260,12 @@ SDK derived signals -> native contract tests -> native contract implementation -
 
 这条线是本阶段的主线。
 
-当前执行焦点：Step 2 `SDK Derived Signals -> Native Contract Tests`。
+当前执行焦点：Step 2 `SDK Derived Signals -> Native Contract Tests`，已实现并等待 NixOS targeted milestone 确认。
+
+待 NixOS 侧确认命令：
+
+```bash
+cd /home/edvulcan/OpenClaw_On_NixOS && \
+git pull origin main && \
+OPENCLAW_MILESTONE_CHECKS=openclaw-plugin-sdk-native-contract-tests,observer-openclaw-plugin-sdk-native-contract-tests npm run dev:milestone-check:unix
+```

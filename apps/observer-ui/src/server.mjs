@@ -468,6 +468,15 @@ function observerHtml() {
           <pre id="plugin-sdk-source-content-json">Loading plugin SDK source content review...</pre>
         </section>
         <section class="panel">
+          <h2>OpenClaw Plugin SDK Native Contract Tests</h2>
+          <div class="metric"><span>Registry</span><span id="plugin-sdk-native-tests-registry">openclaw-plugin-sdk-native-contract-tests-v0</span></div>
+          <div class="metric"><span>Required</span><span id="plugin-sdk-native-tests-required">0/0</span></div>
+          <div class="metric"><span>Enhanced Source</span><span id="plugin-sdk-native-tests-source">0</span></div>
+          <div class="metric"><span>Native Caps</span><span id="plugin-sdk-native-tests-caps">0</span></div>
+          <div class="metric"><span>Mode</span><span id="plugin-sdk-native-tests-mode">native-contract-tests</span></div>
+          <pre id="plugin-sdk-native-tests-json">Loading plugin SDK native contract tests...</pre>
+        </section>
+        <section class="panel">
           <h2>OpenClaw Native Plugin Contract</h2>
           <div class="metric"><span>Registry</span><span id="native-plugin-contract-registry">openclaw-native-plugin-contract-v0</span></div>
           <div class="metric"><span>Owner</span><span id="native-plugin-contract-owner">openclaw_on_nixos</span></div>
@@ -835,6 +844,12 @@ const pluginSdkSourceContentExports = document.querySelector("#plugin-sdk-source
 const pluginSdkSourceContentRaw = document.querySelector("#plugin-sdk-source-content-raw");
 const pluginSdkSourceContentMode = document.querySelector("#plugin-sdk-source-content-mode");
 const pluginSdkSourceContentJson = document.querySelector("#plugin-sdk-source-content-json");
+const pluginSdkNativeTestsRegistry = document.querySelector("#plugin-sdk-native-tests-registry");
+const pluginSdkNativeTestsRequired = document.querySelector("#plugin-sdk-native-tests-required");
+const pluginSdkNativeTestsSource = document.querySelector("#plugin-sdk-native-tests-source");
+const pluginSdkNativeTestsCaps = document.querySelector("#plugin-sdk-native-tests-caps");
+const pluginSdkNativeTestsMode = document.querySelector("#plugin-sdk-native-tests-mode");
+const pluginSdkNativeTestsJson = document.querySelector("#plugin-sdk-native-tests-json");
 const nativePluginContractRegistry = document.querySelector("#native-plugin-contract-registry");
 const nativePluginContractOwner = document.querySelector("#native-plugin-contract-owner");
 const nativePluginContractTotal = document.querySelector("#native-plugin-contract-total");
@@ -1452,6 +1467,42 @@ function renderPluginSdkSourceContentReview(data) {
   ].join("\\n");
 }
 
+function renderPluginSdkNativeContractTests(data) {
+  const summary = data?.summary ?? {};
+  const governance = data?.governance ?? {};
+  const tests = Array.isArray(data?.tests) ? data.tests : [];
+  const mappings = Array.isArray(data?.mappings) ? data.mappings : [];
+  const capabilities = Array.isArray(data?.contract?.capabilities) ? data.contract.capabilities : [];
+  const sourceSummary = data?.enhancedSource?.summary ?? {};
+  pluginSdkNativeTestsRegistry.textContent = data?.registry ?? "openclaw-plugin-sdk-native-contract-tests-v0";
+  pluginSdkNativeTestsRequired.textContent = \`\${summary.passedRequired ?? 0}/\${summary.requiredTests ?? 0}\`;
+  pluginSdkNativeTestsSource.textContent = String(summary.enhancedSourceFilesRead ?? 0);
+  pluginSdkNativeTestsCaps.textContent = String(summary.nativeCapabilities ?? capabilities.length);
+  pluginSdkNativeTestsMode.textContent = data?.mode ?? "native-contract-tests";
+
+  pluginSdkNativeTestsJson.textContent = [
+    "Native contract tests: derived SDK source signals are checked against OpenClawOnNixOS-owned plugin/capability contracts.",
+    "This is a test mapping layer, not runtime activation: old OpenClaw modules are not imported or executed.",
+    \`Registry: \${data?.registry ?? "openclaw-plugin-sdk-native-contract-tests-v0"}\`,
+    \`Mode: \${data?.mode ?? "native-contract-tests"}\`,
+    \`Source Registries: \${(data?.sourceRegistries ?? []).join(", ") || "none"}\`,
+    \`Workspace: \${data?.workspace?.path ?? "unknown"}\`,
+    \`Enhanced Source Root: \${data?.enhancedSource?.root ?? "unknown"}\`,
+    \`Tests: required=\${summary.passedRequired ?? 0}/\${summary.requiredTests ?? 0} failed=\${summary.failedRequired ?? 0}\`,
+    \`Signals: packageFiles=\${summary.sourcePackageFilesRead ?? 0} enhancedFiles=\${summary.enhancedSourceFilesRead ?? 0} exports=\${summary.exportStatements ?? 0} interfaces=\${summary.interfaceDeclarations ?? 0} types=\${summary.typeDeclarations ?? 0} functions=\${summary.functionDeclarations ?? 0} vocabFiles=\${summary.capabilityVocabularyFiles ?? sourceSummary.capabilityVocabularyFiles ?? 0}\`,
+    \`Contract: nativeCapabilities=\${summary.nativeCapabilities ?? capabilities.length} implementationReady=\${Boolean(summary.nativeContractReadyForImplementation)}\`,
+    \`Governance: exposeSource=\${Boolean(governance.exposesSourceFileContent)} importModule=\${Boolean(governance.canImportModule)} executePlugin=\${Boolean(governance.canExecutePluginCode)} activateRuntime=\${Boolean(governance.canActivateRuntime)} task=\${Boolean(governance.createsTask)} approval=\${Boolean(governance.createsApproval)}\`,
+    "",
+    ...tests.map((test) => \`[\${test.status ?? "unknown"}] \${test.id ?? "test"} :: \${test.evidence ?? "no evidence"}\`),
+    "",
+    ...mappings.map((mapping) => \`\${mapping.sourceSignal ?? "source"} -> \${(mapping.nativeContractFields ?? []).join(", ")} [\${mapping.status ?? "unknown"}]\`),
+    "",
+    ...capabilities.map((capability) => \`\${capability.id ?? "unknown"} kind=\${capability.kind ?? "unknown"} risk=\${capability.risk ?? "unknown"} domains=\${(capability.domains ?? []).join(",")} approval=\${Boolean(capability.approval?.required)} runtimeOwner=\${capability.runtimeOwner ?? "unknown"}\`),
+    "",
+    \`Next Allowed Work: \${(summary.nextAllowedWork ?? []).join("; ") || "none"}\`,
+  ].join("\\n");
+}
+
 function renderNativePluginContract(data) {
   const summary = data?.summary ?? {};
   const contract = data?.contract ?? {};
@@ -1984,6 +2035,20 @@ async function refreshPluginSdkSourceContentReview() {
     pluginSdkSourceContentRaw.textContent = "unknown";
     pluginSdkSourceContentMode.textContent = "unknown";
     pluginSdkSourceContentJson.textContent = "Unable to read plugin SDK source content review.";
+  }
+}
+
+async function refreshPluginSdkNativeContractTests() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/workspaces/openclaw-plugin-sdk-native-contract-tests\`);
+    renderPluginSdkNativeContractTests(data);
+  } catch {
+    pluginSdkNativeTestsRegistry.textContent = "offline";
+    pluginSdkNativeTestsRequired.textContent = "0/0";
+    pluginSdkNativeTestsSource.textContent = "0";
+    pluginSdkNativeTestsCaps.textContent = "0";
+    pluginSdkNativeTestsMode.textContent = "unknown";
+    pluginSdkNativeTestsJson.textContent = "Unable to read plugin SDK native contract tests.";
   }
 }
 
@@ -3610,6 +3675,7 @@ await refreshWorkspaceMigrationPlan();
 await refreshPluginSdkContractReview();
 await refreshPluginSdkSourceReviewScope();
 await refreshPluginSdkSourceContentReview();
+await refreshPluginSdkNativeContractTests();
 await refreshNativePluginContract();
 await refreshNativePluginRegistry();
 await refreshFormalIntegrationReadiness();
@@ -3647,6 +3713,7 @@ setInterval(refreshWorkspaceMigrationPlan, 5000);
 setInterval(refreshPluginSdkContractReview, 5000);
 setInterval(refreshPluginSdkSourceReviewScope, 5000);
 setInterval(refreshPluginSdkSourceContentReview, 5000);
+setInterval(refreshPluginSdkNativeContractTests, 5000);
 setInterval(refreshNativePluginContract, 5000);
 setInterval(refreshNativePluginRegistry, 5000);
 setInterval(refreshFormalIntegrationReadiness, 5000);

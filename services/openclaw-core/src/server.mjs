@@ -1438,6 +1438,331 @@ function buildOpenClawPluginSdkSourceContentReview({ packagePath = null } = {}) 
   };
 }
 
+function collectPluginSdkModuleSourceSignals(workspacePath, { maxFiles = 120, maxDepth = 2 } = {}) {
+  const sourceRoot = path.join(workspacePath, "src", "plugin-sdk");
+  const rootStats = safeStat(sourceRoot);
+  if (!rootStats?.isDirectory()) {
+    return {
+      root: sourceRoot,
+      present: false,
+      files: [],
+      summary: {
+        totalFiles: 0,
+        contentRead: 0,
+        skipped: 0,
+        lineCount: 0,
+        exportStatements: 0,
+        importStatements: 0,
+        interfaceDeclarations: 0,
+        typeDeclarations: 0,
+        functionDeclarations: 0,
+        classDeclarations: 0,
+        constDeclarations: 0,
+        capabilityVocabularyFiles: 0,
+      },
+    };
+  }
+
+  const files = [];
+  function visit(currentPath, depth) {
+    if (files.length >= maxFiles || depth > maxDepth) {
+      return;
+    }
+    let entries = [];
+    try {
+      entries = readdirSync(currentPath, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
+      if (files.length >= maxFiles) {
+        return;
+      }
+      const absolutePath = path.join(currentPath, entry.name);
+      if (entry.isDirectory()) {
+        if (!["node_modules", "dist", "build", ".git", ".cache"].includes(entry.name)) {
+          visit(absolutePath, depth + 1);
+        }
+        continue;
+      }
+      if (!entry.isFile()) {
+        continue;
+      }
+      const relativePath = path.relative(sourceRoot, absolutePath).replaceAll(path.sep, "/");
+      const kind = sourceReviewKindForRelativePath(relativePath);
+      if (!["typescript_source", "javascript_source", "type_declaration", "manifest_or_schema"].includes(kind)) {
+        continue;
+      }
+      files.push(analysePluginSdkSourceContentFile(sourceRoot, {
+        relativePath,
+        kind,
+      }));
+    }
+  }
+
+  visit(sourceRoot, 0);
+  const totals = files.reduce((accumulator, file) => {
+    if (file.contentRead) {
+      accumulator.contentRead += 1;
+      accumulator.lineCount += file.lineCount ?? 0;
+      accumulator.exportStatements += file.signals?.exportStatements ?? 0;
+      accumulator.importStatements += file.signals?.importStatements ?? 0;
+      accumulator.interfaceDeclarations += file.signals?.interfaceDeclarations ?? 0;
+      accumulator.typeDeclarations += file.signals?.typeDeclarations ?? 0;
+      accumulator.functionDeclarations += file.signals?.functionDeclarations ?? 0;
+      accumulator.classDeclarations += file.signals?.classDeclarations ?? 0;
+      accumulator.constDeclarations += file.signals?.constDeclarations ?? 0;
+      accumulator.capabilityVocabularyFiles += file.signals?.hasCapabilityVocabulary ? 1 : 0;
+    } else {
+      accumulator.skipped += 1;
+    }
+    return accumulator;
+  }, {
+    contentRead: 0,
+    skipped: 0,
+    lineCount: 0,
+    exportStatements: 0,
+    importStatements: 0,
+    interfaceDeclarations: 0,
+    typeDeclarations: 0,
+    functionDeclarations: 0,
+    classDeclarations: 0,
+    constDeclarations: 0,
+    capabilityVocabularyFiles: 0,
+  });
+
+  return {
+    root: sourceRoot,
+    present: true,
+    files: files.map((file) => ({
+      relativePath: file.relativePath,
+      kind: file.kind,
+      sizeBytes: file.sizeBytes,
+      contentRead: file.contentRead,
+      contentExposed: false,
+      skipped: file.skipped,
+      skipReason: file.skipReason,
+      lineCount: file.lineCount,
+      nonEmptyLineCount: file.nonEmptyLineCount,
+      signals: file.signals,
+      recommendedAbsorption: file.recommendedAbsorption,
+    })),
+    summary: {
+      totalFiles: files.length,
+      ...totals,
+    },
+  };
+}
+
+function buildOpenClawPluginSdkNativeContractTests({ packagePath = null } = {}) {
+  const contentReview = buildOpenClawPluginSdkSourceContentReview({ packagePath });
+  const moduleSource = collectPluginSdkModuleSourceSignals(contentReview.workspace.path);
+  const nativeContractResponse = buildOpenClawNativePluginContractRegistry();
+  const contract = nativeContractResponse.contract ?? {};
+  const capabilities = Array.isArray(contract.capabilities) ? contract.capabilities : [];
+  const manifestProfileCapability = capabilities.find((capability) => capability.id === "sense.plugin.manifest_profile") ?? null;
+  const invokeCapability = capabilities.find((capability) => capability.id === "act.plugin.capability.invoke") ?? null;
+  const combinedSignals = {
+    packageFilesRead: contentReview.summary.contentRead,
+    moduleFilesRead: moduleSource.summary.contentRead,
+    exportStatements: contentReview.summary.exportStatements + moduleSource.summary.exportStatements,
+    importStatements: contentReview.summary.importStatements + moduleSource.summary.importStatements,
+    interfaceDeclarations: contentReview.summary.interfaceDeclarations + moduleSource.summary.interfaceDeclarations,
+    typeDeclarations: contentReview.summary.typeDeclarations + moduleSource.summary.typeDeclarations,
+    functionDeclarations: contentReview.summary.functionDeclarations + moduleSource.summary.functionDeclarations,
+    classDeclarations: contentReview.summary.classDeclarations + moduleSource.summary.classDeclarations,
+    constDeclarations: contentReview.summary.constDeclarations + moduleSource.summary.constDeclarations,
+    capabilityVocabularyFiles: moduleSource.summary.capabilityVocabularyFiles,
+  };
+  const hasCapabilityFieldCoverage = capabilities.every((capability) => (
+    typeof capability.id === "string" && capability.id.length > 0
+    && typeof capability.kind === "string" && capability.kind.length > 0
+    && Array.isArray(capability.domains) && capability.domains.length > 0
+    && typeof capability.risk === "string" && capability.risk.length > 0
+    && capability.runtimeOwner === "openclaw_on_nixos"
+    && capability.permissions && typeof capability.permissions === "object"
+    && capability.approval && typeof capability.approval.required === "boolean"
+    && capability.audit?.required === true
+  ));
+
+  const tests = [
+    {
+      id: "derived_source_signals_present",
+      status: combinedSignals.exportStatements > 0 && combinedSignals.packageFilesRead > 0 ? "passed" : "failed",
+      evidence: `packageFilesRead=${combinedSignals.packageFilesRead}; exports=${combinedSignals.exportStatements}`,
+      required: true,
+    },
+    {
+      id: "enhanced_source_module_profiled",
+      status: moduleSource.present && combinedSignals.moduleFilesRead > 0 ? "passed" : "failed",
+      evidence: `root=${moduleSource.root}; moduleFilesRead=${combinedSignals.moduleFilesRead}`,
+      required: true,
+    },
+    {
+      id: "native_contract_validates",
+      status: nativeContractResponse.validation?.ok === true ? "passed" : "failed",
+      evidence: `issues=${nativeContractResponse.validation?.issues?.length ?? 0}`,
+      required: true,
+    },
+    {
+      id: "runtime_owner_locked",
+      status: contract.governance?.runtimeOwner === "openclaw_on_nixos"
+        && contract.governance?.externalRuntimeDependencyAllowed === false
+        ? "passed"
+        : "failed",
+      evidence: `runtimeOwner=${contract.governance?.runtimeOwner ?? "unknown"}; externalRuntimeDependencyAllowed=${Boolean(contract.governance?.externalRuntimeDependencyAllowed)}`,
+      required: true,
+    },
+    {
+      id: "plugin_identity_mapped",
+      status: contract.plugin?.id === "openclaw.native.plugin-sdk"
+        && typeof contract.plugin?.summary === "string"
+        && contract.plugin.summary.length > 0
+        ? "passed"
+        : "failed",
+      evidence: `pluginId=${contract.plugin?.id ?? "missing"}`,
+      required: true,
+    },
+    {
+      id: "manifest_profile_capability_mapped",
+      status: manifestProfileCapability?.kind === "sense"
+        && manifestProfileCapability?.risk === "low"
+        && manifestProfileCapability?.permissions?.filesystemRead === true
+        && manifestProfileCapability?.approval?.required === false
+        ? "passed"
+        : "failed",
+      evidence: manifestProfileCapability ? `capability=${manifestProfileCapability.id}` : "missing sense.plugin.manifest_profile",
+      required: true,
+    },
+    {
+      id: "governed_invoke_capability_mapped",
+      status: invokeCapability?.kind === "act"
+        && invokeCapability?.risk === "high"
+        && invokeCapability?.domains?.includes("cross_boundary")
+        && invokeCapability?.approval?.required === true
+        && invokeCapability?.audit?.required === true
+        ? "passed"
+        : "failed",
+      evidence: invokeCapability ? `capability=${invokeCapability.id}` : "missing act.plugin.capability.invoke",
+      required: true,
+    },
+    {
+      id: "capability_policy_fields_mapped",
+      status: capabilities.length > 0 && hasCapabilityFieldCoverage ? "passed" : "failed",
+      evidence: `capabilities=${capabilities.length}`,
+      required: true,
+    },
+    {
+      id: "source_content_not_imported",
+      status: contract.governance?.sourceContentImported === false
+        && contentReview.governance.canImportModule === false
+        && contentReview.governance.canExecutePluginCode === false
+        ? "passed"
+        : "failed",
+      evidence: `sourceContentImported=${Boolean(contract.governance?.sourceContentImported)}; canImportModule=${Boolean(contentReview.governance.canImportModule)}`,
+      required: true,
+    },
+  ];
+  const requiredTests = tests.filter((test) => test.required);
+  const passedRequired = requiredTests.filter((test) => test.status === "passed").length;
+  const failedRequired = requiredTests.length - passedRequired;
+
+  return {
+    ok: failedRequired === 0,
+    registry: "openclaw-plugin-sdk-native-contract-tests-v0",
+    mode: "native-contract-tests",
+    generatedAt: new Date().toISOString(),
+    sourceRegistries: [
+      contentReview.registry,
+      nativeContractResponse.registry,
+    ],
+    workspace: contentReview.workspace,
+    package: contentReview.package,
+    enhancedSource: {
+      root: moduleSource.root,
+      present: moduleSource.present,
+      files: moduleSource.files.slice(0, 24),
+      summary: moduleSource.summary,
+    },
+    derivedSignals: combinedSignals,
+    contract: {
+      plugin: contract.plugin,
+      governance: contract.governance,
+      capabilities: capabilities.map((capability) => ({
+        id: capability.id,
+        kind: capability.kind,
+        domains: capability.domains,
+        risk: capability.risk,
+        runtimeOwner: capability.runtimeOwner,
+        permissions: capability.permissions,
+        approval: capability.approval,
+        audit: capability.audit,
+      })),
+    },
+    mappings: [
+      {
+        sourceSignal: "plugin-sdk manifest and exported surface",
+        nativeContractFields: ["plugin.id", "plugin.name", "capabilities[].id", "capabilities[].kind"],
+        status: tests.find((test) => test.id === "plugin_identity_mapped")?.status ?? "failed",
+      },
+      {
+        sourceSignal: "manifest/runtime metadata vocabulary",
+        nativeContractFields: ["sense.plugin.manifest_profile", "permissions.filesystemRead", "approval.required=false"],
+        status: tests.find((test) => test.id === "manifest_profile_capability_mapped")?.status ?? "failed",
+      },
+      {
+        sourceSignal: "policy/approval/capability vocabulary",
+        nativeContractFields: ["risk", "domains", "approval", "audit", "runtimeOwner"],
+        status: tests.find((test) => test.id === "capability_policy_fields_mapped")?.status ?? "failed",
+      },
+      {
+        sourceSignal: "execution-capable plugin capability shape",
+        nativeContractFields: ["act.plugin.capability.invoke", "approval.required=true", "audit.required=true"],
+        status: tests.find((test) => test.id === "governed_invoke_capability_mapped")?.status ?? "failed",
+      },
+    ],
+    tests,
+    summary: {
+      totalTests: tests.length,
+      requiredTests: requiredTests.length,
+      passedRequired,
+      failedRequired,
+      nativeContractReadyForImplementation: failedRequired === 0,
+      sourcePackageFilesRead: combinedSignals.packageFilesRead,
+      enhancedSourceFilesRead: combinedSignals.moduleFilesRead,
+      exportStatements: combinedSignals.exportStatements,
+      interfaceDeclarations: combinedSignals.interfaceDeclarations,
+      typeDeclarations: combinedSignals.typeDeclarations,
+      functionDeclarations: combinedSignals.functionDeclarations,
+      capabilityVocabularyFiles: combinedSignals.capabilityVocabularyFiles,
+      nativeCapabilities: capabilities.length,
+      canImportModule: false,
+      canExecutePluginCode: false,
+      canActivateRuntime: false,
+      createsTask: false,
+      createsApproval: false,
+      nextAllowedWork: [
+        "implement native SDK contract deltas that fail these tests",
+        "select the first real read-only OpenClaw capability absorption slice",
+        "keep old OpenClaw modules non-importable until native adapters exist",
+      ],
+    },
+    governance: {
+      mode: "plugin_sdk_native_contract_tests",
+      runtimeOwner: "openclaw_on_nixos",
+      canReadSourceFileContent: true,
+      exposesSourceFileContent: false,
+      canImportModule: false,
+      canExecutePluginCode: false,
+      canActivateRuntime: false,
+      canMutate: false,
+      createsTask: false,
+      createsApproval: false,
+      absorptionMode: "test_native_contract_mapping_before_implementation",
+    },
+  };
+}
+
 function buildOpenClawPluginSdkContractReview() {
   const plan = buildOpenClawMigrationPlan();
   const items = plan.items
@@ -5896,6 +6221,39 @@ const server = http.createServer(async (req, res) => {
         sourceMode: review.sourceMode,
         summary: review.summary,
         governance: review.governance,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/workspaces/openclaw-plugin-sdk-native-contract-tests") {
+    try {
+      sendJson(res, 200, buildOpenClawPluginSdkNativeContractTests({
+        packagePath: requestUrl.searchParams.get("packagePath"),
+      }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/workspaces/openclaw-plugin-sdk-native-contract-tests/summary") {
+    try {
+      const report = buildOpenClawPluginSdkNativeContractTests({
+        packagePath: requestUrl.searchParams.get("packagePath"),
+      });
+      sendJson(res, 200, {
+        ok: report.ok,
+        registry: report.registry,
+        mode: report.mode,
+        generatedAt: report.generatedAt,
+        sourceRegistries: report.sourceRegistries,
+        summary: report.summary,
+        governance: report.governance,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
