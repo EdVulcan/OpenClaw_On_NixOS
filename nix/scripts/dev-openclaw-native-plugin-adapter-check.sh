@@ -155,11 +155,14 @@ if (
   !adapter.ok
   || adapter.registry !== "openclaw-native-plugin-adapter-v0"
   || adapter.mode !== "native-adapter-shell"
-  || adapter.status !== "manifest_profile_adapter_ready"
+  || adapter.status !== "read_only_adapters_ready"
   || !adapter.implementedCapabilities?.includes("sense.plugin.manifest_profile")
+  || !adapter.implementedCapabilities?.includes("sense.openclaw.tool_catalog")
   || adapter.summary?.canReadManifestMetadata !== true
+  || adapter.summary?.canReadToolCatalogMetadata !== true
   || adapter.summary?.canReadSourceFileContent !== false
   || adapter.summary?.canExecutePluginCode !== false
+  || adapter.summary?.canExecuteToolCode !== false
   || adapter.summary?.canActivateRuntime !== false
 ) {
   throw new Error(`native plugin adapter status mismatch: ${JSON.stringify(adapter)}`);

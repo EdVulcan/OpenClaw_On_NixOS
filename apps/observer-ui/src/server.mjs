@@ -495,6 +495,15 @@ function observerHtml() {
           <pre id="openclaw-tool-catalog-json">Loading OpenClaw tool catalog...</pre>
         </section>
         <section class="panel">
+          <h2>OpenClaw Tool Catalog Adapter</h2>
+          <div class="metric"><span>Registry</span><span id="tool-catalog-adapter-registry">openclaw-native-plugin-adapter-v0</span></div>
+          <div class="metric"><span>Matches</span><span id="tool-catalog-adapter-matches">0</span></div>
+          <div class="metric"><span>Categories</span><span id="tool-catalog-adapter-categories">0</span></div>
+          <div class="metric"><span>Execution</span><span id="tool-catalog-adapter-execution">blocked</span></div>
+          <div class="metric"><span>Mode</span><span id="tool-catalog-adapter-mode">tool-catalog-profile-only</span></div>
+          <pre id="tool-catalog-adapter-json">Loading native tool catalog adapter...</pre>
+        </section>
+        <section class="panel">
           <h2>OpenClaw Native Plugin Contract</h2>
           <div class="metric"><span>Registry</span><span id="native-plugin-contract-registry">openclaw-native-plugin-contract-v0</span></div>
           <div class="metric"><span>Owner</span><span id="native-plugin-contract-owner">openclaw_on_nixos</span></div>
@@ -880,6 +889,12 @@ const openclawToolCatalogDocs = document.querySelector("#openclaw-tool-catalog-d
 const openclawToolCatalogCategories = document.querySelector("#openclaw-tool-catalog-categories");
 const openclawToolCatalogMode = document.querySelector("#openclaw-tool-catalog-mode");
 const openclawToolCatalogJson = document.querySelector("#openclaw-tool-catalog-json");
+const toolCatalogAdapterRegistry = document.querySelector("#tool-catalog-adapter-registry");
+const toolCatalogAdapterMatches = document.querySelector("#tool-catalog-adapter-matches");
+const toolCatalogAdapterCategories = document.querySelector("#tool-catalog-adapter-categories");
+const toolCatalogAdapterExecution = document.querySelector("#tool-catalog-adapter-execution");
+const toolCatalogAdapterMode = document.querySelector("#tool-catalog-adapter-mode");
+const toolCatalogAdapterJson = document.querySelector("#tool-catalog-adapter-json");
 const nativePluginContractRegistry = document.querySelector("#native-plugin-contract-registry");
 const nativePluginContractOwner = document.querySelector("#native-plugin-contract-owner");
 const nativePluginContractTotal = document.querySelector("#native-plugin-contract-total");
@@ -1597,6 +1612,34 @@ function renderOpenClawToolCatalog(data) {
   ].join("\\n");
 }
 
+function renderToolCatalogAdapter(data) {
+  const summary = data?.summary ?? {};
+  const governance = data?.governance ?? {};
+  const tools = Array.isArray(data?.tools) ? data.tools : [];
+  const docs = Array.isArray(data?.documentation) ? data.documentation : [];
+  const categories = Array.isArray(data?.categories) ? data.categories : [];
+  toolCatalogAdapterRegistry.textContent = data?.registry ?? "openclaw-native-plugin-adapter-v0";
+  toolCatalogAdapterMatches.textContent = String(summary.matchedTools ?? tools.length);
+  toolCatalogAdapterCategories.textContent = String(summary.categoryCount ?? categories.length);
+  toolCatalogAdapterExecution.textContent = governance.canExecuteToolCode ? "enabled" : "blocked";
+  toolCatalogAdapterMode.textContent = data?.mode ?? "tool-catalog-profile-only";
+
+  toolCatalogAdapterJson.textContent = [
+    "Native adapter invocation surface for the absorbed enhanced OpenClaw tool catalog.",
+    "This adapter can be invoked through capability history; it still does not import, execute, mutate, activate runtime, or expose source/doc bodies.",
+    \`Registry: \${data?.registry ?? "openclaw-native-plugin-adapter-v0"}\`,
+    \`Mode: \${data?.mode ?? "tool-catalog-profile-only"}\`,
+    \`Adapter Status: \${data?.adapterStatus ?? "unknown"}\`,
+    \`Source Registry: \${data?.sourceRegistry ?? "openclaw-tool-catalog-v0"}\`,
+    \`Capability: \${data?.capability?.id ?? "sense.openclaw.tool_catalog"} risk=\${data?.capability?.risk ?? "low"} approval=\${Boolean(data?.capability?.approvalRequired)} owner=\${data?.capability?.runtimeOwner ?? "unknown"}\`,
+    \`Filter: category=\${data?.filter?.category ?? "none"} query=\${data?.filter?.query ?? "none"} limit=\${data?.filter?.limit ?? "n/a"}\`,
+    \`Counts: matched=\${summary.matchedTools ?? tools.length}/\${summary.totalTools ?? 0} docs=\${summary.matchedDocumentation ?? docs.length}/\${summary.totalDocumentation ?? 0} categories=\${summary.categoryCount ?? categories.length} filterApplied=\${Boolean(summary.filterApplied)}\`,
+    \`Governance: metadata=\${Boolean(governance.canReadMetadata)} readSource=\${Boolean(governance.canReadSourceFileContent)} exposeSource=\${Boolean(governance.exposesSourceFileContent)} exposeDocs=\${Boolean(governance.exposesDocumentationContent)} importModule=\${Boolean(governance.canImportModule)} executeTool=\${Boolean(governance.canExecuteToolCode)} activateRuntime=\${Boolean(governance.canActivateRuntime)} task=\${Boolean(governance.createsTask)} approval=\${Boolean(governance.createsApproval)}\`,
+    "",
+    ...tools.slice(0, 16).map((tool) => \`\${tool.relativePath ?? "unknown"} category=\${tool.category ?? "unknown"} documented=\${Boolean(tool.documented)} slot=\${tool.nativeSlot ?? "none"} contentRead=\${Boolean(tool.contentRead)}\`),
+  ].join("\\n");
+}
+
 function renderNativePluginContract(data) {
   const summary = data?.summary ?? {};
   const contract = data?.contract ?? {};
@@ -2171,6 +2214,20 @@ async function refreshOpenClawToolCatalog() {
     openclawToolCatalogCategories.textContent = "0";
     openclawToolCatalogMode.textContent = "unknown";
     openclawToolCatalogJson.textContent = "Unable to read OpenClaw tool catalog.";
+  }
+}
+
+async function refreshToolCatalogAdapter() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/tool-catalog\`);
+    renderToolCatalogAdapter(data);
+  } catch {
+    toolCatalogAdapterRegistry.textContent = "offline";
+    toolCatalogAdapterMatches.textContent = "0";
+    toolCatalogAdapterCategories.textContent = "0";
+    toolCatalogAdapterExecution.textContent = "unknown";
+    toolCatalogAdapterMode.textContent = "unknown";
+    toolCatalogAdapterJson.textContent = "Unable to read native tool catalog adapter.";
   }
 }
 
@@ -3800,6 +3857,7 @@ await refreshPluginSdkSourceContentReview();
 await refreshPluginSdkNativeContractTests();
 await refreshNativeSdkContractImplementation();
 await refreshOpenClawToolCatalog();
+await refreshToolCatalogAdapter();
 await refreshNativePluginContract();
 await refreshNativePluginRegistry();
 await refreshFormalIntegrationReadiness();
@@ -3840,6 +3898,7 @@ setInterval(refreshPluginSdkSourceContentReview, 5000);
 setInterval(refreshPluginSdkNativeContractTests, 5000);
 setInterval(refreshNativeSdkContractImplementation, 5000);
 setInterval(refreshOpenClawToolCatalog, 5000);
+setInterval(refreshToolCatalogAdapter, 5000);
 setInterval(refreshNativePluginContract, 5000);
 setInterval(refreshNativePluginRegistry, 5000);
 setInterval(refreshFormalIntegrationReadiness, 5000);

@@ -329,6 +329,53 @@ Next intended slice after this passes:
 - Candidate direction: read-only workspace/file semantic inspection or tool metadata lookup.
 - Do not add another readiness/checklist layer unless it directly unlocks that adapter.
 
+## 11. 2026-05-13 Step 4 Update: Native Tool Catalog Adapter
+
+Status: implemented_waiting_check.
+
+Slice: native adapter invocation for `sense.openclaw.tool_catalog`.
+
+Purpose: promote the absorbed enhanced `openclaw` tool catalog from a passive metadata endpoint into a real OpenClawOnNixOS native adapter capability. This means it now follows the body-owned invocation chain: `capability -> policy -> native adapter -> audit/history -> Observer`.
+
+Implemented artifacts:
+- Core native adapter API: `GET /plugins/native-adapter/tool-catalog`.
+- Capability registry entry: `sense.openclaw.tool_catalog`.
+- Capability invoke support: `POST /capabilities/invoke` with `capabilityId=sense.openclaw.tool_catalog`.
+- Invocation history support for `sense.openclaw.tool_catalog`.
+- Observer panel: `OpenClaw Tool Catalog Adapter`.
+- Targeted checks: `openclaw-native-tool-catalog-adapter`, `observer-openclaw-native-tool-catalog-adapter`.
+
+Governance boundaries:
+- Read-only metadata query only.
+- No old `openclaw` module import.
+- No old tool execution.
+- No source text exposure.
+- No documentation body exposure.
+- No script body or dependency version exposure.
+- No runtime activation.
+- No task or approval creation.
+- Invocation is audit-only and recorded in capability history.
+
+Local verification on Windows:
+- `npm run typecheck`: passed.
+- `git diff --check`: passed.
+- Equivalent Node smoke test for native tool catalog adapter invocation: passed.
+- Equivalent Node smoke test for Observer visibility: passed.
+- Unix milestone scripts still require NixOS/bash.
+
+NixOS targeted milestone command:
+
+```bash
+cd /home/edvulcan/OpenClaw_On_NixOS && \
+git pull origin main && \
+OPENCLAW_MILESTONE_CHECKS=openclaw-native-tool-catalog-adapter,observer-openclaw-native-tool-catalog-adapter npm run dev:milestone-check:unix
+```
+
+Next intended slice after this passes:
+- Use the invokable tool catalog to choose and implement one native read-only semantic tool.
+- Recommended candidate: a bounded workspace/file semantic inspection adapter inspired by enhanced OpenClaw tooling.
+- Do not implement mutating tool execution yet.
+
 这条线是本阶段的主线。
 
-当前执行焦点：Step 4 `First Real Capability Absorption`，`sense.openclaw.tool_catalog` 已通过 NixOS targeted milestone。下一步进入第一个 native read-only tool adapter，禁止再新增与真实 adapter 无关的 readiness/checklist 层。
+当前执行焦点：Step 4 `First Real Capability Absorption`，`sense.openclaw.tool_catalog` 已通过 NixOS targeted milestone；native tool catalog adapter 已实现，等待 NixOS targeted milestone 确认。确认后进入第一个 native read-only semantic tool，禁止再新增与真实 adapter 无关的 readiness/checklist 层。

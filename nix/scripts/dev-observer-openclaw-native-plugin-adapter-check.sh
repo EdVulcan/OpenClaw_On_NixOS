@@ -151,10 +151,12 @@ if (!capability || capability.service !== "openclaw-core" || capability.governan
 if (
   !adapter.ok
   || adapter.registry !== "openclaw-native-plugin-adapter-v0"
-  || adapter.status !== "manifest_profile_adapter_ready"
+  || adapter.status !== "read_only_adapters_ready"
   || adapter.summary?.canActivateRuntime !== false
   || adapter.summary?.canExecutePluginCode !== false
+  || adapter.summary?.canExecuteToolCode !== false
   || !adapter.implementedCapabilities?.includes("sense.plugin.manifest_profile")
+  || !adapter.implementedCapabilities?.includes("sense.openclaw.tool_catalog")
 ) {
   throw new Error(`Observer adapter status mismatch: ${JSON.stringify(adapter)}`);
 }

@@ -2391,16 +2391,18 @@ function buildOpenClawNativePluginAdapterStatus() {
     generatedAt: new Date().toISOString(),
     sourceRegistry: registry.registry,
     runtimeOwner: "openclaw_on_nixos",
-    status: "manifest_profile_adapter_ready",
-    implementedCapabilities: ["sense.plugin.manifest_profile", "plan.plugin.runtime_preflight"],
+    status: "read_only_adapters_ready",
+    implementedCapabilities: ["sense.plugin.manifest_profile", "sense.openclaw.tool_catalog", "plan.plugin.runtime_preflight"],
     pendingCapabilities: ["act.plugin.capability.invoke"],
     summary: {
-      implemented: 2,
+      implemented: 3,
       pending: 1,
       canReadManifestMetadata: true,
+      canReadToolCatalogMetadata: true,
       canReadSourceFileContent: false,
       canMutate: false,
       canExecutePluginCode: false,
+      canExecuteToolCode: false,
       canActivateRuntime: false,
       createsTask: false,
       createsApproval: false,
@@ -2409,6 +2411,7 @@ function buildOpenClawNativePluginAdapterStatus() {
     guardrails: [
       "adapter shell is native to OpenClawOnNixOS",
       "manifest profile reads only bounded package metadata from reviewed plugin SDK paths",
+      "tool catalog adapter reads only bounded enhanced OpenClaw tool metadata and never imports legacy tools",
       "runtime preflight builds a governed execution envelope without loading plugin modules",
       "source contents, README text, script bodies, dependency versions, plugin code execution, and runtime activation remain blocked",
       "mutating plugin invocation remains pending explicit adapter design and approval gates",
@@ -2508,6 +2511,118 @@ function buildNativePluginManifestProfile({ packagePath = null } = {}) {
       createsTask: false,
       createsApproval: false,
       sourcePackagePathReviewed: true,
+    },
+  };
+}
+
+function normalisePositiveLimit(value, fallback = 20, max = 80) {
+  const parsed = Number.parseInt(String(value ?? ""), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, max) : fallback;
+}
+
+function buildNativeOpenClawToolCatalogProfile({
+  workspacePath = null,
+  category = null,
+  query = null,
+  limit = 20,
+} = {}) {
+  const catalog = buildOpenClawToolCatalog({ workspacePath });
+  const safeLimit = normalisePositiveLimit(limit, 20, 80);
+  const safeCategory = typeof category === "string" && category.trim() ? category.trim() : null;
+  const safeQuery = typeof query === "string" && query.trim() ? query.trim().toLowerCase() : null;
+  const tools = Array.isArray(catalog.catalog?.tools) ? catalog.catalog.tools : [];
+  const documentation = Array.isArray(catalog.catalog?.documentation) ? catalog.catalog.documentation : [];
+  const categories = Array.isArray(catalog.catalog?.categories) ? catalog.catalog.categories : [];
+  const filteredTools = tools
+    .filter((tool) => !safeCategory || tool.category === safeCategory)
+    .filter((tool) => {
+      if (!safeQuery) {
+        return true;
+      }
+      return [
+        tool.relativePath,
+        tool.fileName,
+        tool.category,
+        tool.nativeSlot,
+      ].some((value) => String(value ?? "").toLowerCase().includes(safeQuery));
+    })
+    .slice(0, safeLimit);
+  const matchedDocNames = new Set(filteredTools.map((tool) => path.basename(tool.fileName, path.extname(tool.fileName))));
+  const relatedDocumentation = documentation
+    .filter((doc) => !safeCategory || doc.category === safeCategory)
+    .filter((doc) => matchedDocNames.size === 0 || [...matchedDocNames].some((name) => doc.fileName.includes(name) || doc.relativePath.includes(name)))
+    .slice(0, safeLimit);
+
+  return {
+    ok: catalog.ok === true,
+    registry: "openclaw-native-plugin-adapter-v0",
+    mode: "tool-catalog-profile-only",
+    generatedAt: new Date().toISOString(),
+    sourceRegistry: catalog.registry,
+    sourceMode: catalog.mode,
+    adapterStatus: "native_shell_active_tool_catalog_only",
+    capability: catalog.capability,
+    workspace: catalog.workspace,
+    filter: {
+      category: safeCategory,
+      query: safeQuery,
+      limit: safeLimit,
+    },
+    tools: filteredTools.map((tool) => ({
+      relativePath: tool.relativePath,
+      fileName: tool.fileName,
+      category: tool.category,
+      sizeBytes: tool.sizeBytes,
+      documented: tool.documented,
+      nativeSlot: tool.nativeSlot,
+      contentRead: false,
+    })),
+    documentation: relatedDocumentation.map((doc) => ({
+      relativePath: doc.relativePath,
+      fileName: doc.fileName,
+      category: doc.category,
+      sizeBytes: doc.sizeBytes,
+      matchesToolImplementation: doc.matchesToolImplementation,
+      contentRead: false,
+    })),
+    categories,
+    summary: {
+      totalTools: tools.length,
+      matchedTools: filteredTools.length,
+      totalDocumentation: documentation.length,
+      matchedDocumentation: relatedDocumentation.length,
+      categoryCount: categories.length,
+      filterApplied: Boolean(safeCategory || safeQuery),
+      canReadSourceFileContent: false,
+      exposesSourceFileContent: false,
+      exposesDocumentationContent: false,
+      canImportModule: false,
+      canExecutePluginCode: false,
+      canExecuteToolCode: false,
+      canActivateRuntime: false,
+      canMutate: false,
+      createsTask: false,
+      createsApproval: false,
+    },
+    governance: {
+      mode: "native_tool_catalog_adapter_read_only",
+      runtimeOwner: "openclaw_on_nixos",
+      sourceRegistry: catalog.registry,
+      canReadMetadata: true,
+      canReadSourceFileContent: false,
+      exposesSourceFileContent: false,
+      exposesDocumentationContent: false,
+      exposesScriptBodies: false,
+      exposesDependencyVersions: false,
+      canMutate: false,
+      canExecute: false,
+      canImportModule: false,
+      canExecutePluginCode: false,
+      canExecuteToolCode: false,
+      canActivateRuntime: false,
+      createsTask: false,
+      createsApproval: false,
+      requiresPolicyInvocation: true,
     },
   };
 }
@@ -3220,6 +3335,14 @@ function resolvePlanCapabilityId({ kind, intent, plannerIntent }) {
   if (candidate === "plugin.manifest.profile" || candidate === "plugin.manifest_profile" || candidate === "plugin.profile") {
     return "sense.plugin.manifest_profile";
   }
+  if (
+    candidate === "openclaw.tool.catalog"
+    || candidate === "openclaw.tool_catalog"
+    || candidate === "tool.catalog"
+    || candidate === "tool_catalog"
+  ) {
+    return "sense.openclaw.tool_catalog";
+  }
   if (candidate === "command.execute" || candidate === "system.command.execute") {
     return "act.system.command.execute";
   }
@@ -3874,6 +3997,18 @@ function baseCapabilities() {
       description: "Profile reviewed OpenClaw plugin SDK manifest metadata through the native adapter shell without reading source contents or executing plugin code.",
     },
     {
+      id: "sense.openclaw.tool_catalog",
+      name: "Native OpenClaw Tool Catalog",
+      kind: "sensor",
+      service: "openclaw-core",
+      endpoint: `http://${host}:${port}/plugins/native-adapter/tool-catalog`,
+      intents: ["openclaw.tool.catalog", "openclaw.tool_catalog", "tool.catalog", "tool_catalog"],
+      domains: ["body_internal"],
+      risk: "low",
+      governance: "audit_only",
+      description: "Query absorbed enhanced OpenClaw tool metadata through the native adapter shell without importing or executing legacy tool code.",
+    },
+    {
       id: "act.system.command.dry_run",
       name: "System Command Dry Run",
       kind: "actuator",
@@ -4210,6 +4345,15 @@ async function callCapabilityBackend(capability, request) {
     });
   }
 
+  if (capability.id === "sense.openclaw.tool_catalog") {
+    return buildNativeOpenClawToolCatalogProfile({
+      workspacePath: request.params.workspacePath,
+      category: request.params.category,
+      query: request.params.query ?? request.params.q,
+      limit: request.params.limit,
+    });
+  }
+
   if (capability.id === "act.system.command.dry_run") {
     return postJson(`${systemSenseUrl}/system/command/dry-run`, {
       ...request.params,
@@ -4336,6 +4480,17 @@ function summariseCapabilityInvocationResult(capability, result) {
       scriptNames: result?.plugin?.scriptNames?.length ?? 0,
       capabilities: Array.isArray(result?.capabilities) ? result.capabilities.length : 0,
       canExecutePluginCode: result?.governance?.canExecutePluginCode === true,
+    };
+  }
+  if (capability.id === "sense.openclaw.tool_catalog") {
+    return {
+      kind: "openclaw.tool_catalog",
+      ok: result?.ok === true,
+      totalTools: result?.summary?.totalTools ?? 0,
+      matchedTools: result?.summary?.matchedTools ?? 0,
+      categories: result?.summary?.categoryCount ?? 0,
+      filterApplied: result?.summary?.filterApplied === true,
+      canExecuteToolCode: result?.governance?.canExecuteToolCode === true,
     };
   }
   if (capability.id === "act.system.command.dry_run") {
@@ -6822,6 +6977,21 @@ const server = http.createServer(async (req, res) => {
     try {
       sendJson(res, 200, buildNativePluginManifestProfile({
         packagePath: requestUrl.searchParams.get("packagePath"),
+      }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 404, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/plugins/native-adapter/tool-catalog") {
+    try {
+      sendJson(res, 200, buildNativeOpenClawToolCatalogProfile({
+        workspacePath: requestUrl.searchParams.get("workspacePath"),
+        category: requestUrl.searchParams.get("category"),
+        query: requestUrl.searchParams.get("query") ?? requestUrl.searchParams.get("q"),
+        limit: requestUrl.searchParams.get("limit"),
       }));
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
