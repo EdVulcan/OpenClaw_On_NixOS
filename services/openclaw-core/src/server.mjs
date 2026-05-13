@@ -4,10 +4,14 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync,
 import path from "node:path";
 import {
   OPENCLAW_NATIVE_PLUGIN_CONTRACT_VERSION,
-  createOpenClawNativePluginContract,
   summariseOpenClawNativePluginContract,
   validateOpenClawNativePluginContract,
 } from "../../../packages/shared-types/src/plugin-contract.mjs";
+import {
+  createOpenClawNativePluginRegistry,
+  summariseOpenClawNativePluginRegistry,
+  validateOpenClawNativePluginRegistry,
+} from "../../../packages/shared-types/src/plugin-registry.mjs";
 
 const host = process.env.OPENCLAW_CORE_HOST ?? "127.0.0.1";
 const port = Number.parseInt(process.env.OPENCLAW_CORE_PORT ?? "4100", 10);
@@ -1119,69 +1123,18 @@ function buildOpenClawPluginSdkContractReview() {
 }
 
 function buildOpenClawNativePluginContractRegistry() {
-  const contract = createOpenClawNativePluginContract({
-    plugin: {
-      id: "openclaw.native.plugin-sdk",
-      name: "OpenClaw Native Plugin SDK",
-      version: "0.1.0",
-      summary: "Native contract surface for governed OpenClaw capabilities.",
-    },
-    governance: {
-      origin: "absorbed_external",
-      sourceContentImported: false,
-      requiresHumanReviewBeforeActivation: true,
-    },
-    capabilities: [
-      {
-        id: "sense.plugin.manifest_profile",
-        title: "Profile plugin manifest metadata",
-        description: "Reads bounded plugin manifest metadata without importing source contents.",
-        kind: "sense",
-        domains: ["body_internal"],
-        risk: "low",
-        permissions: {
-          filesystemRead: true,
-        },
-        approval: {
-          required: false,
-          reason: "Read-only metadata profiling inside the body boundary.",
-        },
-        audit: {
-          required: true,
-          ledger: "capability_history",
-        },
-      },
-      {
-        id: "act.plugin.capability.invoke",
-        title: "Invoke a governed plugin capability",
-        description: "Invokes a registered capability only after policy evaluation and audit binding.",
-        kind: "act",
-        domains: ["user_task", "cross_boundary"],
-        risk: "high",
-        permissions: {
-          commandExecution: true,
-          filesystemWrite: true,
-        },
-        approval: {
-          required: true,
-          reason: "Execution and mutation require explicit user approval.",
-        },
-        audit: {
-          required: true,
-          ledger: "capability_history",
-        },
-      },
-    ],
-  });
+  const registry = createOpenClawNativePluginRegistry();
+  const contract = registry.items[0]?.contract ?? null;
   const validation = validateOpenClawNativePluginContract(contract);
   const summary = summariseOpenClawNativePluginContract(contract);
 
   return {
     registry: OPENCLAW_NATIVE_PLUGIN_CONTRACT_VERSION,
     mode: "contract-only",
-    generatedAt: new Date().toISOString(),
-    sourceRegistry: "openclaw-plugin-sdk-contract-review-v0",
-    sourceMode: "read-only",
+    generatedAt: registry.generatedAt,
+    sourceRegistry: registry.registry,
+    sourceMode: registry.mode,
+    registryItemId: registry.items[0]?.id ?? null,
     contract,
     validation,
     summary: {
@@ -1204,6 +1157,129 @@ function buildOpenClawNativePluginContractRegistry() {
         "registration cannot execute plugin code",
         "high-risk or mutating capabilities require approval",
         "native capabilities require audit ledgers",
+      ],
+    },
+  };
+}
+
+function buildOpenClawNativePluginRegistryResponse() {
+  const registry = createOpenClawNativePluginRegistry();
+  const validation = validateOpenClawNativePluginRegistry(registry);
+  const summary = summariseOpenClawNativePluginRegistry(registry);
+
+  return {
+    ok: true,
+    ...registry,
+    validation,
+    summary: {
+      ...summary,
+      guardrails: [
+        "registry is native to OpenClawOnNixOS",
+        "activation requires a manual adapter implementation",
+        "registration cannot execute plugin code",
+        "external runtime ownership remains forbidden",
+        "source content import remains disabled until explicit review",
+      ],
+    },
+  };
+}
+
+function buildOpenClawFormalIntegrationReadiness() {
+  const nativeRegistry = buildOpenClawNativePluginRegistryResponse();
+  const migrationPlan = buildOpenClawMigrationPlan();
+  const pluginSdkReview = buildOpenClawPluginSdkContractReview();
+  const firstWavePluginSdk = migrationPlan.items.find((item) => item.capability === "plugin_sdk") ?? null;
+  const pluginSdkReviewItem = pluginSdkReview.items.find((item) => item.capability === "plugin_sdk") ?? null;
+  const registryGovernance = nativeRegistry.governance ?? {};
+  const gates = [
+    {
+      id: "native_registry_valid",
+      label: "Native plugin registry validates",
+      required: true,
+      status: nativeRegistry.validation.ok ? "passed" : "blocked",
+      evidence: `issues=${nativeRegistry.validation.issues.length}`,
+    },
+    {
+      id: "runtime_owner_locked",
+      label: "Runtime owner remains OpenClawOnNixOS",
+      required: true,
+      status: nativeRegistry.runtimeOwner === "openclaw_on_nixos" ? "passed" : "blocked",
+      evidence: `runtimeOwner=${nativeRegistry.runtimeOwner}`,
+    },
+    {
+      id: "source_migration_plan_selected",
+      label: "Plugin SDK is selected in first-wave migration plan",
+      required: true,
+      status: firstWavePluginSdk ? "passed" : "blocked",
+      evidence: firstWavePluginSdk ? `status=${firstWavePluginSdk.status}` : "missing plugin_sdk first-wave item",
+    },
+    {
+      id: "sdk_contract_review_complete",
+      label: "Plugin SDK contract review exists without source import",
+      required: true,
+      status: pluginSdkReviewItem?.governance?.canReadSourceFileContent === false ? "passed" : "blocked",
+      evidence: pluginSdkReviewItem ? `verdict=${pluginSdkReviewItem.verdict}` : "missing plugin SDK review item",
+    },
+    {
+      id: "external_runtime_dependency_blocked",
+      label: "External runtime dependency remains blocked",
+      required: true,
+      status: registryGovernance.externalRuntimeDependencyAllowed === false ? "passed" : "blocked",
+      evidence: `externalRuntimeDependencyAllowed=${Boolean(registryGovernance.externalRuntimeDependencyAllowed)}`,
+    },
+    {
+      id: "registration_execution_blocked",
+      label: "Registration cannot execute plugin code",
+      required: true,
+      status: registryGovernance.canExecuteDuringRegistration === false ? "passed" : "blocked",
+      evidence: `canExecuteDuringRegistration=${Boolean(registryGovernance.canExecuteDuringRegistration)}`,
+    },
+    {
+      id: "adapter_implementation_pending",
+      label: "Native adapter implementation is the next manual engineering step",
+      required: false,
+      status: "pending",
+      evidence: "no runtime adapter is activated by readiness checks",
+    },
+  ];
+  const requiredGates = gates.filter((gate) => gate.required);
+  const passedRequired = requiredGates.filter((gate) => gate.status === "passed").length;
+  const readyForFormalIntegration = passedRequired === requiredGates.length;
+
+  return {
+    registry: "openclaw-formal-integration-readiness-v0",
+    mode: "readiness-only",
+    generatedAt: new Date().toISOString(),
+    sourceRegistries: [
+      nativeRegistry.registry,
+      migrationPlan.registry,
+      pluginSdkReview.registry,
+    ],
+    status: readyForFormalIntegration ? "ready_for_native_adapter_implementation" : "blocked",
+    readyForFormalIntegration,
+    gates,
+    summary: {
+      totalGates: gates.length,
+      requiredGates: requiredGates.length,
+      passedRequired,
+      blockedRequired: requiredGates.length - passedRequired,
+      pendingOptional: gates.filter((gate) => gate.status === "pending").length,
+      readyForFormalIntegration,
+      canImportSourceContent: false,
+      canExecutePluginCode: false,
+      canActivateRuntime: false,
+      createsTask: false,
+      createsApproval: false,
+      nextAllowedWork: [
+        "implement a native adapter shell inside OpenClawOnNixOS",
+        "map reviewed SDK concepts into native capability contracts",
+        "add adapter tests before any runtime activation",
+      ],
+      forbiddenWork: [
+        "do not wholesale copy old OpenClaw source",
+        "do not make old OpenClaw a runtime dependency",
+        "do not execute old repository commands",
+        "do not import source contents without explicit review",
       ],
     },
   };
@@ -4724,6 +4800,49 @@ const server = http.createServer(async (req, res) => {
       sourceMode: registry.sourceMode,
       summary: registry.summary,
       validation: registry.validation,
+    });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/plugins/openclaw-native-plugin-registry") {
+    sendJson(res, 200, buildOpenClawNativePluginRegistryResponse());
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/plugins/openclaw-native-plugin-registry/summary") {
+    const registry = buildOpenClawNativePluginRegistryResponse();
+    sendJson(res, 200, {
+      ok: true,
+      registry: registry.registry,
+      mode: registry.mode,
+      runtimeOwner: registry.runtimeOwner,
+      activationMode: registry.activationMode,
+      generatedAt: registry.generatedAt,
+      validation: registry.validation,
+      summary: registry.summary,
+    });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/plugins/openclaw-formal-integration-readiness") {
+    sendJson(res, 200, {
+      ok: true,
+      ...buildOpenClawFormalIntegrationReadiness(),
+    });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/plugins/openclaw-formal-integration-readiness/summary") {
+    const readiness = buildOpenClawFormalIntegrationReadiness();
+    sendJson(res, 200, {
+      ok: true,
+      registry: readiness.registry,
+      mode: readiness.mode,
+      generatedAt: readiness.generatedAt,
+      sourceRegistries: readiness.sourceRegistries,
+      status: readiness.status,
+      readyForFormalIntegration: readiness.readyForFormalIntegration,
+      summary: readiness.summary,
     });
     return;
   }

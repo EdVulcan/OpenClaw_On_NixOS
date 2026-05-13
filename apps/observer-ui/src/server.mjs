@@ -460,6 +460,24 @@ function observerHtml() {
           <pre id="native-plugin-contract-json">Loading native plugin contract...</pre>
         </section>
         <section class="panel">
+          <h2>OpenClaw Native Plugin Registry</h2>
+          <div class="metric"><span>Registry</span><span id="native-plugin-registry-id">openclaw-native-plugin-registry-v0</span></div>
+          <div class="metric"><span>Plugins</span><span id="native-plugin-registry-total">0</span></div>
+          <div class="metric"><span>Capabilities</span><span id="native-plugin-registry-capabilities">0</span></div>
+          <div class="metric"><span>Activation</span><span id="native-plugin-registry-activation">manual</span></div>
+          <div class="metric"><span>Validation</span><span id="native-plugin-registry-validation">unknown</span></div>
+          <pre id="native-plugin-registry-json">Loading native plugin registry...</pre>
+        </section>
+        <section class="panel">
+          <h2>OpenClaw Formal Integration Readiness</h2>
+          <div class="metric"><span>Registry</span><span id="integration-readiness-registry">openclaw-formal-integration-readiness-v0</span></div>
+          <div class="metric"><span>Status</span><span id="integration-readiness-status">unknown</span></div>
+          <div class="metric"><span>Required</span><span id="integration-readiness-required">0/0</span></div>
+          <div class="metric"><span>Runtime</span><span id="integration-readiness-runtime">disabled</span></div>
+          <div class="metric"><span>Mode</span><span id="integration-readiness-mode">readiness-only</span></div>
+          <pre id="integration-readiness-json">Loading formal integration readiness...</pre>
+        </section>
+        <section class="panel">
           <h2>Workspace Command Proposals</h2>
           <div class="metric"><span>Registry</span><span id="workspace-command-registry">workspace-command-proposals-v0</span></div>
           <div class="metric"><span>Total</span><span id="workspace-command-total">0</span></div>
@@ -755,6 +773,18 @@ const nativePluginContractApproval = document.querySelector("#native-plugin-cont
 const nativePluginContractMutation = document.querySelector("#native-plugin-contract-mutation");
 const nativePluginContractValidation = document.querySelector("#native-plugin-contract-validation");
 const nativePluginContractJson = document.querySelector("#native-plugin-contract-json");
+const nativePluginRegistryId = document.querySelector("#native-plugin-registry-id");
+const nativePluginRegistryTotal = document.querySelector("#native-plugin-registry-total");
+const nativePluginRegistryCapabilities = document.querySelector("#native-plugin-registry-capabilities");
+const nativePluginRegistryActivation = document.querySelector("#native-plugin-registry-activation");
+const nativePluginRegistryValidation = document.querySelector("#native-plugin-registry-validation");
+const nativePluginRegistryJson = document.querySelector("#native-plugin-registry-json");
+const integrationReadinessRegistry = document.querySelector("#integration-readiness-registry");
+const integrationReadinessStatus = document.querySelector("#integration-readiness-status");
+const integrationReadinessRequired = document.querySelector("#integration-readiness-required");
+const integrationReadinessRuntime = document.querySelector("#integration-readiness-runtime");
+const integrationReadinessMode = document.querySelector("#integration-readiness-mode");
+const integrationReadinessJson = document.querySelector("#integration-readiness-json");
 const workspaceCommandRegistry = document.querySelector("#workspace-command-registry");
 const workspaceCommandTotal = document.querySelector("#workspace-command-total");
 const workspaceCommandValidation = document.querySelector("#workspace-command-validation");
@@ -1305,6 +1335,75 @@ function renderNativePluginContract(data) {
   ].join("\\n");
 }
 
+function renderNativePluginRegistry(data) {
+  const summary = data?.summary ?? {};
+  const governance = summary.governance ?? data?.governance ?? {};
+  const items = Array.isArray(data?.items) ? data.items : [];
+  const validation = data?.validation ?? {};
+  nativePluginRegistryId.textContent = data?.registry ?? "openclaw-native-plugin-registry-v0";
+  nativePluginRegistryTotal.textContent = String(summary.totalPlugins ?? items.length);
+  nativePluginRegistryCapabilities.textContent = String(summary.totalCapabilities ?? 0);
+  nativePluginRegistryActivation.textContent = data?.activationMode ?? "manual_adapter_required";
+  nativePluginRegistryValidation.textContent = validation.ok === true || summary.validationOk === true ? "valid" : "invalid";
+
+  nativePluginRegistryJson.textContent = [
+    "Native registry: OpenClawOnNixOS-owned contracts that are eligible for adapter implementation.",
+    "Runtime activation is still disabled here; this registry is the controlled starting line.",
+    \`Registry: \${data?.registry ?? "openclaw-native-plugin-registry-v0"}\`,
+    \`Mode: \${data?.mode ?? "native-contract-registry"}\`,
+    \`Runtime Owner: \${data?.runtimeOwner ?? "unknown"}\`,
+    \`Activation Mode: \${data?.activationMode ?? "manual_adapter_required"}\`,
+    \`Plugins: \${summary.totalPlugins ?? items.length}\`,
+    \`Capabilities: \${summary.totalCapabilities ?? 0}\`,
+    \`Approval Required: \${summary.approvalRequired ?? 0}\`,
+    \`Mutation Capable: \${summary.mutationCapable ?? 0}\`,
+    \`Execution Capable: \${summary.executionCapable ?? 0}\`,
+    \`Validation: \${validation.ok === true || summary.validationOk === true ? "ok" : "failed"} issues=\${summary.issueCount ?? validation.issues?.length ?? 0}\`,
+    \`Governance: externalRuntimeDependencyAllowed=\${Boolean(governance.externalRuntimeDependencyAllowed)} sourceContentImported=\${Boolean(governance.sourceContentImported)} canActivateRuntime=\${Boolean(governance.canActivateRuntime)}\`,
+    "",
+    \`Guardrails: \${(summary.guardrails ?? []).join("; ") || "none"}\`,
+    "",
+    ...items.slice(0, 8).map((item) => {
+      const plugin = item.contract?.plugin ?? {};
+      const pluginSummary = summary.byPlugin?.[item.id] ?? {};
+      return \`[\${item.status ?? "unknown"}] \${plugin.id ?? item.id ?? "plugin"} name=\${plugin.name ?? "unknown"} capabilities=\${pluginSummary.totalCapabilities ?? item.contract?.capabilities?.length ?? 0} approval=\${pluginSummary.approvalRequired ?? 0} mutate=\${pluginSummary.mutationCapable ?? 0} execute=\${pluginSummary.executionCapable ?? 0}\`;
+    }),
+  ].join("\\n");
+}
+
+function renderFormalIntegrationReadiness(data) {
+  const summary = data?.summary ?? {};
+  const gates = Array.isArray(data?.gates) ? data.gates : [];
+  integrationReadinessRegistry.textContent = data?.registry ?? "openclaw-formal-integration-readiness-v0";
+  integrationReadinessStatus.textContent = data?.status ?? "unknown";
+  integrationReadinessRequired.textContent = \`\${summary.passedRequired ?? 0}/\${summary.requiredGates ?? 0}\`;
+  integrationReadinessRuntime.textContent = summary.canActivateRuntime ? "enabled" : "disabled";
+  integrationReadinessMode.textContent = data?.mode ?? "readiness-only";
+
+  integrationReadinessJson.textContent = [
+    "Readiness gate: formal adapter work may begin only after required governance gates pass.",
+    "This does not import source, execute plugin code, activate runtime, create tasks, or create approvals.",
+    \`Registry: \${data?.registry ?? "openclaw-formal-integration-readiness-v0"}\`,
+    \`Mode: \${data?.mode ?? "readiness-only"}\`,
+    \`Status: \${data?.status ?? "unknown"}\`,
+    \`Ready For Formal Integration: \${Boolean(data?.readyForFormalIntegration)}\`,
+    \`Required Gates: \${summary.passedRequired ?? 0}/\${summary.requiredGates ?? 0}\`,
+    \`Runtime Activation: \${summary.canActivateRuntime ? "enabled" : "disabled"}\`,
+    \`Import Source Content: \${Boolean(summary.canImportSourceContent)}\`,
+    \`Execute Plugin Code: \${Boolean(summary.canExecutePluginCode)}\`,
+    \`Creates Task: \${Boolean(summary.createsTask)} Creates Approval: \${Boolean(summary.createsApproval)}\`,
+    \`Sources: \${(data?.sourceRegistries ?? []).join(", ") || "none"}\`,
+    "",
+    ...gates.map((gate) => {
+      const required = gate.required ? "required" : "optional";
+      return \`[\${gate.status ?? "unknown"}/\${required}] \${gate.id ?? "gate"} :: \${gate.evidence ?? "no evidence"}\`;
+    }),
+    "",
+    \`Next Allowed Work: \${(summary.nextAllowedWork ?? []).join("; ") || "none"}\`,
+    \`Forbidden Work: \${(summary.forbiddenWork ?? []).join("; ") || "none"}\`,
+  ].join("\\n");
+}
+
 function renderWorkspaceCommandProposals(data) {
   const summary = data?.summary ?? {};
   const items = Array.isArray(data?.items) ? data.items : [];
@@ -1599,6 +1698,34 @@ async function refreshNativePluginContract() {
     nativePluginContractMutation.textContent = "0";
     nativePluginContractValidation.textContent = "unknown";
     nativePluginContractJson.textContent = "Unable to read native plugin contract.";
+  }
+}
+
+async function refreshNativePluginRegistry() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/plugins/openclaw-native-plugin-registry\`);
+    renderNativePluginRegistry(data);
+  } catch {
+    nativePluginRegistryId.textContent = "offline";
+    nativePluginRegistryTotal.textContent = "0";
+    nativePluginRegistryCapabilities.textContent = "0";
+    nativePluginRegistryActivation.textContent = "unknown";
+    nativePluginRegistryValidation.textContent = "unknown";
+    nativePluginRegistryJson.textContent = "Unable to read native plugin registry.";
+  }
+}
+
+async function refreshFormalIntegrationReadiness() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/plugins/openclaw-formal-integration-readiness\`);
+    renderFormalIntegrationReadiness(data);
+  } catch {
+    integrationReadinessRegistry.textContent = "offline";
+    integrationReadinessStatus.textContent = "unknown";
+    integrationReadinessRequired.textContent = "0/0";
+    integrationReadinessRuntime.textContent = "unknown";
+    integrationReadinessMode.textContent = "unknown";
+    integrationReadinessJson.textContent = "Unable to read formal integration readiness.";
   }
 }
 
@@ -3096,6 +3223,8 @@ await refreshWorkspaceMigrationMap();
 await refreshWorkspaceMigrationPlan();
 await refreshPluginSdkContractReview();
 await refreshNativePluginContract();
+await refreshNativePluginRegistry();
+await refreshFormalIntegrationReadiness();
 await refreshWorkspaceCommandProposals();
 await refreshWorkspaceCommandPlanDraft();
 await refreshSystemState();
@@ -3125,6 +3254,8 @@ setInterval(refreshWorkspaceMigrationMap, 5000);
 setInterval(refreshWorkspaceMigrationPlan, 5000);
 setInterval(refreshPluginSdkContractReview, 5000);
 setInterval(refreshNativePluginContract, 5000);
+setInterval(refreshNativePluginRegistry, 5000);
+setInterval(refreshFormalIntegrationReadiness, 5000);
 setInterval(refreshWorkspaceCommandProposals, 5000);
 setInterval(refreshWorkspaceCommandPlanDraft, 5000);
 setInterval(refreshSystemState, 5000);

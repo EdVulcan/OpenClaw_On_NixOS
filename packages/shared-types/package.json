@@ -7,10 +7,14 @@
     "./plugin-contract": {
       "types": "./src/plugin-contract.ts",
       "default": "./src/plugin-contract.mjs"
+    },
+    "./plugin-registry": {
+      "types": "./src/plugin-registry.ts",
+      "default": "./src/plugin-registry.mjs"
     }
   },
   "scripts": {
     "build": "node -e \"console.log('shared-types build placeholder')\"",
-    "typecheck": "node --check src/plugin-contract.mjs"
+    "typecheck": "node --check src/plugin-contract.mjs && node --check src/plugin-registry.mjs"
   }
 }
