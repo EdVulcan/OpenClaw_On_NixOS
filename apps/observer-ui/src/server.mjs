@@ -1789,6 +1789,8 @@ function renderWorkspacePatchApplyDraft(data) {
   const target = data?.target ?? {};
   const governance = data?.draft?.governance ?? data?.governance ?? {};
   const validation = data?.validation ?? {};
+  const structuredValidationEngine = validation.structuredPatch?.engine ?? "openclaw-native-workspace-patch-validation-v0";
+  const previewValidationEngine = validation.preview?.engine ?? "openclaw-native-workspace-patch-preview-validation-v0";
   const diffPreview = data?.diffPreview ?? {};
   const lines = Array.isArray(diffPreview.lines) ? diffPreview.lines : [];
   workspacePatchApplyRegistry.textContent = data?.registry ?? "openclaw-native-workspace-patch-apply-draft-v0";
@@ -1805,7 +1807,7 @@ function renderWorkspacePatchApplyDraft(data) {
     \`Capability: \${data?.capability?.id ?? "act.openclaw.workspace_patch_apply"} risk=\${data?.capability?.risk ?? "high"} approval=\${Boolean(data?.capability?.approvalRequired ?? true)} owner=\${data?.capability?.runtimeOwner ?? "unknown"}\`,
     \`Workspace: \${data?.workspace?.name ?? "unknown"} \${data?.workspace?.path ?? ""}\`,
     \`Target: \${target.relativePath ?? "scratch/observer-native-edit.txt"} edits=\${target.editCount ?? 1} changedAt=\${(target.changedAtLines ?? [target.changedAtLine]).filter(Boolean).join(",") || "unknown"} oldBytes=\${target.originalBytes ?? 0} newBytes=\${target.nextBytes ?? 0} oldSha256=\${target.originalSha256 ?? "unknown"} newSha256=\${target.nextSha256 ?? "unknown"} contentExposed=\${Boolean(target.contentExposed)} diffPreview=\${Boolean(target.diffPreviewExposed)}\`,
-    \`Validation: ok=\${Boolean(validation.ok)} structured=\${validation.structuredPatch?.engine ?? "unknown"} preview=\${validation.preview?.engine ?? "unknown"} appliesAgainstOriginal=\${Boolean(validation.structuredPatch?.checks?.appliesAgainstOriginalContent)}\`,
+    \`Validation: ok=\${Boolean(validation.ok)} structured=\${structuredValidationEngine} preview=\${previewValidationEngine} appliesAgainstOriginal=\${Boolean(validation.structuredPatch?.checks?.appliesAgainstOriginalContent)}\`,
     \`Diff: format=\${diffPreview.format ?? "unknown"} hunks=\${diffPreview.hunkCount ?? 1} oldStart=\${diffPreview.oldStartLine ?? "?"} newStart=\${diffPreview.newStartLine ?? "?"} lines=\${diffPreview.previewLineCount ?? lines.length} truncated=\${Boolean(diffPreview.truncated)}\`,
     \`Governance: createsTask=\${Boolean(governance.createsTask)} createsApproval=\${Boolean(governance.createsApproval)} executeWithoutApproval=\${Boolean(governance.canExecuteWithoutApproval)} filesystemWrite=\${Boolean(governance.usesFilesystemWriteCapability)} exposesFullContent=\${Boolean(governance.exposesFullContent)} exposesDiffPreview=\${Boolean(governance.exposesDiffPreview)}\`,
     "",
