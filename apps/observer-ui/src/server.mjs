@@ -478,6 +478,15 @@ function observerHtml() {
           <pre id="integration-readiness-json">Loading formal integration readiness...</pre>
         </section>
         <section class="panel">
+          <h2>OpenClaw Native Plugin Adapter</h2>
+          <div class="metric"><span>Registry</span><span id="native-plugin-adapter-registry">openclaw-native-plugin-adapter-v0</span></div>
+          <div class="metric"><span>Status</span><span id="native-plugin-adapter-status">unknown</span></div>
+          <div class="metric"><span>Implemented</span><span id="native-plugin-adapter-implemented">0</span></div>
+          <div class="metric"><span>Runtime</span><span id="native-plugin-adapter-runtime">disabled</span></div>
+          <div class="metric"><span>Mode</span><span id="native-plugin-adapter-mode">native-adapter-shell</span></div>
+          <pre id="native-plugin-adapter-json">Loading native plugin adapter...</pre>
+        </section>
+        <section class="panel">
           <h2>Workspace Command Proposals</h2>
           <div class="metric"><span>Registry</span><span id="workspace-command-registry">workspace-command-proposals-v0</span></div>
           <div class="metric"><span>Total</span><span id="workspace-command-total">0</span></div>
@@ -785,6 +794,12 @@ const integrationReadinessRequired = document.querySelector("#integration-readin
 const integrationReadinessRuntime = document.querySelector("#integration-readiness-runtime");
 const integrationReadinessMode = document.querySelector("#integration-readiness-mode");
 const integrationReadinessJson = document.querySelector("#integration-readiness-json");
+const nativePluginAdapterRegistry = document.querySelector("#native-plugin-adapter-registry");
+const nativePluginAdapterStatus = document.querySelector("#native-plugin-adapter-status");
+const nativePluginAdapterImplemented = document.querySelector("#native-plugin-adapter-implemented");
+const nativePluginAdapterRuntime = document.querySelector("#native-plugin-adapter-runtime");
+const nativePluginAdapterMode = document.querySelector("#native-plugin-adapter-mode");
+const nativePluginAdapterJson = document.querySelector("#native-plugin-adapter-json");
 const workspaceCommandRegistry = document.querySelector("#workspace-command-registry");
 const workspaceCommandTotal = document.querySelector("#workspace-command-total");
 const workspaceCommandValidation = document.querySelector("#workspace-command-validation");
@@ -1404,6 +1419,33 @@ function renderFormalIntegrationReadiness(data) {
   ].join("\\n");
 }
 
+function renderNativePluginAdapter(data) {
+  const summary = data?.summary ?? {};
+  nativePluginAdapterRegistry.textContent = data?.registry ?? "openclaw-native-plugin-adapter-v0";
+  nativePluginAdapterStatus.textContent = data?.status ?? "unknown";
+  nativePluginAdapterImplemented.textContent = String(summary.implemented ?? data?.implementedCapabilities?.length ?? 0);
+  nativePluginAdapterRuntime.textContent = summary.canActivateRuntime ? "enabled" : "disabled";
+  nativePluginAdapterMode.textContent = data?.mode ?? "native-adapter-shell";
+
+  nativePluginAdapterJson.textContent = [
+    "Native adapter shell: first real adapter capability is available, but runtime activation remains disabled.",
+    "Implemented adapter reads only reviewed plugin SDK manifest metadata and never reads source contents or executes plugin code.",
+    \`Registry: \${data?.registry ?? "openclaw-native-plugin-adapter-v0"}\`,
+    \`Mode: \${data?.mode ?? "native-adapter-shell"}\`,
+    \`Status: \${data?.status ?? "unknown"}\`,
+    \`Runtime Owner: \${data?.runtimeOwner ?? "unknown"}\`,
+    \`Implemented: \${(data?.implementedCapabilities ?? []).join(", ") || "none"}\`,
+    \`Pending: \${(data?.pendingCapabilities ?? []).join(", ") || "none"}\`,
+    \`Read Manifest Metadata: \${Boolean(summary.canReadManifestMetadata)}\`,
+    \`Read Source Content: \${Boolean(summary.canReadSourceFileContent)}\`,
+    \`Execute Plugin Code: \${Boolean(summary.canExecutePluginCode)}\`,
+    \`Runtime Activation: \${summary.canActivateRuntime ? "enabled" : "disabled"}\`,
+    \`Creates Task: \${Boolean(summary.createsTask)} Creates Approval: \${Boolean(summary.createsApproval)}\`,
+    "",
+    \`Guardrails: \${(data?.guardrails ?? []).join("; ") || "none"}\`,
+  ].join("\\n");
+}
+
 function renderWorkspaceCommandProposals(data) {
   const summary = data?.summary ?? {};
   const items = Array.isArray(data?.items) ? data.items : [];
@@ -1726,6 +1768,20 @@ async function refreshFormalIntegrationReadiness() {
     integrationReadinessRuntime.textContent = "unknown";
     integrationReadinessMode.textContent = "unknown";
     integrationReadinessJson.textContent = "Unable to read formal integration readiness.";
+  }
+}
+
+async function refreshNativePluginAdapter() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/plugins/openclaw-native-plugin-adapter\`);
+    renderNativePluginAdapter(data);
+  } catch {
+    nativePluginAdapterRegistry.textContent = "offline";
+    nativePluginAdapterStatus.textContent = "unknown";
+    nativePluginAdapterImplemented.textContent = "0";
+    nativePluginAdapterRuntime.textContent = "unknown";
+    nativePluginAdapterMode.textContent = "unknown";
+    nativePluginAdapterJson.textContent = "Unable to read native plugin adapter.";
   }
 }
 
@@ -3225,6 +3281,7 @@ await refreshPluginSdkContractReview();
 await refreshNativePluginContract();
 await refreshNativePluginRegistry();
 await refreshFormalIntegrationReadiness();
+await refreshNativePluginAdapter();
 await refreshWorkspaceCommandProposals();
 await refreshWorkspaceCommandPlanDraft();
 await refreshSystemState();
@@ -3256,6 +3313,7 @@ setInterval(refreshPluginSdkContractReview, 5000);
 setInterval(refreshNativePluginContract, 5000);
 setInterval(refreshNativePluginRegistry, 5000);
 setInterval(refreshFormalIntegrationReadiness, 5000);
+setInterval(refreshNativePluginAdapter, 5000);
 setInterval(refreshWorkspaceCommandProposals, 5000);
 setInterval(refreshWorkspaceCommandPlanDraft, 5000);
 setInterval(refreshSystemState, 5000);

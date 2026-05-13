@@ -1285,6 +1285,134 @@ function buildOpenClawFormalIntegrationReadiness() {
   };
 }
 
+function buildOpenClawNativePluginAdapterStatus() {
+  const registry = buildOpenClawNativePluginRegistryResponse();
+  return {
+    registry: "openclaw-native-plugin-adapter-v0",
+    mode: "native-adapter-shell",
+    generatedAt: new Date().toISOString(),
+    sourceRegistry: registry.registry,
+    runtimeOwner: "openclaw_on_nixos",
+    status: "manifest_profile_adapter_ready",
+    implementedCapabilities: ["sense.plugin.manifest_profile"],
+    pendingCapabilities: ["act.plugin.capability.invoke"],
+    summary: {
+      implemented: 1,
+      pending: 1,
+      canReadManifestMetadata: true,
+      canReadSourceFileContent: false,
+      canMutate: false,
+      canExecutePluginCode: false,
+      canActivateRuntime: false,
+      createsTask: false,
+      createsApproval: false,
+      requiresPolicyInvocation: true,
+    },
+    guardrails: [
+      "adapter shell is native to OpenClawOnNixOS",
+      "manifest profile reads only bounded package metadata from reviewed plugin SDK paths",
+      "source contents, README text, script bodies, dependency versions, plugin code execution, and runtime activation remain blocked",
+      "mutating plugin invocation remains pending explicit adapter design and approval gates",
+    ],
+  };
+}
+
+function selectReviewedPluginSdkPackage({ packagePath = null } = {}) {
+  const review = buildOpenClawPluginSdkContractReview();
+  const reviewedPackages = review.items
+    .filter((item) => item.capability === "plugin_sdk" && item.governance?.runtimeOwner === "openclaw_on_nixos")
+    .filter((item) => item.governance?.canReadSourceFileContent === false && item.governance?.canExecute === false);
+
+  if (reviewedPackages.length === 0) {
+    throw new Error("No reviewed OpenClaw plugin SDK package is available for native adapter profiling.");
+  }
+
+  if (typeof packagePath === "string" && packagePath.trim()) {
+    const requested = path.resolve(packagePath);
+    const match = reviewedPackages.find((item) => path.resolve(item.packagePath) === requested);
+    if (!match) {
+      throw new Error("Requested packagePath is not an OpenClaw plugin SDK path approved by the contract review.");
+    }
+    return { review, item: match };
+  }
+
+  return { review, item: reviewedPackages[0] };
+}
+
+function buildNativePluginManifestProfile({ packagePath = null } = {}) {
+  const { review, item } = selectReviewedPluginSdkPackage({ packagePath });
+  const manifestPath = path.join(item.packagePath, "package.json");
+  const manifest = readJsonFileIfPresent(manifestPath);
+  if (!manifest) {
+    throw new Error("Reviewed plugin SDK package does not include a readable package manifest.");
+  }
+
+  const nativeRegistry = createOpenClawNativePluginRegistry();
+  const registryItem = nativeRegistry.items.find((entry) => entry.id === "openclaw.native.plugin-sdk") ?? null;
+  const contract = registryItem?.contract ?? null;
+  const exportKeys = typeof manifest.exports === "string"
+    ? ["default"]
+    : safeObjectKeys(manifest.exports);
+  const scriptNames = safeObjectKeys(manifest.scripts);
+  const dependencySummary = {
+    dependencies: safeObjectKeys(manifest.dependencies).length,
+    devDependencies: safeObjectKeys(manifest.devDependencies).length,
+    peerDependencies: safeObjectKeys(manifest.peerDependencies).length,
+  };
+
+  return {
+    ok: true,
+    registry: "openclaw-native-plugin-adapter-v0",
+    mode: "manifest-profile-only",
+    generatedAt: new Date().toISOString(),
+    sourceRegistry: review.registry,
+    sourceMode: review.mode,
+    adapterStatus: "native_shell_active_manifest_only",
+    workspace: {
+      id: item.workspaceId,
+      name: item.workspaceName,
+      path: item.workspacePath,
+    },
+    plugin: {
+      id: registryItem?.id ?? "openclaw.native.plugin-sdk",
+      contractVersion: contract?.contractVersion ?? null,
+      packageName: typeof manifest.name === "string" ? manifest.name : null,
+      private: manifest.private === true,
+      hasVersion: typeof manifest.version === "string",
+      hasMain: typeof manifest.main === "string",
+      hasModule: typeof manifest.module === "string",
+      hasTypes: typeof manifest.types === "string" || typeof manifest.typings === "string",
+      hasExports: manifest.exports !== undefined,
+      exportKeys,
+      scriptNames,
+      dependencySummary,
+    },
+    capabilities: (contract?.capabilities ?? []).map((capability) => ({
+      id: capability.id,
+      kind: capability.kind,
+      risk: capability.risk,
+      domains: capability.domains,
+      approvalRequired: capability.approval?.required === true,
+      runtimeOwner: capability.runtimeOwner,
+    })),
+    governance: {
+      mode: "native_adapter_manifest_profile_only",
+      runtimeOwner: "openclaw_on_nixos",
+      canReadManifestMetadata: true,
+      canReadSourceFileContent: false,
+      exposesReadmeContent: false,
+      exposesScriptBodies: false,
+      exposesDependencyVersions: false,
+      canMutate: false,
+      canExecutePluginCode: false,
+      canActivateRuntime: false,
+      createsTask: false,
+      createsApproval: false,
+      sourcePackagePathReviewed: true,
+    },
+  };
+}
+
 function findWorkspaceCommandProposal({ proposalId = null, workspaceId = null, scriptName = null } = {}) {
   const proposals = buildWorkspaceCommandProposals();
   const match = proposals.items.find((item) => {
@@ -1521,6 +1649,9 @@ function resolvePlanCapabilityId({ kind, intent, plannerIntent }) {
   }
   if (candidate.startsWith("process.")) {
     return "sense.process.list";
+  }
+  if (candidate === "plugin.manifest.profile" || candidate === "plugin.manifest_profile" || candidate === "plugin.profile") {
+    return "sense.plugin.manifest_profile";
   }
   if (candidate === "command.execute" || candidate === "system.command.execute") {
     return "act.system.command.execute";
@@ -2164,6 +2295,18 @@ function baseCapabilities() {
       description: "Inspect local process summaries without mutating process state.",
     },
     {
+      id: "sense.plugin.manifest_profile",
+      name: "Native Plugin Manifest Profile",
+      kind: "sensor",
+      service: "openclaw-core",
+      endpoint: `http://${host}:${port}/plugins/native-adapter/manifest-profile`,
+      intents: ["plugin.manifest.profile", "plugin.manifest_profile", "plugin.profile"],
+      domains: ["body_internal"],
+      risk: "low",
+      governance: "audit_only",
+      description: "Profile reviewed OpenClaw plugin SDK manifest metadata through the native adapter shell without reading source contents or executing plugin code.",
+    },
+    {
       id: "act.system.command.dry_run",
       name: "System Command Dry Run",
       kind: "actuator",
@@ -2494,6 +2637,12 @@ async function callCapabilityBackend(capability, request) {
     }));
   }
 
+  if (capability.id === "sense.plugin.manifest_profile") {
+    return buildNativePluginManifestProfile({
+      packagePath: request.params.packagePath,
+    });
+  }
+
   if (capability.id === "act.system.command.dry_run") {
     return postJson(`${systemSenseUrl}/system/command/dry-run`, {
       ...request.params,
@@ -2608,6 +2757,18 @@ function summariseCapabilityInvocationResult(capability, result) {
       kind: "process.list",
       ok: result?.ok === true,
       count: result?.count ?? 0,
+    };
+  }
+  if (capability.id === "sense.plugin.manifest_profile") {
+    return {
+      kind: "plugin.manifest_profile",
+      ok: result?.ok === true,
+      pluginId: result?.plugin?.id ?? null,
+      packageName: result?.plugin?.packageName ?? null,
+      exportKeys: result?.plugin?.exportKeys?.length ?? 0,
+      scriptNames: result?.plugin?.scriptNames?.length ?? 0,
+      capabilities: Array.isArray(result?.capabilities) ? result.capabilities.length : 0,
+      canExecutePluginCode: result?.governance?.canExecutePluginCode === true,
     };
   }
   if (capability.id === "act.system.command.dry_run") {
@@ -4844,6 +5005,26 @@ const server = http.createServer(async (req, res) => {
       readyForFormalIntegration: readiness.readyForFormalIntegration,
       summary: readiness.summary,
     });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/plugins/openclaw-native-plugin-adapter") {
+    sendJson(res, 200, {
+      ok: true,
+      ...buildOpenClawNativePluginAdapterStatus(),
+    });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/plugins/native-adapter/manifest-profile") {
+    try {
+      sendJson(res, 200, buildNativePluginManifestProfile({
+        packagePath: requestUrl.searchParams.get("packagePath"),
+      }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 404, { ok: false, error: message });
+    }
     return;
   }
 
