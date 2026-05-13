@@ -450,6 +450,15 @@ function observerHtml() {
           <pre id="plugin-sdk-review-json">Loading plugin SDK contract review...</pre>
         </section>
         <section class="panel">
+          <h2>OpenClaw Plugin SDK Source Review Scope</h2>
+          <div class="metric"><span>Registry</span><span id="plugin-sdk-source-scope-registry">openclaw-plugin-sdk-source-review-scope-v0</span></div>
+          <div class="metric"><span>Files</span><span id="plugin-sdk-source-scope-total">0</span></div>
+          <div class="metric"><span>Content</span><span id="plugin-sdk-source-scope-content">blocked</span></div>
+          <div class="metric"><span>Approval</span><span id="plugin-sdk-source-scope-approval">required</span></div>
+          <div class="metric"><span>Mode</span><span id="plugin-sdk-source-scope-mode">scope-plan-only</span></div>
+          <pre id="plugin-sdk-source-scope-json">Loading plugin SDK source review scope...</pre>
+        </section>
+        <section class="panel">
           <h2>OpenClaw Native Plugin Contract</h2>
           <div class="metric"><span>Registry</span><span id="native-plugin-contract-registry">openclaw-native-plugin-contract-v0</span></div>
           <div class="metric"><span>Owner</span><span id="native-plugin-contract-owner">openclaw_on_nixos</span></div>
@@ -805,6 +814,12 @@ const pluginSdkReviewTypes = document.querySelector("#plugin-sdk-review-types");
 const pluginSdkReviewExports = document.querySelector("#plugin-sdk-review-exports");
 const pluginSdkReviewMode = document.querySelector("#plugin-sdk-review-mode");
 const pluginSdkReviewJson = document.querySelector("#plugin-sdk-review-json");
+const pluginSdkSourceScopeRegistry = document.querySelector("#plugin-sdk-source-scope-registry");
+const pluginSdkSourceScopeTotal = document.querySelector("#plugin-sdk-source-scope-total");
+const pluginSdkSourceScopeContent = document.querySelector("#plugin-sdk-source-scope-content");
+const pluginSdkSourceScopeApproval = document.querySelector("#plugin-sdk-source-scope-approval");
+const pluginSdkSourceScopeMode = document.querySelector("#plugin-sdk-source-scope-mode");
+const pluginSdkSourceScopeJson = document.querySelector("#plugin-sdk-source-scope-json");
 const nativePluginContractRegistry = document.querySelector("#native-plugin-contract-registry");
 const nativePluginContractOwner = document.querySelector("#native-plugin-contract-owner");
 const nativePluginContractTotal = document.querySelector("#native-plugin-contract-total");
@@ -1360,6 +1375,36 @@ function renderPluginSdkContractReview(data) {
   ].join("\\n");
 }
 
+function renderPluginSdkSourceReviewScope(data) {
+  const summary = data?.summary ?? {};
+  const governance = data?.governance ?? {};
+  const files = Array.isArray(data?.files) ? data.files : [];
+  const gates = Array.isArray(data?.gates) ? data.gates : [];
+  pluginSdkSourceScopeRegistry.textContent = data?.registry ?? "openclaw-plugin-sdk-source-review-scope-v0";
+  pluginSdkSourceScopeTotal.textContent = String(summary.totalFiles ?? files.length);
+  pluginSdkSourceScopeContent.textContent = summary.canReadSourceFileContent ? "allowed" : "blocked";
+  pluginSdkSourceScopeApproval.textContent = summary.requiresApprovalBeforeContentRead ? "required" : "not required";
+  pluginSdkSourceScopeMode.textContent = data?.mode ?? "scope-plan-only";
+
+  pluginSdkSourceScopeJson.textContent = [
+    "Source review scope: file metadata only. Source contents are not read, displayed, imported, or executed.",
+    "This is the checklist for a future explicit content-read approval, not the content review itself.",
+    \`Registry: \${data?.registry ?? "openclaw-plugin-sdk-source-review-scope-v0"}\`,
+    \`Mode: \${data?.mode ?? "scope-plan-only"}\`,
+    \`Package: \${data?.package?.name ?? "unknown"}\`,
+    \`Files: \${summary.totalFiles ?? files.length}\`,
+    \`By Kind: \${Object.entries(summary.byKind ?? {}).map(([kind, count]) => \`\${kind}=\${count}\`).join(", ") || "none"}\`,
+    \`Governance: readSource=\${Boolean(governance.canReadSourceFileContent)} importModule=\${Boolean(governance.canImportModule)} executePlugin=\${Boolean(governance.canExecutePluginCode)} activateRuntime=\${Boolean(governance.canActivateRuntime)} task=\${Boolean(governance.createsTask)} approval=\${Boolean(governance.createsApproval)}\`,
+    "",
+    ...gates.map((gate) => {
+      const required = gate.required ? "required" : "optional";
+      return \`[\${gate.status ?? "unknown"}/\${required}] \${gate.id ?? "gate"} :: \${gate.evidence ?? "no evidence"}\`;
+    }),
+    "",
+    ...files.slice(0, 16).map((file) => \`\${file.relativePath ?? "unknown"} kind=\${file.kind ?? "unknown"} size=\${file.sizeBytes ?? "unknown"} contentRead=\${Boolean(file.contentRead)}\`),
+  ].join("\\n");
+}
+
 function renderNativePluginContract(data) {
   const summary = data?.summary ?? {};
   const contract = data?.contract ?? {};
@@ -1864,6 +1909,20 @@ async function refreshPluginSdkContractReview() {
     pluginSdkReviewExports.textContent = "0";
     pluginSdkReviewMode.textContent = "unknown";
     pluginSdkReviewJson.textContent = "Unable to read plugin SDK contract review.";
+  }
+}
+
+async function refreshPluginSdkSourceReviewScope() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/workspaces/openclaw-plugin-sdk-source-review-scope\`);
+    renderPluginSdkSourceReviewScope(data);
+  } catch {
+    pluginSdkSourceScopeRegistry.textContent = "offline";
+    pluginSdkSourceScopeTotal.textContent = "0";
+    pluginSdkSourceScopeContent.textContent = "unknown";
+    pluginSdkSourceScopeApproval.textContent = "unknown";
+    pluginSdkSourceScopeMode.textContent = "unknown";
+    pluginSdkSourceScopeJson.textContent = "Unable to read plugin SDK source review scope.";
   }
 }
 
@@ -3488,6 +3547,7 @@ await refreshWorkspaceRegistry();
 await refreshWorkspaceMigrationMap();
 await refreshWorkspaceMigrationPlan();
 await refreshPluginSdkContractReview();
+await refreshPluginSdkSourceReviewScope();
 await refreshNativePluginContract();
 await refreshNativePluginRegistry();
 await refreshFormalIntegrationReadiness();
@@ -3523,6 +3583,7 @@ setInterval(refreshWorkspaceRegistry, 5000);
 setInterval(refreshWorkspaceMigrationMap, 5000);
 setInterval(refreshWorkspaceMigrationPlan, 5000);
 setInterval(refreshPluginSdkContractReview, 5000);
+setInterval(refreshPluginSdkSourceReviewScope, 5000);
 setInterval(refreshNativePluginContract, 5000);
 setInterval(refreshNativePluginRegistry, 5000);
 setInterval(refreshFormalIntegrationReadiness, 5000);

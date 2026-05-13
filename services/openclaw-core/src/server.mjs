@@ -996,6 +996,84 @@ function safeObjectKeys(value) {
     : [];
 }
 
+const SOURCE_REVIEW_EXTENSION_KINDS = new Map([
+  [".ts", "typescript_source"],
+  [".tsx", "typescript_source"],
+  [".js", "javascript_source"],
+  [".mjs", "javascript_source"],
+  [".cjs", "javascript_source"],
+  [".d.ts", "type_declaration"],
+  [".json", "manifest_or_schema"],
+  [".md", "documentation"],
+]);
+
+function sourceReviewKindForRelativePath(relativePath) {
+  if (relativePath.endsWith(".d.ts")) {
+    return SOURCE_REVIEW_EXTENSION_KINDS.get(".d.ts");
+  }
+  return SOURCE_REVIEW_EXTENSION_KINDS.get(path.extname(relativePath)) ?? "other";
+}
+
+function collectSourceReviewScopeFiles(rootPath, { maxDepth = 4, maxFiles = 80 } = {}) {
+  const files = [];
+  const ignoredDirectories = new Set([".git", "node_modules", "dist", "build", ".turbo", ".cache"]);
+  const allowedTopLevel = new Set(["src", "types", "test", "tests", "README.md", "package.json"]);
+
+  function visit(currentPath, depth) {
+    if (files.length >= maxFiles || depth > maxDepth) {
+      return;
+    }
+    let entries = [];
+    try {
+      entries = readdirSync(currentPath, { withFileTypes: true });
+    } catch {
+      return;
+    }
+
+    for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
+      if (files.length >= maxFiles) {
+        return;
+      }
+      const absolutePath = path.join(currentPath, entry.name);
+      const relativePath = path.relative(rootPath, absolutePath).replaceAll(path.sep, "/");
+      const topLevel = relativePath.split("/")[0];
+      if (!allowedTopLevel.has(topLevel)) {
+        continue;
+      }
+      if (entry.isDirectory()) {
+        if (!ignoredDirectories.has(entry.name)) {
+          visit(absolutePath, depth + 1);
+        }
+        continue;
+      }
+      if (!entry.isFile()) {
+        continue;
+      }
+
+      const kind = sourceReviewKindForRelativePath(relativePath);
+      if (kind === "other") {
+        continue;
+      }
+      const stats = safeStat(absolutePath);
+      files.push({
+        relativePath,
+        kind,
+        extension: relativePath.endsWith(".d.ts") ? ".d.ts" : path.extname(relativePath),
+        sizeBytes: stats?.size ?? null,
+        contentRead: false,
+        recommendedReview: kind === "manifest_or_schema"
+          ? "verify metadata shape without exposing script bodies or dependency versions"
+          : kind === "documentation"
+            ? "review public contract wording only after explicit content approval"
+            : "review exported capability surface before native implementation",
+      });
+    }
+  }
+
+  visit(rootPath, 0);
+  return files;
+}
+
 function buildPluginSdkContractReviewForPlanItem(planItem) {
   const sdkPath = path.join(planItem.workspacePath, "packages", "plugin-sdk");
   const manifest = readJsonFileIfPresent(path.join(sdkPath, "package.json"));
@@ -1076,6 +1154,90 @@ function buildPluginSdkContractReviewForPlanItem(planItem) {
       createsApproval: false,
       migrationStatus: "review_required_before_import",
       runtimeOwner: "openclaw_on_nixos",
+    },
+  };
+}
+
+function buildOpenClawPluginSdkSourceReviewScope({ packagePath = null } = {}) {
+  const { review, item } = selectReviewedPluginSdkPackage({ packagePath });
+  const files = collectSourceReviewScopeFiles(item.packagePath);
+  const byKind = files.reduce((accumulator, file) => {
+    accumulator[file.kind] = (accumulator[file.kind] ?? 0) + 1;
+    return accumulator;
+  }, {});
+
+  return {
+    ok: true,
+    registry: "openclaw-plugin-sdk-source-review-scope-v0",
+    mode: "scope-plan-only",
+    generatedAt: new Date().toISOString(),
+    sourceRegistry: review.registry,
+    sourceMode: review.mode,
+    workspace: {
+      id: item.workspaceId,
+      name: item.workspaceName,
+      path: item.workspacePath,
+    },
+    package: {
+      path: item.packagePath,
+      name: item.packageManifest?.name ?? null,
+      surfaces: item.contractSurfaces ?? [],
+    },
+    files,
+    gates: [
+      {
+        id: "scope_metadata_only",
+        label: "Only file metadata is in scope",
+        required: true,
+        status: "passed",
+        evidence: `files=${files.length}`,
+      },
+      {
+        id: "content_read_approval_required",
+        label: "Explicit approval is required before reading source contents",
+        required: true,
+        status: "blocked",
+        evidence: "no content-read approval exists in this scope plan",
+      },
+      {
+        id: "native_reimplementation_required",
+        label: "Approved concepts must be reimplemented natively in OpenClawOnNixOS",
+        required: true,
+        status: "blocked",
+        evidence: "old OpenClaw remains non-authoritative source material",
+      },
+    ],
+    summary: {
+      totalFiles: files.length,
+      byKind,
+      canReadManifestMetadata: true,
+      canReadSourceFileContent: false,
+      exposesReadmeContent: false,
+      exposesScriptBodies: false,
+      exposesDependencyVersions: false,
+      canImportModule: false,
+      canExecutePluginCode: false,
+      canActivateRuntime: false,
+      createsTask: false,
+      createsApproval: false,
+      requiresApprovalBeforeContentRead: true,
+    },
+    governance: {
+      mode: "plugin_sdk_source_review_scope_plan_only",
+      runtimeOwner: "openclaw_on_nixos",
+      canReadManifestMetadata: true,
+      canReadSourceFileContent: false,
+      exposesReadmeContent: false,
+      exposesScriptBodies: false,
+      exposesDependencyVersions: false,
+      canMutate: false,
+      canExecute: false,
+      canImportModule: false,
+      canExecutePluginCode: false,
+      canActivateRuntime: false,
+      createsTask: false,
+      createsApproval: false,
+      requiresApprovalBeforeContentRead: true,
     },
   };
 }
@@ -5475,6 +5637,40 @@ const server = http.createServer(async (req, res) => {
       roots: review.roots,
       summary: review.summary,
     });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/workspaces/openclaw-plugin-sdk-source-review-scope") {
+    try {
+      sendJson(res, 200, buildOpenClawPluginSdkSourceReviewScope({
+        packagePath: requestUrl.searchParams.get("packagePath"),
+      }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/workspaces/openclaw-plugin-sdk-source-review-scope/summary") {
+    try {
+      const scope = buildOpenClawPluginSdkSourceReviewScope({
+        packagePath: requestUrl.searchParams.get("packagePath"),
+      });
+      sendJson(res, 200, {
+        ok: true,
+        registry: scope.registry,
+        mode: scope.mode,
+        generatedAt: scope.generatedAt,
+        sourceRegistry: scope.sourceRegistry,
+        sourceMode: scope.sourceMode,
+        summary: scope.summary,
+        governance: scope.governance,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
     return;
   }
 
