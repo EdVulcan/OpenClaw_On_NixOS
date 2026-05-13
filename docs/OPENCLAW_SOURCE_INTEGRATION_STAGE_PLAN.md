@@ -280,7 +280,14 @@ SDK derived signals -> native contract tests -> native contract implementation -
 
 ## 10. 2026-05-13 Step 4 Update: Tool Catalog Absorption
 
-Status: implemented_waiting_check.
+Status: passed.
+
+Confirmed on NixOS:
+- Started: 2026-05-13 19:39:25 +08:00.
+- Finished: 2026-05-13 19:39:36 +08:00.
+- `openclaw-tool-catalog`: PASS, 6s.
+- `observer-openclaw-tool-catalog`: PASS, 5s.
+- Total: 2 passed / 0 failed.
 
 Slice: `sense.openclaw.tool_catalog`.
 
@@ -324,4 +331,4 @@ Next intended slice after this passes:
 
 这条线是本阶段的主线。
 
-当前执行焦点：Step 4 `First Real Capability Absorption`，`sense.openclaw.tool_catalog` 已实现，状态为 `implemented_waiting_check`，等待 NixOS targeted milestone 确认。
+当前执行焦点：Step 4 `First Real Capability Absorption`，`sense.openclaw.tool_catalog` 已通过 NixOS targeted milestone。下一步进入第一个 native read-only tool adapter，禁止再新增与真实 adapter 无关的 readiness/checklist 层。
