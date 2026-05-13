@@ -1294,10 +1294,10 @@ function buildOpenClawNativePluginAdapterStatus() {
     sourceRegistry: registry.registry,
     runtimeOwner: "openclaw_on_nixos",
     status: "manifest_profile_adapter_ready",
-    implementedCapabilities: ["sense.plugin.manifest_profile"],
+    implementedCapabilities: ["sense.plugin.manifest_profile", "plan.plugin.runtime_preflight"],
     pendingCapabilities: ["act.plugin.capability.invoke"],
     summary: {
-      implemented: 1,
+      implemented: 2,
       pending: 1,
       canReadManifestMetadata: true,
       canReadSourceFileContent: false,
@@ -1311,6 +1311,7 @@ function buildOpenClawNativePluginAdapterStatus() {
     guardrails: [
       "adapter shell is native to OpenClawOnNixOS",
       "manifest profile reads only bounded package metadata from reviewed plugin SDK paths",
+      "runtime preflight builds a governed execution envelope without loading plugin modules",
       "source contents, README text, script bodies, dependency versions, plugin code execution, and runtime activation remain blocked",
       "mutating plugin invocation remains pending explicit adapter design and approval gates",
     ],
@@ -1533,6 +1534,100 @@ function buildNativePluginCapabilityInvokePlan({ packagePath = null, capabilityI
       "explicit user approval not collected",
       "source content review not explicitly approved",
     ],
+  };
+}
+
+function buildNativePluginRuntimePreflight({ packagePath = null, capabilityId = "act.plugin.capability.invoke" } = {}) {
+  const planEnvelope = buildNativePluginCapabilityInvokePlan({ packagePath, capabilityId });
+  const capability = planEnvelope.capability ?? {};
+  const plugin = planEnvelope.plugin ?? {};
+  const policyDecision = planEnvelope.policy?.decision ?? {};
+
+  return {
+    ok: true,
+    registry: "openclaw-native-plugin-runtime-preflight-v0",
+    mode: "preflight-only",
+    generatedAt: new Date().toISOString(),
+    sourceRegistry: planEnvelope.registry,
+    sourceMode: planEnvelope.mode,
+    adapter: {
+      id: "native-plugin-adapter-v0",
+      runtimeOwner: "openclaw_on_nixos",
+      status: "preflight_ready_runtime_disabled",
+      canLoadPluginModule: false,
+      canExecutePluginCode: false,
+      canActivateRuntime: false,
+    },
+    plugin: {
+      id: plugin.id ?? null,
+      packageName: plugin.packageName ?? null,
+      hasTypes: plugin.hasTypes === true,
+      hasExports: plugin.hasExports === true,
+      exportKeys: plugin.exportKeys ?? [],
+      dependencySummary: plugin.dependencySummary ?? {},
+    },
+    capability: {
+      id: capability.id ?? null,
+      kind: capability.kind ?? null,
+      risk: capability.risk ?? null,
+      domains: capability.domains ?? [],
+      runtimeOwner: capability.runtimeOwner ?? null,
+      approvalRequired: capability.approvalRequired === true,
+      permissions: capability.permissions ?? {},
+      audit: capability.audit ?? {},
+    },
+    executionEnvelope: {
+      envelopeVersion: "native-plugin-execution-envelope-v0",
+      state: "blocked_pending_runtime_adapter",
+      adapterId: "native-plugin-adapter-v0",
+      pluginId: plugin.id ?? null,
+      packageName: plugin.packageName ?? null,
+      capabilityId: capability.id ?? null,
+      policyDecision: {
+        decision: policyDecision.decision ?? null,
+        reason: policyDecision.reason ?? null,
+        domain: policyDecision.domain ?? null,
+        risk: policyDecision.risk ?? null,
+        approved: policyDecision.approved === true,
+      },
+      approval: {
+        required: true,
+        collected: false,
+        reason: capability.approvalReason ?? "Execution and mutation require explicit user approval.",
+      },
+      audit: {
+        required: capability.audit?.required !== false,
+        ledger: capability.audit?.ledger ?? "capability_history",
+      },
+      permissions: capability.permissions ?? {},
+      constraints: {
+        canReadManifestMetadata: true,
+        canReadSourceFileContent: false,
+        canImportModule: false,
+        canExecutePluginCode: false,
+        canActivateRuntime: false,
+        canMutate: false,
+        canCreateTask: false,
+        canCreateApproval: false,
+      },
+    },
+    governance: {
+      mode: "native_plugin_runtime_preflight_only",
+      runtimeOwner: "openclaw_on_nixos",
+      createsTask: false,
+      createsApproval: false,
+      canReadManifestMetadata: true,
+      canReadSourceFileContent: false,
+      exposesReadmeContent: false,
+      exposesScriptBodies: false,
+      exposesDependencyVersions: false,
+      canImportModule: false,
+      canExecutePluginCode: false,
+      canActivateRuntime: false,
+      canMutate: false,
+      requiresExplicitApprovalBeforeExecution: true,
+      requiresRuntimeAdapterBeforeExecution: true,
+    },
   };
 }
 
@@ -5363,6 +5458,19 @@ const server = http.createServer(async (req, res) => {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       sendJson(res, 404, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/plugins/native-adapter/runtime-preflight") {
+    try {
+      sendJson(res, 200, buildNativePluginRuntimePreflight({
+        packagePath: requestUrl.searchParams.get("packagePath"),
+        capabilityId: requestUrl.searchParams.get("capabilityId") ?? "act.plugin.capability.invoke",
+      }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
     }
     return;
   }

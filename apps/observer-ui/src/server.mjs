@@ -487,6 +487,15 @@ function observerHtml() {
           <pre id="native-plugin-adapter-json">Loading native plugin adapter...</pre>
         </section>
         <section class="panel">
+          <h2>OpenClaw Native Runtime Preflight</h2>
+          <div class="metric"><span>Registry</span><span id="native-plugin-preflight-registry">openclaw-native-plugin-runtime-preflight-v0</span></div>
+          <div class="metric"><span>Envelope</span><span id="native-plugin-preflight-envelope">unknown</span></div>
+          <div class="metric"><span>Approval</span><span id="native-plugin-preflight-approval">required</span></div>
+          <div class="metric"><span>Runtime</span><span id="native-plugin-preflight-runtime">disabled</span></div>
+          <div class="metric"><span>Mode</span><span id="native-plugin-preflight-mode">preflight-only</span></div>
+          <pre id="native-plugin-preflight-json">Loading native plugin runtime preflight...</pre>
+        </section>
+        <section class="panel">
           <h2>OpenClaw Native Plugin Invoke Plan</h2>
           <div class="metric"><span>Registry</span><span id="native-plugin-invoke-plan-registry">openclaw-native-plugin-invoke-plan-v0</span></div>
           <div class="metric"><span>Capability</span><span id="native-plugin-invoke-plan-capability">act.plugin.capability.invoke</span></div>
@@ -812,6 +821,12 @@ const nativePluginAdapterImplemented = document.querySelector("#native-plugin-ad
 const nativePluginAdapterRuntime = document.querySelector("#native-plugin-adapter-runtime");
 const nativePluginAdapterMode = document.querySelector("#native-plugin-adapter-mode");
 const nativePluginAdapterJson = document.querySelector("#native-plugin-adapter-json");
+const nativePluginPreflightRegistry = document.querySelector("#native-plugin-preflight-registry");
+const nativePluginPreflightEnvelope = document.querySelector("#native-plugin-preflight-envelope");
+const nativePluginPreflightApproval = document.querySelector("#native-plugin-preflight-approval");
+const nativePluginPreflightRuntime = document.querySelector("#native-plugin-preflight-runtime");
+const nativePluginPreflightMode = document.querySelector("#native-plugin-preflight-mode");
+const nativePluginPreflightJson = document.querySelector("#native-plugin-preflight-json");
 const nativePluginInvokePlanRegistry = document.querySelector("#native-plugin-invoke-plan-registry");
 const nativePluginInvokePlanCapability = document.querySelector("#native-plugin-invoke-plan-capability");
 const nativePluginInvokePlanDecision = document.querySelector("#native-plugin-invoke-plan-decision");
@@ -1465,6 +1480,35 @@ function renderNativePluginAdapter(data) {
   ].join("\\n");
 }
 
+function renderNativePluginPreflight(data) {
+  const governance = data?.governance ?? {};
+  const envelope = data?.executionEnvelope ?? {};
+  const adapter = data?.adapter ?? {};
+  const capability = data?.capability ?? {};
+  const approval = envelope.approval ?? {};
+  const constraints = envelope.constraints ?? {};
+  nativePluginPreflightRegistry.textContent = data?.registry ?? "openclaw-native-plugin-runtime-preflight-v0";
+  nativePluginPreflightEnvelope.textContent = envelope.envelopeVersion ?? "unknown";
+  nativePluginPreflightApproval.textContent = approval.required ? "required" : "not required";
+  nativePluginPreflightRuntime.textContent = adapter.canActivateRuntime ? "enabled" : "disabled";
+  nativePluginPreflightMode.textContent = data?.mode ?? "preflight-only";
+
+  nativePluginPreflightJson.textContent = [
+    "Runtime preflight: builds the governed execution envelope before any plugin module can be loaded.",
+    "This still does not create tasks, create approvals, import modules, execute plugin code, mutate state, or activate runtime.",
+    \`Registry: \${data?.registry ?? "openclaw-native-plugin-runtime-preflight-v0"}\`,
+    \`Mode: \${data?.mode ?? "preflight-only"}\`,
+    \`Envelope: \${envelope.envelopeVersion ?? "unknown"} state=\${envelope.state ?? "unknown"}\`,
+    \`Adapter: \${adapter.id ?? "unknown"} status=\${adapter.status ?? "unknown"} owner=\${adapter.runtimeOwner ?? "unknown"}\`,
+    \`Plugin: \${data?.plugin?.id ?? "unknown"} package=\${data?.plugin?.packageName ?? "unknown"}\`,
+    \`Capability: \${capability.id ?? "unknown"} risk=\${capability.risk ?? "unknown"} approval=\${Boolean(capability.approvalRequired)}\`,
+    \`Policy: \${envelope.policyDecision?.decision ?? "unknown"} reason=\${envelope.policyDecision?.reason ?? "none"}\`,
+    \`Audit: required=\${Boolean(envelope.audit?.required)} ledger=\${envelope.audit?.ledger ?? "unknown"}\`,
+    \`Constraints: importModule=\${Boolean(constraints.canImportModule)} executePlugin=\${Boolean(constraints.canExecutePluginCode)} activateRuntime=\${Boolean(constraints.canActivateRuntime)} mutate=\${Boolean(constraints.canMutate)}\`,
+    \`Governance: createsTask=\${Boolean(governance.createsTask)} createsApproval=\${Boolean(governance.createsApproval)} readSource=\${Boolean(governance.canReadSourceFileContent)} exposesScripts=\${Boolean(governance.exposesScriptBodies)} exposesDeps=\${Boolean(governance.exposesDependencyVersions)}\`,
+  ].join("\\n");
+}
+
 function renderNativePluginInvokePlan(data) {
   const governance = data?.governance ?? {};
   const policyDecision = data?.policy?.decision ?? {};
@@ -1830,6 +1874,20 @@ async function refreshNativePluginAdapter() {
     nativePluginAdapterRuntime.textContent = "unknown";
     nativePluginAdapterMode.textContent = "unknown";
     nativePluginAdapterJson.textContent = "Unable to read native plugin adapter.";
+  }
+}
+
+async function refreshNativePluginPreflight() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/runtime-preflight\`);
+    renderNativePluginPreflight(data);
+  } catch {
+    nativePluginPreflightRegistry.textContent = "offline";
+    nativePluginPreflightEnvelope.textContent = "unknown";
+    nativePluginPreflightApproval.textContent = "unknown";
+    nativePluginPreflightRuntime.textContent = "unknown";
+    nativePluginPreflightMode.textContent = "unknown";
+    nativePluginPreflightJson.textContent = "Unable to read native plugin runtime preflight.";
   }
 }
 
@@ -3373,6 +3431,7 @@ await refreshNativePluginContract();
 await refreshNativePluginRegistry();
 await refreshFormalIntegrationReadiness();
 await refreshNativePluginAdapter();
+await refreshNativePluginPreflight();
 await refreshNativePluginInvokePlan();
 await refreshWorkspaceCommandProposals();
 await refreshWorkspaceCommandPlanDraft();
@@ -3406,6 +3465,7 @@ setInterval(refreshNativePluginContract, 5000);
 setInterval(refreshNativePluginRegistry, 5000);
 setInterval(refreshFormalIntegrationReadiness, 5000);
 setInterval(refreshNativePluginAdapter, 5000);
+setInterval(refreshNativePluginPreflight, 5000);
 setInterval(refreshNativePluginInvokePlan, 5000);
 setInterval(refreshWorkspaceCommandProposals, 5000);
 setInterval(refreshWorkspaceCommandPlanDraft, 5000);
