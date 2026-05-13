@@ -1,6 +1,6 @@
 # OpenClaw Source Integration Stage Plan
 
-更新时间：2026-05-13 21:30 +08:00
+更新时间：2026-05-13 21:20 +08:00
 
 本文档用于跟踪当前阶段：把旁路 `openclaw` 增强源码项目中的能力，受控接入 `OpenClawOnNixOS`。后续每推进一个接入切片，都必须同步更新本文件，避免路线漂移、重复准备层、或忘记阶段边界。
 
@@ -504,7 +504,14 @@ Next intended slice after this passes:
 
 ## 14. 2026-05-13 Step 5 Update: Native Workspace Text Write
 
-Status: implemented_waiting_check.
+Status: passed.
+
+Confirmed on NixOS:
+- Started: 2026-05-13 21:17:41 +08:00.
+- Finished: 2026-05-13 21:17:53 +08:00.
+- `openclaw-native-workspace-text-write`: PASS, 6s.
+- `observer-openclaw-native-workspace-text-write`: PASS, 5s.
+- Total: 2 passed / 0 failed.
 
 Slice: `act.openclaw.workspace_text_write`.
 
@@ -529,10 +536,11 @@ Governance boundaries:
 - Public task/approval/Observer responses expose content bytes and sha256, not raw content.
 - Runtime owner remains `openclaw_on_nixos`.
 
-Local verification target:
-- `npm run typecheck`.
-- `git diff --check`.
-- Targeted service smoke via the new milestone scripts on NixOS/bash.
+Local verification:
+- `npm run typecheck`: passed.
+- `git diff --check`: passed.
+- PowerShell service smoke: passed.
+- NixOS targeted milestone: passed.
 
 NixOS targeted milestone command:
 
@@ -542,7 +550,7 @@ git pull origin main && \
 OPENCLAW_MILESTONE_CHECKS=openclaw-native-workspace-text-write,observer-openclaw-native-workspace-text-write npm run dev:milestone-check:unix
 ```
 
-Next intended slice after this passes:
+Next intended slice:
 - Extend from whole-file text write to a conservative edit proposal/apply chain with diff preview.
 - Keep all writes behind approval and filesystem ledgering.
-- Do not jump to shell/process/web gateway execution until this mutation adapter has passed on NixOS.
+- Do not jump to shell/process/web gateway execution until the diff-preview edit chain is proven.
