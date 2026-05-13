@@ -83,6 +83,25 @@ export function createOpenClawNativePluginRegistry({ generatedAt = new Date().to
         },
       },
       {
+        id: "sense.openclaw.workspace_symbol_lookup",
+        title: "Execute OpenClaw workspace symbol lookup",
+        description: "Runs a bounded read-only symbol query over enhanced OpenClaw workspace files without importing modules, executing legacy code, or exposing function bodies.",
+        kind: "sense",
+        domains: ["body_internal"],
+        risk: "low",
+        permissions: {
+          filesystemRead: true,
+        },
+        approval: {
+          required: false,
+          reason: "Read-only symbol lookup inside the body boundary.",
+        },
+        audit: {
+          required: true,
+          ledger: "capability_history",
+        },
+      },
+      {
         id: "sense.openclaw.prompt_pack",
         title: "Profile OpenClaw prompt pack",
         description: "Summarizes enhanced OpenClaw prompt and agent-behavior surfaces as native policy metadata without importing runtime modules.",

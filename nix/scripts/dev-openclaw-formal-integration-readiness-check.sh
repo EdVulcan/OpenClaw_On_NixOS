@@ -127,7 +127,7 @@ if (
   || registry.activationMode !== "manual_adapter_required"
   || registry.validation?.ok !== true
   || registry.summary?.totalPlugins !== 1
-  || registry.summary?.totalCapabilities !== 6
+  || registry.summary?.totalCapabilities !== 7
   || registry.summary?.governance?.canActivateRuntime !== false
 ) {
   throw new Error(`native plugin registry endpoint mismatch: ${JSON.stringify(registry)}`);

@@ -513,6 +513,15 @@ function observerHtml() {
           <pre id="semantic-index-json">Loading native workspace semantic index...</pre>
         </section>
         <section class="panel">
+          <h2>OpenClaw Symbol Lookup</h2>
+          <div class="metric"><span>Registry</span><span id="symbol-lookup-registry">openclaw-native-plugin-adapter-v0</span></div>
+          <div class="metric"><span>Matches</span><span id="symbol-lookup-matches">0</span></div>
+          <div class="metric"><span>Files</span><span id="symbol-lookup-files">0</span></div>
+          <div class="metric"><span>Execution</span><span id="symbol-lookup-execution">query-only</span></div>
+          <div class="metric"><span>Mode</span><span id="symbol-lookup-mode">workspace-symbol-lookup-executable-read-only</span></div>
+          <pre id="symbol-lookup-json">Loading native workspace symbol lookup...</pre>
+        </section>
+        <section class="panel">
           <h2>OpenClaw Native Plugin Contract</h2>
           <div class="metric"><span>Registry</span><span id="native-plugin-contract-registry">openclaw-native-plugin-contract-v0</span></div>
           <div class="metric"><span>Owner</span><span id="native-plugin-contract-owner">openclaw_on_nixos</span></div>
@@ -910,6 +919,12 @@ const semanticIndexExports = document.querySelector("#semantic-index-exports");
 const semanticIndexSource = document.querySelector("#semantic-index-source");
 const semanticIndexMode = document.querySelector("#semantic-index-mode");
 const semanticIndexJson = document.querySelector("#semantic-index-json");
+const symbolLookupRegistry = document.querySelector("#symbol-lookup-registry");
+const symbolLookupMatches = document.querySelector("#symbol-lookup-matches");
+const symbolLookupFiles = document.querySelector("#symbol-lookup-files");
+const symbolLookupExecution = document.querySelector("#symbol-lookup-execution");
+const symbolLookupMode = document.querySelector("#symbol-lookup-mode");
+const symbolLookupJson = document.querySelector("#symbol-lookup-json");
 const nativePluginContractRegistry = document.querySelector("#native-plugin-contract-registry");
 const nativePluginContractOwner = document.querySelector("#native-plugin-contract-owner");
 const nativePluginContractTotal = document.querySelector("#native-plugin-contract-total");
@@ -1686,6 +1701,31 @@ function renderSemanticIndex(data) {
   ].join("\\n");
 }
 
+function renderSymbolLookup(data) {
+  const summary = data?.summary ?? {};
+  const governance = data?.governance ?? {};
+  const matches = Array.isArray(data?.matches) ? data.matches : [];
+  symbolLookupRegistry.textContent = data?.registry ?? "openclaw-native-plugin-adapter-v0";
+  symbolLookupMatches.textContent = String(summary.matchedSymbols ?? matches.length);
+  symbolLookupFiles.textContent = String(summary.filesScanned ?? 0);
+  symbolLookupExecution.textContent = governance.canExecuteQuery ? "query-only" : "blocked";
+  symbolLookupMode.textContent = data?.mode ?? "workspace-symbol-lookup-executable-read-only";
+
+  symbolLookupJson.textContent = [
+    "Native governed executable adapter: bounded read-only symbol lookup over enhanced OpenClaw files.",
+    "This executes a local query and returns declaration symbols only; no old module imports, tool execution, function bodies, mutations, tasks, or approvals.",
+    \`Registry: \${data?.registry ?? "openclaw-native-plugin-adapter-v0"}\`,
+    \`Mode: \${data?.mode ?? "workspace-symbol-lookup-executable-read-only"}\`,
+    \`Adapter Status: \${data?.adapterStatus ?? "unknown"}\`,
+    \`Capability: \${data?.capability?.id ?? "sense.openclaw.workspace_symbol_lookup"} risk=\${data?.capability?.risk ?? "low"} approval=\${Boolean(data?.capability?.approvalRequired)} owner=\${data?.capability?.runtimeOwner ?? "unknown"}\`,
+    \`Query: text=\${data?.query?.text ?? "tool"} scope=\${data?.query?.scope ?? "tools"} root=\${data?.query?.relativeRoot ?? "unknown"} limit=\${data?.query?.limit ?? "n/a"}\`,
+    \`Counts: matches=\${summary.matchedSymbols ?? matches.length} files=\${summary.filesScanned ?? 0} declarations=\${summary.declarationsScanned ?? 0} contentRead=\${summary.contentRead ?? 0}\`,
+    \`Governance: executeQuery=\${Boolean(governance.canExecuteQuery)} readSource=\${Boolean(governance.canReadSourceFileContent)} exposeSource=\${Boolean(governance.exposesSourceFileContent)} exposePreview=\${Boolean(governance.exposesDeclarationPreview)} exposeBodies=\${Boolean(governance.exposesFunctionBodies)} importModule=\${Boolean(governance.canImportModule)} executeTool=\${Boolean(governance.canExecuteToolCode)} activateRuntime=\${Boolean(governance.canActivateRuntime)} task=\${Boolean(governance.createsTask)} approval=\${Boolean(governance.createsApproval)}\`,
+    "",
+    ...matches.slice(0, 16).map((match) => \`\${match.relativePath ?? "unknown"}:\${match.lineNumber ?? "?"} \${match.declarationKind ?? "symbol"} \${match.symbolName ?? "unknown"} exported=\${Boolean(match.exported)} preview=\${match.declarationPreview ?? ""}\`),
+  ].join("\\n");
+}
+
 function renderNativePluginContract(data) {
   const summary = data?.summary ?? {};
   const contract = data?.contract ?? {};
@@ -2288,6 +2328,20 @@ async function refreshSemanticIndex() {
     semanticIndexSource.textContent = "unknown";
     semanticIndexMode.textContent = "unknown";
     semanticIndexJson.textContent = "Unable to read native workspace semantic index.";
+  }
+}
+
+async function refreshSymbolLookup() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/workspace-symbol-lookup?scope=tools&query=tool&limit=16\`);
+    renderSymbolLookup(data);
+  } catch {
+    symbolLookupRegistry.textContent = "offline";
+    symbolLookupMatches.textContent = "0";
+    symbolLookupFiles.textContent = "0";
+    symbolLookupExecution.textContent = "unknown";
+    symbolLookupMode.textContent = "unknown";
+    symbolLookupJson.textContent = "Unable to run native workspace symbol lookup.";
   }
 }
 
@@ -3919,6 +3973,7 @@ await refreshNativeSdkContractImplementation();
 await refreshOpenClawToolCatalog();
 await refreshToolCatalogAdapter();
 await refreshSemanticIndex();
+await refreshSymbolLookup();
 await refreshNativePluginContract();
 await refreshNativePluginRegistry();
 await refreshFormalIntegrationReadiness();
@@ -3961,6 +4016,7 @@ setInterval(refreshNativeSdkContractImplementation, 5000);
 setInterval(refreshOpenClawToolCatalog, 5000);
 setInterval(refreshToolCatalogAdapter, 5000);
 setInterval(refreshSemanticIndex, 5000);
+setInterval(refreshSymbolLookup, 5000);
 setInterval(refreshNativePluginContract, 5000);
 setInterval(refreshNativePluginRegistry, 5000);
 setInterval(refreshFormalIntegrationReadiness, 5000);

@@ -141,9 +141,9 @@ for (const token of [
 if (
   !implementation.ok
   || implementation.registry !== "openclaw-native-plugin-sdk-contract-implementation-v0"
-  || implementation.summary?.implementedSlots !== 6
-  || implementation.summary?.totalSlots !== 6
-  || implementation.summary?.readOnlySlots !== 5
+  || implementation.summary?.implementedSlots !== 7
+  || implementation.summary?.totalSlots !== 7
+  || implementation.summary?.readOnlySlots !== 6
   || implementation.summary?.executableSlots !== 1
   || implementation.summary?.readyForFirstReadOnlyAbsorption !== true
   || implementation.governance?.canImportModule !== false

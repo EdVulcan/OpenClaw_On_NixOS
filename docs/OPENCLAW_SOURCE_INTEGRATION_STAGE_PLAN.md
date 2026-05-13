@@ -1,6 +1,6 @@
 # OpenClaw Source Integration Stage Plan
 
-更新时间：2026-05-13 20:28 +08:00
+更新时间：2026-05-13 20:48 +08:00
 
 本文档用于跟踪当前阶段：把旁路 `openclaw` 增强源码项目中的能力，受控接入 `OpenClawOnNixOS`。后续每推进一个接入切片，都必须同步更新本文件，避免路线漂移、重复准备层、或忘记阶段边界。
 
@@ -440,6 +440,57 @@ Next intended slice:
 - Recommended candidate: a read-only workspace/LSP-style navigation tool or conservative filesystem inspection tool inspired by enhanced OpenClaw.
 - Do not implement mutating file edits, shell execution, or cross-boundary gateway tools until a read-only executable adapter has proven the governed execution chain.
 
+## 13. 2026-05-13 Step 5 Update: Native Workspace Symbol Lookup
+
+Status: implemented_waiting_check.
+
+Slice: `sense.openclaw.workspace_symbol_lookup`.
+
+Purpose: implement the first governed executable native adapter after the read-only semantic index. This adapter executes a bounded local symbol query over enhanced `openclaw` workspace files and returns declaration-level navigation results. It is inspired by the enhanced OpenClaw workspace/LSP/code-navigation direction, but remains owned by `OpenClawOnNixOS` and does not import or run old OpenClaw modules.
+
+Implemented artifacts:
+- Core native adapter API: `GET /plugins/native-adapter/workspace-symbol-lookup`.
+- Capability registry entry: `sense.openclaw.workspace_symbol_lookup`.
+- Capability invoke support: `POST /capabilities/invoke` with `capabilityId=sense.openclaw.workspace_symbol_lookup`.
+- Invocation history support for `sense.openclaw.workspace_symbol_lookup`.
+- Observer panel: `OpenClaw Symbol Lookup`.
+- Targeted checks: `openclaw-native-workspace-symbol-lookup`, `observer-openclaw-native-workspace-symbol-lookup`.
+
+Governance boundaries:
+- Executes only a bounded local read-only symbol query.
+- Reads small source files only to extract declarations.
+- Returns declaration symbols, line numbers, file paths, export flags, and sanitized declaration previews.
+- Does not expose function bodies.
+- Does not expose raw source files.
+- Does not expose documentation bodies.
+- Does not expose package versions, dependency versions, or script bodies.
+- Does not import or execute old `openclaw` modules.
+- Does not execute old OpenClaw tools.
+- Does not mutate files.
+- Does not activate runtime.
+- Does not create tasks or approvals.
+- Invocation is audit-only and recorded in capability history.
+
+Local verification on Windows:
+- `npm run typecheck`: passed.
+- `git diff --check`: passed.
+- Local PowerShell service smoke against `D:\OpenclawAndClaudecode\openclaw`: passed.
+- Smoke result: `matches=20`, `files=9`, `declarations=30`, `policy=audit_only`, `history>=1`.
+- Unix milestone scripts still require NixOS/bash.
+
+NixOS targeted milestone command:
+
+```bash
+cd /home/edvulcan/OpenClaw_On_NixOS && \
+git pull origin main && \
+OPENCLAW_MILESTONE_CHECKS=openclaw-native-workspace-symbol-lookup,observer-openclaw-native-workspace-symbol-lookup npm run dev:milestone-check:unix
+```
+
+Next intended slice after this passes:
+- Start the first approval-gated native adapter that can affect workspace state, likely a conservative file-edit proposal/apply chain.
+- Keep mutation behind approval and ledgering.
+- Do not jump to shell/process/web gateway execution until one bounded filesystem mutation adapter is proven.
+
 这条线是本阶段的主线。
 
-当前执行焦点：Step 4 `First Real Capability Absorption` 的第一个 native read-only semantic tool：`sense.openclaw.workspace_semantic_index` 已通过 NixOS targeted milestone。下一步进入第一个 governed executable native adapter，禁止再新增与真实 adapter 无关的 readiness/checklist 层。
+当前执行焦点：Step 5 `First Governed Executable Adapter` 已实现第一个 read-only executable adapter：`sense.openclaw.workspace_symbol_lookup`。本地实现和 Windows smoke 已通过，等待 NixOS targeted milestone 确认；确认后再进入第一个 approval-gated workspace mutation adapter，禁止再新增与真实 adapter 无关的 readiness/checklist 层。

@@ -158,6 +158,8 @@ if (
   || !adapter.implementedCapabilities?.includes("sense.plugin.manifest_profile")
   || !adapter.implementedCapabilities?.includes("sense.openclaw.tool_catalog")
   || !adapter.implementedCapabilities?.includes("sense.openclaw.workspace_semantic_index")
+  || !adapter.implementedCapabilities?.includes("sense.openclaw.workspace_symbol_lookup")
+  || adapter.summary?.canExecuteWorkspaceSymbolLookup !== true
 ) {
   throw new Error(`Observer adapter status mismatch: ${JSON.stringify(adapter)}`);
 }

@@ -1773,6 +1773,7 @@ function buildOpenClawNativePluginSdkContractImplementation({ packagePath = null
     "sense.plugin.manifest_profile",
     "sense.openclaw.tool_catalog",
     "sense.openclaw.workspace_semantic_index",
+    "sense.openclaw.workspace_symbol_lookup",
     "sense.openclaw.prompt_pack",
     "sense.openclaw.plugin_manifest_map",
     "act.plugin.capability.invoke",
@@ -2397,15 +2398,17 @@ function buildOpenClawNativePluginAdapterStatus() {
       "sense.plugin.manifest_profile",
       "sense.openclaw.tool_catalog",
       "sense.openclaw.workspace_semantic_index",
+      "sense.openclaw.workspace_symbol_lookup",
       "plan.plugin.runtime_preflight",
     ],
     pendingCapabilities: ["act.plugin.capability.invoke"],
     summary: {
-      implemented: 4,
+      implemented: 5,
       pending: 1,
       canReadManifestMetadata: true,
       canReadToolCatalogMetadata: true,
       canReadWorkspaceSemanticMetadata: true,
+      canExecuteWorkspaceSymbolLookup: true,
       canReadSourceFileContent: false,
       canMutate: false,
       canExecutePluginCode: false,
@@ -2920,6 +2923,239 @@ function buildNativeOpenClawWorkspaceSemanticIndex({
       createsApproval: false,
       requiresPolicyInvocation: true,
       outputMode: "derived_signals_only",
+    },
+  };
+}
+
+function normaliseSymbolLookupQuery(query) {
+  if (typeof query !== "string") {
+    return "tool";
+  }
+  const trimmed = query.trim().replace(/\s+/g, " ");
+  return trimmed ? trimmed.slice(0, 64) : "tool";
+}
+
+function sanitizeDeclarationPreview(line) {
+  const withoutBody = line
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/\s*\{.*$/, " { ... }")
+    .replace(/\s*=>.*$/, " => ...")
+    .replace(/\s*=\s*.*$/, " = ...");
+  const withoutLiteralValues = withoutBody.replace(/(["'`])(?:\\.|(?!\1)[^\\])*\1/g, "$1...$1");
+  return withoutLiteralValues.length > 160
+    ? `${withoutLiteralValues.slice(0, 157)}...`
+    : withoutLiteralValues;
+}
+
+function collectWorkspaceSymbolLookupMatches(rootPath, {
+  scope = "tools",
+  query = "tool",
+  maxDepth = 2,
+  maxFiles = 80,
+  maxMatches = 20,
+} = {}) {
+  const relativeRoot = SEMANTIC_INDEX_SCOPES.get(scope) ?? SEMANTIC_INDEX_SCOPES.get("tools");
+  const sourceRoot = path.join(rootPath, relativeRoot);
+  const rootStats = safeStat(sourceRoot);
+  if (!rootStats?.isDirectory()) {
+    return {
+      scope,
+      root: sourceRoot,
+      relativeRoot,
+      present: false,
+      filesScanned: 0,
+      declarationsScanned: 0,
+      matches: [],
+    };
+  }
+
+  const safeQuery = normaliseSymbolLookupQuery(query);
+  const lowerQuery = safeQuery.toLowerCase();
+  const matches = [];
+  let filesScanned = 0;
+  let declarationsScanned = 0;
+
+  function visit(currentPath, depth) {
+    if (matches.length >= maxMatches || filesScanned >= maxFiles || depth > maxDepth) {
+      return;
+    }
+    let entries = [];
+    try {
+      entries = readdirSync(currentPath, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
+      if (matches.length >= maxMatches || filesScanned >= maxFiles) {
+        return;
+      }
+      const absolutePath = path.join(currentPath, entry.name);
+      if (entry.isDirectory()) {
+        if (!TOOL_CATALOG_IGNORED_DIRECTORIES.has(entry.name)) {
+          visit(absolutePath, depth + 1);
+        }
+        continue;
+      }
+      if (!entry.isFile()) {
+        continue;
+      }
+      const relativePath = path.relative(sourceRoot, absolutePath).replaceAll(path.sep, "/");
+      const kind = semanticIndexKindForRelativePath(relativePath);
+      if (!["typescript_source", "javascript_source", "type_declaration"].includes(kind)) {
+        continue;
+      }
+      const stats = safeStat(absolutePath);
+      if (!stats?.isFile() || stats.size > 64 * 1024) {
+        continue;
+      }
+      let text = "";
+      try {
+        text = readFileSync(absolutePath, "utf8");
+      } catch {
+        continue;
+      }
+      filesScanned += 1;
+      const category = classifyToolCatalogEntry(relativePath);
+      const lines = text.split(/\r?\n/);
+      lines.forEach((line, index) => {
+        if (matches.length >= maxMatches) {
+          return;
+        }
+        const declarationLine = line.replace(/^\uFEFF/, "");
+        const declaration = declarationLine.match(/^(export\s+)?(?:default\s+)?(?:async\s+)?(function|class|interface|type|const|let|var|enum)\s+([A-Za-z_$][\w$]*)/);
+        if (!declaration) {
+          return;
+        }
+        declarationsScanned += 1;
+        const exported = Boolean(declaration[1]);
+        const declarationKind = declaration[2];
+        const symbolName = declaration[3];
+        const declarationPreview = sanitizeDeclarationPreview(declarationLine);
+        const searchable = [
+          relativePath,
+          category,
+          declarationKind,
+          symbolName,
+          declarationPreview,
+        ].join(" ").toLowerCase();
+        if (!searchable.includes(lowerQuery)) {
+          return;
+        }
+        matches.push({
+          relativePath,
+          kind,
+          category,
+          lineNumber: index + 1,
+          declarationKind,
+          symbolName,
+          exported,
+          declarationPreview,
+          contentRead: true,
+          contentExposed: false,
+          declarationPreviewExposed: true,
+        });
+      });
+    }
+  }
+
+  visit(sourceRoot, 0);
+  return {
+    scope,
+    root: sourceRoot,
+    relativeRoot,
+    present: true,
+    query: safeQuery,
+    filesScanned,
+    declarationsScanned,
+    matches,
+  };
+}
+
+function buildNativeOpenClawWorkspaceSymbolLookup({
+  workspacePath = null,
+  scope = "tools",
+  query = "tool",
+  limit = 20,
+} = {}) {
+  const { item } = selectOpenClawToolCatalogWorkspace({ workspacePath });
+  const safeScope = SEMANTIC_INDEX_SCOPES.has(scope) ? scope : "tools";
+  const safeLimit = normalisePositiveLimit(limit, 20, 50);
+  const collection = collectWorkspaceSymbolLookupMatches(item.path, {
+    scope: safeScope,
+    query,
+    maxMatches: safeLimit,
+  });
+  const nativeRegistry = createOpenClawNativePluginRegistry();
+  const capability = nativeRegistry.items[0]?.contract?.capabilities
+    ?.find((entry) => entry.id === "sense.openclaw.workspace_symbol_lookup") ?? null;
+
+  return {
+    ok: collection.present,
+    registry: "openclaw-native-plugin-adapter-v0",
+    mode: "workspace-symbol-lookup-executable-read-only",
+    generatedAt: new Date().toISOString(),
+    sourceRegistry: "openclaw-tool-catalog-v0",
+    adapterStatus: "native_shell_active_workspace_symbol_lookup",
+    capability: {
+      id: capability?.id ?? "sense.openclaw.workspace_symbol_lookup",
+      kind: capability?.kind ?? "sense",
+      risk: capability?.risk ?? "low",
+      approvalRequired: capability?.approval?.required ?? false,
+      runtimeOwner: capability?.runtimeOwner ?? "openclaw_on_nixos",
+    },
+    workspace: {
+      id: item.id,
+      name: item.name,
+      path: item.path,
+    },
+    query: {
+      text: collection.query,
+      scope: safeScope,
+      relativeRoot: collection.relativeRoot,
+      limit: safeLimit,
+    },
+    matches: collection.matches,
+    summary: {
+      matchedSymbols: collection.matches.length,
+      filesScanned: collection.filesScanned,
+      declarationsScanned: collection.declarationsScanned,
+      contentRead: collection.filesScanned,
+      canExecuteQuery: true,
+      canReadSourceFileContent: true,
+      exposesSourceFileContent: false,
+      exposesDeclarationPreview: true,
+      exposesFunctionBodies: false,
+      canImportModule: false,
+      canExecutePluginCode: false,
+      canExecuteToolCode: false,
+      canActivateRuntime: false,
+      canMutate: false,
+      createsTask: false,
+      createsApproval: false,
+    },
+    governance: {
+      mode: "native_workspace_symbol_lookup_read_only",
+      runtimeOwner: "openclaw_on_nixos",
+      canReadMetadata: true,
+      canReadSourceFileContent: true,
+      exposesSourceFileContent: false,
+      exposesDeclarationPreview: true,
+      exposesFunctionBodies: false,
+      exposesDocumentationContent: false,
+      exposesScriptBodies: false,
+      exposesDependencyVersions: false,
+      canExecuteQuery: true,
+      canMutate: false,
+      canExecute: false,
+      canImportModule: false,
+      canExecutePluginCode: false,
+      canExecuteToolCode: false,
+      canActivateRuntime: false,
+      createsTask: false,
+      createsApproval: false,
+      requiresPolicyInvocation: true,
+      outputMode: "declaration_symbols_only",
     },
   };
 }
@@ -3649,6 +3885,15 @@ function resolvePlanCapabilityId({ kind, intent, plannerIntent }) {
   ) {
     return "sense.openclaw.workspace_semantic_index";
   }
+  if (
+    candidate === "openclaw.workspace.symbol_lookup"
+    || candidate === "openclaw.workspace.symbol-lookup"
+    || candidate === "workspace.symbol_lookup"
+    || candidate === "workspace.symbol-lookup"
+    || candidate === "symbol.lookup"
+  ) {
+    return "sense.openclaw.workspace_symbol_lookup";
+  }
   if (candidate === "command.execute" || candidate === "system.command.execute") {
     return "act.system.command.execute";
   }
@@ -4333,6 +4578,24 @@ function baseCapabilities() {
       description: "Build a bounded derived semantic index from enhanced OpenClaw files without exposing source text or executing legacy code.",
     },
     {
+      id: "sense.openclaw.workspace_symbol_lookup",
+      name: "Native OpenClaw Workspace Symbol Lookup",
+      kind: "sensor",
+      service: "openclaw-core",
+      endpoint: `http://${host}:${port}/plugins/native-adapter/workspace-symbol-lookup`,
+      intents: [
+        "openclaw.workspace.symbol_lookup",
+        "openclaw.workspace.symbol-lookup",
+        "workspace.symbol_lookup",
+        "workspace.symbol-lookup",
+        "symbol.lookup",
+      ],
+      domains: ["body_internal"],
+      risk: "low",
+      governance: "audit_only",
+      description: "Execute a bounded read-only symbol lookup over enhanced OpenClaw workspace files without exposing function bodies or executing legacy code.",
+    },
+    {
       id: "act.system.command.dry_run",
       name: "System Command Dry Run",
       kind: "actuator",
@@ -4687,6 +4950,15 @@ async function callCapabilityBackend(capability, request) {
     });
   }
 
+  if (capability.id === "sense.openclaw.workspace_symbol_lookup") {
+    return buildNativeOpenClawWorkspaceSymbolLookup({
+      workspacePath: request.params.workspacePath,
+      scope: request.params.scope,
+      query: request.params.query ?? request.params.q,
+      limit: request.params.limit,
+    });
+  }
+
   if (capability.id === "act.system.command.dry_run") {
     return postJson(`${systemSenseUrl}/system/command/dry-run`, {
       ...request.params,
@@ -4837,6 +5109,21 @@ function summariseCapabilityInvocationResult(capability, result) {
       functionDeclarations: result?.summary?.functionDeclarations ?? 0,
       semanticVocabularyFiles: result?.summary?.semanticVocabularyFiles ?? 0,
       exposesSourceFileContent: result?.governance?.exposesSourceFileContent === true,
+      canExecuteToolCode: result?.governance?.canExecuteToolCode === true,
+    };
+  }
+  if (capability.id === "sense.openclaw.workspace_symbol_lookup") {
+    return {
+      kind: "openclaw.workspace_symbol_lookup",
+      ok: result?.ok === true,
+      query: result?.query?.text ?? null,
+      scope: result?.query?.scope ?? null,
+      matchedSymbols: result?.summary?.matchedSymbols ?? 0,
+      filesScanned: result?.summary?.filesScanned ?? 0,
+      declarationsScanned: result?.summary?.declarationsScanned ?? 0,
+      canExecuteQuery: result?.governance?.canExecuteQuery === true,
+      exposesSourceFileContent: result?.governance?.exposesSourceFileContent === true,
+      exposesFunctionBodies: result?.governance?.exposesFunctionBodies === true,
       canExecuteToolCode: result?.governance?.canExecuteToolCode === true,
     };
   }
@@ -7353,6 +7640,21 @@ const server = http.createServer(async (req, res) => {
         workspacePath: requestUrl.searchParams.get("workspacePath"),
         scope: requestUrl.searchParams.get("scope") ?? "tools",
         query: requestUrl.searchParams.get("query") ?? requestUrl.searchParams.get("q"),
+        limit: requestUrl.searchParams.get("limit"),
+      }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 404, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/plugins/native-adapter/workspace-symbol-lookup") {
+    try {
+      sendJson(res, 200, buildNativeOpenClawWorkspaceSymbolLookup({
+        workspacePath: requestUrl.searchParams.get("workspacePath"),
+        scope: requestUrl.searchParams.get("scope") ?? "tools",
+        query: requestUrl.searchParams.get("query") ?? requestUrl.searchParams.get("q") ?? "tool",
         limit: requestUrl.searchParams.get("limit"),
       }));
     } catch (error) {

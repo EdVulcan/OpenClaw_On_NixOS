@@ -107,7 +107,7 @@ if (
   || governance.requiresHumanReviewBeforeActivation !== true
   || contractResponse.validation?.ok !== true
   || summary.validationOk !== true
-  || summary.totalCapabilities !== 6
+  || summary.totalCapabilities !== 7
   || summary.approvalRequired !== 1
   || summary.mutationCapable !== 1
   || summary.executionCapable !== 1
@@ -120,9 +120,11 @@ if (
 
 const capabilities = contract.capabilities ?? [];
 if (
-  capabilities.length !== 5
+  capabilities.length !== 7
   || !capabilities.some((capability) => capability.id === "sense.plugin.manifest_profile" && capability.risk === "low" && capability.approval?.required === false)
   || !capabilities.some((capability) => capability.id === "sense.openclaw.tool_catalog" && capability.risk === "low" && capability.approval?.required === false)
+  || !capabilities.some((capability) => capability.id === "sense.openclaw.workspace_semantic_index" && capability.risk === "low" && capability.approval?.required === false)
+  || !capabilities.some((capability) => capability.id === "sense.openclaw.workspace_symbol_lookup" && capability.risk === "low" && capability.approval?.required === false)
   || !capabilities.some((capability) => capability.id === "sense.openclaw.prompt_pack" && capability.risk === "low" && capability.approval?.required === false)
   || !capabilities.some((capability) => capability.id === "sense.openclaw.plugin_manifest_map" && capability.risk === "low" && capability.approval?.required === false)
   || !capabilities.some((capability) => capability.id === "act.plugin.capability.invoke" && capability.risk === "high" && capability.approval?.required === true && capability.permissions?.commandExecution === true)

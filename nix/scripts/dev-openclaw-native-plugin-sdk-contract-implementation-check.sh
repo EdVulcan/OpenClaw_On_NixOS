@@ -123,12 +123,12 @@ if (
   throw new Error(`native SDK implementation response mismatch: ${JSON.stringify(implementation)}`);
 }
 if (
-  implementation.summary?.totalSlots !== 6
-  || implementation.summary?.implementedSlots !== 6
+  implementation.summary?.totalSlots !== 7
+  || implementation.summary?.implementedSlots !== 7
   || implementation.summary?.missingSlots !== 0
-  || implementation.summary?.readOnlySlots !== 5
+  || implementation.summary?.readOnlySlots !== 6
   || implementation.summary?.executableSlots !== 1
-  || implementation.summary?.nativeCapabilities !== 6
+  || implementation.summary?.nativeCapabilities !== 7
   || implementation.summary?.nativeContractTestsPassed !== true
   || implementation.summary?.readyForFirstReadOnlyAbsorption !== true
   || implementation.summary?.canImportModule !== false
@@ -143,6 +143,7 @@ for (const slotId of [
   "sense.plugin.manifest_profile",
   "sense.openclaw.tool_catalog",
   "sense.openclaw.workspace_semantic_index",
+  "sense.openclaw.workspace_symbol_lookup",
   "sense.openclaw.prompt_pack",
   "sense.openclaw.plugin_manifest_map",
   "act.plugin.capability.invoke",
