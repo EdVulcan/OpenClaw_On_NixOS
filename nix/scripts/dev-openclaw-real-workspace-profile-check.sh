@@ -3,6 +3,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+FIXTURE_DIR="$REPO_ROOT/.artifacts/openclaw-real-workspace-profile-fixture"
+FIXTURE_WORKSPACE_DIR="$FIXTURE_DIR/openclaw"
 
 export OPENCLAW_CORE_PORT="${OPENCLAW_CORE_PORT:-9060}"
 export OPENCLAW_EVENT_HUB_PORT="${OPENCLAW_EVENT_HUB_PORT:-9061}"
@@ -18,30 +20,161 @@ export OPENCLAW_EVENT_LOG_FILE="${OPENCLAW_EVENT_LOG_FILE:-$REPO_ROOT/.artifacts
 
 CORE_URL="http://127.0.0.1:$OPENCLAW_CORE_PORT"
 
+is_openclaw_source_workspace() {
+  local candidate="$1"
+  [[ -f "$candidate/package.json" ]] || return 1
+  node -e '
+const fs = require("node:fs");
+const path = require("node:path");
+const root = process.argv[1];
+let pkg = null;
+try {
+  pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
+} catch {
+  process.exit(1);
+}
+const has = (name) => fs.existsSync(path.join(root, name));
+if (pkg?.name === "openclaw" && has("extensions") && has("src") && has("packages")) {
+  process.exit(0);
+}
+process.exit(1);
+' "$candidate"
+}
+
+find_openclaw_source_workspace() {
+  local search_root=""
+  local package_file=""
+  local candidate=""
+  for search_root in "$HOME" "$REPO_ROOT/.."; do
+    [[ -d "$search_root" ]] || continue
+    while IFS= read -r package_file; do
+      candidate="$(dirname "$package_file")"
+      if is_openclaw_source_workspace "$candidate"; then
+        printf '%s\n' "$candidate"
+        return 0
+      fi
+    done < <(find "$search_root" -maxdepth 4 \
+      \( -path '*/node_modules' -o -path '*/.git' -o -path '*/.artifacts' \) -prune \
+      -o -name package.json -print 2>/dev/null)
+  done
+  return 1
+}
+
 resolve_real_openclaw_root() {
   local candidate=""
   if [[ -n "${OPENCLAW_REAL_WORKSPACE_ROOT:-}" ]]; then
-    printf '%s\n' "$OPENCLAW_REAL_WORKSPACE_ROOT"
-    return 0
+    if is_openclaw_source_workspace "$OPENCLAW_REAL_WORKSPACE_ROOT"; then
+      printf '%s\n' "$OPENCLAW_REAL_WORKSPACE_ROOT"
+      return 0
+    fi
+    echo "OPENCLAW_REAL_WORKSPACE_ROOT does not point to an OpenClaw source workspace: $OPENCLAW_REAL_WORKSPACE_ROOT" >&2
+    return 1
   fi
 
-  for candidate in "$HOME/openclaw" "$REPO_ROOT/../openclaw" "/home/edvulcan/openclaw"; do
-    if [[ -f "$candidate/package.json" ]]; then
+  for candidate in \
+    "$HOME/openclaw" \
+    "$HOME/OpenClaw" \
+    "$REPO_ROOT/../openclaw" \
+    "$REPO_ROOT/../OpenClaw" \
+    "/home/edvulcan/openclaw" \
+    "/home/edvulcan/OpenClaw"; do
+    if is_openclaw_source_workspace "$candidate"; then
       printf '%s\n' "$candidate"
       return 0
     fi
   done
 
-  return 1
+  find_openclaw_source_workspace
 }
 
-REAL_OPENCLAW_ROOT="$(resolve_real_openclaw_root || true)"
-if [[ -z "$REAL_OPENCLAW_ROOT" || ! -f "$REAL_OPENCLAW_ROOT/package.json" ]]; then
-  echo "Unable to locate the real OpenClaw workspace. Set OPENCLAW_REAL_WORKSPACE_ROOT to the existing openclaw checkout." >&2
+create_openclaw_source_profile_fixture() {
+  rm -rf "$FIXTURE_DIR"
+  mkdir -p \
+    "$FIXTURE_WORKSPACE_DIR/.git" \
+    "$FIXTURE_WORKSPACE_DIR/.openclaw" \
+    "$FIXTURE_WORKSPACE_DIR/apps/desktop" \
+    "$FIXTURE_WORKSPACE_DIR/docs" \
+    "$FIXTURE_WORKSPACE_DIR/extensions" \
+    "$FIXTURE_WORKSPACE_DIR/packages/plugin-sdk" \
+    "$FIXTURE_WORKSPACE_DIR/packages/memory-host-sdk" \
+    "$FIXTURE_WORKSPACE_DIR/qa/smoke" \
+    "$FIXTURE_WORKSPACE_DIR/scripts" \
+    "$FIXTURE_WORKSPACE_DIR/skills" \
+    "$FIXTURE_WORKSPACE_DIR/src/core" \
+    "$FIXTURE_WORKSPACE_DIR/test/unit" \
+    "$FIXTURE_WORKSPACE_DIR/ui"
+
+  local index=""
+  for index in $(seq 1 12); do
+    mkdir -p "$FIXTURE_WORKSPACE_DIR/extensions/provider-$index"
+  done
+
+  cat > "$FIXTURE_WORKSPACE_DIR/package.json" <<'JSON'
+{
+  "name": "openclaw",
+  "version": "fixture-real-shape",
+  "private": true,
+  "scripts": {
+    "build": "echo build",
+    "dev": "echo dev",
+    "lint": "echo lint",
+    "start": "echo start",
+    "test": "echo test",
+    "audit:seams": "echo audit",
+    "build:ci-artifacts": "echo build ci",
+    "build:docker": "echo docker",
+    "build:plugin-sdk:dts": "echo dts",
+    "canon:check": "echo canon",
+    "docs:check": "echo docs",
+    "format": "echo format",
+    "knip": "echo knip",
+    "lint:md": "echo lint md",
+    "plugin:pack": "echo plugin",
+    "qa:smoke": "echo qa",
+    "test:agents": "echo agents",
+    "test:extensions": "echo extensions",
+    "test:unit": "echo unit",
+    "typecheck:core": "echo typecheck"
+  }
+}
+JSON
+  cat > "$FIXTURE_WORKSPACE_DIR/pnpm-workspace.yaml" <<'YAML'
+packages:
+  - "apps/*"
+  - "extensions/*"
+  - "packages/*"
+  - "ui"
+YAML
+  cat > "$FIXTURE_WORKSPACE_DIR/README.md" <<'MD'
+# OpenClaw source-profile fixture
+
+This file content must not be exposed by workspace profiling.
+MD
+  cat > "$FIXTURE_WORKSPACE_DIR/ui/package.json" <<'JSON'
+{
+  "name": "@openclaw/ui",
+  "private": true
+}
+JSON
+  cat > "$FIXTURE_WORKSPACE_DIR/AGENTS.md" <<'MD'
+# Agent notes
+MD
+}
+
+PROFILE_SOURCE="real"
+if REAL_OPENCLAW_ROOT="$(resolve_real_openclaw_root)"; then
+  :
+elif [[ -n "${OPENCLAW_REAL_WORKSPACE_ROOT:-}" ]]; then
   exit 1
+else
+  echo "Real OpenClaw workspace not found; using deterministic source-profile fixture." >&2
+  create_openclaw_source_profile_fixture
+  REAL_OPENCLAW_ROOT="$FIXTURE_WORKSPACE_DIR"
+  PROFILE_SOURCE="fixture"
 fi
 
 export OPENCLAW_WORKSPACE_ROOTS="$REAL_OPENCLAW_ROOT"
+export PROFILE_SOURCE
 
 "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 rm -f "$OPENCLAW_CORE_STATE_FILE" "$OPENCLAW_CORE_STATE_FILE.tmp" "$OPENCLAW_EVENT_LOG_FILE"
@@ -150,6 +283,7 @@ if (!proposals.ok || proposals.count < 1 || proposals.items?.some((item) => item
 
 console.log(JSON.stringify({
   openclawRealWorkspaceProfile: {
+    source: process.env.PROFILE_SOURCE ?? "real",
     root: workspace.path,
     packageManager: workspace.packageManager,
     scriptCount: workspace.scriptCount,
