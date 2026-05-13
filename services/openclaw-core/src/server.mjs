@@ -1242,6 +1242,202 @@ function buildOpenClawPluginSdkSourceReviewScope({ packagePath = null } = {}) {
   };
 }
 
+function analysePluginSdkSourceContentFile(rootPath, file) {
+  const absolutePath = path.join(rootPath, file.relativePath);
+  const stats = safeStat(absolutePath);
+  const maxBytes = 64 * 1024;
+  if (!stats || !stats.isFile() || stats.size > maxBytes) {
+    return {
+      relativePath: file.relativePath,
+      kind: file.kind,
+      sizeBytes: stats?.size ?? file.sizeBytes ?? null,
+      contentRead: false,
+      contentExposed: false,
+      skipped: true,
+      skipReason: stats?.size > maxBytes ? "file_too_large" : "not_readable",
+    };
+  }
+
+  let text = "";
+  try {
+    text = readFileSync(absolutePath, "utf8");
+  } catch {
+    return {
+      relativePath: file.relativePath,
+      kind: file.kind,
+      sizeBytes: stats.size,
+      contentRead: false,
+      contentExposed: false,
+      skipped: true,
+      skipReason: "read_failed",
+    };
+  }
+
+  const lines = text.split(/\r?\n/);
+  const nonEmptyLines = lines.filter((line) => line.trim().length > 0);
+  const exportStatements = text.match(/\bexport\b/g)?.length ?? 0;
+  const importStatements = text.match(/\bimport\b/g)?.length ?? 0;
+  const interfaceDeclarations = text.match(/\binterface\s+[A-Za-z_$][\w$]*/g)?.length ?? 0;
+  const typeDeclarations = text.match(/\btype\s+[A-Za-z_$][\w$]*/g)?.length ?? 0;
+  const functionDeclarations = text.match(/\bfunction\s+[A-Za-z_$][\w$]*/g)?.length ?? 0;
+  const classDeclarations = text.match(/\bclass\s+[A-Za-z_$][\w$]*/g)?.length ?? 0;
+  const constDeclarations = text.match(/\bconst\s+[A-Za-z_$][\w$]*/g)?.length ?? 0;
+  const capabilityTerms = [
+    "capability",
+    "plugin",
+    "permission",
+    "policy",
+    "approval",
+    "runtime",
+    "manifest",
+  ].filter((term) => text.toLowerCase().includes(term));
+
+  return {
+    relativePath: file.relativePath,
+    kind: file.kind,
+    sizeBytes: stats.size,
+    contentRead: true,
+    contentExposed: false,
+    skipped: false,
+    lineCount: lines.length,
+    nonEmptyLineCount: nonEmptyLines.length,
+    signals: {
+      exportStatements,
+      importStatements,
+      interfaceDeclarations,
+      typeDeclarations,
+      functionDeclarations,
+      classDeclarations,
+      constDeclarations,
+      capabilityTermCount: capabilityTerms.length,
+      hasCapabilityVocabulary: capabilityTerms.length > 0,
+    },
+    recommendedAbsorption: file.kind === "type_declaration" || interfaceDeclarations > 0 || typeDeclarations > 0
+      ? "derive_native_contract_shape"
+      : exportStatements > 0
+        ? "review_exported_surface_for_native_reimplementation"
+        : "background_context_only",
+  };
+}
+
+function buildOpenClawPluginSdkSourceContentReview({ packagePath = null } = {}) {
+  const scope = buildOpenClawPluginSdkSourceReviewScope({ packagePath });
+  const reviewableFiles = scope.files.filter((file) => [
+    "typescript_source",
+    "javascript_source",
+    "type_declaration",
+    "manifest_or_schema",
+  ].includes(file.kind));
+  const files = reviewableFiles.map((file) => analysePluginSdkSourceContentFile(scope.package.path, file));
+  const byKind = files.reduce((accumulator, file) => {
+    accumulator[file.kind] = (accumulator[file.kind] ?? 0) + 1;
+    return accumulator;
+  }, {});
+  const totals = files.reduce((accumulator, file) => {
+    if (file.contentRead) {
+      accumulator.contentRead += 1;
+      accumulator.lines += file.lineCount ?? 0;
+      accumulator.exports += file.signals?.exportStatements ?? 0;
+      accumulator.imports += file.signals?.importStatements ?? 0;
+      accumulator.interfaces += file.signals?.interfaceDeclarations ?? 0;
+      accumulator.types += file.signals?.typeDeclarations ?? 0;
+      accumulator.functions += file.signals?.functionDeclarations ?? 0;
+      accumulator.classes += file.signals?.classDeclarations ?? 0;
+      accumulator.consts += file.signals?.constDeclarations ?? 0;
+    } else {
+      accumulator.skipped += 1;
+    }
+    return accumulator;
+  }, {
+    contentRead: 0,
+    skipped: 0,
+    lines: 0,
+    exports: 0,
+    imports: 0,
+    interfaces: 0,
+    types: 0,
+    functions: 0,
+    classes: 0,
+    consts: 0,
+  });
+
+  return {
+    ok: true,
+    registry: "openclaw-plugin-sdk-source-content-review-v0",
+    mode: "content-review-derived-signals",
+    generatedAt: new Date().toISOString(),
+    sourceRegistry: scope.registry,
+    sourceMode: scope.mode,
+    workspace: scope.workspace,
+    package: scope.package,
+    files,
+    findings: [
+      {
+        id: "source_content_read_started",
+        status: "passed",
+        summary: "Scoped plugin SDK files were read for derived interface and export signals.",
+      },
+      {
+        id: "raw_content_not_exposed",
+        status: "passed",
+        summary: "API output contains derived counts only; raw source, README text, script bodies, and dependency versions remain hidden.",
+      },
+      {
+        id: "native_reimplementation_required",
+        status: "pending",
+        summary: "Reviewed concepts must be mapped into OpenClawOnNixOS-native contracts before implementation.",
+      },
+    ],
+    summary: {
+      totalFiles: files.length,
+      contentRead: totals.contentRead,
+      skipped: totals.skipped,
+      byKind,
+      lineCount: totals.lines,
+      exportStatements: totals.exports,
+      importStatements: totals.imports,
+      interfaceDeclarations: totals.interfaces,
+      typeDeclarations: totals.types,
+      functionDeclarations: totals.functions,
+      classDeclarations: totals.classes,
+      constDeclarations: totals.consts,
+      canReadSourceFileContent: true,
+      exposesSourceFileContent: false,
+      exposesReadmeContent: false,
+      exposesScriptBodies: false,
+      exposesDependencyVersions: false,
+      canImportModule: false,
+      canExecutePluginCode: false,
+      canActivateRuntime: false,
+      canMutate: false,
+      createsTask: false,
+      createsApproval: false,
+      nextAllowedWork: [
+        "map derived source signals into native contract deltas",
+        "write native OpenClawOnNixOS tests before implementation",
+        "reimplement approved concepts natively instead of importing old modules",
+      ],
+    },
+    governance: {
+      mode: "plugin_sdk_source_content_review_derived_signals",
+      runtimeOwner: "openclaw_on_nixos",
+      canReadSourceFileContent: true,
+      exposesSourceFileContent: false,
+      exposesReadmeContent: false,
+      exposesScriptBodies: false,
+      exposesDependencyVersions: false,
+      canMutate: false,
+      canExecute: false,
+      canImportModule: false,
+      canExecutePluginCode: false,
+      canActivateRuntime: false,
+      createsTask: false,
+      createsApproval: false,
+      absorptionMode: "native_reimplementation_required",
+    },
+  };
+}
+
 function buildOpenClawPluginSdkContractReview() {
   const plan = buildOpenClawMigrationPlan();
   const items = plan.items
@@ -1340,7 +1536,7 @@ function buildOpenClawNativePluginRegistryResponse() {
         "activation requires a manual adapter implementation",
         "registration cannot execute plugin code",
         "external runtime ownership remains forbidden",
-        "source content import remains disabled until explicit review",
+        "source content review is limited to derived signals; old modules remain non-importable",
       ],
     },
   };
@@ -1882,7 +2078,7 @@ function buildNativePluginRuntimeActivationPlan({ packagePath = null, capability
       createsApproval: false,
       nextAllowedWork: [
         "design sandboxed native runtime loader inside OpenClawOnNixOS",
-        "add explicit source-content review gates before module import",
+        "map derived source-content signals into native contract tests",
         "materialize runtime activation only through approval-gated tasks",
       ],
       forbiddenWork: [
@@ -5666,6 +5862,40 @@ const server = http.createServer(async (req, res) => {
         sourceMode: scope.sourceMode,
         summary: scope.summary,
         governance: scope.governance,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/workspaces/openclaw-plugin-sdk-source-content-review") {
+    try {
+      sendJson(res, 200, buildOpenClawPluginSdkSourceContentReview({
+        packagePath: requestUrl.searchParams.get("packagePath"),
+      }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/workspaces/openclaw-plugin-sdk-source-content-review/summary") {
+    try {
+      const review = buildOpenClawPluginSdkSourceContentReview({
+        packagePath: requestUrl.searchParams.get("packagePath"),
+      });
+      sendJson(res, 200, {
+        ok: true,
+        registry: review.registry,
+        mode: review.mode,
+        generatedAt: review.generatedAt,
+        sourceRegistry: review.sourceRegistry,
+        sourceMode: review.sourceMode,
+        summary: review.summary,
+        governance: review.governance,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";

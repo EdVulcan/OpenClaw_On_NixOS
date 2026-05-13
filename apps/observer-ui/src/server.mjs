@@ -459,6 +459,15 @@ function observerHtml() {
           <pre id="plugin-sdk-source-scope-json">Loading plugin SDK source review scope...</pre>
         </section>
         <section class="panel">
+          <h2>OpenClaw Plugin SDK Source Content Review</h2>
+          <div class="metric"><span>Registry</span><span id="plugin-sdk-source-content-registry">openclaw-plugin-sdk-source-content-review-v0</span></div>
+          <div class="metric"><span>Read</span><span id="plugin-sdk-source-content-read">0</span></div>
+          <div class="metric"><span>Exports</span><span id="plugin-sdk-source-content-exports">0</span></div>
+          <div class="metric"><span>Raw</span><span id="plugin-sdk-source-content-raw">hidden</span></div>
+          <div class="metric"><span>Mode</span><span id="plugin-sdk-source-content-mode">content-review-derived-signals</span></div>
+          <pre id="plugin-sdk-source-content-json">Loading plugin SDK source content review...</pre>
+        </section>
+        <section class="panel">
           <h2>OpenClaw Native Plugin Contract</h2>
           <div class="metric"><span>Registry</span><span id="native-plugin-contract-registry">openclaw-native-plugin-contract-v0</span></div>
           <div class="metric"><span>Owner</span><span id="native-plugin-contract-owner">openclaw_on_nixos</span></div>
@@ -820,6 +829,12 @@ const pluginSdkSourceScopeContent = document.querySelector("#plugin-sdk-source-s
 const pluginSdkSourceScopeApproval = document.querySelector("#plugin-sdk-source-scope-approval");
 const pluginSdkSourceScopeMode = document.querySelector("#plugin-sdk-source-scope-mode");
 const pluginSdkSourceScopeJson = document.querySelector("#plugin-sdk-source-scope-json");
+const pluginSdkSourceContentRegistry = document.querySelector("#plugin-sdk-source-content-registry");
+const pluginSdkSourceContentRead = document.querySelector("#plugin-sdk-source-content-read");
+const pluginSdkSourceContentExports = document.querySelector("#plugin-sdk-source-content-exports");
+const pluginSdkSourceContentRaw = document.querySelector("#plugin-sdk-source-content-raw");
+const pluginSdkSourceContentMode = document.querySelector("#plugin-sdk-source-content-mode");
+const pluginSdkSourceContentJson = document.querySelector("#plugin-sdk-source-content-json");
 const nativePluginContractRegistry = document.querySelector("#native-plugin-contract-registry");
 const nativePluginContractOwner = document.querySelector("#native-plugin-contract-owner");
 const nativePluginContractTotal = document.querySelector("#native-plugin-contract-total");
@@ -1405,6 +1420,38 @@ function renderPluginSdkSourceReviewScope(data) {
   ].join("\\n");
 }
 
+function renderPluginSdkSourceContentReview(data) {
+  const summary = data?.summary ?? {};
+  const governance = data?.governance ?? {};
+  const files = Array.isArray(data?.files) ? data.files : [];
+  const findings = Array.isArray(data?.findings) ? data.findings : [];
+  pluginSdkSourceContentRegistry.textContent = data?.registry ?? "openclaw-plugin-sdk-source-content-review-v0";
+  pluginSdkSourceContentRead.textContent = String(summary.contentRead ?? 0);
+  pluginSdkSourceContentExports.textContent = String(summary.exportStatements ?? 0);
+  pluginSdkSourceContentRaw.textContent = summary.exposesSourceFileContent ? "exposed" : "hidden";
+  pluginSdkSourceContentMode.textContent = data?.mode ?? "content-review-derived-signals";
+
+  pluginSdkSourceContentJson.textContent = [
+    "Source content review: scoped files are read, but only derived signals are shown.",
+    "Raw source text, README contents, script bodies, dependency versions, imports, execution, and runtime activation remain blocked.",
+    \`Registry: \${data?.registry ?? "openclaw-plugin-sdk-source-content-review-v0"}\`,
+    \`Mode: \${data?.mode ?? "content-review-derived-signals"}\`,
+    \`Source Registry: \${data?.sourceRegistry ?? "openclaw-plugin-sdk-source-review-scope-v0"}\`,
+    \`Files: total=\${summary.totalFiles ?? files.length} read=\${summary.contentRead ?? 0} skipped=\${summary.skipped ?? 0}\`,
+    \`Signals: exports=\${summary.exportStatements ?? 0} imports=\${summary.importStatements ?? 0} interfaces=\${summary.interfaceDeclarations ?? 0} types=\${summary.typeDeclarations ?? 0} functions=\${summary.functionDeclarations ?? 0} classes=\${summary.classDeclarations ?? 0}\`,
+    \`Governance: readSource=\${Boolean(governance.canReadSourceFileContent)} exposeSource=\${Boolean(governance.exposesSourceFileContent)} importModule=\${Boolean(governance.canImportModule)} executePlugin=\${Boolean(governance.canExecutePluginCode)} activateRuntime=\${Boolean(governance.canActivateRuntime)} task=\${Boolean(governance.createsTask)} approval=\${Boolean(governance.createsApproval)}\`,
+    "",
+    ...findings.map((finding) => \`[\${finding.status ?? "unknown"}] \${finding.id ?? "finding"} :: \${finding.summary ?? "no summary"}\`),
+    "",
+    ...files.slice(0, 16).map((file) => {
+      const signals = file.signals ?? {};
+      return \`\${file.relativePath ?? "unknown"} kind=\${file.kind ?? "unknown"} read=\${Boolean(file.contentRead)} exposed=\${Boolean(file.contentExposed)} exports=\${signals.exportStatements ?? 0} interfaces=\${signals.interfaceDeclarations ?? 0} types=\${signals.typeDeclarations ?? 0} recommendation=\${file.recommendedAbsorption ?? "none"}\`;
+    }),
+    "",
+    \`Next Allowed Work: \${(summary.nextAllowedWork ?? []).join("; ") || "none"}\`,
+  ].join("\\n");
+}
+
 function renderNativePluginContract(data) {
   const summary = data?.summary ?? {};
   const contract = data?.contract ?? {};
@@ -1923,6 +1970,20 @@ async function refreshPluginSdkSourceReviewScope() {
     pluginSdkSourceScopeApproval.textContent = "unknown";
     pluginSdkSourceScopeMode.textContent = "unknown";
     pluginSdkSourceScopeJson.textContent = "Unable to read plugin SDK source review scope.";
+  }
+}
+
+async function refreshPluginSdkSourceContentReview() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/workspaces/openclaw-plugin-sdk-source-content-review\`);
+    renderPluginSdkSourceContentReview(data);
+  } catch {
+    pluginSdkSourceContentRegistry.textContent = "offline";
+    pluginSdkSourceContentRead.textContent = "0";
+    pluginSdkSourceContentExports.textContent = "0";
+    pluginSdkSourceContentRaw.textContent = "unknown";
+    pluginSdkSourceContentMode.textContent = "unknown";
+    pluginSdkSourceContentJson.textContent = "Unable to read plugin SDK source content review.";
   }
 }
 
@@ -3548,6 +3609,7 @@ await refreshWorkspaceMigrationMap();
 await refreshWorkspaceMigrationPlan();
 await refreshPluginSdkContractReview();
 await refreshPluginSdkSourceReviewScope();
+await refreshPluginSdkSourceContentReview();
 await refreshNativePluginContract();
 await refreshNativePluginRegistry();
 await refreshFormalIntegrationReadiness();
@@ -3584,6 +3646,7 @@ setInterval(refreshWorkspaceMigrationMap, 5000);
 setInterval(refreshWorkspaceMigrationPlan, 5000);
 setInterval(refreshPluginSdkContractReview, 5000);
 setInterval(refreshPluginSdkSourceReviewScope, 5000);
+setInterval(refreshPluginSdkSourceContentReview, 5000);
 setInterval(refreshNativePluginContract, 5000);
 setInterval(refreshNativePluginRegistry, 5000);
 setInterval(refreshFormalIntegrationReadiness, 5000);
