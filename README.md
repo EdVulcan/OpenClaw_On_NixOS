@@ -489,6 +489,14 @@ npm run dev:openclaw-source-migration-plan-check:unix
 
 This verifies core can turn read-only migration candidates into a plan-only first-wave migration draft, including recommended next steps, acceptance criteria, blockers, and backlog items without creating tasks, approvals, imports, source reads, mutations, or executions.
 
+Run the OpenClaw plugin SDK contract review slice directly:
+
+```bash
+npm run dev:openclaw-plugin-sdk-contract-review-check:unix
+```
+
+This verifies core can turn the first-wave `plugin_sdk` migration plan item into a read-only contract review draft using only package manifest metadata and SDK directory markers, without exposing source contents, script bodies, dependency versions, README text, mutations, executions, tasks, or approvals.
+
 Run the OpenClaw workspace command plan slice directly:
 
 ```bash
@@ -784,6 +792,7 @@ This is based on real NixOS VM validation:
 - `dev:system-heal-check:unix` covers conservative diagnosis, autofix, and heal history
 - `dev:openclaw-source-migration-map-check:unix` covers read-only migration candidate maps for profiled OpenClaw source capabilities
 - `dev:openclaw-source-migration-plan-check:unix` covers plan-only first-wave migration drafts for OpenClaw source capabilities
+- `dev:openclaw-plugin-sdk-contract-review-check:unix` covers read-only plugin SDK contract review drafts derived from first-wave migration plans
 - `dev:openclaw-workspace-command-proposals-check:unix` covers proposal-only command shapes for detected OpenClaw workspaces
 - `dev:openclaw-workspace-command-plan-check:unix` covers plan-only execution drafts for selected OpenClaw workspace commands
 - `dev:openclaw-workspace-command-task-check:unix` covers approval-gated task materialization for selected OpenClaw workspace commands

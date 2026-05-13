@@ -245,7 +245,7 @@ function readJsonFileIfPresent(filePath) {
   }
 
   try {
-    return JSON.parse(readFileSync(filePath, "utf8"));
+    return JSON.parse(readFileSync(filePath, "utf8").replace(/^\uFEFF/, ""));
   } catch {
     return null;
   }
@@ -975,6 +975,138 @@ function buildOpenClawMigrationPlan() {
         createsTask: false,
         createsApproval: false,
         migrationStatus: "planned_not_imported",
+      },
+    },
+  };
+}
+
+function safeObjectKeys(value) {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? Object.keys(value).sort()
+    : [];
+}
+
+function buildPluginSdkContractReviewForPlanItem(planItem) {
+  const sdkPath = path.join(planItem.workspacePath, "packages", "plugin-sdk");
+  const manifest = readJsonFileIfPresent(path.join(sdkPath, "package.json"));
+  const topLevelDirectories = safeDirectoryEntries(sdkPath);
+  const markers = [
+    "package.json",
+    "README.md",
+    "src",
+    "dist",
+    "types",
+  ].filter((marker) => existsSync(path.join(sdkPath, marker)));
+  const scriptNames = safeObjectKeys(manifest?.scripts);
+  const exportKeys = typeof manifest?.exports === "string"
+    ? ["default"]
+    : safeObjectKeys(manifest?.exports);
+
+  return {
+    id: `${planItem.workspaceId}:plugin-sdk-contract-review`,
+    workspaceId: planItem.workspaceId,
+    workspaceName: planItem.workspaceName,
+    workspacePath: planItem.workspacePath,
+    packagePath: sdkPath,
+    sourcePlanItemId: planItem.candidateId,
+    capability: planItem.capability,
+    targetArea: planItem.targetArea,
+    status: "manifest_profiled_not_imported",
+    verdict: "review_required_before_import",
+    packageManifest: {
+      present: Boolean(manifest),
+      name: typeof manifest?.name === "string" ? manifest.name : null,
+      private: manifest?.private === true,
+      hasVersion: typeof manifest?.version === "string",
+      hasMain: typeof manifest?.main === "string",
+      hasModule: typeof manifest?.module === "string",
+      hasTypes: typeof manifest?.types === "string" || typeof manifest?.typings === "string",
+      hasExports: manifest?.exports !== undefined,
+      exportKeys,
+      scriptNames,
+      dependencySummary: {
+        dependencies: safeObjectKeys(manifest?.dependencies).length,
+        devDependencies: safeObjectKeys(manifest?.devDependencies).length,
+        peerDependencies: safeObjectKeys(manifest?.peerDependencies).length,
+      },
+    },
+    structure: {
+      markers,
+      topLevelDirectories,
+      hasSourceDirectory: topLevelDirectories.includes("src"),
+      hasDistDirectory: topLevelDirectories.includes("dist"),
+      hasTypesDirectory: topLevelDirectories.includes("types"),
+    },
+    contractSurfaces: [
+      ...(exportKeys.length > 0 ? ["package_exports"] : []),
+      ...(typeof manifest?.types === "string" || typeof manifest?.typings === "string" || topLevelDirectories.includes("types")
+        ? ["type_declarations"]
+        : []),
+      ...(topLevelDirectories.includes("src") ? ["source_contract_candidates"] : []),
+      ...(scriptNames.length > 0 ? ["package_scripts_metadata"] : []),
+    ],
+    recommendedReviews: [
+      "confirm stable public capability interfaces before native reimplementation",
+      "reject runtime ownership assumptions that make the old source workspace authoritative",
+      "define OpenClaw policy wrappers and approval gates before exposing SDK-backed capabilities",
+      "write native contract tests before any code absorption",
+    ],
+    blockers: [
+      "source content review not explicitly approved",
+      "native capability contract tests not written",
+      "policy wrapper design not approved",
+    ],
+    governance: {
+      mode: "plugin_sdk_contract_review_read_only",
+      canReadManifestMetadata: true,
+      canReadSourceFileContent: false,
+      canMutate: false,
+      canExecute: false,
+      createsTask: false,
+      createsApproval: false,
+      migrationStatus: "review_required_before_import",
+      runtimeOwner: "openclaw_on_nixos",
+    },
+  };
+}
+
+function buildOpenClawPluginSdkContractReview() {
+  const plan = buildOpenClawMigrationPlan();
+  const items = plan.items
+    .filter((item) => item.capability === "plugin_sdk")
+    .map((item) => buildPluginSdkContractReviewForPlanItem(item));
+
+  return {
+    registry: "openclaw-plugin-sdk-contract-review-v0",
+    mode: "read-only",
+    generatedAt: plan.generatedAt,
+    sourceRegistry: plan.registry,
+    sourceMode: plan.mode,
+    roots: plan.roots,
+    count: items.length,
+    items,
+    summary: {
+      total: items.length,
+      withManifest: items.filter((item) => item.packageManifest.present).length,
+      withTypes: items.filter((item) => item.packageManifest.hasTypes || item.structure.hasTypesDirectory).length,
+      withExports: items.filter((item) => item.packageManifest.hasExports).length,
+      byVerdict: items.reduce((accumulator, item) => {
+        accumulator[item.verdict] = (accumulator[item.verdict] ?? 0) + 1;
+        return accumulator;
+      }, {}),
+      byStatus: items.reduce((accumulator, item) => {
+        accumulator[item.status] = (accumulator[item.status] ?? 0) + 1;
+        return accumulator;
+      }, {}),
+      governance: {
+        mode: "plugin_sdk_contract_review_read_only",
+        canReadManifestMetadata: true,
+        canReadSourceFileContent: false,
+        canMutate: false,
+        canExecute: false,
+        createsTask: false,
+        createsApproval: false,
+        migrationStatus: "review_required_before_import",
       },
     },
   };
@@ -4450,6 +4582,28 @@ const server = http.createServer(async (req, res) => {
       sourceRegistry: plan.sourceRegistry,
       roots: plan.roots,
       summary: plan.summary,
+    });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/workspaces/openclaw-plugin-sdk-contract-review") {
+    sendJson(res, 200, {
+      ok: true,
+      ...buildOpenClawPluginSdkContractReview(),
+    });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/workspaces/openclaw-plugin-sdk-contract-review/summary") {
+    const review = buildOpenClawPluginSdkContractReview();
+    sendJson(res, 200, {
+      ok: true,
+      registry: review.registry,
+      mode: review.mode,
+      generatedAt: review.generatedAt,
+      sourceRegistry: review.sourceRegistry,
+      roots: review.roots,
+      summary: review.summary,
     });
     return;
   }

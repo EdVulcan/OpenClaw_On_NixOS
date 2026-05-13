@@ -58,6 +58,7 @@
     "dev:openclaw-real-workspace-profile-check:unix": "bash ./nix/scripts/dev-openclaw-real-workspace-profile-check.sh",
     "dev:openclaw-source-migration-map-check:unix": "bash ./nix/scripts/dev-openclaw-source-migration-map-check.sh",
     "dev:openclaw-source-migration-plan-check:unix": "bash ./nix/scripts/dev-openclaw-source-migration-plan-check.sh",
+    "dev:openclaw-plugin-sdk-contract-review-check:unix": "bash ./nix/scripts/dev-openclaw-plugin-sdk-contract-review-check.sh",
     "dev:openclaw-workspace-command-proposals-check:unix": "bash ./nix/scripts/dev-openclaw-workspace-command-proposals-check.sh",
     "dev:openclaw-workspace-command-plan-check:unix": "bash ./nix/scripts/dev-openclaw-workspace-command-plan-check.sh",
     "dev:openclaw-workspace-command-task-check:unix": "bash ./nix/scripts/dev-openclaw-workspace-command-task-check.sh",
