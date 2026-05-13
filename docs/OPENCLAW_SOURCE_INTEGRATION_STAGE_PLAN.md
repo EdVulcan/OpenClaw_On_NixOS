@@ -1,6 +1,6 @@
 # OpenClaw Source Integration Stage Plan
 
-更新时间：2026-05-13
+更新时间：2026-05-13 12:27 +08:00
 
 本文档用于跟踪当前阶段：把旁路 `openclaw` 增强源码项目中的能力，受控接入 `OpenClawOnNixOS`。后续每推进一个接入切片，都必须同步更新本文件，避免路线漂移、重复准备层、或忘记阶段边界。
 
@@ -44,14 +44,15 @@
 最近提交：
 
 - `cb9ad20 Add plugin SDK source content review`
+- `6564d79 Document OpenClaw source integration stage plan`
 
 本地验证：
 
 - `npm run typecheck` 通过。
 - `git diff --check` 通过。
-- 新增 targeted milestone 已推送，等待 NixOS 侧运行确认。
+- NixOS targeted milestone 已确认通过：`openclaw-plugin-sdk-source-content-review`、`observer-openclaw-plugin-sdk-source-content-review`。
 
-待 NixOS 侧确认命令：
+已确认的 NixOS 侧命令：
 
 ```bash
 cd /home/edvulcan/OpenClaw_On_NixOS && \
@@ -63,7 +64,15 @@ OPENCLAW_MILESTONE_CHECKS=openclaw-plugin-sdk-source-content-review,observer-ope
 
 切片名称：Plugin SDK Source Content Review
 
-状态：已实现，等待 NixOS targeted milestone 确认。
+状态：passed。
+
+确认时间：2026-05-13 12:27:31 +08:00 至 2026-05-13 12:27:41 +08:00。
+
+确认结果：
+
+- `openclaw-plugin-sdk-source-content-review`：PASS，5s。
+- `observer-openclaw-plugin-sdk-source-content-review`：PASS，5s。
+- 合计：2 passed / 0 failed。
 
 目的：
 
@@ -93,6 +102,8 @@ OPENCLAW_MILESTONE_CHECKS=openclaw-plugin-sdk-source-content-review,observer-ope
 
 ### Step 1: 确认 Source Content Review
 
+状态：passed。
+
 目标：确认新增的两个 targeted milestone 在 NixOS 侧通过。
 
 完成条件：
@@ -108,6 +119,8 @@ OPENCLAW_MILESTONE_CHECKS=openclaw-plugin-sdk-source-content-review,observer-ope
 - 不新增额外准备层。
 
 ### Step 2: SDK Derived Signals -> Native Contract Tests
+
+状态：planned，下一步执行焦点。
 
 目标：把 Step 1 读出的 SDK 派生信号，转成 `OpenClawOnNixOS` 原生合同测试。
 
@@ -246,3 +259,5 @@ SDK derived signals -> native contract tests -> native contract implementation -
 ```
 
 这条线是本阶段的主线。
+
+当前执行焦点：Step 2 `SDK Derived Signals -> Native Contract Tests`。
