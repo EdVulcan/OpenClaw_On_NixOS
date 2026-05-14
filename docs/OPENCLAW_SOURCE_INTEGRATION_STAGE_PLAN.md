@@ -1,6 +1,6 @@
 # OpenClaw Source Integration Stage Plan
 
-更新时间：2026-05-14 12:31 +08:00
+更新时间：2026-05-14 14:10 +08:00
 
 本文档用于跟踪当前阶段：把旁路 `openclaw` 增强源码项目中的能力，受控接入 `OpenClawOnNixOS`。后续每推进一个接入切片，都必须同步更新本文件，避免路线漂移、重复准备层、或忘记阶段边界。
 
@@ -766,7 +766,7 @@ Next intended slice after this passes:
 
 ## 20. 2026-05-14 Step 5 Update: Source-Derived Edit Proposal
 
-Status: implemented_waiting_recheck.
+Status: passed.
 
 Slice: `act.openclaw.workspace_patch_apply` source-derived proposal mode.
 
@@ -783,6 +783,7 @@ Recheck note:
 - 2026-05-14 12:22 +08:00 NixOS core check passed.
 - Observer check failed because the client bundle displayed source-derived registry values from runtime API data but did not contain the static `openclaw-source-derived-edit-proposal-v0` token expected by the milestone contract.
 - Fix: publish the registry token in the Observer client contract and include it in the source-signal display without changing execution behavior.
+- 2026-05-14 14:06 +08:00 NixOS targeted milestone passed: `openclaw-source-derived-edit-proposal`, `observer-openclaw-source-derived-edit-proposal`.
 
 Governance boundaries:
 - Does not import or execute old `openclaw` modules.
