@@ -1,6 +1,6 @@
 # OpenClaw Source Integration Stage Plan
 
-更新时间：2026-05-14 14:35 +08:00
+更新时间：2026-05-14 15:38 +08:00
 
 本文档用于跟踪当前阶段：把旁路 `openclaw` 增强源码项目中的能力，受控接入 `OpenClawOnNixOS`。后续每推进一个接入切片，都必须同步更新本文件，避免路线漂移、重复准备层、或忘记阶段边界。
 
@@ -825,6 +825,11 @@ Implemented artifacts:
 - Target selection metadata included in patch draft/task responses.
 - Observer panel: `OpenClaw Edit Target Selection`.
 - Targeted checks: `openclaw-workspace-edit-target-selection`, `observer-openclaw-workspace-edit-target-selection`.
+
+Recheck note:
+- 2026-05-14 15:30 +08:00 NixOS targeted milestone failed with curl exit 22 before Node assertions.
+- Diagnosis: the new fixture created real tool files but omitted the minimal `packages/plugin-sdk` structure expected by the existing tool-catalog/source-derived proposal chain.
+- Fix: add minimal plugin SDK fixture structure and make edit target selection tolerate missing optional tool-catalog metadata while still selecting from semantic/symbol signals.
 
 Governance boundaries:
 - Does not import or execute old `openclaw` modules.

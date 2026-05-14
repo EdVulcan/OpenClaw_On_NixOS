@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 FIXTURE_DIR="$REPO_ROOT/.artifacts/openclaw-workspace-edit-target-selection-fixture"
 WORKSPACE_DIR="$FIXTURE_DIR/openclaw"
+PLUGIN_SDK_DIR="$WORKSPACE_DIR/packages/plugin-sdk"
 TOOLS_DIR="$WORKSPACE_DIR/src/agents/tools"
 TARGET_RELATIVE_PATH="src/agents/tools/edit-target-tool.ts"
 TARGET_FILE="$WORKSPACE_DIR/$TARGET_RELATIVE_PATH"
@@ -28,12 +29,27 @@ CORE_URL="http://127.0.0.1:$OPENCLAW_CORE_PORT"
 
 "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 rm -rf "$FIXTURE_DIR"
-mkdir -p "$WORKSPACE_DIR/.git" "$WORKSPACE_DIR/.openclaw" "$TOOLS_DIR"
+mkdir -p "$WORKSPACE_DIR/.git" "$WORKSPACE_DIR/.openclaw" "$PLUGIN_SDK_DIR/src" "$PLUGIN_SDK_DIR/types" "$TOOLS_DIR"
 rm -f "$OPENCLAW_CORE_STATE_FILE" "$OPENCLAW_CORE_STATE_FILE.tmp" "$OPENCLAW_EVENT_LOG_FILE"
 
 cat > "$WORKSPACE_DIR/package.json" <<'JSON'
 {"name":"openclaw","private":true}
 JSON
+cat > "$WORKSPACE_DIR/pnpm-workspace.yaml" <<'YAML'
+packages:
+  - "packages/*"
+YAML
+cat > "$PLUGIN_SDK_DIR/package.json" <<'JSON'
+{"name":"@openclaw/plugin-sdk","private":false,"types":"./types/index.d.ts","exports":{".":"./dist/index.js"}}
+JSON
+cat > "$PLUGIN_SDK_DIR/src/index.ts" <<'TS'
+export function createEditTargetSelectionContract() {
+  return { capabilityId: "edit-target-selection" };
+}
+TS
+cat > "$PLUGIN_SDK_DIR/types/index.d.ts" <<'TS'
+export type EditTargetSelectionManifest = { pluginId: string };
+TS
 cat > "$TARGET_FILE" <<EOF
 export function editTargetTool() {
   const before = "before";

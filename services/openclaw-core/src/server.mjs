@@ -3222,13 +3222,18 @@ function buildNativeOpenClawWorkspaceEditTargetSelection({
     query: safeQuery,
     limit: safeLimit * 2,
   });
-  const catalogProfile = safeScope === "tools"
-    ? buildNativeOpenClawToolCatalogProfile({
-      workspacePath: item.path,
-      query: safeQuery,
-      limit: safeLimit * 2,
-    })
-    : null;
+  let catalogProfile = null;
+  if (safeScope === "tools") {
+    try {
+      catalogProfile = buildNativeOpenClawToolCatalogProfile({
+        workspacePath: item.path,
+        query: safeQuery,
+        limit: safeLimit * 2,
+      });
+    } catch {
+      catalogProfile = null;
+    }
+  }
   const catalogPaths = new Set((catalogProfile?.tools ?? []).map((tool) => tool.relativePath));
   const matchesByPath = new Map();
   for (const match of symbolLookup.matches ?? []) {
