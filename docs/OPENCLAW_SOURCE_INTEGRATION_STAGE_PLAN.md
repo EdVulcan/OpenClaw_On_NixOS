@@ -1,6 +1,6 @@
 # OpenClaw Source Integration Stage Plan
 
-更新时间：2026-05-14 11:48 +08:00
+更新时间：2026-05-14 11:52 +08:00
 
 本文档用于跟踪当前阶段：把旁路 `openclaw` 增强源码项目中的能力，受控接入 `OpenClawOnNixOS`。后续每推进一个接入切片，都必须同步更新本文件，避免路线漂移、重复准备层、或忘记阶段边界。
 
@@ -726,7 +726,7 @@ Next intended slice after this passes:
 
 ## 19. 2026-05-14 Step 5 Update: Native Workspace Edit Proposal Envelope
 
-Status: implemented_waiting_check.
+Status: passed.
 
 Slice: `act.openclaw.workspace_patch_apply` proposal envelope.
 
