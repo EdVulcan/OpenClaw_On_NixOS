@@ -1789,6 +1789,7 @@ function renderWorkspacePatchApplyDraft(data) {
   const target = data?.target ?? {};
   const governance = data?.draft?.governance ?? data?.governance ?? {};
   const validation = data?.validation ?? {};
+  const proposal = data?.proposal ?? {};
   const structuredValidationEngine = validation.structuredPatch?.engine ?? "openclaw-native-workspace-patch-validation-v0";
   const previewValidationEngine = validation.preview?.engine ?? "openclaw-native-workspace-patch-preview-validation-v0";
   const diffPreview = data?.diffPreview ?? {};
@@ -1807,6 +1808,7 @@ function renderWorkspacePatchApplyDraft(data) {
     \`Capability: \${data?.capability?.id ?? "act.openclaw.workspace_patch_apply"} risk=\${data?.capability?.risk ?? "high"} approval=\${Boolean(data?.capability?.approvalRequired ?? true)} owner=\${data?.capability?.runtimeOwner ?? "unknown"}\`,
     \`Workspace: \${data?.workspace?.name ?? "unknown"} \${data?.workspace?.path ?? ""}\`,
     \`Target: \${target.relativePath ?? "scratch/observer-native-edit.txt"} edits=\${target.editCount ?? 1} changedAt=\${(target.changedAtLines ?? [target.changedAtLine]).filter(Boolean).join(",") || "unknown"} oldBytes=\${target.originalBytes ?? 0} newBytes=\${target.nextBytes ?? 0} oldSha256=\${target.originalSha256 ?? "unknown"} newSha256=\${target.nextSha256 ?? "unknown"} contentExposed=\${Boolean(target.contentExposed)} diffPreview=\${Boolean(target.diffPreviewExposed)}\`,
+    \`Proposal Envelope: registry=\${proposal.registry ?? "openclaw-native-workspace-edit-proposal-v0"} title=\${proposal.title ?? "unknown"} dryRun=\${Boolean(proposal.dryRun?.ok)} contentExposed=\${Boolean(proposal.dryRun?.contentExposed)} rationale=\${proposal.rationale ?? "unknown"}\`,
     \`Structured Edits: supportedKinds=replace_text,replace_lines observedKinds=\${(data?.edits ?? []).map((edit) => edit.kind ?? "replace_text").join(",") || "none"}\`,
     \`Validation: ok=\${Boolean(validation.ok)} structured=\${structuredValidationEngine} preview=\${previewValidationEngine} appliesAgainstOriginal=\${Boolean(validation.structuredPatch?.checks?.appliesAgainstOriginalContent)} structuredLineRangesResolved=\${Boolean(validation.structuredPatch?.checks?.structuredLineRangesResolved)}\`,
     \`Diff: format=\${diffPreview.format ?? "unknown"} hunks=\${diffPreview.hunkCount ?? 1} oldStart=\${diffPreview.oldStartLine ?? "?"} newStart=\${diffPreview.newStartLine ?? "?"} lines=\${diffPreview.previewLineCount ?? lines.length} truncated=\${Boolean(diffPreview.truncated)}\`,
@@ -2460,7 +2462,12 @@ async function refreshWorkspacePatchApplyDraft() {
       { search: "before", replacement: "after", occurrence: 1 },
       { search: "omega", replacement: "zeta", occurrence: 1 },
     ]));
-    const data = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/workspace-patch-apply/draft?relativePath=scratch/observer-native-edit.txt&edits=\${edits}&contextLines=0\`);
+    const proposal = encodeURIComponent(JSON.stringify({
+      title: "Observer sample edit proposal",
+      rationale: "Demonstrate proposal envelope metadata for an approval-gated OpenClaw workspace patch.",
+      targetContext: { symbol: "observer-sample", fileRole: "workspace scratch fixture" },
+    }));
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/workspace-patch-apply/draft?relativePath=scratch/observer-native-edit.txt&edits=\${edits}&proposal=\${proposal}&contextLines=0\`);
     renderWorkspacePatchApplyDraft(data);
   } catch {
     workspacePatchApplyRegistry.textContent = "offline";
@@ -3257,6 +3264,11 @@ async function createWorkspacePatchApplyApprovalTask() {
         { search: "before", replacement: "after", occurrence: 1 },
         { search: "omega", replacement: "zeta", occurrence: 1 },
       ],
+      proposal: {
+        title: "Observer sample edit proposal",
+        rationale: "Demonstrate proposal envelope metadata for an approval-gated OpenClaw workspace patch.",
+        targetContext: { symbol: "observer-sample", fileRole: "workspace scratch fixture" },
+      },
       contextLines: 0,
       confirm: true,
     }),

@@ -1,6 +1,6 @@
 # OpenClaw Source Integration Stage Plan
 
-更新时间：2026-05-14 11:43 +08:00
+更新时间：2026-05-14 11:48 +08:00
 
 本文档用于跟踪当前阶段：把旁路 `openclaw` 增强源码项目中的能力，受控接入 `OpenClawOnNixOS`。后续每推进一个接入切片，都必须同步更新本文件，避免路线漂移、重复准备层、或忘记阶段边界。
 
@@ -722,4 +722,44 @@ OPENCLAW_MILESTONE_CHECKS=openclaw-native-workspace-structured-edit,observer-ope
 
 Next intended slice after this passes:
 - Add a higher-level edit proposal wrapper that can carry rationale, target symbol/file context, and a dry-run summary before approval.
+- Keep shell/process/web gateway execution deferred until code-edit safety is stable.
+
+## 19. 2026-05-14 Step 5 Update: Native Workspace Edit Proposal Envelope
+
+Status: implemented_waiting_check.
+
+Slice: `act.openclaw.workspace_patch_apply` proposal envelope.
+
+Purpose: add a high-level edit proposal wrapper around the existing patch adapter so future OpenClaw/Claude Code-inspired planning can carry rationale, target symbol/file context, and dry-run governance metadata before approval. This keeps the low-level patch execution chain unchanged while making proposals more inspectable and auditable.
+
+Implemented artifacts:
+- Proposal envelope registry: `openclaw-native-workspace-edit-proposal-v0`.
+- Proposal metadata: title, rationale, source, target context, dry-run summary, governance summary.
+- Core draft and task responses include redacted proposal metadata.
+- Observer panel renders proposal envelope metadata.
+- Targeted checks: `openclaw-native-workspace-edit-proposal`, `observer-openclaw-native-workspace-edit-proposal`.
+
+Governance boundaries:
+- Does not import or execute old `openclaw` modules.
+- Does not create a new write channel.
+- Proposal envelopes do not expose full patched content.
+- Proposal envelopes do not execute before approval.
+- Approved proposal tasks still execute through `act.filesystem.write_text`.
+- Filesystem and capability ledgers remain authoritative.
+
+Local verification target:
+- `npm run typecheck`.
+- `git diff --check`.
+- Targeted milestone checks on NixOS.
+
+NixOS targeted milestone command:
+
+```bash
+cd /home/edvulcan/OpenClaw_On_NixOS && \
+git pull origin main && \
+OPENCLAW_MILESTONE_CHECKS=openclaw-native-workspace-edit-proposal,observer-openclaw-native-workspace-edit-proposal npm run dev:milestone-check:unix
+```
+
+Next intended slice after this passes:
+- Start deriving proposal envelopes from the enhanced `openclaw` source/tool signals instead of hand-authored request metadata.
 - Keep shell/process/web gateway execution deferred until code-edit safety is stable.

@@ -3711,6 +3711,63 @@ function validateWorkspacePatchDiffPreview(diffPreview, { maxPreviewLines = 64 }
   };
 }
 
+function truncatePatchMetadata(value, maxLength = 240) {
+  const text = typeof value === "string" ? value : "";
+  return text.length > maxLength ? `${text.slice(0, maxLength - 3)}...` : text;
+}
+
+function buildWorkspacePatchProposalEnvelope({
+  proposal = null,
+  target,
+  capability,
+  safeEdits,
+  diffPreview,
+  validation,
+} = {}) {
+  const raw = proposal && typeof proposal === "object" ? proposal : {};
+  const title = truncatePatchMetadata(raw.title ?? raw.summary ?? `Patch ${target.relativePath}`, 120);
+  const rationale = truncatePatchMetadata(raw.rationale ?? raw.reason ?? "No rationale supplied.", 320);
+  const targetContext = raw.targetContext && typeof raw.targetContext === "object" ? raw.targetContext : {};
+  const symbol = truncatePatchMetadata(targetContext.symbol ?? raw.symbol ?? "", 120);
+  const fileRole = truncatePatchMetadata(targetContext.fileRole ?? raw.fileRole ?? "", 160);
+
+  return {
+    id: typeof raw.id === "string" && raw.id ? truncatePatchMetadata(raw.id, 96) : randomUUID(),
+    registry: "openclaw-native-workspace-edit-proposal-v0",
+    mode: "proposal-envelope",
+    title,
+    rationale,
+    source: truncatePatchMetadata(raw.source ?? "native-openclaw-workspace-patch-adapter", 120),
+    targetContext: {
+      workspace: target.workspace.name,
+      relativePath: target.relativePath,
+      symbol: symbol || null,
+      fileRole: fileRole || null,
+    },
+    dryRun: {
+      ok: true,
+      editCount: safeEdits.length,
+      editKinds: [...new Set(safeEdits.map((edit) => edit.kind))],
+      diffFormat: diffPreview.format,
+      hunkCount: diffPreview.hunkCount ?? 1,
+      previewLineCount: diffPreview.previewLineCount ?? 0,
+      validationEngines: [
+        validation.structuredPatch.engine,
+        validation.preview.engine,
+      ],
+      contentExposed: false,
+    },
+    governance: {
+      capabilityId: capability.id,
+      risk: capability.risk,
+      approvalRequired: capability.approvalRequired,
+      runtimeOwner: capability.runtimeOwner,
+      usesFilesystemWriteCapability: true,
+      createsTaskBeforeApproval: false,
+    },
+  };
+}
+
 function buildNativeOpenClawWorkspacePatchApplyDraft({
   workspacePath = null,
   relativePath = "scratch/native-edit.txt",
@@ -3719,6 +3776,7 @@ function buildNativeOpenClawWorkspacePatchApplyDraft({
   occurrence = 1,
   edits = null,
   contextLines = 1,
+  proposal = null,
 } = {}) {
   const target = resolveOpenClawWorkspaceTarget({ workspacePath, relativePath });
   const safeEdits = normaliseWorkspacePatchEdits({ edits, search, replacement, occurrence });
@@ -3779,19 +3837,33 @@ function buildNativeOpenClawWorkspacePatchApplyDraft({
     autonomyMode,
     autonomous: false,
   };
+  const capabilityEnvelope = {
+    id: capability?.id ?? "act.openclaw.workspace_patch_apply",
+    kind: capability?.kind ?? "act",
+    risk: capability?.risk ?? "high",
+    approvalRequired: capability?.approval?.required ?? true,
+    runtimeOwner: capability?.runtimeOwner ?? "openclaw_on_nixos",
+  };
+  const validationEnvelope = {
+    ok: true,
+    structuredPatch: validation,
+    preview: previewValidation,
+  };
+  const proposalEnvelope = buildWorkspacePatchProposalEnvelope({
+    proposal,
+    target,
+    capability: capabilityEnvelope,
+    safeEdits,
+    diffPreview,
+    validation: validationEnvelope,
+  });
 
   return {
     registry: "openclaw-native-workspace-patch-apply-draft-v0",
     mode: "diff-preview-approval-gated-draft",
     generatedAt: now,
     sourceRegistry: "openclaw-native-plugin-adapter-v0",
-    capability: {
-      id: capability?.id ?? "act.openclaw.workspace_patch_apply",
-      kind: capability?.kind ?? "act",
-      risk: capability?.risk ?? "high",
-      approvalRequired: capability?.approval?.required ?? true,
-      runtimeOwner: capability?.runtimeOwner ?? "openclaw_on_nixos",
-    },
+    capability: capabilityEnvelope,
     workspace: {
       id: target.workspace.id,
       name: target.workspace.name,
@@ -3813,11 +3885,8 @@ function buildNativeOpenClawWorkspacePatchApplyDraft({
       contentExposed: false,
       diffPreviewExposed: true,
     },
-    validation: {
-      ok: true,
-      structuredPatch: validation,
-      preview: previewValidation,
-    },
+    validation: validationEnvelope,
+    proposal: proposalEnvelope,
     edits: appliedEdits.map((edit) => ({
       index: edit.index,
       kind: edit.kind,
@@ -3867,6 +3936,7 @@ async function createNativeOpenClawWorkspacePatchApplyTask({
   occurrence = 1,
   edits = null,
   contextLines = 1,
+  proposal = null,
   confirm = false,
 } = {}) {
   if (confirm !== true) {
@@ -3881,6 +3951,7 @@ async function createNativeOpenClawWorkspacePatchApplyTask({
     occurrence,
     edits,
     contextLines,
+    proposal,
   });
   const draft = draftEnvelope.draft;
   const task = createTask({
@@ -3912,6 +3983,7 @@ async function createNativeOpenClawWorkspacePatchApplyTask({
     workspace: draftEnvelope.workspace,
     target: draftEnvelope.target,
     validation: draftEnvelope.validation,
+    proposal: draftEnvelope.proposal,
     edits: draftEnvelope.edits,
     diffPreview: draftEnvelope.diffPreview,
     task,
@@ -8580,6 +8652,8 @@ const server = http.createServer(async (req, res) => {
     try {
       const editsParam = requestUrl.searchParams.get("edits");
       const edits = editsParam ? JSON.parse(editsParam) : null;
+      const proposalParam = requestUrl.searchParams.get("proposal");
+      const proposal = proposalParam ? JSON.parse(proposalParam) : null;
       const draft = buildNativeOpenClawWorkspacePatchApplyDraft({
         workspacePath: requestUrl.searchParams.get("workspacePath"),
         relativePath: requestUrl.searchParams.get("relativePath") ?? "scratch/native-edit.txt",
@@ -8588,6 +8662,7 @@ const server = http.createServer(async (req, res) => {
         occurrence: Number.parseInt(requestUrl.searchParams.get("occurrence") ?? "1", 10),
         edits,
         contextLines: Number.parseInt(requestUrl.searchParams.get("contextLines") ?? "1", 10),
+        proposal,
       });
       sendJson(res, 200, {
         ok: true,
@@ -8615,6 +8690,7 @@ const server = http.createServer(async (req, res) => {
         occurrence: Number.isInteger(body.occurrence) ? body.occurrence : 1,
         edits: Array.isArray(body.edits) ? body.edits : null,
         contextLines: Number.isInteger(body.contextLines) ? body.contextLines : 1,
+        proposal: body.proposal && typeof body.proposal === "object" ? body.proposal : null,
         confirm: body.confirm === true,
       });
       sendJson(res, 201, {
@@ -8627,6 +8703,7 @@ const server = http.createServer(async (req, res) => {
         workspace: result.workspace,
         target: result.target,
         validation: result.validation,
+        proposal: result.proposal,
         edits: result.edits,
         diffPreview: result.diffPreview,
         task: serialiseTask(result.task),
