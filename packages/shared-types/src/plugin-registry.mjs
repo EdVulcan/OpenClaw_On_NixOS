@@ -102,6 +102,25 @@ export function createOpenClawNativePluginRegistry({ generatedAt = new Date().to
         },
       },
       {
+        id: "sense.openclaw.workspace_edit_target_select",
+        title: "Select OpenClaw workspace edit target",
+        description: "Builds a bounded read-only target selection envelope for enhanced OpenClaw workspace edits from source-derived metadata without exposing file bodies.",
+        kind: "sense",
+        domains: ["body_internal"],
+        risk: "low",
+        permissions: {
+          filesystemRead: true,
+        },
+        approval: {
+          required: false,
+          reason: "Read-only target selection inside the body boundary.",
+        },
+        audit: {
+          required: true,
+          ledger: "capability_history",
+        },
+      },
+      {
         id: "act.openclaw.workspace_text_write",
         title: "Apply OpenClaw workspace text write",
         description: "Materializes a bounded OpenClaw workspace text write only through explicit approval, native filesystem governance, and filesystem ledgering.",

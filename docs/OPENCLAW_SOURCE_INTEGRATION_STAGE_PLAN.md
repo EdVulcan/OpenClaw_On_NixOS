@@ -1,6 +1,6 @@
 # OpenClaw Source Integration Stage Plan
 
-更新时间：2026-05-14 14:10 +08:00
+更新时间：2026-05-14 14:35 +08:00
 
 本文档用于跟踪当前阶段：把旁路 `openclaw` 增强源码项目中的能力，受控接入 `OpenClawOnNixOS`。后续每推进一个接入切片，都必须同步更新本文件，避免路线漂移、重复准备层、或忘记阶段边界。
 
@@ -809,3 +809,44 @@ OPENCLAW_MILESTONE_CHECKS=openclaw-source-derived-edit-proposal,observer-opencla
 Next intended slice after this passes:
 - Connect source-derived proposals to a bounded real OpenClaw workspace target selection flow.
 - Keep shell/process/web gateway execution deferred until code-edit safety is stable.
+
+## 21. 2026-05-14 Step 5 Update: Real Workspace Edit Target Selection
+
+Status: implemented_waiting_check.
+
+Slice: `sense.openclaw.workspace_edit_target_select` plus `act.openclaw.workspace_patch_apply` target-selection bridge.
+
+Purpose: connect source-derived edit proposals to bounded real enhanced `openclaw` workspace files. This moves beyond scratch fixtures by selecting eligible target paths from the real workspace semantic index, symbol lookup, and tool catalog metadata, then feeding the selected path into the existing approval-gated patch proposal chain.
+
+Implemented artifacts:
+- Target selection registry: `openclaw-native-workspace-edit-target-selection-v0`.
+- Core endpoint: `GET /plugins/native-adapter/workspace-edit-target-selection`.
+- Patch draft/task option: `selectTargetFromSource=true`.
+- Target selection metadata included in patch draft/task responses.
+- Observer panel: `OpenClaw Edit Target Selection`.
+- Targeted checks: `openclaw-workspace-edit-target-selection`, `observer-openclaw-workspace-edit-target-selection`.
+
+Governance boundaries:
+- Does not import or execute old `openclaw` modules.
+- Does not expose source file bodies or function bodies.
+- Exposes only bounded target metadata and sanitized declaration previews.
+- Does not create a task or approval by itself.
+- Mutation still happens only through `act.openclaw.workspace_patch_apply` and requires explicit approval.
+- Approved patch tasks still execute through `act.filesystem.write_text`.
+
+Local verification target:
+- `npm run typecheck`.
+- `git diff --check`.
+- Targeted milestone checks on NixOS.
+
+NixOS targeted milestone command:
+
+```bash
+cd /home/edvulcan/OpenClaw_On_NixOS && \
+git pull origin main && \
+OPENCLAW_MILESTONE_CHECKS=openclaw-workspace-edit-target-selection,observer-openclaw-workspace-edit-target-selection npm run dev:milestone-check:unix
+```
+
+Next intended slice after this passes:
+- Use target-selected source-derived proposals as the entry point for absorbing prompt/tool semantics into concrete edit plans.
+- Keep shell/process/web gateway execution deferred until code-edit target safety is stable.

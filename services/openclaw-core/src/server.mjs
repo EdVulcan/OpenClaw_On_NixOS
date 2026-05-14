@@ -2401,18 +2401,20 @@ function buildOpenClawNativePluginAdapterStatus() {
       "sense.openclaw.tool_catalog",
       "sense.openclaw.workspace_semantic_index",
       "sense.openclaw.workspace_symbol_lookup",
+      "sense.openclaw.workspace_edit_target_select",
       "act.openclaw.workspace_text_write",
       "act.openclaw.workspace_patch_apply",
       "plan.plugin.runtime_preflight",
     ],
     pendingCapabilities: ["act.plugin.capability.invoke"],
     summary: {
-      implemented: 7,
+      implemented: 8,
       pending: 1,
       canReadManifestMetadata: true,
       canReadToolCatalogMetadata: true,
       canReadWorkspaceSemanticMetadata: true,
       canExecuteWorkspaceSymbolLookup: true,
+      canSelectWorkspaceEditTargets: true,
       canCreateApprovalGatedWorkspaceTextWriteTasks: true,
       canCreateApprovalGatedWorkspacePatchTasks: true,
       canReadSourceFileContent: false,
@@ -3166,6 +3168,190 @@ function buildNativeOpenClawWorkspaceSymbolLookup({
   };
 }
 
+function scoreOpenClawEditTargetCandidate(candidate, query) {
+  const lowerQuery = normaliseSymbolLookupQuery(query).toLowerCase();
+  const searchable = [
+    candidate.relativePath,
+    candidate.kind,
+    candidate.category,
+    candidate.primarySymbol?.symbolName,
+    candidate.primarySymbol?.declarationKind,
+  ].join(" ").toLowerCase();
+  let score = 0;
+  if (candidate.kind === "typescript_source" || candidate.kind === "javascript_source") {
+    score += 30;
+  }
+  if (candidate.kind === "type_declaration") {
+    score += 15;
+  }
+  if (candidate.primarySymbol) {
+    score += 20;
+  }
+  if (candidate.toolCatalogMatch) {
+    score += 15;
+  }
+  if (candidate.semanticSignals?.hasSemanticVocabulary) {
+    score += 10;
+  }
+  if (searchable.includes(lowerQuery)) {
+    score += 25;
+  }
+  return score;
+}
+
+function buildNativeOpenClawWorkspaceEditTargetSelection({
+  workspacePath = null,
+  scope = "tools",
+  query = "edit",
+  limit = 8,
+} = {}) {
+  const { item } = selectOpenClawToolCatalogWorkspace({ workspacePath });
+  const safeScope = SEMANTIC_INDEX_SCOPES.has(scope) ? scope : "tools";
+  const safeQuery = normaliseSymbolLookupQuery(query);
+  const safeLimit = normalisePositiveLimit(limit, 8, 20);
+  const relativeRoot = SEMANTIC_INDEX_SCOPES.get(safeScope) ?? SEMANTIC_INDEX_SCOPES.get("tools");
+  const semanticIndex = buildNativeOpenClawWorkspaceSemanticIndex({
+    workspacePath: item.path,
+    scope: safeScope,
+    query: safeQuery,
+    limit: safeLimit * 2,
+  });
+  const symbolLookup = buildNativeOpenClawWorkspaceSymbolLookup({
+    workspacePath: item.path,
+    scope: safeScope,
+    query: safeQuery,
+    limit: safeLimit * 2,
+  });
+  const catalogProfile = safeScope === "tools"
+    ? buildNativeOpenClawToolCatalogProfile({
+      workspacePath: item.path,
+      query: safeQuery,
+      limit: safeLimit * 2,
+    })
+    : null;
+  const catalogPaths = new Set((catalogProfile?.tools ?? []).map((tool) => tool.relativePath));
+  const matchesByPath = new Map();
+  for (const match of symbolLookup.matches ?? []) {
+    if (!matchesByPath.has(match.relativePath)) {
+      matchesByPath.set(match.relativePath, match);
+    }
+  }
+  const candidates = (semanticIndex.files ?? [])
+    .filter((file) => file.contentRead && !file.skipped)
+    .filter((file) => ["typescript_source", "javascript_source", "type_declaration"].includes(file.kind))
+    .map((file) => {
+      const workspaceRelativePath = `${relativeRoot}/${file.relativePath}`.replaceAll("\\", "/");
+      const primarySymbol = matchesByPath.get(file.relativePath) ?? null;
+      const candidate = {
+        relativePath: workspaceRelativePath,
+        sourceRelativePath: file.relativePath,
+        kind: file.kind,
+        category: file.category,
+        lineCount: file.lineCount,
+        sizeBytes: file.sizeBytes,
+        primarySymbol: primarySymbol ? {
+          symbolName: primarySymbol.symbolName,
+          declarationKind: primarySymbol.declarationKind,
+          lineNumber: primarySymbol.lineNumber,
+          exported: primarySymbol.exported,
+          declarationPreview: primarySymbol.declarationPreview,
+          declarationPreviewExposed: true,
+        } : null,
+        semanticSignals: {
+          exportStatements: file.signals?.exportStatements ?? 0,
+          functionDeclarations: file.signals?.functionDeclarations ?? 0,
+          interfaceDeclarations: file.signals?.interfaceDeclarations ?? 0,
+          typeDeclarations: file.signals?.typeDeclarations ?? 0,
+          semanticTermCount: file.signals?.semanticTermCount ?? 0,
+          hasSemanticVocabulary: Boolean(file.signals?.hasSemanticVocabulary),
+        },
+        toolCatalogMatch: catalogPaths.has(workspaceRelativePath),
+        contentRead: true,
+        contentExposed: false,
+        eligibleForPatchProposal: true,
+      };
+      return {
+        ...candidate,
+        score: scoreOpenClawEditTargetCandidate(candidate, safeQuery),
+      };
+    })
+    .sort((left, right) => right.score - left.score || left.relativePath.localeCompare(right.relativePath))
+    .slice(0, safeLimit);
+  const selectedTarget = candidates[0] ?? null;
+  const nativeRegistry = createOpenClawNativePluginRegistry();
+  const capability = nativeRegistry.items[0]?.contract?.capabilities
+    ?.find((entry) => entry.id === "sense.openclaw.workspace_edit_target_select") ?? null;
+
+  return {
+    ok: Boolean(selectedTarget),
+    registry: "openclaw-native-workspace-edit-target-selection-v0",
+    mode: "source-derived-bounded-target-selection",
+    generatedAt: new Date().toISOString(),
+    sourceRegistries: [
+      semanticIndex.registry,
+      symbolLookup.registry,
+      catalogProfile?.registry,
+    ].filter(Boolean),
+    capability: {
+      id: capability?.id ?? "sense.openclaw.workspace_edit_target_select",
+      kind: capability?.kind ?? "sense",
+      risk: capability?.risk ?? "low",
+      approvalRequired: capability?.approval?.required ?? false,
+      runtimeOwner: capability?.runtimeOwner ?? "openclaw_on_nixos",
+    },
+    workspace: {
+      id: item.id,
+      name: item.name,
+      path: item.path,
+    },
+    query: {
+      text: safeQuery,
+      scope: safeScope,
+      relativeRoot,
+      limit: safeLimit,
+    },
+    selectedTarget,
+    candidates,
+    summary: {
+      candidateCount: candidates.length,
+      selected: Boolean(selectedTarget),
+      semanticFilesMatched: semanticIndex.files?.length ?? 0,
+      symbolMatches: symbolLookup.matches?.length ?? 0,
+      toolCatalogMatches: catalogProfile?.summary?.matchedTools ?? 0,
+      canReadSourceFileContent: true,
+      exposesSourceFileContent: false,
+      exposesDeclarationPreview: true,
+      canImportModule: false,
+      canExecutePluginCode: false,
+      canExecuteToolCode: false,
+      canActivateRuntime: false,
+      canMutate: false,
+      createsTask: false,
+      createsApproval: false,
+      canFeedPatchProposal: Boolean(selectedTarget),
+    },
+    governance: {
+      mode: "native_workspace_edit_target_selection_read_only",
+      runtimeOwner: "openclaw_on_nixos",
+      canReadMetadata: true,
+      canReadSourceFileContent: true,
+      exposesSourceFileContent: false,
+      exposesDeclarationPreview: true,
+      exposesFunctionBodies: false,
+      canMutate: false,
+      canExecute: false,
+      canImportModule: false,
+      canExecutePluginCode: false,
+      canExecuteToolCode: false,
+      canActivateRuntime: false,
+      createsTask: false,
+      createsApproval: false,
+      requiresPolicyInvocation: true,
+      outputMode: "bounded_target_metadata_only",
+    },
+  };
+}
+
 function sha256Hex(value) {
   return createHash("sha256").update(value, "utf8").digest("hex");
 }
@@ -3841,7 +4027,7 @@ function buildOpenClawSourceDerivedPatchProposal({
 
 function buildNativeOpenClawWorkspacePatchApplyDraft({
   workspacePath = null,
-  relativePath = "scratch/native-edit.txt",
+  relativePath = null,
   search = "",
   replacement = "",
   occurrence = 1,
@@ -3850,8 +4036,22 @@ function buildNativeOpenClawWorkspacePatchApplyDraft({
   proposal = null,
   deriveProposalFromSource = false,
   proposalQuery = "edit",
+  selectTargetFromSource = false,
+  targetSelectionQuery = null,
+  targetSelectionScope = "tools",
 } = {}) {
-  const target = resolveOpenClawWorkspaceTarget({ workspacePath, relativePath });
+  const targetSelection = selectTargetFromSource
+    ? buildNativeOpenClawWorkspaceEditTargetSelection({
+      workspacePath,
+      scope: targetSelectionScope,
+      query: targetSelectionQuery ?? proposalQuery,
+      limit: 8,
+    })
+    : null;
+  const effectiveRelativePath = targetSelection?.selectedTarget?.relativePath
+    ?? relativePath
+    ?? "scratch/native-edit.txt";
+  const target = resolveOpenClawWorkspaceTarget({ workspacePath, relativePath: effectiveRelativePath });
   const safeEdits = normaliseWorkspacePatchEdits({ edits, search, replacement, occurrence });
   const originalContent = readBoundedWorkspaceTextFile(target);
   const { nextContent, appliedEdits, validation } = applyWorkspacePatchEdits(originalContent, safeEdits);
@@ -3968,6 +4168,7 @@ function buildNativeOpenClawWorkspacePatchApplyDraft({
     validation: validationEnvelope,
     proposal: proposalEnvelope,
     proposalSourceSignals: sourceDerivedProposal?.sourceSignals ?? null,
+    targetSelection,
     edits: appliedEdits.map((edit) => ({
       index: edit.index,
       kind: edit.kind,
@@ -4011,7 +4212,7 @@ function buildNativeOpenClawWorkspacePatchApplyDraft({
 
 async function createNativeOpenClawWorkspacePatchApplyTask({
   workspacePath = null,
-  relativePath = "scratch/native-edit.txt",
+  relativePath = null,
   search = "",
   replacement = "",
   occurrence = 1,
@@ -4020,6 +4221,9 @@ async function createNativeOpenClawWorkspacePatchApplyTask({
   proposal = null,
   deriveProposalFromSource = false,
   proposalQuery = "edit",
+  selectTargetFromSource = false,
+  targetSelectionQuery = null,
+  targetSelectionScope = "tools",
   confirm = false,
 } = {}) {
   if (confirm !== true) {
@@ -4037,6 +4241,9 @@ async function createNativeOpenClawWorkspacePatchApplyTask({
     proposal,
     deriveProposalFromSource,
     proposalQuery,
+    selectTargetFromSource,
+    targetSelectionQuery,
+    targetSelectionScope,
   });
   const draft = draftEnvelope.draft;
   const task = createTask({
@@ -4070,6 +4277,7 @@ async function createNativeOpenClawWorkspacePatchApplyTask({
     validation: draftEnvelope.validation,
     proposal: draftEnvelope.proposal,
     proposalSourceSignals: draftEnvelope.proposalSourceSignals,
+    targetSelection: draftEnvelope.targetSelection,
     edits: draftEnvelope.edits,
     diffPreview: draftEnvelope.diffPreview,
     task,
@@ -5968,6 +6176,15 @@ async function callCapabilityBackend(capability, request) {
 
   if (capability.id === "sense.openclaw.workspace_symbol_lookup") {
     return buildNativeOpenClawWorkspaceSymbolLookup({
+      workspacePath: request.params.workspacePath,
+      scope: request.params.scope,
+      query: request.params.query ?? request.params.q,
+      limit: request.params.limit,
+    });
+  }
+
+  if (capability.id === "sense.openclaw.workspace_edit_target_select") {
+    return buildNativeOpenClawWorkspaceEditTargetSelection({
       workspacePath: request.params.workspacePath,
       scope: request.params.scope,
       query: request.params.query ?? request.params.q,
@@ -8680,6 +8897,21 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === "GET" && requestUrl.pathname === "/plugins/native-adapter/workspace-edit-target-selection") {
+    try {
+      sendJson(res, 200, buildNativeOpenClawWorkspaceEditTargetSelection({
+        workspacePath: requestUrl.searchParams.get("workspacePath"),
+        scope: requestUrl.searchParams.get("scope") ?? "tools",
+        query: requestUrl.searchParams.get("query") ?? requestUrl.searchParams.get("q") ?? "edit",
+        limit: requestUrl.searchParams.get("limit"),
+      }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 404, { ok: false, error: message });
+    }
+    return;
+  }
+
   if (req.method === "GET" && requestUrl.pathname === "/plugins/native-adapter/workspace-text-write/draft") {
     try {
       const draft = buildNativeOpenClawWorkspaceTextWriteDraft({
@@ -8740,9 +8972,10 @@ const server = http.createServer(async (req, res) => {
       const edits = editsParam ? JSON.parse(editsParam) : null;
       const proposalParam = requestUrl.searchParams.get("proposal");
       const proposal = proposalParam ? JSON.parse(proposalParam) : null;
+      const selectTargetFromSource = requestUrl.searchParams.get("selectTargetFromSource") === "true";
       const draft = buildNativeOpenClawWorkspacePatchApplyDraft({
         workspacePath: requestUrl.searchParams.get("workspacePath"),
-        relativePath: requestUrl.searchParams.get("relativePath") ?? "scratch/native-edit.txt",
+        relativePath: requestUrl.searchParams.get("relativePath") ?? null,
         search: requestUrl.searchParams.get("search") ?? "before",
         replacement: requestUrl.searchParams.get("replacement") ?? "after",
         occurrence: Number.parseInt(requestUrl.searchParams.get("occurrence") ?? "1", 10),
@@ -8751,6 +8984,9 @@ const server = http.createServer(async (req, res) => {
         proposal,
         deriveProposalFromSource: requestUrl.searchParams.get("deriveProposalFromSource") === "true",
         proposalQuery: requestUrl.searchParams.get("proposalQuery") ?? "edit",
+        selectTargetFromSource,
+        targetSelectionQuery: requestUrl.searchParams.get("targetSelectionQuery") ?? requestUrl.searchParams.get("proposalQuery") ?? "edit",
+        targetSelectionScope: requestUrl.searchParams.get("targetSelectionScope") ?? "tools",
       });
       sendJson(res, 200, {
         ok: true,
@@ -8772,7 +9008,7 @@ const server = http.createServer(async (req, res) => {
       const body = await readJsonBody(req);
       const result = await createNativeOpenClawWorkspacePatchApplyTask({
         workspacePath: typeof body.workspacePath === "string" ? body.workspacePath : null,
-        relativePath: typeof body.relativePath === "string" ? body.relativePath : "scratch/native-edit.txt",
+        relativePath: typeof body.relativePath === "string" ? body.relativePath : null,
         search: typeof body.search === "string" ? body.search : "",
         replacement: typeof body.replacement === "string" ? body.replacement : "",
         occurrence: Number.isInteger(body.occurrence) ? body.occurrence : 1,
@@ -8781,6 +9017,9 @@ const server = http.createServer(async (req, res) => {
         proposal: body.proposal && typeof body.proposal === "object" ? body.proposal : null,
         deriveProposalFromSource: body.deriveProposalFromSource === true,
         proposalQuery: typeof body.proposalQuery === "string" ? body.proposalQuery : "edit",
+        selectTargetFromSource: body.selectTargetFromSource === true,
+        targetSelectionQuery: typeof body.targetSelectionQuery === "string" ? body.targetSelectionQuery : typeof body.proposalQuery === "string" ? body.proposalQuery : "edit",
+        targetSelectionScope: typeof body.targetSelectionScope === "string" ? body.targetSelectionScope : "tools",
         confirm: body.confirm === true,
       });
       sendJson(res, 201, {
@@ -8795,6 +9034,7 @@ const server = http.createServer(async (req, res) => {
         validation: result.validation,
         proposal: result.proposal,
         proposalSourceSignals: result.proposalSourceSignals,
+        targetSelection: result.targetSelection,
         edits: result.edits,
         diffPreview: result.diffPreview,
         task: serialiseTask(result.task),

@@ -522,6 +522,15 @@ function observerHtml() {
           <pre id="symbol-lookup-json">Loading native workspace symbol lookup...</pre>
         </section>
         <section class="panel">
+          <h2>OpenClaw Edit Target Selection</h2>
+          <div class="metric"><span>Registry</span><span id="edit-target-selection-registry">openclaw-native-workspace-edit-target-selection-v0</span></div>
+          <div class="metric"><span>Candidates</span><span id="edit-target-selection-candidates">0</span></div>
+          <div class="metric"><span>Selected</span><span id="edit-target-selection-selected">none</span></div>
+          <div class="metric"><span>Source</span><span id="edit-target-selection-source">hidden</span></div>
+          <div class="metric"><span>Mode</span><span id="edit-target-selection-mode">source-derived-bounded-target-selection</span></div>
+          <pre id="edit-target-selection-json">Loading native workspace edit target selection...</pre>
+        </section>
+        <section class="panel">
           <h2>OpenClaw Workspace Text Write</h2>
           <div class="metric"><span>Registry</span><span id="workspace-text-write-registry">openclaw-native-workspace-text-write-draft-v0</span></div>
           <div class="metric"><span>Capability</span><span id="workspace-text-write-capability">act.openclaw.workspace_text_write</span></div>
@@ -951,6 +960,12 @@ const symbolLookupFiles = document.querySelector("#symbol-lookup-files");
 const symbolLookupExecution = document.querySelector("#symbol-lookup-execution");
 const symbolLookupMode = document.querySelector("#symbol-lookup-mode");
 const symbolLookupJson = document.querySelector("#symbol-lookup-json");
+const editTargetSelectionRegistry = document.querySelector("#edit-target-selection-registry");
+const editTargetSelectionCandidates = document.querySelector("#edit-target-selection-candidates");
+const editTargetSelectionSelected = document.querySelector("#edit-target-selection-selected");
+const editTargetSelectionSource = document.querySelector("#edit-target-selection-source");
+const editTargetSelectionMode = document.querySelector("#edit-target-selection-mode");
+const editTargetSelectionJson = document.querySelector("#edit-target-selection-json");
 const workspaceTextWriteRegistry = document.querySelector("#workspace-text-write-registry");
 const workspaceTextWriteCapability = document.querySelector("#workspace-text-write-capability");
 const workspaceTextWriteApproval = document.querySelector("#workspace-text-write-approval");
@@ -1766,6 +1781,33 @@ function renderSymbolLookup(data) {
   ].join("\\n");
 }
 
+function renderEditTargetSelection(data) {
+  const summary = data?.summary ?? {};
+  const governance = data?.governance ?? {};
+  const candidates = Array.isArray(data?.candidates) ? data.candidates : [];
+  const selectedTarget = data?.selectedTarget ?? null;
+  editTargetSelectionRegistry.textContent = data?.registry ?? "openclaw-native-workspace-edit-target-selection-v0";
+  editTargetSelectionCandidates.textContent = String(summary.candidateCount ?? candidates.length);
+  editTargetSelectionSelected.textContent = selectedTarget?.relativePath ?? "none";
+  editTargetSelectionSource.textContent = governance.exposesSourceFileContent ? "exposed" : "hidden";
+  editTargetSelectionMode.textContent = data?.mode ?? "source-derived-bounded-target-selection";
+
+  editTargetSelectionJson.textContent = [
+    "Native source-derived edit target selection: bounded real OpenClaw workspace target metadata for later approval-gated patch proposals.",
+    "This selects file paths from derived metadata only; source bodies remain hidden, no legacy modules are imported, and no task or mutation is created.",
+    "Patch bridge flag: selectTargetFromSource=true",
+    \`Registry: \${data?.registry ?? "openclaw-native-workspace-edit-target-selection-v0"}\`,
+    \`Mode: \${data?.mode ?? "source-derived-bounded-target-selection"}\`,
+    \`Capability: \${data?.capability?.id ?? "sense.openclaw.workspace_edit_target_select"} risk=\${data?.capability?.risk ?? "low"} approval=\${Boolean(data?.capability?.approvalRequired)} owner=\${data?.capability?.runtimeOwner ?? "unknown"}\`,
+    \`Query: text=\${data?.query?.text ?? "edit"} scope=\${data?.query?.scope ?? "tools"} root=\${data?.query?.relativeRoot ?? "unknown"} limit=\${data?.query?.limit ?? "n/a"}\`,
+    \`Selected: \${selectedTarget?.relativePath ?? "none"} score=\${selectedTarget?.score ?? 0} kind=\${selectedTarget?.kind ?? "unknown"} symbol=\${selectedTarget?.primarySymbol?.symbolName ?? "none"} eligible=\${Boolean(selectedTarget?.eligibleForPatchProposal)}\`,
+    \`Counts: candidates=\${summary.candidateCount ?? candidates.length} semanticFiles=\${summary.semanticFilesMatched ?? 0} symbols=\${summary.symbolMatches ?? 0} toolCatalog=\${summary.toolCatalogMatches ?? 0} canFeedPatch=\${Boolean(summary.canFeedPatchProposal)}\`,
+    \`Governance: readSource=\${Boolean(governance.canReadSourceFileContent)} exposeSource=\${Boolean(governance.exposesSourceFileContent)} exposePreview=\${Boolean(governance.exposesDeclarationPreview)} importModule=\${Boolean(governance.canImportModule)} executeTool=\${Boolean(governance.canExecuteToolCode)} mutate=\${Boolean(governance.canMutate)} task=\${Boolean(governance.createsTask)} approval=\${Boolean(governance.createsApproval)}\`,
+    "",
+    ...candidates.slice(0, 12).map((candidate) => \`\${candidate.relativePath ?? "unknown"} score=\${candidate.score ?? 0} kind=\${candidate.kind ?? "unknown"} category=\${candidate.category ?? "unknown"} symbol=\${candidate.primarySymbol?.symbolName ?? "none"} exposed=\${Boolean(candidate.contentExposed)} eligible=\${Boolean(candidate.eligibleForPatchProposal)}\`),
+  ].join("\\n");
+}
+
 function renderWorkspaceTextWriteDraft(data) {
   const target = data?.target ?? {};
   const governance = data?.draft?.governance ?? data?.governance ?? {};
@@ -1793,6 +1835,7 @@ function renderWorkspacePatchApplyDraft(data) {
   const validation = data?.validation ?? {};
   const proposal = data?.proposal ?? {};
   const proposalSourceSignals = data?.proposalSourceSignals ?? null;
+  const targetSelection = data?.targetSelection ?? null;
   const structuredValidationEngine = validation.structuredPatch?.engine ?? "openclaw-native-workspace-patch-validation-v0";
   const previewValidationEngine = validation.preview?.engine ?? "openclaw-native-workspace-patch-preview-validation-v0";
   const diffPreview = data?.diffPreview ?? {};
@@ -1811,6 +1854,7 @@ function renderWorkspacePatchApplyDraft(data) {
     \`Capability: \${data?.capability?.id ?? "act.openclaw.workspace_patch_apply"} risk=\${data?.capability?.risk ?? "high"} approval=\${Boolean(data?.capability?.approvalRequired ?? true)} owner=\${data?.capability?.runtimeOwner ?? "unknown"}\`,
     \`Workspace: \${data?.workspace?.name ?? "unknown"} \${data?.workspace?.path ?? ""}\`,
     \`Target: \${target.relativePath ?? "scratch/observer-native-edit.txt"} edits=\${target.editCount ?? 1} changedAt=\${(target.changedAtLines ?? [target.changedAtLine]).filter(Boolean).join(",") || "unknown"} oldBytes=\${target.originalBytes ?? 0} newBytes=\${target.nextBytes ?? 0} oldSha256=\${target.originalSha256 ?? "unknown"} newSha256=\${target.nextSha256 ?? "unknown"} contentExposed=\${Boolean(target.contentExposed)} diffPreview=\${Boolean(target.diffPreviewExposed)}\`,
+    \`Target Selection: registry=\${targetSelection?.registry ?? "none"} selected=\${targetSelection?.selectedTarget?.relativePath ?? "none"} candidates=\${targetSelection?.summary?.candidateCount ?? 0} canFeedPatch=\${Boolean(targetSelection?.summary?.canFeedPatchProposal)} exposesSource=\${Boolean(targetSelection?.governance?.exposesSourceFileContent)}\`,
     \`Proposal Envelope: registry=\${proposal.registry ?? "openclaw-native-workspace-edit-proposal-v0"} title=\${proposal.title ?? "unknown"} dryRun=\${Boolean(proposal.dryRun?.ok)} contentExposed=\${Boolean(proposal.dryRun?.contentExposed)} rationale=\${proposal.rationale ?? "unknown"}\`,
     \`Proposal Source Signals: registry=\${proposalSourceSignals?.registry ?? "none"} knownRegistry=\${SOURCE_DERIVED_EDIT_PROPOSAL_REGISTRY} matchedTools=\${proposalSourceSignals?.toolSignals?.matchedTools ?? 0} matchedSemanticFiles=\${proposalSourceSignals?.semanticSignals?.matchedFiles ?? 0} exposesSource=\${Boolean(proposalSourceSignals?.governance?.exposesSourceFileContent)} executesTool=\${Boolean(proposalSourceSignals?.governance?.canExecuteToolCode)}\`,
     \`Structured Edits: supportedKinds=replace_text,replace_lines observedKinds=\${(data?.edits ?? []).map((edit) => edit.kind ?? "replace_text").join(",") || "none"}\`,
@@ -2443,6 +2487,20 @@ async function refreshSymbolLookup() {
     symbolLookupExecution.textContent = "unknown";
     symbolLookupMode.textContent = "unknown";
     symbolLookupJson.textContent = "Unable to run native workspace symbol lookup.";
+  }
+}
+
+async function refreshEditTargetSelection() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/workspace-edit-target-selection?scope=tools&query=edit&limit=8\`);
+    renderEditTargetSelection(data);
+  } catch {
+    editTargetSelectionRegistry.textContent = "offline";
+    editTargetSelectionCandidates.textContent = "0";
+    editTargetSelectionSelected.textContent = "none";
+    editTargetSelectionSource.textContent = "unknown";
+    editTargetSelectionMode.textContent = "unknown";
+    editTargetSelectionJson.textContent = "Unable to select native OpenClaw workspace edit targets.";
   }
 }
 
@@ -4184,6 +4242,7 @@ await refreshOpenClawToolCatalog();
 await refreshToolCatalogAdapter();
 await refreshSemanticIndex();
 await refreshSymbolLookup();
+await refreshEditTargetSelection();
 await refreshWorkspaceTextWriteDraft();
 await refreshWorkspacePatchApplyDraft();
 await refreshNativePluginContract();
@@ -4229,6 +4288,7 @@ setInterval(refreshOpenClawToolCatalog, 5000);
 setInterval(refreshToolCatalogAdapter, 5000);
 setInterval(refreshSemanticIndex, 5000);
 setInterval(refreshSymbolLookup, 5000);
+setInterval(refreshEditTargetSelection, 5000);
 setInterval(refreshWorkspaceTextWriteDraft, 5000);
 setInterval(refreshWorkspacePatchApplyDraft, 5000);
 setInterval(refreshNativePluginContract, 5000);
