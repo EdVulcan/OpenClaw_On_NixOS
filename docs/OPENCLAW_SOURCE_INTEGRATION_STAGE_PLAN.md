@@ -1,6 +1,6 @@
 # OpenClaw Source Integration Stage Plan
 
-更新时间：2026-05-14 11:34 +08:00
+更新时间：2026-05-14 11:38 +08:00
 
 本文档用于跟踪当前阶段：把旁路 `openclaw` 增强源码项目中的能力，受控接入 `OpenClawOnNixOS`。后续每推进一个接入切片，都必须同步更新本文件，避免路线漂移、重复准备层、或忘记阶段边界。
 
@@ -682,4 +682,44 @@ OPENCLAW_MILESTONE_CHECKS=openclaw-native-workspace-patch-validation,observer-op
 
 Next intended slice after this passes:
 - Move from exact text replacement toward a richer structured edit proposal format, but only within the same approval/ledger execution chain.
+- Keep shell/process/web gateway execution deferred until code-edit safety is stable.
+
+## 18. 2026-05-14 Step 5 Update: Native Workspace Structured Edit
+
+Status: implemented_waiting_check.
+
+Slice: `act.openclaw.workspace_patch_apply` structured line-edit mode.
+
+Purpose: extend the patch adapter beyond exact text search into a richer structured edit proposal shape. This slice adds `kind: "replace_lines"` hunks with explicit `startLine`/`endLine` ranges, while preserving the existing `replace_text` behavior and the same approval/ledger execution chain.
+
+Implemented artifacts:
+- Structured edit kind: `replace_lines`.
+- Backward-compatible exact edit kind: `replace_text`.
+- Original-file line range resolver with overlap validation shared with text hunks.
+- Observer visibility for supported and observed edit kinds.
+- Targeted checks: `openclaw-native-workspace-structured-edit`, `observer-openclaw-native-workspace-structured-edit`.
+
+Governance boundaries:
+- Does not import or execute old `openclaw` modules.
+- Does not create a new write channel.
+- Structured line edits still produce a bounded diff preview.
+- Structured line edits still require explicit approval before execution.
+- Structured line edits still execute through `act.filesystem.write_text`.
+- Public responses expose edit kind, ranges, byte counts, hashes, and bounded previews, not full patched file content.
+
+Local verification target:
+- `npm run typecheck`.
+- `git diff --check`.
+- Targeted milestone checks on NixOS.
+
+NixOS targeted milestone command:
+
+```bash
+cd /home/edvulcan/OpenClaw_On_NixOS && \
+git pull origin main && \
+OPENCLAW_MILESTONE_CHECKS=openclaw-native-workspace-structured-edit,observer-openclaw-native-workspace-structured-edit npm run dev:milestone-check:unix
+```
+
+Next intended slice after this passes:
+- Add a higher-level edit proposal wrapper that can carry rationale, target symbol/file context, and a dry-run summary before approval.
 - Keep shell/process/web gateway execution deferred until code-edit safety is stable.

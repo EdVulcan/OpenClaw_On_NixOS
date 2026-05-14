@@ -3440,6 +3440,32 @@ function findNthOccurrenceRange(text, search, occurrence = 1) {
   return null;
 }
 
+function buildTextLineRanges(text) {
+  const ranges = [];
+  let line = 1;
+  let start = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (char === "\n") {
+      ranges.push({ line, start, end: index + 1 });
+      line += 1;
+      start = index + 1;
+    } else if (char === "\r") {
+      const end = text[index + 1] === "\n" ? index + 2 : index + 1;
+      ranges.push({ line, start, end });
+      line += 1;
+      start = end;
+      if (end === index + 2) {
+        index += 1;
+      }
+    }
+  }
+  if (start < text.length) {
+    ranges.push({ line, start, end: text.length });
+  }
+  return ranges;
+}
+
 function normaliseWorkspacePatchEdits({ edits = null, search = "", replacement = "", occurrence = 1 } = {}) {
   const rawEdits = Array.isArray(edits) && edits.length > 0
     ? edits
@@ -3448,15 +3474,37 @@ function normaliseWorkspacePatchEdits({ edits = null, search = "", replacement =
     throw new Error("OpenClaw workspace patch drafts are limited to 8 edit hunks.");
   }
   return rawEdits.map((edit, index) => {
+    const kind = edit?.kind === "replace_lines" ? "replace_lines" : "replace_text";
+    const safeReplacement = typeof edit?.replacement === "string"
+      ? edit.replacement
+      : Array.isArray(edit?.replacementLines)
+        ? edit.replacementLines.map((line) => String(line)).join("\n")
+        : "";
+    if (Buffer.byteLength(safeReplacement, "utf8") > 16 * 1024) {
+      throw new Error(`OpenClaw workspace patch edit ${index + 1} exceeds the per-hunk replacement size limit.`);
+    }
+    if (kind === "replace_lines") {
+      const startLine = Number.isInteger(edit?.startLine) ? edit.startLine : null;
+      const endLine = Number.isInteger(edit?.endLine) ? edit.endLine : startLine;
+      if (!startLine || !endLine || startLine < 1 || endLine < startLine) {
+        throw new Error(`valid startLine/endLine are required for OpenClaw workspace line edit ${index + 1}.`);
+      }
+      return {
+        kind,
+        startLine,
+        endLine,
+        replacement: safeReplacement,
+      };
+    }
     const safeSearch = typeof edit?.search === "string" ? edit.search : "";
     if (!safeSearch) {
       throw new Error(`search text is required for OpenClaw workspace patch edit ${index + 1}.`);
     }
-    const safeReplacement = typeof edit?.replacement === "string" ? edit.replacement : "";
-    if (Buffer.byteLength(safeSearch, "utf8") > 16 * 1024 || Buffer.byteLength(safeReplacement, "utf8") > 16 * 1024) {
-      throw new Error(`OpenClaw workspace patch edit ${index + 1} exceeds the per-hunk size limit.`);
+    if (Buffer.byteLength(safeSearch, "utf8") > 16 * 1024) {
+      throw new Error(`OpenClaw workspace patch edit ${index + 1} exceeds the per-hunk search size limit.`);
     }
     return {
+      kind,
       search: safeSearch,
       replacement: safeReplacement,
       occurrence: Number.isInteger(edit?.occurrence) && edit.occurrence > 0 ? edit.occurrence : 1,
@@ -3465,7 +3513,23 @@ function normaliseWorkspacePatchEdits({ edits = null, search = "", replacement =
 }
 
 function applyWorkspacePatchEdits(originalContent, edits) {
+  const lineRanges = buildTextLineRanges(originalContent);
   const ranges = edits.map((edit, index) => {
+    if (edit.kind === "replace_lines") {
+      const startLine = lineRanges[edit.startLine - 1] ?? null;
+      const endLine = lineRanges[edit.endLine - 1] ?? null;
+      if (!startLine || !endLine) {
+        throw new Error(`OpenClaw workspace line edit ${index + 1} targets lines outside the file.`);
+      }
+      return {
+        index: index + 1,
+        kind: edit.kind,
+        edit,
+        replacementsAvailable: 1,
+        start: startLine.start,
+        end: endLine.end,
+      };
+    }
     const replacementsAvailable = countOccurrences(originalContent, edit.search);
     const range = findNthOccurrenceRange(originalContent, edit.search, edit.occurrence);
     if (!range) {
@@ -3473,6 +3537,7 @@ function applyWorkspacePatchEdits(originalContent, edits) {
     }
     return {
       index: index + 1,
+      kind: edit.kind,
       edit,
       replacementsAvailable,
       ...range,
@@ -3500,10 +3565,13 @@ function applyWorkspacePatchEdits(originalContent, edits) {
     const singleEditContent = `${originalContent.slice(0, range.start)}${range.edit.replacement}${originalContent.slice(range.end)}`;
     return {
       index: range.index,
+      kind: range.kind,
       occurrence: range.edit.occurrence,
+      startLine: range.edit.startLine ?? null,
+      endLine: range.edit.endLine ?? null,
       originalStart: range.start,
       originalEnd: range.end,
-      searchBytes: Buffer.byteLength(range.edit.search, "utf8"),
+      searchBytes: Buffer.byteLength(range.edit.search ?? originalContent.slice(range.start, range.end), "utf8"),
       replacementsAvailable: range.replacementsAvailable,
       replacementBytes: Buffer.byteLength(range.edit.replacement, "utf8"),
       changedAtLine: lineNumberForIndex(originalContent, range.start),
@@ -3522,14 +3590,18 @@ function applyWorkspacePatchEdits(originalContent, edits) {
       checks: {
         allMatchesFound: true,
         originalRangesResolved: true,
+        structuredLineRangesResolved: true,
         overlappingEditsRejected: true,
         appliesAgainstOriginalContent: true,
       },
       ranges: appliedEdits.map((edit) => ({
         index: edit.index,
+        kind: edit.kind,
         start: edit.originalStart,
         end: edit.originalEnd,
         occurrence: edit.occurrence,
+        startLine: edit.startLine,
+        endLine: edit.endLine,
         changedAtLine: edit.changedAtLine,
       })),
     },
@@ -3748,7 +3820,10 @@ function buildNativeOpenClawWorkspacePatchApplyDraft({
     },
     edits: appliedEdits.map((edit) => ({
       index: edit.index,
+      kind: edit.kind,
       occurrence: edit.occurrence,
+      startLine: edit.startLine,
+      endLine: edit.endLine,
       originalStart: edit.originalStart,
       originalEnd: edit.originalEnd,
       searchBytes: edit.searchBytes,
@@ -3837,6 +3912,7 @@ async function createNativeOpenClawWorkspacePatchApplyTask({
     workspace: draftEnvelope.workspace,
     target: draftEnvelope.target,
     validation: draftEnvelope.validation,
+    edits: draftEnvelope.edits,
     diffPreview: draftEnvelope.diffPreview,
     task,
     approval,
@@ -8551,6 +8627,7 @@ const server = http.createServer(async (req, res) => {
         workspace: result.workspace,
         target: result.target,
         validation: result.validation,
+        edits: result.edits,
         diffPreview: result.diffPreview,
         task: serialiseTask(result.task),
         approval: serialiseApproval(result.approval),
