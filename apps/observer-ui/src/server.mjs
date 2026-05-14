@@ -1790,6 +1790,7 @@ function renderWorkspacePatchApplyDraft(data) {
   const governance = data?.draft?.governance ?? data?.governance ?? {};
   const validation = data?.validation ?? {};
   const proposal = data?.proposal ?? {};
+  const proposalSourceSignals = data?.proposalSourceSignals ?? null;
   const structuredValidationEngine = validation.structuredPatch?.engine ?? "openclaw-native-workspace-patch-validation-v0";
   const previewValidationEngine = validation.preview?.engine ?? "openclaw-native-workspace-patch-preview-validation-v0";
   const diffPreview = data?.diffPreview ?? {};
@@ -1809,6 +1810,7 @@ function renderWorkspacePatchApplyDraft(data) {
     \`Workspace: \${data?.workspace?.name ?? "unknown"} \${data?.workspace?.path ?? ""}\`,
     \`Target: \${target.relativePath ?? "scratch/observer-native-edit.txt"} edits=\${target.editCount ?? 1} changedAt=\${(target.changedAtLines ?? [target.changedAtLine]).filter(Boolean).join(",") || "unknown"} oldBytes=\${target.originalBytes ?? 0} newBytes=\${target.nextBytes ?? 0} oldSha256=\${target.originalSha256 ?? "unknown"} newSha256=\${target.nextSha256 ?? "unknown"} contentExposed=\${Boolean(target.contentExposed)} diffPreview=\${Boolean(target.diffPreviewExposed)}\`,
     \`Proposal Envelope: registry=\${proposal.registry ?? "openclaw-native-workspace-edit-proposal-v0"} title=\${proposal.title ?? "unknown"} dryRun=\${Boolean(proposal.dryRun?.ok)} contentExposed=\${Boolean(proposal.dryRun?.contentExposed)} rationale=\${proposal.rationale ?? "unknown"}\`,
+    \`Proposal Source Signals: registry=\${proposalSourceSignals?.registry ?? "none"} matchedTools=\${proposalSourceSignals?.toolSignals?.matchedTools ?? 0} matchedSemanticFiles=\${proposalSourceSignals?.semanticSignals?.matchedFiles ?? 0} exposesSource=\${Boolean(proposalSourceSignals?.governance?.exposesSourceFileContent)} executesTool=\${Boolean(proposalSourceSignals?.governance?.canExecuteToolCode)}\`,
     \`Structured Edits: supportedKinds=replace_text,replace_lines observedKinds=\${(data?.edits ?? []).map((edit) => edit.kind ?? "replace_text").join(",") || "none"}\`,
     \`Validation: ok=\${Boolean(validation.ok)} structured=\${structuredValidationEngine} preview=\${previewValidationEngine} appliesAgainstOriginal=\${Boolean(validation.structuredPatch?.checks?.appliesAgainstOriginalContent)} structuredLineRangesResolved=\${Boolean(validation.structuredPatch?.checks?.structuredLineRangesResolved)}\`,
     \`Diff: format=\${diffPreview.format ?? "unknown"} hunks=\${diffPreview.hunkCount ?? 1} oldStart=\${diffPreview.oldStartLine ?? "?"} newStart=\${diffPreview.newStartLine ?? "?"} lines=\${diffPreview.previewLineCount ?? lines.length} truncated=\${Boolean(diffPreview.truncated)}\`,
@@ -2467,7 +2469,7 @@ async function refreshWorkspacePatchApplyDraft() {
       rationale: "Demonstrate proposal envelope metadata for an approval-gated OpenClaw workspace patch.",
       targetContext: { symbol: "observer-sample", fileRole: "workspace scratch fixture" },
     }));
-    const data = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/workspace-patch-apply/draft?relativePath=scratch/observer-native-edit.txt&edits=\${edits}&proposal=\${proposal}&contextLines=0\`);
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/workspace-patch-apply/draft?relativePath=scratch/observer-native-edit.txt&edits=\${edits}&proposal=\${proposal}&deriveProposalFromSource=true&proposalQuery=edit&contextLines=0\`);
     renderWorkspacePatchApplyDraft(data);
   } catch {
     workspacePatchApplyRegistry.textContent = "offline";
@@ -3269,6 +3271,8 @@ async function createWorkspacePatchApplyApprovalTask() {
         rationale: "Demonstrate proposal envelope metadata for an approval-gated OpenClaw workspace patch.",
         targetContext: { symbol: "observer-sample", fileRole: "workspace scratch fixture" },
       },
+      deriveProposalFromSource: true,
+      proposalQuery: "edit",
       contextLines: 0,
       confirm: true,
     }),

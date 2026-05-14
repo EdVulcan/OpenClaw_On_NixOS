@@ -1,6 +1,6 @@
 # OpenClaw Source Integration Stage Plan
 
-更新时间：2026-05-14 11:52 +08:00
+更新时间：2026-05-14 11:58 +08:00
 
 本文档用于跟踪当前阶段：把旁路 `openclaw` 增强源码项目中的能力，受控接入 `OpenClawOnNixOS`。后续每推进一个接入切片，都必须同步更新本文件，避免路线漂移、重复准备层、或忘记阶段边界。
 
@@ -762,4 +762,44 @@ OPENCLAW_MILESTONE_CHECKS=openclaw-native-workspace-edit-proposal,observer-openc
 
 Next intended slice after this passes:
 - Start deriving proposal envelopes from the enhanced `openclaw` source/tool signals instead of hand-authored request metadata.
+- Keep shell/process/web gateway execution deferred until code-edit safety is stable.
+
+## 20. 2026-05-14 Step 5 Update: Source-Derived Edit Proposal
+
+Status: implemented_waiting_check.
+
+Slice: `act.openclaw.workspace_patch_apply` source-derived proposal mode.
+
+Purpose: move proposal envelopes from hand-authored metadata toward enhanced `openclaw` source/tool signals. This slice derives proposal title/rationale/target context from the existing read-only tool catalog and semantic index, while still refusing to import, execute, or expose old OpenClaw source bodies.
+
+Implemented artifacts:
+- Source-derived proposal registry: `openclaw-source-derived-edit-proposal-v0`.
+- Draft/task option: `deriveProposalFromSource=true`.
+- Proposal source signal summary from tool catalog and semantic index.
+- Observer visibility for source-derived proposal signals.
+- Targeted checks: `openclaw-source-derived-edit-proposal`, `observer-openclaw-source-derived-edit-proposal`.
+
+Governance boundaries:
+- Does not import or execute old `openclaw` modules.
+- Does not expose source file bodies or tool implementation content.
+- Does not create a new write channel.
+- Source-derived proposals still require approval before execution.
+- Approved tasks still execute through `act.filesystem.write_text`.
+- Filesystem and capability ledgers remain authoritative.
+
+Local verification target:
+- `npm run typecheck`.
+- `git diff --check`.
+- Targeted milestone checks on NixOS.
+
+NixOS targeted milestone command:
+
+```bash
+cd /home/edvulcan/OpenClaw_On_NixOS && \
+git pull origin main && \
+OPENCLAW_MILESTONE_CHECKS=openclaw-source-derived-edit-proposal,observer-openclaw-source-derived-edit-proposal npm run dev:milestone-check:unix
+```
+
+Next intended slice after this passes:
+- Connect source-derived proposals to a bounded real OpenClaw workspace target selection flow.
 - Keep shell/process/web gateway execution deferred until code-edit safety is stable.

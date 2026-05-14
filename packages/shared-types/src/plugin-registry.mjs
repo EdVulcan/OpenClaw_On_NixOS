@@ -123,7 +123,7 @@ export function createOpenClawNativePluginRegistry({ generatedAt = new Date().to
       {
         id: "act.openclaw.workspace_patch_apply",
         title: "Apply OpenClaw workspace patch",
-        description: "Creates governed proposal envelopes with bounded single, multi-hunk, and structured line-edit previews for OpenClaw workspace edits, then applies them only after explicit approval through native filesystem governance.",
+        description: "Creates governed proposal envelopes from request metadata or enhanced OpenClaw source signals, with bounded single, multi-hunk, and structured line-edit previews, then applies them only after explicit approval through native filesystem governance.",
         kind: "act",
         domains: ["body_internal"],
         risk: "high",

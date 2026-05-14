@@ -3768,6 +3768,77 @@ function buildWorkspacePatchProposalEnvelope({
   };
 }
 
+function buildOpenClawSourceDerivedPatchProposal({
+  workspacePath = null,
+  relativePath = "scratch/native-edit.txt",
+  query = "edit",
+} = {}) {
+  const catalogProfile = buildNativeOpenClawToolCatalogProfile({
+    workspacePath,
+    query,
+    limit: 8,
+  });
+  const semanticIndex = buildNativeOpenClawWorkspaceSemanticIndex({
+    workspacePath,
+    scope: "tools",
+    query,
+    limit: 8,
+  });
+  const primaryTool = catalogProfile.tools?.[0] ?? null;
+  const primarySemanticFile = semanticIndex.files?.[0] ?? null;
+  const categories = [...new Set((catalogProfile.tools ?? []).map((tool) => tool.category).filter(Boolean))];
+  const sourceSignals = {
+    registry: "openclaw-source-derived-edit-proposal-v0",
+    mode: "read-only-source-signal-derivation",
+    sourceRegistries: [catalogProfile.registry, semanticIndex.registry],
+    query,
+    toolSignals: {
+      matchedTools: catalogProfile.summary?.matchedTools ?? 0,
+      categories,
+      primaryTool: primaryTool ? {
+        relativePath: primaryTool.relativePath,
+        category: primaryTool.category,
+        documented: Boolean(primaryTool.documented),
+        contentRead: false,
+      } : null,
+    },
+    semanticSignals: {
+      matchedFiles: semanticIndex.files?.length ?? 0,
+      totalDeclarations: semanticIndex.summary?.exportedFunctions ?? 0,
+      primaryFile: primarySemanticFile ? {
+        relativePath: primarySemanticFile.relativePath,
+        kind: primarySemanticFile.kind,
+        category: primarySemanticFile.category,
+        lineCount: primarySemanticFile.lineCount,
+        contentExposed: false,
+      } : null,
+    },
+    governance: {
+      canReadMetadata: true,
+      canReadSourceFileContent: true,
+      exposesSourceFileContent: false,
+      canExecuteToolCode: false,
+      canImportModule: false,
+      canMutate: false,
+    },
+  };
+
+  return {
+    id: `source-derived-${sha256Hex(`${catalogProfile.workspace?.path ?? ""}:${relativePath}:${query}`).slice(0, 12)}`,
+    title: `Source-derived OpenClaw edit proposal for ${relativePath}`,
+    rationale: [
+      `Derived from enhanced OpenClaw read-only tool catalog and semantic index signals for query "${query}".`,
+      `Matched ${sourceSignals.toolSignals.matchedTools} tool metadata entries and ${sourceSignals.semanticSignals.matchedFiles} semantic files without importing or executing source modules.`,
+    ].join(" "),
+    source: sourceSignals.registry,
+    targetContext: {
+      symbol: primarySemanticFile?.signals?.exports?.[0] ?? primaryTool?.fileName ?? "openclaw-source-signal",
+      fileRole: categories[0] ? `openclaw ${categories[0]} source signal` : "openclaw source signal",
+    },
+    sourceSignals,
+  };
+}
+
 function buildNativeOpenClawWorkspacePatchApplyDraft({
   workspacePath = null,
   relativePath = "scratch/native-edit.txt",
@@ -3777,6 +3848,8 @@ function buildNativeOpenClawWorkspacePatchApplyDraft({
   edits = null,
   contextLines = 1,
   proposal = null,
+  deriveProposalFromSource = false,
+  proposalQuery = "edit",
 } = {}) {
   const target = resolveOpenClawWorkspaceTarget({ workspacePath, relativePath });
   const safeEdits = normaliseWorkspacePatchEdits({ edits, search, replacement, occurrence });
@@ -3849,8 +3922,15 @@ function buildNativeOpenClawWorkspacePatchApplyDraft({
     structuredPatch: validation,
     preview: previewValidation,
   };
+  const sourceDerivedProposal = deriveProposalFromSource
+    ? buildOpenClawSourceDerivedPatchProposal({
+      workspacePath,
+      relativePath: target.relativePath,
+      query: proposalQuery,
+    })
+    : null;
   const proposalEnvelope = buildWorkspacePatchProposalEnvelope({
-    proposal,
+    proposal: sourceDerivedProposal ?? proposal,
     target,
     capability: capabilityEnvelope,
     safeEdits,
@@ -3887,6 +3967,7 @@ function buildNativeOpenClawWorkspacePatchApplyDraft({
     },
     validation: validationEnvelope,
     proposal: proposalEnvelope,
+    proposalSourceSignals: sourceDerivedProposal?.sourceSignals ?? null,
     edits: appliedEdits.map((edit) => ({
       index: edit.index,
       kind: edit.kind,
@@ -3937,6 +4018,8 @@ async function createNativeOpenClawWorkspacePatchApplyTask({
   edits = null,
   contextLines = 1,
   proposal = null,
+  deriveProposalFromSource = false,
+  proposalQuery = "edit",
   confirm = false,
 } = {}) {
   if (confirm !== true) {
@@ -3952,6 +4035,8 @@ async function createNativeOpenClawWorkspacePatchApplyTask({
     edits,
     contextLines,
     proposal,
+    deriveProposalFromSource,
+    proposalQuery,
   });
   const draft = draftEnvelope.draft;
   const task = createTask({
@@ -3984,6 +4069,7 @@ async function createNativeOpenClawWorkspacePatchApplyTask({
     target: draftEnvelope.target,
     validation: draftEnvelope.validation,
     proposal: draftEnvelope.proposal,
+    proposalSourceSignals: draftEnvelope.proposalSourceSignals,
     edits: draftEnvelope.edits,
     diffPreview: draftEnvelope.diffPreview,
     task,
@@ -8663,6 +8749,8 @@ const server = http.createServer(async (req, res) => {
         edits,
         contextLines: Number.parseInt(requestUrl.searchParams.get("contextLines") ?? "1", 10),
         proposal,
+        deriveProposalFromSource: requestUrl.searchParams.get("deriveProposalFromSource") === "true",
+        proposalQuery: requestUrl.searchParams.get("proposalQuery") ?? "edit",
       });
       sendJson(res, 200, {
         ok: true,
@@ -8691,6 +8779,8 @@ const server = http.createServer(async (req, res) => {
         edits: Array.isArray(body.edits) ? body.edits : null,
         contextLines: Number.isInteger(body.contextLines) ? body.contextLines : 1,
         proposal: body.proposal && typeof body.proposal === "object" ? body.proposal : null,
+        deriveProposalFromSource: body.deriveProposalFromSource === true,
+        proposalQuery: typeof body.proposalQuery === "string" ? body.proposalQuery : "edit",
         confirm: body.confirm === true,
       });
       sendJson(res, 201, {
@@ -8704,6 +8794,7 @@ const server = http.createServer(async (req, res) => {
         target: result.target,
         validation: result.validation,
         proposal: result.proposal,
+        proposalSourceSignals: result.proposalSourceSignals,
         edits: result.edits,
         diffPreview: result.diffPreview,
         task: serialiseTask(result.task),
