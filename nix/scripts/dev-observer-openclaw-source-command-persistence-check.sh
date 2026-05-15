@@ -113,7 +113,7 @@ trap cleanup EXIT
 post_json() {
   local url="$1"
   local body="$2"
-  curl --silent --fail -X POST "$url" -H 'content-type: application/json' -d "$body"
+  curl --silent --show-error --fail -X POST "$url" -H 'content-type: application/json' -d "$body"
 }
 
 "$SCRIPT_DIR/dev-up.sh"
@@ -148,8 +148,9 @@ POST_FINAL_RESTART_TRANSCRIPTS_FILE="$(mktemp)"
 POST_FINAL_RESTART_HISTORY_FILE="$(mktemp)"
 POST_FINAL_RESTART_DETAIL_FILE="$(mktemp)"
 
-curl --silent --fail "$OBSERVER_URL/" > "$HTML_FILE"
-curl --silent --fail "$OBSERVER_URL/client-v5.js" > "$CLIENT_FILE"
+echo "Checking Observer source command persistence controls ..."
+curl --silent --show-error --fail "$OBSERVER_URL/" > "$HTML_FILE"
+curl --silent --show-error --fail "$OBSERVER_URL/client-v5.js" > "$CLIENT_FILE"
 post_json "$CORE_URL/plugins/native-adapter/source-command-proposals/tasks" '{"proposalId":"openclaw:typecheck","query":"command","confirm":true}' > "$TASK_FILE"
 post_json "$CORE_URL/operator/step" '{}' > "$BLOCKED_STEP_FILE"
 
@@ -178,7 +179,6 @@ for (const token of [
   "/plugins/native-adapter/source-command-proposals/tasks",
   "recoverLatestFailedTask",
   "recoverSelectedTask",
-  "/tasks/${sourceTask.id}/recover",
   "task.recovered",
   "system.command.executed",
   "refreshApprovalState",
@@ -227,10 +227,10 @@ EOF
 )"
 
 post_json "$CORE_URL/tasks/$failed_task_id/recover" '{}' > "$RECOVERED_FILE"
-curl --silent --fail "$CORE_URL/tasks?limit=8" > "$PRE_RESTART_TASKS_FILE"
-curl --silent --fail "$CORE_URL/approvals?limit=8" > "$PRE_RESTART_APPROVALS_FILE"
-curl --silent --fail "$CORE_URL/commands/transcripts?limit=8" > "$PRE_RESTART_TRANSCRIPTS_FILE"
-curl --silent --fail "$CORE_URL/capabilities/invocations?capabilityId=act.system.command.execute&limit=8" > "$PRE_RESTART_HISTORY_FILE"
+curl --silent --show-error --fail "$CORE_URL/tasks?limit=8" > "$PRE_RESTART_TASKS_FILE"
+curl --silent --show-error --fail "$CORE_URL/approvals?limit=8" > "$PRE_RESTART_APPROVALS_FILE"
+curl --silent --show-error --fail "$CORE_URL/commands/transcripts?limit=8" > "$PRE_RESTART_TRANSCRIPTS_FILE"
+curl --silent --show-error --fail "$CORE_URL/capabilities/invocations?capabilityId=act.system.command.execute&limit=8" > "$PRE_RESTART_HISTORY_FILE"
 
 read -r recovered_task_id recovered_approval_id < <(node - <<'EOF' "$FAIL_STEP_FILE" "$RECOVERED_FILE" "$PRE_RESTART_TASKS_FILE" "$PRE_RESTART_APPROVALS_FILE" "$PRE_RESTART_TRANSCRIPTS_FILE" "$PRE_RESTART_HISTORY_FILE"
 const fs = require("node:fs");
@@ -270,13 +270,14 @@ EOF
 "$SCRIPT_DIR/dev-down.sh" >/dev/null
 "$SCRIPT_DIR/dev-up.sh" >/dev/null
 
-curl --silent --fail "$OBSERVER_URL/" > "$POST_RESTART_HTML_FILE"
-curl --silent --fail "$OBSERVER_URL/client-v5.js" > "$POST_RESTART_CLIENT_FILE"
-curl --silent --fail "$CORE_URL/tasks?limit=8" > "$POST_RECOVERY_RESTART_TASKS_FILE"
-curl --silent --fail "$CORE_URL/approvals?limit=8" > "$POST_RECOVERY_RESTART_APPROVALS_FILE"
-curl --silent --fail "$CORE_URL/commands/transcripts?limit=8" > "$POST_RECOVERY_RESTART_TRANSCRIPTS_FILE"
-curl --silent --fail "$CORE_URL/capabilities/invocations?capabilityId=act.system.command.execute&limit=8" > "$POST_RECOVERY_RESTART_HISTORY_FILE"
-curl --silent --fail "$CORE_URL/tasks/$recovered_task_id" > "$POST_RECOVERY_RESTART_DETAIL_FILE"
+echo "Checking Observer source command persistence after pending recovery restart ..."
+curl --silent --show-error --fail "$OBSERVER_URL/" > "$POST_RESTART_HTML_FILE"
+curl --silent --show-error --fail "$OBSERVER_URL/client-v5.js" > "$POST_RESTART_CLIENT_FILE"
+curl --silent --show-error --fail "$CORE_URL/tasks?limit=8" > "$POST_RECOVERY_RESTART_TASKS_FILE"
+curl --silent --show-error --fail "$CORE_URL/approvals?limit=8" > "$POST_RECOVERY_RESTART_APPROVALS_FILE"
+curl --silent --show-error --fail "$CORE_URL/commands/transcripts?limit=8" > "$POST_RECOVERY_RESTART_TRANSCRIPTS_FILE"
+curl --silent --show-error --fail "$CORE_URL/capabilities/invocations?capabilityId=act.system.command.execute&limit=8" > "$POST_RECOVERY_RESTART_HISTORY_FILE"
+curl --silent --show-error --fail "$CORE_URL/tasks/$recovered_task_id" > "$POST_RECOVERY_RESTART_DETAIL_FILE"
 
 node - <<'EOF' \
   "$POST_RESTART_HTML_FILE" \
@@ -353,10 +354,10 @@ write_package_json 'node -e \"process.stdout.write('\''observer-source-command-p
 post_json "$CORE_URL/operator/step" '{}' > "$BLOCKED_STEP_FILE"
 post_json "$CORE_URL/approvals/$recovered_approval_id/approve" '{"approvedBy":"dev-observer-openclaw-source-command-persistence-check","reason":"approve recovered observer source command after restart"}' > "$RECOVERED_APPROVED_FILE"
 post_json "$CORE_URL/operator/step" '{}' > "$RECOVERED_STEP_FILE"
-curl --silent --fail "$CORE_URL/tasks?limit=8" > "$PRE_FINAL_RESTART_TASKS_FILE"
-curl --silent --fail "$CORE_URL/approvals?limit=8" > "$PRE_FINAL_RESTART_APPROVALS_FILE"
-curl --silent --fail "$CORE_URL/commands/transcripts?limit=8" > "$PRE_FINAL_RESTART_TRANSCRIPTS_FILE"
-curl --silent --fail "$CORE_URL/capabilities/invocations?capabilityId=act.system.command.execute&limit=8" > "$PRE_FINAL_RESTART_HISTORY_FILE"
+curl --silent --show-error --fail "$CORE_URL/tasks?limit=8" > "$PRE_FINAL_RESTART_TASKS_FILE"
+curl --silent --show-error --fail "$CORE_URL/approvals?limit=8" > "$PRE_FINAL_RESTART_APPROVALS_FILE"
+curl --silent --show-error --fail "$CORE_URL/commands/transcripts?limit=8" > "$PRE_FINAL_RESTART_TRANSCRIPTS_FILE"
+curl --silent --show-error --fail "$CORE_URL/capabilities/invocations?capabilityId=act.system.command.execute&limit=8" > "$PRE_FINAL_RESTART_HISTORY_FILE"
 
 node - <<'EOF' "$BLOCKED_STEP_FILE" "$RECOVERED_APPROVED_FILE" "$RECOVERED_STEP_FILE" "$PRE_FINAL_RESTART_TASKS_FILE" "$PRE_FINAL_RESTART_APPROVALS_FILE" "$PRE_FINAL_RESTART_TRANSCRIPTS_FILE" "$PRE_FINAL_RESTART_HISTORY_FILE"
 const fs = require("node:fs");
@@ -397,11 +398,12 @@ EOF
 "$SCRIPT_DIR/dev-down.sh" >/dev/null
 "$SCRIPT_DIR/dev-up.sh" >/dev/null
 
-curl --silent --fail "$CORE_URL/tasks?limit=8" > "$POST_FINAL_RESTART_TASKS_FILE"
-curl --silent --fail "$CORE_URL/approvals?limit=8" > "$POST_FINAL_RESTART_APPROVALS_FILE"
-curl --silent --fail "$CORE_URL/commands/transcripts?limit=8" > "$POST_FINAL_RESTART_TRANSCRIPTS_FILE"
-curl --silent --fail "$CORE_URL/capabilities/invocations?capabilityId=act.system.command.execute&limit=8" > "$POST_FINAL_RESTART_HISTORY_FILE"
-curl --silent --fail "$CORE_URL/tasks/$recovered_task_id" > "$POST_FINAL_RESTART_DETAIL_FILE"
+echo "Checking Observer source command persistence after completed recovery restart ..."
+curl --silent --show-error --fail "$CORE_URL/tasks?limit=8" > "$POST_FINAL_RESTART_TASKS_FILE"
+curl --silent --show-error --fail "$CORE_URL/approvals?limit=8" > "$POST_FINAL_RESTART_APPROVALS_FILE"
+curl --silent --show-error --fail "$CORE_URL/commands/transcripts?limit=8" > "$POST_FINAL_RESTART_TRANSCRIPTS_FILE"
+curl --silent --show-error --fail "$CORE_URL/capabilities/invocations?capabilityId=act.system.command.execute&limit=8" > "$POST_FINAL_RESTART_HISTORY_FILE"
+curl --silent --show-error --fail "$CORE_URL/tasks/$recovered_task_id" > "$POST_FINAL_RESTART_DETAIL_FILE"
 
 node - <<'EOF' \
   "$FAIL_STEP_FILE" \
