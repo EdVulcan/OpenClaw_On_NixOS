@@ -901,3 +901,44 @@ OPENCLAW_MILESTONE_CHECKS=openclaw-prompt-semantics-edit-plan,observer-openclaw-
 Next intended slice after this passes:
 - Use prompt/tool semantics plus target selection to produce richer structured edit proposals with named rationale/check bundles.
 - Keep shell/process/web gateway execution deferred until prompt-derived edit planning is stable.
+
+## 23. 2026-05-15 Step 6 Update: Rationale / Check / Risk Bundles
+
+Status: implemented_waiting_check.
+
+Slice: structured audit bundles on source-derived OpenClaw workspace edit proposals.
+
+Purpose: turn prompt/tool semantics plus target selection into auditable proposal bundles before approval. This enriches the existing approval-gated patch proposal with named rationale, required/recommended checks, and risk notes, without creating a new mutation path or executing legacy `openclaw` modules.
+
+Implemented artifacts:
+- Bundle registry: `openclaw-rationale-check-bundle-v0`.
+- Proposal enrichment: `rationaleBundle`, `checkBundle`, `riskNotes`.
+- Rationale bundle carries sanitized source signal counts and target context only.
+- Check bundle separates required checks, recommended follow-up checks, and actions blocked until approval.
+- Risk notes restate approval and redaction boundaries for source-derived edits.
+- Observer patch panel shows `Rationale Bundle`, `Check Bundle`, and `Risk Notes`.
+- Targeted checks: `openclaw-rationale-check-bundle`, `observer-openclaw-rationale-check-bundle`.
+
+Governance boundaries:
+- Does not import or execute old `openclaw` modules.
+- Does not expose prompt bodies, source file bodies, function bodies, search text, or replacement text through proposal metadata.
+- Does not create a task or approval by itself.
+- Mutation remains only through `act.openclaw.workspace_patch_apply` with explicit approval.
+- Approved patch tasks still execute through `act.filesystem.write_text`.
+
+Local verification target:
+- `npm run typecheck`.
+- `git diff --check`.
+- Targeted milestone checks on NixOS.
+
+NixOS targeted milestone command:
+
+```bash
+cd /home/edvulcan/OpenClaw_On_NixOS && \
+git pull origin main && \
+OPENCLAW_MILESTONE_CHECKS=openclaw-rationale-check-bundle,observer-openclaw-rationale-check-bundle npm run dev:milestone-check:unix
+```
+
+Next intended slice after this passes:
+- Start converting source-derived proposal bundles into the first governed OpenClaw-authored edit execution path, still behind explicit approval and existing filesystem ledgers.
+- Defer shell/process/web gateway expansion until the edit path has passed a full targeted regression.

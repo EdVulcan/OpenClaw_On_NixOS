@@ -1884,6 +1884,9 @@ function renderWorkspacePatchApplyDraft(data) {
   const editIntent = proposal.editIntent ?? {};
   const expectedChecks = Array.isArray(proposal.expectedChecks) ? proposal.expectedChecks : [];
   const semanticPlan = proposal.semanticPlan ?? null;
+  const rationaleBundle = proposal.rationaleBundle ?? null;
+  const checkBundle = proposal.checkBundle ?? null;
+  const riskNotes = proposal.riskNotes ?? null;
   const structuredValidationEngine = validation.structuredPatch?.engine ?? "openclaw-native-workspace-patch-validation-v0";
   const previewValidationEngine = validation.preview?.engine ?? "openclaw-native-workspace-patch-preview-validation-v0";
   const diffPreview = data?.diffPreview ?? {};
@@ -1906,6 +1909,9 @@ function renderWorkspacePatchApplyDraft(data) {
     \`Proposal Envelope: registry=\${proposal.registry ?? "openclaw-native-workspace-edit-proposal-v0"} title=\${proposal.title ?? "unknown"} dryRun=\${Boolean(proposal.dryRun?.ok)} contentExposed=\${Boolean(proposal.dryRun?.contentExposed)} rationale=\${proposal.rationale ?? "unknown"}\`,
     \`Edit Intent: kind=\${editIntent.kind ?? "none"} objective=\${editIntent.objective ?? "none"} planning=\${editIntent.planningStyle ?? "none"} safety=\${editIntent.targetSafety ?? "none"}\`,
     \`Expected Checks: \${expectedChecks.join(",") || "none"} semanticPlan=\${semanticPlan?.registry ?? "none"} promptFiles=\${semanticPlan?.promptFiles ?? 0} contentExposed=\${Boolean(semanticPlan?.contentExposed)}\`,
+    \`Rationale Bundle: registry=\${rationaleBundle?.registry ?? "openclaw-rationale-check-bundle-v0"} reasons=\${rationaleBundle?.reasons?.length ?? 0} matchedTools=\${rationaleBundle?.sourceSignals?.matchedTools ?? 0} matchedSemanticFiles=\${rationaleBundle?.sourceSignals?.matchedSemanticFiles ?? 0} promptFiles=\${rationaleBundle?.sourceSignals?.promptSemanticFiles ?? 0} contentExposed=\${Boolean(rationaleBundle?.contentExposed)}\`,
+    \`Check Bundle: registry=\${checkBundle?.registry ?? "openclaw-rationale-check-bundle-v0"} required=\${(checkBundle?.required ?? []).join(",") || "none"} recommended=\${(checkBundle?.recommended ?? []).join(",") || "none"} blockedUntilApproval=\${(checkBundle?.blockedUntilApproval ?? []).join(",") || "none"} contentExposed=\${Boolean(checkBundle?.contentExposed)}\`,
+    \`Risk Notes: registry=\${riskNotes?.registry ?? "openclaw-rationale-check-bundle-v0"} risk=\${riskNotes?.risk ?? "none"} approvalRequired=\${Boolean(riskNotes?.approvalRequired)} notes=\${(riskNotes?.notes ?? []).join(";") || "none"} contentExposed=\${Boolean(riskNotes?.contentExposed)}\`,
     \`Proposal Source Signals: registry=\${proposalSourceSignals?.registry ?? "none"} knownRegistry=\${SOURCE_DERIVED_EDIT_PROPOSAL_REGISTRY} matchedTools=\${proposalSourceSignals?.toolSignals?.matchedTools ?? 0} matchedSemanticFiles=\${proposalSourceSignals?.semanticSignals?.matchedFiles ?? 0} exposesSource=\${Boolean(proposalSourceSignals?.governance?.exposesSourceFileContent)} executesTool=\${Boolean(proposalSourceSignals?.governance?.canExecuteToolCode)}\`,
     \`Structured Edits: supportedKinds=replace_text,replace_lines observedKinds=\${(data?.edits ?? []).map((edit) => edit.kind ?? "replace_text").join(",") || "none"}\`,
     \`Validation: ok=\${Boolean(validation.ok)} structured=\${structuredValidationEngine} preview=\${previewValidationEngine} appliesAgainstOriginal=\${Boolean(validation.structuredPatch?.checks?.appliesAgainstOriginalContent)} structuredLineRangesResolved=\${Boolean(validation.structuredPatch?.checks?.structuredLineRangesResolved)}\`,
