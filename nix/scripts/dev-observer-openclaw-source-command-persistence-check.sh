@@ -116,6 +116,13 @@ post_json() {
   curl --silent --show-error --fail-with-body -X POST "$url" -H 'content-type: application/json' -d "$body"
 }
 
+post_json_status() {
+  local url="$1"
+  local body="$2"
+  local output_file="$3"
+  curl --silent --show-error --output "$output_file" --write-out "%{http_code}" -X POST "$url" -H 'content-type: application/json' -d "$body"
+}
+
 check_static_token() {
   local file="$1"
   local label="$2"
@@ -169,21 +176,53 @@ check_static_token "$CLIENT_FILE" "client" "createSourceCommandApprovalTask"
 check_static_token "$CLIENT_FILE" "client" "recoverSelectedTask"
 check_static_token "$CLIENT_FILE" "client" "refreshCommandLedger"
 echo "Creating observer source command persistence task ..."
-post_json "$CORE_URL/plugins/native-adapter/source-command-proposals/tasks" '{"proposalId":"openclaw:typecheck","query":"command","confirm":true}' > "$TASK_FILE"
-post_json "$CORE_URL/operator/step" '{}' > "$BLOCKED_STEP_FILE"
+task_status="$(post_json_status "$CORE_URL/plugins/native-adapter/source-command-proposals/tasks" '{"proposalId":"openclaw:typecheck","query":"command","confirm":true}' "$TASK_FILE")"
+if [[ "$task_status" != "200" ]]; then
+  echo "Observer source command task creation returned HTTP $task_status" >&2
+  cat "$TASK_FILE" >&2 || true
+  exit 1
+fi
+echo "Stepping observer source command task before approval ..."
+blocked_step_status="$(post_json_status "$CORE_URL/operator/step" '{}' "$BLOCKED_STEP_FILE")"
+if [[ "$blocked_step_status" != "200" ]]; then
+  echo "Observer source command blocked operator step returned HTTP $blocked_step_status" >&2
+  cat "$BLOCKED_STEP_FILE" >&2 || true
+  exit 1
+fi
 
 approval_id="$(node - <<'EOF' "$TASK_FILE" "$BLOCKED_STEP_FILE"
 const fs = require("node:fs");
 const taskResponse = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
 const blockedStep = JSON.parse(fs.readFileSync(process.argv[3], "utf8"));
+const fail = (message, details) => {
+  console.error("[observer-source-command-persistence-debug]", message);
+  console.error(JSON.stringify(details, null, 2));
+  throw new Error(message);
+};
+console.error("[observer-source-command-persistence-debug] task response shape", JSON.stringify({
+  ok: taskResponse.ok ?? null,
+  registry: taskResponse.registry ?? null,
+  mode: taskResponse.mode ?? null,
+  taskId: taskResponse.task?.id ?? null,
+  taskStatus: taskResponse.task?.status ?? null,
+  sourceRegistry: taskResponse.task?.sourceCommand?.registry ?? null,
+  approvalId: taskResponse.approval?.id ?? null,
+}, null, 2));
+console.error("[observer-source-command-persistence-debug] blocked step shape", JSON.stringify({
+  ok: blockedStep.ok ?? null,
+  ran: blockedStep.ran ?? null,
+  blocked: blockedStep.blocked ?? null,
+  reason: blockedStep.reason ?? null,
+  approvalId: blockedStep.approval?.id ?? null,
+}, null, 2));
 if (!taskResponse.ok || taskResponse.registry !== "openclaw-source-command-task-v0" || taskResponse.task?.sourceCommand?.registry !== "openclaw-source-command-task-v0") {
-  throw new Error(`observer source persistence fixture should create a provenance-bearing source task: ${JSON.stringify(taskResponse)}`);
+  fail("observer source persistence fixture should create a provenance-bearing source task", taskResponse);
 }
 if (!blockedStep.ok || blockedStep.ran !== false || blockedStep.blocked !== true || blockedStep.reason !== "policy_requires_approval") {
-  throw new Error(`operator should block observer source command before approval: ${JSON.stringify(blockedStep)}`);
+  fail("operator should block observer source command before approval", blockedStep);
 }
 if (!blockedStep.approval?.id || blockedStep.approval.id !== taskResponse.approval?.id) {
-  throw new Error(`blocked step should expose linked observer source approval: ${JSON.stringify(blockedStep.approval)}`);
+  fail("blocked step should expose linked observer source approval", { taskApproval: taskResponse.approval, blockedApproval: blockedStep.approval });
 }
 
 process.stdout.write(blockedStep.approval.id);
