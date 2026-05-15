@@ -948,7 +948,7 @@ Next intended slice after this passes:
 
 ## 24. 2026-05-15 Step 7 Update: Source-Authored Edit Task Entrypoint
 
-Status: implemented_waiting_check.
+Status: passed.
 
 Slice: first approval-gated source-authored OpenClaw edit task entrypoint.
 
@@ -961,6 +961,9 @@ Implemented artifacts:
 - Source-authored task registry: `openclaw-source-authored-edit-task-v0`.
 - Observer workspace patch panel now exposes source-authored edit metadata and a `Create Source-Authored Task` control.
 - Targeted checks: `openclaw-source-authored-edit-task`, `observer-openclaw-source-authored-edit-task`.
+
+Recheck note:
+- 2026-05-15 12:52 +08:00 NixOS targeted milestone passed: `openclaw-source-authored-edit-task`, `observer-openclaw-source-authored-edit-task`.
 
 Governance boundaries:
 - Reuses `act.openclaw.workspace_patch_apply` and the existing approval-gated task materialization path.
@@ -985,3 +988,40 @@ OPENCLAW_MILESTONE_CHECKS=openclaw-source-authored-edit-task,observer-openclaw-s
 Next intended slice after this passes:
 - Run a focused regression over the source-authored edit chain plus prior proposal/bundle milestones.
 - Then begin the next OpenClaw capability surface only if the edit path remains stable: likely read-only shell/process command proposal absorption before any execution expansion.
+
+## 25. 2026-05-15 Step 8 Update: Source Integration Focused Regression
+
+Status: implemented_waiting_check.
+
+Slice: focused regression over the first real enhanced OpenClaw edit integration chain.
+
+Purpose: lock the source-authored edit path before expanding to additional OpenClaw capability surfaces. This regression deliberately avoids the full milestone suite and instead replays only the source integration chain that now matters for the first governed edit path.
+
+Implemented artifacts:
+- Core focused regression check: `openclaw-source-integration-regression`.
+- Observer focused regression check: `observer-openclaw-source-integration-regression`.
+- Core regression covers source-derived edit proposals, target selection, prompt semantics, rationale/check/risk bundles, and source-authored edit task creation.
+- Observer regression covers the matching UI/API visibility and controls for the same chain.
+
+Governance boundaries:
+- Regression remains read-only or approval-gated; it does not approve or execute pending mutation tasks.
+- Uses existing milestone fixtures and existing approval-gated task creation checks.
+- Does not import or execute old `openclaw` modules.
+- Does not expose prompt bodies or source bodies.
+
+Local verification target:
+- `npm run typecheck`.
+- `git diff --check`.
+- Targeted milestone checks on NixOS.
+
+NixOS targeted milestone command:
+
+```bash
+cd /home/edvulcan/OpenClaw_On_NixOS && \
+git pull origin main && \
+OPENCLAW_MILESTONE_CHECKS=openclaw-source-integration-regression,observer-openclaw-source-integration-regression npm run dev:milestone-check:unix
+```
+
+Next intended slice after this passes:
+- Begin the next OpenClaw capability surface only after this focused regression passes.
+- Candidate: read-only shell/process command proposal absorption, still proposal-only before any execution expansion.
