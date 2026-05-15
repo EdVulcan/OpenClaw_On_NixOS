@@ -1244,7 +1244,7 @@ Next intended slice after this passes:
 
 ## 31. 2026-05-15 Step 14 Update: Source-Derived Command Hardening
 
-Status: implemented_waiting_check.
+Status: passed.
 
 Slice: hardening for enhanced `openclaw` source-derived command approval and recovery chains.
 
@@ -1254,6 +1254,9 @@ Implemented artifacts:
 - Targeted checks: `openclaw-source-command-hardening`, `observer-openclaw-source-command-hardening`.
 - Source command hardening checks cover expired approval rejection, duplicate resolution rejection, duplicate recovery rejection, and chained recovery.
 - Observer hardening checks confirm the same chain is visible through existing approval, recovery, task history, command ledger, and capability history surfaces.
+
+Recheck note:
+- 2026-05-15 14:30 +08:00 NixOS targeted milestone passed: `openclaw-source-command-hardening`, `observer-openclaw-source-command-hardening`.
 
 Governance boundaries:
 - Expired source command approvals fail active tasks and reject late approve/deny.
@@ -1279,3 +1282,41 @@ OPENCLAW_MILESTONE_CHECKS=openclaw-source-command-hardening,observer-openclaw-so
 Next intended slice after this passes:
 - Add restart persistence coverage for source command provenance, recovered source-command chains, approvals, and command transcript ledgers.
 - Then run a focused source-command regression across proposal -> plan -> task -> execute -> denial/recovery -> hardening.
+
+## 32. 2026-05-15 Step 15 Update: Source-Derived Command Persistence
+
+Status: implemented_waiting_check.
+
+Slice: restart persistence for enhanced `openclaw` source-derived command approval and recovery chains.
+
+Purpose: prove that the already-integrated source command path remains trustworthy across service restarts. This is not another readiness layer; it closes the runtime durability gap for real source-derived command execution by checking pending approvals, failed tasks, recovered tasks, transcripts, and capability history after restarts.
+
+Implemented artifacts:
+- Targeted checks: `openclaw-source-command-persistence`, `observer-openclaw-source-command-persistence`.
+- Source command persistence check creates a source-derived command task, approves a failing run, materializes a recovery task, restarts services before approving recovery, then verifies the recovered command after a second restart.
+- Observer persistence check confirms the same persisted chain remains visible through existing source command task, approval, recovery, task detail, command ledger, and capability history surfaces.
+
+Governance boundaries:
+- Pending recovered source-command approvals survive restart but do not execute until freshly approved.
+- Failed source-command tasks preserve `sourceCommand` provenance, `restorable`, and `recoveredByTaskId`.
+- Recovered source-command tasks preserve `sourceCommand` provenance and `recovery.recoveredFromTaskId`.
+- Command transcript ledgers preserve failed and executed source-command records across restart.
+- Capability invocation history remains stable across restart.
+- Does not expose package script bodies, prompt bodies, source file bodies, or old tool bodies.
+
+Local verification target:
+- `npm run typecheck`.
+- `git diff --check`.
+- Targeted milestone checks on NixOS.
+
+NixOS targeted milestone command:
+
+```bash
+cd /home/edvulcan/OpenClaw_On_NixOS && \
+git pull origin main && \
+OPENCLAW_MILESTONE_CHECKS=openclaw-source-command-persistence,observer-openclaw-source-command-persistence npm run dev:milestone-check:unix
+```
+
+Next intended slice after this passes:
+- Run a focused source-command regression across proposal -> plan -> task -> execute -> denial/recovery -> hardening -> persistence.
+- If regression is stable, move to the next real enhanced OpenClaw absorption surface instead of adding more command preflight layers.
