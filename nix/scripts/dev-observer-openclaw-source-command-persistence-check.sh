@@ -289,7 +289,14 @@ process.stdout.write(failStep.task.id);
 EOF
 )"
 
-post_json "$CORE_URL/tasks/$failed_task_id/recover" '{}' > "$RECOVERED_FILE"
+echo "Creating recovered observer source command task from $failed_task_id ..."
+recovered_status="$(post_json_status "$CORE_URL/tasks/$failed_task_id/recover" '{}' "$RECOVERED_FILE")"
+if ! is_success_http_status "$recovered_status"; then
+  echo "Observer source command recovery creation returned HTTP $recovered_status" >&2
+  cat "$RECOVERED_FILE" >&2 || true
+  exit 1
+fi
+echo "Reading observer source command pre-restart snapshots ..."
 curl --silent --show-error --fail "$CORE_URL/tasks?limit=8" > "$PRE_RESTART_TASKS_FILE"
 curl --silent --show-error --fail "$CORE_URL/approvals?limit=8" > "$PRE_RESTART_APPROVALS_FILE"
 curl --silent --show-error --fail "$CORE_URL/commands/transcripts?limit=8" > "$PRE_RESTART_TRANSCRIPTS_FILE"
@@ -303,27 +310,47 @@ const tasks = JSON.parse(fs.readFileSync(process.argv[4], "utf8"));
 const approvals = JSON.parse(fs.readFileSync(process.argv[5], "utf8"));
 const transcripts = JSON.parse(fs.readFileSync(process.argv[6], "utf8"));
 const history = JSON.parse(fs.readFileSync(process.argv[7], "utf8"));
+const fail = (message, details) => {
+  console.error("[observer-source-command-persistence-debug]", message);
+  console.error(JSON.stringify(details, null, 2));
+  throw new Error(message);
+};
+console.error("[observer-source-command-persistence-debug] recovered shape", JSON.stringify({
+  ok: recovered.ok ?? null,
+  taskId: recovered.task?.id ?? null,
+  taskStatus: recovered.task?.status ?? null,
+  sourceRegistry: recovered.task?.sourceCommand?.registry ?? null,
+  recoveredFromTaskId: recovered.task?.recovery?.recoveredFromTaskId ?? null,
+  approvalStatus: recovered.task?.approval?.status ?? null,
+  approvalId: recovered.task?.approval?.requestId ?? null,
+}, null, 2));
+console.error("[observer-source-command-persistence-debug] pre-restart summaries", JSON.stringify({
+  tasks: tasks.summary ?? null,
+  approvals: approvals.summary ?? null,
+  transcripts: transcripts.summary ?? null,
+  history: history.summary ?? null,
+}, null, 2));
 
 if (!recovered.ok || recovered.task?.status !== "queued" || recovered.task?.sourceCommand?.registry !== "openclaw-source-command-task-v0") {
-  throw new Error(`observer recovered source command should be queued with provenance before restart: ${JSON.stringify(recovered)}`);
+  fail("observer recovered source command should be queued with provenance before restart", recovered);
 }
 if (recovered.task?.recovery?.recoveredFromTaskId !== failStep.task?.id) {
-  throw new Error(`observer recovered source task should link to failed source before restart: ${JSON.stringify(recovered.task?.recovery)}`);
+  fail("observer recovered source task should link to failed source before restart", { recovery: recovered.task?.recovery, failedTaskId: failStep.task?.id });
 }
 if (recovered.task?.approval?.required !== true || recovered.task?.approval?.status !== "pending") {
-  throw new Error(`observer recovered source task should require approval before restart: ${JSON.stringify(recovered.task?.approval)}`);
+  fail("observer recovered source task should require approval before restart", recovered.task?.approval);
 }
 if (tasks.summary?.counts?.failed !== 1 || tasks.summary?.counts?.queued !== 1 || tasks.summary?.counts?.recoverable !== 1) {
-  throw new Error(`observer task summary should expose failed source and queued recovery before restart: ${JSON.stringify(tasks.summary)}`);
+  fail("observer task summary should expose failed source and queued recovery before restart", tasks.summary);
 }
 if (!(approvals.items ?? []).some((approval) => approval.id === recovered.task.approval.requestId && approval.status === "pending")) {
-  throw new Error(`observer approval inbox should expose pending recovered source approval before restart: ${JSON.stringify(approvals.items)}`);
+  fail("observer approval inbox should expose pending recovered source approval before restart", approvals.items);
 }
 if (transcripts.summary?.total !== 1 || transcripts.summary?.failed !== 1 || transcripts.items?.[0]?.sourceCommand?.registry !== "openclaw-source-command-task-v0") {
-  throw new Error(`observer command ledger should contain failed source provenance before restart: ${JSON.stringify(transcripts)}`);
+  fail("observer command ledger should contain failed source provenance before restart", transcripts);
 }
 if (history.summary?.total !== 1 || history.summary?.invoked !== 1 || history.summary?.blocked !== 0) {
-  throw new Error(`observer capability history should contain first source invocation before restart: ${JSON.stringify(history.summary)}`);
+  fail("observer capability history should contain first source invocation before restart", history.summary);
 }
 
 process.stdout.write(`${recovered.task.id} ${recovered.task.approval.requestId}`);
