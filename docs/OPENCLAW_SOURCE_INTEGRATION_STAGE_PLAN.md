@@ -1285,7 +1285,7 @@ Next intended slice after this passes:
 
 ## 32. 2026-05-15 Step 15 Update: Source-Derived Command Persistence
 
-Status: implemented_waiting_check.
+Status: passed.
 
 Slice: restart persistence for enhanced `openclaw` source-derived command approval and recovery chains.
 
@@ -1295,6 +1295,9 @@ Implemented artifacts:
 - Targeted checks: `openclaw-source-command-persistence`, `observer-openclaw-source-command-persistence`.
 - Source command persistence check creates a source-derived command task, approves a failing run, materializes a recovery task, restarts services before approving recovery, then verifies the recovered command after a second restart.
 - Observer persistence check confirms the same persisted chain remains visible through existing source command task, approval, recovery, task detail, command ledger, and capability history surfaces.
+
+Recheck note:
+- 2026-05-15 16:01 +08:00 NixOS targeted milestone passed: `openclaw-source-command-persistence`, `observer-openclaw-source-command-persistence`.
 
 Governance boundaries:
 - Pending recovered source-command approvals survive restart but do not execute until freshly approved.
@@ -1320,3 +1323,38 @@ OPENCLAW_MILESTONE_CHECKS=openclaw-source-command-persistence,observer-openclaw-
 Next intended slice after this passes:
 - Run a focused source-command regression across proposal -> plan -> task -> execute -> denial/recovery -> hardening -> persistence.
 - If regression is stable, move to the next real enhanced OpenClaw absorption surface instead of adding more command preflight layers.
+
+## 33. 2026-05-15 Step 16 Update: Source-Derived Command Regression
+
+Status: implemented_waiting_check.
+
+Slice: focused regression for the enhanced `openclaw` source-derived command integration chain.
+
+Purpose: lock the completed command-side absorption path together as one regression target. This prevents future work from accidentally breaking an earlier link in the chain after persistence has passed.
+
+Implemented artifacts:
+- Targeted checks: `openclaw-source-command-regression`, `observer-openclaw-source-command-regression`.
+- Core regression chains proposal -> plan -> task -> approved execution -> denial/recovery -> hardening -> persistence.
+- Observer regression chains the matching UI/API visibility checks for the same command path.
+
+Governance boundaries:
+- This does not introduce another capability or preflight layer.
+- It only re-runs already-approved source command slices as a focused integration guard.
+- Mutating/executing behavior remains approval-gated and allowlisted by the existing command capability.
+
+Local verification target:
+- `npm run typecheck`.
+- `git diff --check`.
+- Targeted milestone checks on NixOS.
+
+NixOS targeted milestone command:
+
+```bash
+cd /home/edvulcan/OpenClaw_On_NixOS && \
+git pull origin main && \
+OPENCLAW_MILESTONE_CHECKS=openclaw-source-command-regression,observer-openclaw-source-command-regression npm run dev:milestone-check:unix
+```
+
+Next intended slice after this passes:
+- Treat the source-derived command lane as stable enough for normal regression coverage.
+- Move to the next real enhanced OpenClaw absorption surface rather than adding more command-readiness layers.

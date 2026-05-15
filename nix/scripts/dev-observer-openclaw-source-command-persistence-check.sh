@@ -218,22 +218,6 @@ const fail = (message, details) => {
   console.error(JSON.stringify(details, null, 2));
   throw new Error(message);
 };
-console.error("[observer-source-command-persistence-debug] task response shape", JSON.stringify({
-  ok: taskResponse.ok ?? null,
-  registry: taskResponse.registry ?? null,
-  mode: taskResponse.mode ?? null,
-  taskId: taskResponse.task?.id ?? null,
-  taskStatus: taskResponse.task?.status ?? null,
-  sourceRegistry: taskResponse.task?.sourceCommand?.registry ?? null,
-  approvalId: taskResponse.approval?.id ?? null,
-}, null, 2));
-console.error("[observer-source-command-persistence-debug] blocked step shape", JSON.stringify({
-  ok: blockedStep.ok ?? null,
-  ran: blockedStep.ran ?? null,
-  blocked: blockedStep.blocked ?? null,
-  reason: blockedStep.reason ?? null,
-  approvalId: blockedStep.approval?.id ?? null,
-}, null, 2));
 if (!taskResponse.ok || taskResponse.registry !== "openclaw-source-command-task-v0" || taskResponse.task?.sourceCommand?.registry !== "openclaw-source-command-task-v0") {
   fail("observer source persistence fixture should create a provenance-bearing source task", taskResponse);
 }
@@ -272,23 +256,6 @@ const fail = (message, details) => {
   console.error(JSON.stringify(details, null, 2));
   throw new Error(message);
 };
-console.error("[observer-source-command-persistence-debug] approved shape", JSON.stringify({
-  ok: approved.ok ?? null,
-  approvalStatus: approved.approval?.status ?? null,
-  taskId: approved.task?.id ?? null,
-  taskStatus: approved.task?.status ?? null,
-  sourceRegistry: approved.task?.sourceCommand?.registry ?? null,
-}, null, 2));
-console.error("[observer-source-command-persistence-debug] failed step shape", JSON.stringify({
-  ok: failStep.ok ?? null,
-  ran: failStep.ran ?? null,
-  taskId: failStep.task?.id ?? null,
-  taskStatus: failStep.task?.status ?? null,
-  restorable: failStep.task?.restorable ?? null,
-  sourceRegistry: failStep.task?.sourceCommand?.registry ?? null,
-  reason: failStep.task?.outcome?.reason ?? null,
-}, null, 2));
-
 if (approved.approval?.status !== "approved" || approved.task?.sourceCommand?.registry !== "openclaw-source-command-task-v0") {
   fail("observer approved source command should retain provenance", approved);
 }
@@ -329,22 +296,6 @@ const fail = (message, details) => {
   console.error(JSON.stringify(details, null, 2));
   throw new Error(message);
 };
-console.error("[observer-source-command-persistence-debug] recovered shape", JSON.stringify({
-  ok: recovered.ok ?? null,
-  taskId: recovered.task?.id ?? null,
-  taskStatus: recovered.task?.status ?? null,
-  sourceRegistry: recovered.task?.sourceCommand?.registry ?? null,
-  recoveredFromTaskId: recovered.task?.recovery?.recoveredFromTaskId ?? null,
-  approvalStatus: recovered.task?.approval?.status ?? null,
-  approvalId: recovered.task?.approval?.requestId ?? null,
-}, null, 2));
-console.error("[observer-source-command-persistence-debug] pre-restart summaries", JSON.stringify({
-  tasks: tasks.summary ?? null,
-  approvals: approvals.summary ?? null,
-  transcripts: transcripts.summary ?? null,
-  history: history.summary ?? null,
-}, null, 2));
-
 if (!recovered.ok || recovered.task?.status !== "queued" || recovered.task?.sourceCommand?.registry !== "openclaw-source-command-task-v0") {
   fail("observer recovered source command should be queued with provenance before restart", recovered);
 }
