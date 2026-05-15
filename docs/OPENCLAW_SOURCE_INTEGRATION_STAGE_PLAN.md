@@ -1203,7 +1203,7 @@ Next intended slice after this passes:
 
 ## 30. 2026-05-15 Step 13 Update: Source-Derived Command Denial Recovery
 
-Status: implemented_waiting_check.
+Status: passed.
 
 Slice: denial and fresh-approval recovery for enhanced `openclaw` source-derived shell/process command tasks.
 
@@ -1213,6 +1213,9 @@ Implemented artifacts:
 - Recovery now preserves redacted `sourceCommand` provenance from the denied task to the recovered task.
 - Targeted checks: `openclaw-source-command-denial-recovery`, `observer-openclaw-source-command-denial-recovery`.
 - Observer verification uses the existing deny, recover, approve, operator, command ledger, capability history, task history, and audit visibility paths.
+
+Recheck note:
+- 2026-05-15 14:15 +08:00 NixOS targeted milestone passed: `openclaw-source-command-denial-recovery`, `observer-openclaw-source-command-denial-recovery`.
 
 Governance boundaries:
 - Denied source command tasks fail without command execution.
@@ -1238,3 +1241,41 @@ OPENCLAW_MILESTONE_CHECKS=openclaw-source-command-denial-recovery,observer-openc
 Next intended slice after this passes:
 - Add command hardening for source-derived commands: duplicate approval/denial safety, duplicate recovery safety, and chained recovery.
 - Then add restart persistence coverage for source command provenance and recovered command transcripts.
+
+## 31. 2026-05-15 Step 14 Update: Source-Derived Command Hardening
+
+Status: implemented_waiting_check.
+
+Slice: hardening for enhanced `openclaw` source-derived command approval and recovery chains.
+
+Purpose: close edge cases around the approved source command execution path before persistence work. This verifies approval expiry, duplicate approval/denial clicks, duplicate recovery attempts, and multi-hop recovery chains while preserving `sourceCommand` provenance.
+
+Implemented artifacts:
+- Targeted checks: `openclaw-source-command-hardening`, `observer-openclaw-source-command-hardening`.
+- Source command hardening checks cover expired approval rejection, duplicate resolution rejection, duplicate recovery rejection, and chained recovery.
+- Observer hardening checks confirm the same chain is visible through existing approval, recovery, task history, command ledger, and capability history surfaces.
+
+Governance boundaries:
+- Expired source command approvals fail active tasks and reject late approve/deny.
+- Duplicate approve/deny after resolution returns conflict.
+- A failed source command task can create only one direct recovery task.
+- Recovery chains preserve `sourceCommand` provenance on every link.
+- Command transcript ledger keeps provenance for failed and successful recovered command attempts.
+- Does not expose package script bodies, prompt bodies, source file bodies, or old tool bodies.
+
+Local verification target:
+- `npm run typecheck`.
+- `git diff --check`.
+- Targeted milestone checks on NixOS.
+
+NixOS targeted milestone command:
+
+```bash
+cd /home/edvulcan/OpenClaw_On_NixOS && \
+git pull origin main && \
+OPENCLAW_MILESTONE_CHECKS=openclaw-source-command-hardening,observer-openclaw-source-command-hardening npm run dev:milestone-check:unix
+```
+
+Next intended slice after this passes:
+- Add restart persistence coverage for source command provenance, recovered source-command chains, approvals, and command transcript ledgers.
+- Then run a focused source-command regression across proposal -> plan -> task -> execute -> denial/recovery -> hardening.
