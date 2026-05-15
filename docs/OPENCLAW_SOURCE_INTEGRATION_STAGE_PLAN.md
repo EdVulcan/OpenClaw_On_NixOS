@@ -904,7 +904,7 @@ Next intended slice after this passes:
 
 ## 23. 2026-05-15 Step 6 Update: Rationale / Check / Risk Bundles
 
-Status: implemented_waiting_check.
+Status: passed.
 
 Slice: structured audit bundles on source-derived OpenClaw workspace edit proposals.
 
@@ -918,6 +918,9 @@ Implemented artifacts:
 - Risk notes restate approval and redaction boundaries for source-derived edits.
 - Observer patch panel shows `Rationale Bundle`, `Check Bundle`, and `Risk Notes`.
 - Targeted checks: `openclaw-rationale-check-bundle`, `observer-openclaw-rationale-check-bundle`.
+
+Recheck note:
+- 2026-05-15 12:25 +08:00 NixOS targeted milestone passed: `openclaw-rationale-check-bundle`, `observer-openclaw-rationale-check-bundle`.
 
 Governance boundaries:
 - Does not import or execute old `openclaw` modules.
@@ -942,3 +945,43 @@ OPENCLAW_MILESTONE_CHECKS=openclaw-rationale-check-bundle,observer-openclaw-rati
 Next intended slice after this passes:
 - Start converting source-derived proposal bundles into the first governed OpenClaw-authored edit execution path, still behind explicit approval and existing filesystem ledgers.
 - Defer shell/process/web gateway expansion until the edit path has passed a full targeted regression.
+
+## 24. 2026-05-15 Step 7 Update: Source-Authored Edit Task Entrypoint
+
+Status: implemented_waiting_check.
+
+Slice: first approval-gated source-authored OpenClaw edit task entrypoint.
+
+Purpose: make enhanced `openclaw` prompt/tool semantics drive a real governed edit task path instead of only enriching previews. This adds a formal source-authored edit draft/task API that composes target selection, source-derived proposals, rationale/check/risk bundles, and the existing patch approval task chain.
+
+Implemented artifacts:
+- Source-authored edit registry: `openclaw-source-authored-edit-v0`.
+- Draft API: `GET /plugins/native-adapter/source-authored-edit/draft`.
+- Task API: `POST /plugins/native-adapter/source-authored-edit-tasks`.
+- Source-authored task registry: `openclaw-source-authored-edit-task-v0`.
+- Observer workspace patch panel now exposes source-authored edit metadata and a `Create Source-Authored Task` control.
+- Targeted checks: `openclaw-source-authored-edit-task`, `observer-openclaw-source-authored-edit-task`.
+
+Governance boundaries:
+- Reuses `act.openclaw.workspace_patch_apply` and the existing approval-gated task materialization path.
+- Does not import or execute old `openclaw` modules.
+- Does not expose prompt bodies, source file bodies, function bodies, search text, or replacement text through public outputs.
+- Cannot mutate without explicit approval.
+- Approved patch tasks still execute through `act.filesystem.write_text`, preserving filesystem ledger and task history.
+
+Local verification target:
+- `npm run typecheck`.
+- `git diff --check`.
+- Targeted milestone checks on NixOS.
+
+NixOS targeted milestone command:
+
+```bash
+cd /home/edvulcan/OpenClaw_On_NixOS && \
+git pull origin main && \
+OPENCLAW_MILESTONE_CHECKS=openclaw-source-authored-edit-task,observer-openclaw-source-authored-edit-task npm run dev:milestone-check:unix
+```
+
+Next intended slice after this passes:
+- Run a focused regression over the source-authored edit chain plus prior proposal/bundle milestones.
+- Then begin the next OpenClaw capability surface only if the edit path remains stable: likely read-only shell/process command proposal absorption before any execution expansion.

@@ -560,6 +560,7 @@ function observerHtml() {
           <div class="metric"><span>Mode</span><span id="workspace-patch-apply-mode">diff-preview-approval-gated-draft</span></div>
           <div class="actions tight">
             <button id="workspace-patch-apply-task-button" class="secondary">Create Approval Task</button>
+            <button id="source-authored-edit-task-button" class="secondary">Create Source-Authored Task</button>
           </div>
           <pre id="workspace-patch-apply-json">Loading native workspace patch draft...</pre>
         </section>
@@ -995,6 +996,7 @@ const workspacePatchApplyPreview = document.querySelector("#workspace-patch-appl
 const workspacePatchApplyMode = document.querySelector("#workspace-patch-apply-mode");
 const workspacePatchApplyJson = document.querySelector("#workspace-patch-apply-json");
 const workspacePatchApplyTaskButton = document.querySelector("#workspace-patch-apply-task-button");
+const sourceAuthoredEditTaskButton = document.querySelector("#source-authored-edit-task-button");
 const nativePluginContractRegistry = document.querySelector("#native-plugin-contract-registry");
 const nativePluginContractOwner = document.querySelector("#native-plugin-contract-owner");
 const nativePluginContractTotal = document.querySelector("#native-plugin-contract-total");
@@ -1881,6 +1883,7 @@ function renderWorkspacePatchApplyDraft(data) {
   const proposal = data?.proposal ?? {};
   const proposalSourceSignals = data?.proposalSourceSignals ?? null;
   const targetSelection = data?.targetSelection ?? null;
+  const sourceAuthoredEdit = data?.sourceAuthoredEdit ?? null;
   const editIntent = proposal.editIntent ?? {};
   const expectedChecks = Array.isArray(proposal.expectedChecks) ? proposal.expectedChecks : [];
   const semanticPlan = proposal.semanticPlan ?? null;
@@ -1905,6 +1908,7 @@ function renderWorkspacePatchApplyDraft(data) {
     \`Capability: \${data?.capability?.id ?? "act.openclaw.workspace_patch_apply"} risk=\${data?.capability?.risk ?? "high"} approval=\${Boolean(data?.capability?.approvalRequired ?? true)} owner=\${data?.capability?.runtimeOwner ?? "unknown"}\`,
     \`Workspace: \${data?.workspace?.name ?? "unknown"} \${data?.workspace?.path ?? ""}\`,
     \`Target: \${target.relativePath ?? "scratch/observer-native-edit.txt"} edits=\${target.editCount ?? 1} changedAt=\${(target.changedAtLines ?? [target.changedAtLine]).filter(Boolean).join(",") || "unknown"} oldBytes=\${target.originalBytes ?? 0} newBytes=\${target.nextBytes ?? 0} oldSha256=\${target.originalSha256 ?? "unknown"} newSha256=\${target.nextSha256 ?? "unknown"} contentExposed=\${Boolean(target.contentExposed)} diffPreview=\${Boolean(target.diffPreviewExposed)}\`,
+    \`Source-Authored Edit: registry=\${sourceAuthoredEdit?.registry ?? "openclaw-source-authored-edit-v0"} mode=\${sourceAuthoredEdit?.mode ?? "none"} entrypoint=\${sourceAuthoredEdit?.entrypoint ?? "/plugins/native-adapter/source-authored-edit-tasks"} proposal=\${sourceAuthoredEdit?.proposalRegistry ?? "none"} rationale=\${sourceAuthoredEdit?.rationaleBundleRegistry ?? "none"} checks=\${sourceAuthoredEdit?.checkBundleRegistry ?? "none"} contentExposed=\${Boolean(sourceAuthoredEdit?.contentExposed)}\`,
     \`Target Selection: registry=\${targetSelection?.registry ?? "none"} selected=\${targetSelection?.selectedTarget?.relativePath ?? "none"} candidates=\${targetSelection?.summary?.candidateCount ?? 0} canFeedPatch=\${Boolean(targetSelection?.summary?.canFeedPatchProposal)} exposesSource=\${Boolean(targetSelection?.governance?.exposesSourceFileContent)}\`,
     \`Proposal Envelope: registry=\${proposal.registry ?? "openclaw-native-workspace-edit-proposal-v0"} title=\${proposal.title ?? "unknown"} dryRun=\${Boolean(proposal.dryRun?.ok)} contentExposed=\${Boolean(proposal.dryRun?.contentExposed)} rationale=\${proposal.rationale ?? "unknown"}\`,
     \`Edit Intent: kind=\${editIntent.kind ?? "none"} objective=\${editIntent.objective ?? "none"} planning=\${editIntent.planningStyle ?? "none"} safety=\${editIntent.targetSafety ?? "none"}\`,
@@ -2594,12 +2598,7 @@ async function refreshWorkspacePatchApplyDraft() {
       { search: "before", replacement: "after", occurrence: 1 },
       { search: "omega", replacement: "zeta", occurrence: 1 },
     ]));
-    const proposal = encodeURIComponent(JSON.stringify({
-      title: "Observer sample edit proposal",
-      rationale: "Demonstrate proposal envelope metadata for an approval-gated OpenClaw workspace patch.",
-      targetContext: { symbol: "observer-sample", fileRole: "workspace scratch fixture" },
-    }));
-    const data = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/workspace-patch-apply/draft?relativePath=scratch/observer-native-edit.txt&edits=\${edits}&proposal=\${proposal}&deriveProposalFromSource=true&proposalQuery=edit&contextLines=0\`);
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/source-authored-edit/draft?edits=\${edits}&proposalQuery=edit&targetSelectionQuery=edit&contextLines=0\`);
     renderWorkspacePatchApplyDraft(data);
   } catch {
     workspacePatchApplyRegistry.textContent = "offline";
@@ -3361,6 +3360,35 @@ async function createNativePluginInvokeApprovalTask() {
   await refreshNativePluginInvokePlan();
 }
 
+async function createSourceAuthoredEditApprovalTask() {
+  const result = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/source-authored-edit-tasks\`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      edits: [
+        { search: "before", replacement: "after", occurrence: 1 },
+        { search: "omega", replacement: "zeta", occurrence: 1 },
+      ],
+      proposalQuery: "edit",
+      targetSelectionQuery: "edit",
+      contextLines: 0,
+      confirm: true,
+    }),
+  });
+
+  taskHistoryFocus = "selected-task";
+  selectedHistoryTaskId = result.task?.id ?? null;
+  taskDetailIdInput.value = result.task?.id ?? "";
+  renderPlanPanel(result.task);
+  setControlMessage(\`Created approval-gated OpenClaw source-authored edit task \${result.task?.id ?? "unknown"}.\`);
+  await refreshRuntime();
+  await refreshTaskList();
+  await refreshTaskHistoryDetail();
+  await refreshApprovalState();
+  await refreshOperatorState();
+  await refreshWorkspacePatchApplyDraft();
+}
+
 async function createWorkspaceTextWriteApprovalTask() {
   const result = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/workspace-text-write-tasks\`, {
     method: "POST",
@@ -4004,6 +4032,12 @@ workspaceTextWriteTaskButton.addEventListener("click", () => {
 
 workspacePatchApplyTaskButton.addEventListener("click", () => {
   createWorkspacePatchApplyApprovalTask().catch((error) => {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  });
+});
+
+sourceAuthoredEditTaskButton.addEventListener("click", () => {
+  createSourceAuthoredEditApprovalTask().catch((error) => {
     setControlMessage(\`Request failed: \${formatError(error)}\`);
   });
 });

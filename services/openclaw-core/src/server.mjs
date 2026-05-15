@@ -4890,6 +4890,128 @@ async function createNativeOpenClawWorkspacePatchApplyTask({
   };
 }
 
+function buildOpenClawSourceAuthoredEditDraft({
+  workspacePath = null,
+  proposalQuery = "edit",
+  targetSelectionQuery = null,
+  targetSelectionScope = "tools",
+  edits = null,
+  search = "",
+  replacement = "",
+  occurrence = 1,
+  contextLines = 0,
+} = {}) {
+  const draft = buildNativeOpenClawWorkspacePatchApplyDraft({
+    workspacePath,
+    search,
+    replacement,
+    occurrence,
+    edits,
+    contextLines,
+    deriveProposalFromSource: true,
+    proposalQuery,
+    selectTargetFromSource: true,
+    targetSelectionQuery: targetSelectionQuery ?? proposalQuery,
+    targetSelectionScope,
+  });
+  const sourceAuthoredEdit = {
+    registry: "openclaw-source-authored-edit-v0",
+    mode: "approval-gated-source-authored-edit-draft",
+    sourceRegistry: draft.proposal?.source ?? "openclaw-source-derived-edit-proposal-v0",
+    proposalRegistry: draft.proposal?.registry ?? "openclaw-native-workspace-edit-proposal-v0",
+    rationaleBundleRegistry: draft.proposal?.rationaleBundle?.registry ?? "openclaw-rationale-check-bundle-v0",
+    checkBundleRegistry: draft.proposal?.checkBundle?.registry ?? "openclaw-rationale-check-bundle-v0",
+    riskRegistry: draft.proposal?.riskNotes?.registry ?? "openclaw-rationale-check-bundle-v0",
+    targetSelectionRegistry: draft.targetSelection?.registry ?? "openclaw-native-workspace-edit-target-selection-v0",
+    promptSemanticsRegistry: draft.proposal?.semanticPlan?.registry ?? "openclaw-native-prompt-semantics-v0",
+    entrypoint: "/plugins/native-adapter/source-authored-edit-tasks",
+    query: truncatePatchMetadata(proposalQuery, 120),
+    contentExposed: false,
+  };
+
+  return {
+    ...draft,
+    registry: "openclaw-source-authored-edit-v0",
+    mode: "approval-gated-source-authored-edit-draft",
+    sourceRegistry: draft.registry,
+    sourceAuthoredEdit,
+    governance: {
+      ...(draft.draft?.governance ?? {}),
+      mode: "openclaw_source_authored_edit_draft",
+      runtimeOwner: "openclaw_on_nixos",
+      derivesFromEnhancedOpenClawSignals: true,
+      canExecuteLegacyOpenClawCode: false,
+      canImportLegacyOpenClawModules: false,
+      canMutateWithoutApproval: false,
+      usesWorkspacePatchApplyAdapter: true,
+      exposesPromptContent: false,
+      exposesSourceFileContent: false,
+    },
+  };
+}
+
+async function createOpenClawSourceAuthoredEditTask({
+  workspacePath = null,
+  proposalQuery = "edit",
+  targetSelectionQuery = null,
+  targetSelectionScope = "tools",
+  edits = null,
+  search = "",
+  replacement = "",
+  occurrence = 1,
+  contextLines = 0,
+  confirm = false,
+} = {}) {
+  const result = await createNativeOpenClawWorkspacePatchApplyTask({
+    workspacePath,
+    search,
+    replacement,
+    occurrence,
+    edits,
+    contextLines,
+    deriveProposalFromSource: true,
+    proposalQuery,
+    selectTargetFromSource: true,
+    targetSelectionQuery: targetSelectionQuery ?? proposalQuery,
+    targetSelectionScope,
+    confirm,
+  });
+  const sourceAuthoredEdit = {
+    registry: "openclaw-source-authored-edit-v0",
+    mode: "approval-gated-source-authored-edit-task",
+    sourceRegistry: result.proposal?.source ?? "openclaw-source-derived-edit-proposal-v0",
+    proposalRegistry: result.proposal?.registry ?? "openclaw-native-workspace-edit-proposal-v0",
+    rationaleBundleRegistry: result.proposal?.rationaleBundle?.registry ?? "openclaw-rationale-check-bundle-v0",
+    checkBundleRegistry: result.proposal?.checkBundle?.registry ?? "openclaw-rationale-check-bundle-v0",
+    riskRegistry: result.proposal?.riskNotes?.registry ?? "openclaw-rationale-check-bundle-v0",
+    targetSelectionRegistry: result.targetSelection?.registry ?? "openclaw-native-workspace-edit-target-selection-v0",
+    promptSemanticsRegistry: result.proposal?.semanticPlan?.registry ?? "openclaw-native-prompt-semantics-v0",
+    entrypoint: "/plugins/native-adapter/source-authored-edit-tasks",
+    query: truncatePatchMetadata(proposalQuery, 120),
+    contentExposed: false,
+  };
+
+  return {
+    ...result,
+    registry: "openclaw-source-authored-edit-task-v0",
+    mode: "approval-gated-source-authored-edit-task",
+    sourceRegistry: result.registry,
+    sourceAuthoredEdit,
+    governance: {
+      ...(result.governance ?? {}),
+      mode: "openclaw_source_authored_edit_task",
+      runtimeOwner: "openclaw_on_nixos",
+      derivesFromEnhancedOpenClawSignals: true,
+      canExecuteLegacyOpenClawCode: false,
+      canImportLegacyOpenClawModules: false,
+      canMutateWithoutApproval: false,
+      usesWorkspacePatchApplyAdapter: true,
+      exposesPromptContent: false,
+      exposesSourceFileContent: false,
+    },
+  };
+}
+
 function buildNativePluginCapabilityInvokePlan({ packagePath = null, capabilityId = "act.plugin.capability.invoke" } = {}) {
   const manifestProfile = buildNativePluginManifestProfile({ packagePath });
   const nativeRegistry = createOpenClawNativePluginRegistry();
@@ -9642,6 +9764,79 @@ const server = http.createServer(async (req, res) => {
         mode: result.mode,
         generatedAt: result.generatedAt,
         sourceRegistry: result.sourceRegistry,
+        capability: result.capability,
+        workspace: result.workspace,
+        target: result.target,
+        validation: result.validation,
+        proposal: result.proposal,
+        proposalSourceSignals: result.proposalSourceSignals,
+        targetSelection: result.targetSelection,
+        edits: result.edits,
+        diffPreview: result.diffPreview,
+        task: serialiseTask(result.task),
+        approval: serialiseApproval(result.approval),
+        governance: result.governance,
+        summary: buildTaskSummary(),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/plugins/native-adapter/source-authored-edit/draft") {
+    try {
+      const editsParam = requestUrl.searchParams.get("edits");
+      const edits = editsParam ? JSON.parse(editsParam) : null;
+      const draft = buildOpenClawSourceAuthoredEditDraft({
+        workspacePath: requestUrl.searchParams.get("workspacePath"),
+        search: requestUrl.searchParams.get("search") ?? "before",
+        replacement: requestUrl.searchParams.get("replacement") ?? "after",
+        occurrence: Number.parseInt(requestUrl.searchParams.get("occurrence") ?? "1", 10),
+        edits,
+        contextLines: Number.parseInt(requestUrl.searchParams.get("contextLines") ?? "0", 10),
+        proposalQuery: requestUrl.searchParams.get("proposalQuery") ?? "edit",
+        targetSelectionQuery: requestUrl.searchParams.get("targetSelectionQuery") ?? requestUrl.searchParams.get("proposalQuery") ?? "edit",
+        targetSelectionScope: requestUrl.searchParams.get("targetSelectionScope") ?? "tools",
+      });
+      sendJson(res, 200, {
+        ok: true,
+        ...draft,
+        draft: {
+          ...draft.draft,
+          plan: serialisePlanForPublic(draft.draft.plan),
+        },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/plugins/native-adapter/source-authored-edit-tasks") {
+    try {
+      const body = await readJsonBody(req);
+      const result = await createOpenClawSourceAuthoredEditTask({
+        workspacePath: typeof body.workspacePath === "string" ? body.workspacePath : null,
+        search: typeof body.search === "string" ? body.search : "",
+        replacement: typeof body.replacement === "string" ? body.replacement : "",
+        occurrence: Number.isInteger(body.occurrence) ? body.occurrence : 1,
+        edits: Array.isArray(body.edits) ? body.edits : null,
+        contextLines: Number.isInteger(body.contextLines) ? body.contextLines : 0,
+        proposalQuery: typeof body.proposalQuery === "string" ? body.proposalQuery : "edit",
+        targetSelectionQuery: typeof body.targetSelectionQuery === "string" ? body.targetSelectionQuery : typeof body.proposalQuery === "string" ? body.proposalQuery : "edit",
+        targetSelectionScope: typeof body.targetSelectionScope === "string" ? body.targetSelectionScope : "tools",
+        confirm: body.confirm === true,
+      });
+      sendJson(res, 201, {
+        ok: true,
+        registry: result.registry,
+        mode: result.mode,
+        generatedAt: result.generatedAt,
+        sourceRegistry: result.sourceRegistry,
+        sourceAuthoredEdit: result.sourceAuthoredEdit,
         capability: result.capability,
         workspace: result.workspace,
         target: result.target,
