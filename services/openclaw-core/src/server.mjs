@@ -2402,19 +2402,21 @@ function buildOpenClawNativePluginAdapterStatus() {
       "sense.openclaw.workspace_semantic_index",
       "sense.openclaw.workspace_symbol_lookup",
       "sense.openclaw.workspace_edit_target_select",
+      "sense.openclaw.prompt_pack",
       "act.openclaw.workspace_text_write",
       "act.openclaw.workspace_patch_apply",
       "plan.plugin.runtime_preflight",
     ],
     pendingCapabilities: ["act.plugin.capability.invoke"],
     summary: {
-      implemented: 8,
+      implemented: 9,
       pending: 1,
       canReadManifestMetadata: true,
       canReadToolCatalogMetadata: true,
       canReadWorkspaceSemanticMetadata: true,
       canExecuteWorkspaceSymbolLookup: true,
       canSelectWorkspaceEditTargets: true,
+      canReadPromptSemantics: true,
       canCreateApprovalGatedWorkspaceTextWriteTasks: true,
       canCreateApprovalGatedWorkspacePatchTasks: true,
       canReadSourceFileContent: false,
@@ -2670,6 +2672,311 @@ function semanticIndexKindForRelativePath(relativePath) {
     return "manifest_or_schema";
   }
   return "other";
+}
+
+const PROMPT_SEMANTICS_ROOTS = [
+  { relativeRoot: "", files: ["TOOLS.md", "AGENTS.md", "CLAUDE.md"] },
+  { relativeRoot: "docs/tools", maxDepth: 1 },
+  { relativeRoot: "skills", maxDepth: 2 },
+  { relativeRoot: ".agents", maxDepth: 2 },
+  { relativeRoot: "ui", files: ["AGENTS.md", "CLAUDE.md"] },
+  { relativeRoot: "src/wizard", maxDepth: 1 },
+];
+
+const PROMPT_SEMANTIC_TERMS = [
+  "edit",
+  "patch",
+  "diff",
+  "verify",
+  "test",
+  "typecheck",
+  "lint",
+  "approval",
+  "plan",
+  "tool",
+  "skill",
+  "agent",
+  "prompt",
+  "safety",
+];
+
+function promptSemanticKindForRelativePath(relativePath) {
+  const extension = path.extname(relativePath);
+  if ([".md", ".mdx"].includes(extension)) {
+    return "prompt_documentation";
+  }
+  if ([".ts", ".tsx", ".js", ".mjs", ".cjs"].includes(extension)) {
+    return "prompt_source";
+  }
+  if (extension === ".json") {
+    return "prompt_manifest";
+  }
+  return "other";
+}
+
+function buildExpectedChecksFromPromptTerms(termCounts, scripts = []) {
+  const checks = new Set(["diff-preview", "approval-required", "filesystem-ledger"]);
+  const scriptSet = new Set(scripts);
+  if ((termCounts.typecheck ?? 0) > 0 || scriptSet.has("typecheck")) {
+    checks.add("typecheck");
+  }
+  if ((termCounts.test ?? 0) > 0 || scriptSet.has("test")) {
+    checks.add("test");
+  }
+  if ((termCounts.lint ?? 0) > 0 || scriptSet.has("lint")) {
+    checks.add("lint");
+  }
+  if ((termCounts.verify ?? 0) > 0) {
+    checks.add("verify");
+  }
+  if ((termCounts.patch ?? 0) > 0 || (termCounts.diff ?? 0) > 0) {
+    checks.add("patch-validation");
+  }
+  return [...checks];
+}
+
+function analysePromptSemanticFile(rootPath, absolutePath, relativePath) {
+  const stats = safeStat(absolutePath);
+  const kind = promptSemanticKindForRelativePath(relativePath);
+  const base = {
+    relativePath,
+    kind,
+    category: classifyToolCatalogEntry(relativePath),
+    sizeBytes: stats?.size ?? null,
+    contentRead: false,
+    contentExposed: false,
+  };
+  if (!stats?.isFile() || stats.size > 64 * 1024 || kind === "other") {
+    return {
+      ...base,
+      skipped: true,
+      skipReason: stats?.size > 64 * 1024 ? "file_too_large" : "not_readable_or_supported",
+    };
+  }
+
+  let text = "";
+  try {
+    text = readFileSync(absolutePath, "utf8");
+  } catch {
+    return {
+      ...base,
+      skipped: true,
+      skipReason: "read_failed",
+    };
+  }
+
+  const lower = text.toLowerCase();
+  const lines = text.split(/\r?\n/);
+  const termCounts = Object.fromEntries(PROMPT_SEMANTIC_TERMS.map((term) => [
+    term,
+    (lower.match(new RegExp(`\\b${term}\\b`, "g")) ?? []).length,
+  ]));
+  return {
+    ...base,
+    contentRead: true,
+    skipped: false,
+    lineCount: lines.length,
+    nonEmptyLineCount: lines.filter((line) => line.trim()).length,
+    signals: {
+      headings: kind === "prompt_documentation" ? text.match(/^#{1,6}\s+/gm)?.length ?? 0 : 0,
+      fencedCodeBlocks: kind === "prompt_documentation" ? text.match(/```/g)?.length ?? 0 : 0,
+      exportedSymbols: kind === "prompt_source" ? text.match(/\bexport\b/g)?.length ?? 0 : 0,
+      semanticTermCounts: termCounts,
+      hasEditVocabulary: (termCounts.edit ?? 0) > 0 || (termCounts.patch ?? 0) > 0 || (termCounts.diff ?? 0) > 0,
+      hasVerificationVocabulary: (termCounts.verify ?? 0) > 0 || (termCounts.test ?? 0) > 0 || (termCounts.typecheck ?? 0) > 0 || (termCounts.lint ?? 0) > 0,
+      hasGovernanceVocabulary: (termCounts.approval ?? 0) > 0 || (termCounts.safety ?? 0) > 0,
+    },
+  };
+}
+
+function collectPromptSemanticFiles(rootPath, { query = null, maxFiles = 80 } = {}) {
+  const safeQuery = typeof query === "string" && query.trim() ? query.trim().toLowerCase() : null;
+  const files = [];
+
+  function maybeAddFile(relativePath) {
+    if (files.length >= maxFiles) {
+      return;
+    }
+    const absolutePath = path.join(rootPath, relativePath);
+    const stats = safeStat(absolutePath);
+    if (!stats?.isFile()) {
+      return;
+    }
+    if (safeQuery && !relativePath.toLowerCase().includes(safeQuery)) {
+      try {
+        const text = readFileSync(absolutePath, "utf8").slice(0, 64 * 1024).toLowerCase();
+        if (!text.includes(safeQuery)) {
+          return;
+        }
+      } catch {
+        return;
+      }
+    }
+    files.push(analysePromptSemanticFile(rootPath, absolutePath, relativePath.replaceAll(path.sep, "/")));
+  }
+
+  function visit(relativeRoot, depth, maxDepth) {
+    if (files.length >= maxFiles || depth > maxDepth) {
+      return;
+    }
+    const absoluteRoot = path.join(rootPath, relativeRoot);
+    let entries = [];
+    try {
+      entries = readdirSync(absoluteRoot, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
+      if (files.length >= maxFiles) {
+        return;
+      }
+      const relativePath = path.join(relativeRoot, entry.name);
+      if (entry.isDirectory()) {
+        if (!TOOL_CATALOG_IGNORED_DIRECTORIES.has(entry.name)) {
+          visit(relativePath, depth + 1, maxDepth);
+        }
+        continue;
+      }
+      if (!entry.isFile() || promptSemanticKindForRelativePath(relativePath) === "other") {
+        continue;
+      }
+      maybeAddFile(relativePath);
+    }
+  }
+
+  for (const root of PROMPT_SEMANTICS_ROOTS) {
+    for (const file of root.files ?? []) {
+      maybeAddFile(path.join(root.relativeRoot, file));
+    }
+    if (root.maxDepth !== undefined) {
+      visit(root.relativeRoot, 0, root.maxDepth);
+    }
+  }
+  return files;
+}
+
+function buildNativeOpenClawPromptSemanticsProfile({
+  workspacePath = null,
+  query = "edit",
+  limit = 40,
+} = {}) {
+  const { item } = selectOpenClawToolCatalogWorkspace({ workspacePath });
+  const safeLimit = normalisePositiveLimit(limit, 40, 100);
+  const files = collectPromptSemanticFiles(item.path, { query, maxFiles: safeLimit });
+  const scripts = Array.isArray(item.scripts) ? item.scripts : [];
+  const termCounts = Object.fromEntries(PROMPT_SEMANTIC_TERMS.map((term) => [term, 0]));
+  const totals = files.reduce((accumulator, file) => {
+    accumulator.totalFiles += 1;
+    if (file.contentRead) {
+      accumulator.contentRead += 1;
+      accumulator.lineCount += file.lineCount ?? 0;
+      accumulator.editVocabularyFiles += file.signals?.hasEditVocabulary ? 1 : 0;
+      accumulator.verificationVocabularyFiles += file.signals?.hasVerificationVocabulary ? 1 : 0;
+      accumulator.governanceVocabularyFiles += file.signals?.hasGovernanceVocabulary ? 1 : 0;
+      for (const [term, count] of Object.entries(file.signals?.semanticTermCounts ?? {})) {
+        termCounts[term] = (termCounts[term] ?? 0) + count;
+      }
+    } else {
+      accumulator.skipped += 1;
+    }
+    accumulator.byKind[file.kind] = (accumulator.byKind[file.kind] ?? 0) + 1;
+    accumulator.byCategory[file.category] = (accumulator.byCategory[file.category] ?? 0) + 1;
+    return accumulator;
+  }, {
+    totalFiles: 0,
+    contentRead: 0,
+    skipped: 0,
+    lineCount: 0,
+    editVocabularyFiles: 0,
+    verificationVocabularyFiles: 0,
+    governanceVocabularyFiles: 0,
+    byKind: {},
+    byCategory: {},
+  });
+  const expectedChecks = buildExpectedChecksFromPromptTerms(termCounts, scripts);
+  const nativeRegistry = createOpenClawNativePluginRegistry();
+  const capability = nativeRegistry.items[0]?.contract?.capabilities
+    ?.find((entry) => entry.id === "sense.openclaw.prompt_pack") ?? null;
+
+  return {
+    ok: files.length > 0,
+    registry: "openclaw-native-prompt-semantics-v0",
+    mode: "prompt-tool-semantics-profile-only",
+    generatedAt: new Date().toISOString(),
+    sourceRegistry: "openclaw-source-workspace-v0",
+    adapterStatus: "native_shell_active_prompt_semantics_only",
+    capability: {
+      id: capability?.id ?? "sense.openclaw.prompt_pack",
+      kind: capability?.kind ?? "sense",
+      risk: capability?.risk ?? "low",
+      approvalRequired: capability?.approval?.required ?? false,
+      runtimeOwner: capability?.runtimeOwner ?? "openclaw_on_nixos",
+    },
+    workspace: {
+      id: item.id,
+      name: item.name,
+      path: item.path,
+    },
+    query: {
+      text: typeof query === "string" && query.trim() ? query.trim() : "edit",
+      limit: safeLimit,
+    },
+    files: files.map((file) => ({
+      relativePath: file.relativePath,
+      kind: file.kind,
+      category: file.category,
+      sizeBytes: file.sizeBytes,
+      contentRead: file.contentRead,
+      contentExposed: false,
+      skipped: file.skipped,
+      skipReason: file.skipReason,
+      lineCount: file.lineCount,
+      signals: file.signals,
+    })),
+    derivedPlanSemantics: {
+      editIntent: {
+        kind: "source_derived_workspace_edit",
+        planningStyle: termCounts.plan > 0 ? "plan_first" : "direct_patch_review",
+        targetSafety: termCounts.approval > 0 || termCounts.safety > 0 ? "approval_gated" : "native_policy_gated",
+        verificationStyle: expectedChecks.filter((check) => ["typecheck", "test", "lint", "verify"].includes(check)),
+      },
+      expectedChecks,
+      promptTermCounts: termCounts,
+      contentExposed: false,
+    },
+    summary: {
+      ...totals,
+      expectedChecks,
+      promptTermCounts: termCounts,
+      canReadPromptContent: true,
+      exposesPromptContent: false,
+      canImportModule: false,
+      canExecutePromptCode: false,
+      canExecuteToolCode: false,
+      canMutate: false,
+      createsTask: false,
+      createsApproval: false,
+    },
+    governance: {
+      mode: "native_prompt_semantics_read_only",
+      runtimeOwner: "openclaw_on_nixos",
+      canReadMetadata: true,
+      canReadPromptContent: true,
+      exposesPromptContent: false,
+      exposesSourceFileContent: false,
+      exposesFunctionBodies: false,
+      canMutate: false,
+      canExecute: false,
+      canImportModule: false,
+      canExecutePromptCode: false,
+      canExecuteToolCode: false,
+      canActivateRuntime: false,
+      createsTask: false,
+      createsApproval: false,
+      requiresPolicyInvocation: true,
+      outputMode: "derived_prompt_semantics_only",
+    },
+  };
 }
 
 function analyseSemanticIndexFile(rootPath, absolutePath, relativePath) {
@@ -3907,6 +4214,14 @@ function truncatePatchMetadata(value, maxLength = 240) {
   return text.length > maxLength ? `${text.slice(0, maxLength - 3)}...` : text;
 }
 
+function normalisePatchMetadataList(value, { fallback = [], maxItems = 8, maxLength = 80 } = {}) {
+  const items = Array.isArray(value) ? value : fallback;
+  return items
+    .filter((item) => typeof item === "string" && item.trim())
+    .map((item) => truncatePatchMetadata(item.trim(), maxLength))
+    .slice(0, maxItems);
+}
+
 function buildWorkspacePatchProposalEnvelope({
   proposal = null,
   target,
@@ -3921,6 +4236,8 @@ function buildWorkspacePatchProposalEnvelope({
   const targetContext = raw.targetContext && typeof raw.targetContext === "object" ? raw.targetContext : {};
   const symbol = truncatePatchMetadata(targetContext.symbol ?? raw.symbol ?? "", 120);
   const fileRole = truncatePatchMetadata(targetContext.fileRole ?? raw.fileRole ?? "", 160);
+  const rawEditIntent = raw.editIntent && typeof raw.editIntent === "object" ? raw.editIntent : null;
+  const rawSemanticPlan = raw.semanticPlan && typeof raw.semanticPlan === "object" ? raw.semanticPlan : null;
 
   return {
     id: typeof raw.id === "string" && raw.id ? truncatePatchMetadata(raw.id, 96) : randomUUID(),
@@ -3935,6 +4252,26 @@ function buildWorkspacePatchProposalEnvelope({
       symbol: symbol || null,
       fileRole: fileRole || null,
     },
+    editIntent: rawEditIntent ? {
+      kind: truncatePatchMetadata(rawEditIntent.kind ?? "workspace_edit", 80),
+      objective: truncatePatchMetadata(rawEditIntent.objective ?? "", 180),
+      planningStyle: truncatePatchMetadata(rawEditIntent.planningStyle ?? "", 80) || null,
+      targetSafety: truncatePatchMetadata(rawEditIntent.targetSafety ?? "", 80) || null,
+      verificationStyle: normalisePatchMetadataList(rawEditIntent.verificationStyle, { maxItems: 6, maxLength: 64 }),
+      contentExposed: false,
+    } : null,
+    expectedChecks: normalisePatchMetadataList(raw.expectedChecks, {
+      fallback: ["diff-preview", "approval-required", "filesystem-ledger"],
+      maxItems: 8,
+      maxLength: 64,
+    }),
+    semanticPlan: rawSemanticPlan ? {
+      registry: truncatePatchMetadata(rawSemanticPlan.registry ?? "unknown", 120),
+      mode: truncatePatchMetadata(rawSemanticPlan.mode ?? "unknown", 120),
+      promptFiles: Number.isFinite(rawSemanticPlan.promptFiles) ? rawSemanticPlan.promptFiles : 0,
+      expectedChecks: normalisePatchMetadataList(rawSemanticPlan.expectedChecks, { maxItems: 8, maxLength: 64 }),
+      contentExposed: false,
+    } : null,
     dryRun: {
       ok: true,
       editCount: safeEdits.length,
@@ -3978,10 +4315,28 @@ function buildOpenClawSourceDerivedPatchProposal({
   const primaryTool = catalogProfile.tools?.[0] ?? null;
   const primarySemanticFile = semanticIndex.files?.[0] ?? null;
   const categories = [...new Set((catalogProfile.tools ?? []).map((tool) => tool.category).filter(Boolean))];
+  let promptSemantics = null;
+  try {
+    promptSemantics = buildNativeOpenClawPromptSemanticsProfile({
+      workspacePath,
+      query,
+      limit: 12,
+    });
+  } catch {
+    promptSemantics = null;
+  }
+  const promptExpectedChecks = promptSemantics?.derivedPlanSemantics?.expectedChecks ?? [];
+  const expectedChecks = normalisePatchMetadataList([
+    ...promptExpectedChecks,
+    "patch-validation",
+    "diff-preview",
+    "approval-required",
+    "filesystem-ledger",
+  ]);
   const sourceSignals = {
     registry: "openclaw-source-derived-edit-proposal-v0",
     mode: "read-only-source-signal-derivation",
-    sourceRegistries: [catalogProfile.registry, semanticIndex.registry],
+    sourceRegistries: [catalogProfile.registry, semanticIndex.registry, promptSemantics?.registry].filter(Boolean),
     query,
     toolSignals: {
       matchedTools: catalogProfile.summary?.matchedTools ?? 0,
@@ -4004,10 +4359,21 @@ function buildOpenClawSourceDerivedPatchProposal({
         contentExposed: false,
       } : null,
     },
+    promptSignals: promptSemantics ? {
+      registry: promptSemantics.registry,
+      matchedFiles: promptSemantics.summary?.totalFiles ?? 0,
+      editVocabularyFiles: promptSemantics.summary?.editVocabularyFiles ?? 0,
+      verificationVocabularyFiles: promptSemantics.summary?.verificationVocabularyFiles ?? 0,
+      governanceVocabularyFiles: promptSemantics.summary?.governanceVocabularyFiles ?? 0,
+      expectedChecks,
+      contentExposed: false,
+    } : null,
     governance: {
       canReadMetadata: true,
       canReadSourceFileContent: true,
+      canReadPromptContent: true,
       exposesSourceFileContent: false,
+      exposesPromptContent: false,
       canExecuteToolCode: false,
       canImportModule: false,
       canMutate: false,
@@ -4019,13 +4385,27 @@ function buildOpenClawSourceDerivedPatchProposal({
     title: `Source-derived OpenClaw edit proposal for ${relativePath}`,
     rationale: [
       `Derived from enhanced OpenClaw read-only tool catalog and semantic index signals for query "${query}".`,
-      `Matched ${sourceSignals.toolSignals.matchedTools} tool metadata entries and ${sourceSignals.semanticSignals.matchedFiles} semantic files without importing or executing source modules.`,
+      `Matched ${sourceSignals.toolSignals.matchedTools} tool metadata entries, ${sourceSignals.semanticSignals.matchedFiles} semantic files, and ${sourceSignals.promptSignals?.matchedFiles ?? 0} prompt semantic files without importing or executing source modules.`,
     ].join(" "),
     source: sourceSignals.registry,
     targetContext: {
       symbol: primarySemanticFile?.signals?.exports?.[0] ?? primaryTool?.fileName ?? "openclaw-source-signal",
       fileRole: categories[0] ? `openclaw ${categories[0]} source signal` : "openclaw source signal",
     },
+    editIntent: {
+      kind: "source_derived_workspace_edit",
+      objective: `Patch ${relativePath} using enhanced OpenClaw prompt/tool semantics for "${query}".`,
+      planningStyle: promptSemantics?.derivedPlanSemantics?.editIntent?.planningStyle ?? "direct_patch_review",
+      targetSafety: promptSemantics?.derivedPlanSemantics?.editIntent?.targetSafety ?? "approval_gated",
+      verificationStyle: promptSemantics?.derivedPlanSemantics?.editIntent?.verificationStyle ?? [],
+    },
+    expectedChecks,
+    semanticPlan: promptSemantics ? {
+      registry: promptSemantics.registry,
+      mode: promptSemantics.mode,
+      promptFiles: promptSemantics.summary?.totalFiles ?? 0,
+      expectedChecks,
+    } : null,
     sourceSignals,
   };
 }
@@ -6192,6 +6572,14 @@ async function callCapabilityBackend(capability, request) {
     return buildNativeOpenClawWorkspaceEditTargetSelection({
       workspacePath: request.params.workspacePath,
       scope: request.params.scope,
+      query: request.params.query ?? request.params.q,
+      limit: request.params.limit,
+    });
+  }
+
+  if (capability.id === "sense.openclaw.prompt_pack") {
+    return buildNativeOpenClawPromptSemanticsProfile({
+      workspacePath: request.params.workspacePath,
       query: request.params.query ?? request.params.q,
       limit: request.params.limit,
     });
@@ -8907,6 +9295,20 @@ const server = http.createServer(async (req, res) => {
       sendJson(res, 200, buildNativeOpenClawWorkspaceEditTargetSelection({
         workspacePath: requestUrl.searchParams.get("workspacePath"),
         scope: requestUrl.searchParams.get("scope") ?? "tools",
+        query: requestUrl.searchParams.get("query") ?? requestUrl.searchParams.get("q") ?? "edit",
+        limit: requestUrl.searchParams.get("limit"),
+      }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 404, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/plugins/native-adapter/prompt-semantics") {
+    try {
+      sendJson(res, 200, buildNativeOpenClawPromptSemanticsProfile({
+        workspacePath: requestUrl.searchParams.get("workspacePath"),
         query: requestUrl.searchParams.get("query") ?? requestUrl.searchParams.get("q") ?? "edit",
         limit: requestUrl.searchParams.get("limit"),
       }));

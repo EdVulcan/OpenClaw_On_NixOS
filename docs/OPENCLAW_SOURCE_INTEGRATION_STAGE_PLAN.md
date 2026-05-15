@@ -1,6 +1,6 @@
 # OpenClaw Source Integration Stage Plan
 
-更新时间：2026-05-15 11:03 +08:00
+更新时间：2026-05-15 11:26 +08:00
 
 本文档用于跟踪当前阶段：把旁路 `openclaw` 增强源码项目中的能力，受控接入 `OpenClawOnNixOS`。后续每推进一个接入切片，都必须同步更新本文件，避免路线漂移、重复准备层、或忘记阶段边界。
 
@@ -856,3 +856,45 @@ OPENCLAW_MILESTONE_CHECKS=openclaw-workspace-edit-target-selection,observer-open
 Next intended slice after this passes:
 - Use target-selected source-derived proposals as the entry point for absorbing prompt/tool semantics into concrete edit plans.
 - Keep shell/process/web gateway execution deferred until code-edit target safety is stable.
+
+## 22. 2026-05-15 Step 5 Update: Prompt Semantics Edit Plan
+
+Status: implemented_waiting_check.
+
+Slice: `sense.openclaw.prompt_pack` plus `act.openclaw.workspace_patch_apply` semantic plan enrichment.
+
+Purpose: absorb enhanced `openclaw` prompt/tool semantics into concrete edit plans. This turns prompt/tool surfaces into redacted `editIntent`, `expectedChecks`, and `semanticPlan` metadata on source-derived patch proposals, while keeping prompt bodies, source bodies, old module imports, and old tool execution blocked.
+
+Implemented artifacts:
+- Prompt semantics registry: `openclaw-native-prompt-semantics-v0`.
+- Core endpoint: `GET /plugins/native-adapter/prompt-semantics`.
+- Source-derived proposal enrichment: `editIntent`, `expectedChecks`, `semanticPlan`.
+- Proposal source signals now include redacted prompt semantic signals.
+- Observer panel: `OpenClaw Prompt Semantics`.
+- Observer patch panel shows `Edit Intent` and `Expected Checks`.
+- Targeted checks: `openclaw-prompt-semantics-edit-plan`, `observer-openclaw-prompt-semantics-edit-plan`.
+
+Governance boundaries:
+- Does not import or execute old `openclaw` modules.
+- Does not expose prompt bodies, source file bodies, or function bodies.
+- Reads bounded prompt/tool files only to derive counts, vocabulary flags, and check names.
+- Does not create a task or approval by itself.
+- Mutation remains only through `act.openclaw.workspace_patch_apply` with explicit approval.
+- Approved patch tasks still execute through `act.filesystem.write_text`.
+
+Local verification target:
+- `npm run typecheck`.
+- `git diff --check`.
+- Targeted milestone checks on NixOS.
+
+NixOS targeted milestone command:
+
+```bash
+cd /home/edvulcan/OpenClaw_On_NixOS && \
+git pull origin main && \
+OPENCLAW_MILESTONE_CHECKS=openclaw-prompt-semantics-edit-plan,observer-openclaw-prompt-semantics-edit-plan npm run dev:milestone-check:unix
+```
+
+Next intended slice after this passes:
+- Use prompt/tool semantics plus target selection to produce richer structured edit proposals with named rationale/check bundles.
+- Keep shell/process/web gateway execution deferred until prompt-derived edit planning is stable.

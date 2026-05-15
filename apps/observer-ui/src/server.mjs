@@ -531,6 +531,15 @@ function observerHtml() {
           <pre id="edit-target-selection-json">Loading native workspace edit target selection...</pre>
         </section>
         <section class="panel">
+          <h2>OpenClaw Prompt Semantics</h2>
+          <div class="metric"><span>Registry</span><span id="prompt-semantics-registry">openclaw-native-prompt-semantics-v0</span></div>
+          <div class="metric"><span>Files</span><span id="prompt-semantics-files">0</span></div>
+          <div class="metric"><span>Checks</span><span id="prompt-semantics-checks">0</span></div>
+          <div class="metric"><span>Content</span><span id="prompt-semantics-content">hidden</span></div>
+          <div class="metric"><span>Mode</span><span id="prompt-semantics-mode">prompt-tool-semantics-profile-only</span></div>
+          <pre id="prompt-semantics-json">Loading native prompt semantics...</pre>
+        </section>
+        <section class="panel">
           <h2>OpenClaw Workspace Text Write</h2>
           <div class="metric"><span>Registry</span><span id="workspace-text-write-registry">openclaw-native-workspace-text-write-draft-v0</span></div>
           <div class="metric"><span>Capability</span><span id="workspace-text-write-capability">act.openclaw.workspace_text_write</span></div>
@@ -966,6 +975,12 @@ const editTargetSelectionSelected = document.querySelector("#edit-target-selecti
 const editTargetSelectionSource = document.querySelector("#edit-target-selection-source");
 const editTargetSelectionMode = document.querySelector("#edit-target-selection-mode");
 const editTargetSelectionJson = document.querySelector("#edit-target-selection-json");
+const promptSemanticsRegistry = document.querySelector("#prompt-semantics-registry");
+const promptSemanticsFiles = document.querySelector("#prompt-semantics-files");
+const promptSemanticsChecks = document.querySelector("#prompt-semantics-checks");
+const promptSemanticsContent = document.querySelector("#prompt-semantics-content");
+const promptSemanticsMode = document.querySelector("#prompt-semantics-mode");
+const promptSemanticsJson = document.querySelector("#prompt-semantics-json");
 const workspaceTextWriteRegistry = document.querySelector("#workspace-text-write-registry");
 const workspaceTextWriteCapability = document.querySelector("#workspace-text-write-capability");
 const workspaceTextWriteApproval = document.querySelector("#workspace-text-write-approval");
@@ -1808,6 +1823,36 @@ function renderEditTargetSelection(data) {
   ].join("\\n");
 }
 
+function renderPromptSemantics(data) {
+  const summary = data?.summary ?? {};
+  const governance = data?.governance ?? {};
+  const files = Array.isArray(data?.files) ? data.files : [];
+  const expectedChecks = data?.derivedPlanSemantics?.expectedChecks ?? summary.expectedChecks ?? [];
+  const editIntent = data?.derivedPlanSemantics?.editIntent ?? {};
+  promptSemanticsRegistry.textContent = data?.registry ?? "openclaw-native-prompt-semantics-v0";
+  promptSemanticsFiles.textContent = String(summary.totalFiles ?? files.length);
+  promptSemanticsChecks.textContent = String(expectedChecks.length);
+  promptSemanticsContent.textContent = governance.exposesPromptContent ? "exposed" : "hidden";
+  promptSemanticsMode.textContent = data?.mode ?? "prompt-tool-semantics-profile-only";
+
+  promptSemanticsJson.textContent = [
+    "Native prompt/tool semantics profile: derives edit intent and expected checks from enhanced OpenClaw prompt/tool surfaces.",
+    "Prompt and source bodies remain hidden; no legacy modules are imported, no prompt code is executed, and no mutation/task is created.",
+    \`Registry: \${data?.registry ?? "openclaw-native-prompt-semantics-v0"}\`,
+    \`Mode: \${data?.mode ?? "prompt-tool-semantics-profile-only"}\`,
+    \`Capability: \${data?.capability?.id ?? "sense.openclaw.prompt_pack"} risk=\${data?.capability?.risk ?? "low"} approval=\${Boolean(data?.capability?.approvalRequired)} owner=\${data?.capability?.runtimeOwner ?? "unknown"}\`,
+    \`Intent: kind=\${editIntent.kind ?? "source_derived_workspace_edit"} planning=\${editIntent.planningStyle ?? "unknown"} safety=\${editIntent.targetSafety ?? "unknown"} verification=\${(editIntent.verificationStyle ?? []).join(",") || "none"}\`,
+    \`Expected Checks: \${expectedChecks.join(",") || "none"}\`,
+    \`Counts: files=\${summary.totalFiles ?? files.length} read=\${summary.contentRead ?? 0} editFiles=\${summary.editVocabularyFiles ?? 0} verificationFiles=\${summary.verificationVocabularyFiles ?? 0} governanceFiles=\${summary.governanceVocabularyFiles ?? 0}\`,
+    \`Governance: readPrompt=\${Boolean(governance.canReadPromptContent)} exposePrompt=\${Boolean(governance.exposesPromptContent)} exposeSource=\${Boolean(governance.exposesSourceFileContent)} importModule=\${Boolean(governance.canImportModule)} executePrompt=\${Boolean(governance.canExecutePromptCode)} executeTool=\${Boolean(governance.canExecuteToolCode)} mutate=\${Boolean(governance.canMutate)} task=\${Boolean(governance.createsTask)} approval=\${Boolean(governance.createsApproval)}\`,
+    "",
+    ...files.slice(0, 12).map((file) => {
+      const signals = file.signals ?? {};
+      return \`\${file.relativePath ?? "unknown"} kind=\${file.kind ?? "unknown"} read=\${Boolean(file.contentRead)} exposed=\${Boolean(file.contentExposed)} edit=\${Boolean(signals.hasEditVocabulary)} verify=\${Boolean(signals.hasVerificationVocabulary)} governance=\${Boolean(signals.hasGovernanceVocabulary)}\`;
+    }),
+  ].join("\\n");
+}
+
 function renderWorkspaceTextWriteDraft(data) {
   const target = data?.target ?? {};
   const governance = data?.draft?.governance ?? data?.governance ?? {};
@@ -1836,6 +1881,9 @@ function renderWorkspacePatchApplyDraft(data) {
   const proposal = data?.proposal ?? {};
   const proposalSourceSignals = data?.proposalSourceSignals ?? null;
   const targetSelection = data?.targetSelection ?? null;
+  const editIntent = proposal.editIntent ?? {};
+  const expectedChecks = Array.isArray(proposal.expectedChecks) ? proposal.expectedChecks : [];
+  const semanticPlan = proposal.semanticPlan ?? null;
   const structuredValidationEngine = validation.structuredPatch?.engine ?? "openclaw-native-workspace-patch-validation-v0";
   const previewValidationEngine = validation.preview?.engine ?? "openclaw-native-workspace-patch-preview-validation-v0";
   const diffPreview = data?.diffPreview ?? {};
@@ -1856,6 +1904,8 @@ function renderWorkspacePatchApplyDraft(data) {
     \`Target: \${target.relativePath ?? "scratch/observer-native-edit.txt"} edits=\${target.editCount ?? 1} changedAt=\${(target.changedAtLines ?? [target.changedAtLine]).filter(Boolean).join(",") || "unknown"} oldBytes=\${target.originalBytes ?? 0} newBytes=\${target.nextBytes ?? 0} oldSha256=\${target.originalSha256 ?? "unknown"} newSha256=\${target.nextSha256 ?? "unknown"} contentExposed=\${Boolean(target.contentExposed)} diffPreview=\${Boolean(target.diffPreviewExposed)}\`,
     \`Target Selection: registry=\${targetSelection?.registry ?? "none"} selected=\${targetSelection?.selectedTarget?.relativePath ?? "none"} candidates=\${targetSelection?.summary?.candidateCount ?? 0} canFeedPatch=\${Boolean(targetSelection?.summary?.canFeedPatchProposal)} exposesSource=\${Boolean(targetSelection?.governance?.exposesSourceFileContent)}\`,
     \`Proposal Envelope: registry=\${proposal.registry ?? "openclaw-native-workspace-edit-proposal-v0"} title=\${proposal.title ?? "unknown"} dryRun=\${Boolean(proposal.dryRun?.ok)} contentExposed=\${Boolean(proposal.dryRun?.contentExposed)} rationale=\${proposal.rationale ?? "unknown"}\`,
+    \`Edit Intent: kind=\${editIntent.kind ?? "none"} objective=\${editIntent.objective ?? "none"} planning=\${editIntent.planningStyle ?? "none"} safety=\${editIntent.targetSafety ?? "none"}\`,
+    \`Expected Checks: \${expectedChecks.join(",") || "none"} semanticPlan=\${semanticPlan?.registry ?? "none"} promptFiles=\${semanticPlan?.promptFiles ?? 0} contentExposed=\${Boolean(semanticPlan?.contentExposed)}\`,
     \`Proposal Source Signals: registry=\${proposalSourceSignals?.registry ?? "none"} knownRegistry=\${SOURCE_DERIVED_EDIT_PROPOSAL_REGISTRY} matchedTools=\${proposalSourceSignals?.toolSignals?.matchedTools ?? 0} matchedSemanticFiles=\${proposalSourceSignals?.semanticSignals?.matchedFiles ?? 0} exposesSource=\${Boolean(proposalSourceSignals?.governance?.exposesSourceFileContent)} executesTool=\${Boolean(proposalSourceSignals?.governance?.canExecuteToolCode)}\`,
     \`Structured Edits: supportedKinds=replace_text,replace_lines observedKinds=\${(data?.edits ?? []).map((edit) => edit.kind ?? "replace_text").join(",") || "none"}\`,
     \`Validation: ok=\${Boolean(validation.ok)} structured=\${structuredValidationEngine} preview=\${previewValidationEngine} appliesAgainstOriginal=\${Boolean(validation.structuredPatch?.checks?.appliesAgainstOriginalContent)} structuredLineRangesResolved=\${Boolean(validation.structuredPatch?.checks?.structuredLineRangesResolved)}\`,
@@ -2501,6 +2551,20 @@ async function refreshEditTargetSelection() {
     editTargetSelectionSource.textContent = "unknown";
     editTargetSelectionMode.textContent = "unknown";
     editTargetSelectionJson.textContent = "Unable to select native OpenClaw workspace edit targets.";
+  }
+}
+
+async function refreshPromptSemantics() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/prompt-semantics?query=edit&limit=24\`);
+    renderPromptSemantics(data);
+  } catch {
+    promptSemanticsRegistry.textContent = "offline";
+    promptSemanticsFiles.textContent = "0";
+    promptSemanticsChecks.textContent = "0";
+    promptSemanticsContent.textContent = "unknown";
+    promptSemanticsMode.textContent = "unknown";
+    promptSemanticsJson.textContent = "Unable to read native OpenClaw prompt semantics.";
   }
 }
 
@@ -4243,6 +4307,7 @@ await refreshToolCatalogAdapter();
 await refreshSemanticIndex();
 await refreshSymbolLookup();
 await refreshEditTargetSelection();
+await refreshPromptSemantics();
 await refreshWorkspaceTextWriteDraft();
 await refreshWorkspacePatchApplyDraft();
 await refreshNativePluginContract();
@@ -4289,6 +4354,7 @@ setInterval(refreshToolCatalogAdapter, 5000);
 setInterval(refreshSemanticIndex, 5000);
 setInterval(refreshSymbolLookup, 5000);
 setInterval(refreshEditTargetSelection, 5000);
+setInterval(refreshPromptSemantics, 5000);
 setInterval(refreshWorkspaceTextWriteDraft, 5000);
 setInterval(refreshWorkspacePatchApplyDraft, 5000);
 setInterval(refreshNativePluginContract, 5000);
