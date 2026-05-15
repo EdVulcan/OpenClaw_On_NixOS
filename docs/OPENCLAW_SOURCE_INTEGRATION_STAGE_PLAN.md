@@ -1162,7 +1162,7 @@ Next intended slice after this passes:
 
 ## 29. 2026-05-15 Step 12 Update: Source-Derived Command Approved Execution
 
-Status: implemented_waiting_check.
+Status: passed.
 
 Slice: approved execution for enhanced `openclaw` source-derived shell/process command tasks.
 
@@ -1173,6 +1173,9 @@ Implemented artifacts:
 - Command transcript records include source command provenance for executed source-derived command tasks.
 - Targeted checks: `openclaw-source-command-execute`, `observer-openclaw-source-command-execute`.
 - Observer execution verification uses the existing approval, operator, command ledger, and capability history controls.
+
+Recheck note:
+- 2026-05-15 14:07 +08:00 NixOS targeted milestone passed: `openclaw-source-command-execute`, `observer-openclaw-source-command-execute`.
 
 Governance boundaries:
 - Must block on `policy_requires_approval` before approval.
@@ -1197,3 +1200,41 @@ OPENCLAW_MILESTONE_CHECKS=openclaw-source-command-execute,observer-openclaw-sour
 Next intended slice after this passes:
 - Add denial/recovery coverage for source-derived command tasks.
 - Then add hardening/persistence coverage only if the first execution path remains stable.
+
+## 30. 2026-05-15 Step 13 Update: Source-Derived Command Denial Recovery
+
+Status: implemented_waiting_check.
+
+Slice: denial and fresh-approval recovery for enhanced `openclaw` source-derived shell/process command tasks.
+
+Purpose: prove that a rejected source-derived command cannot execute, remains recoverable, and can only execute after a newly materialized recovery task receives a fresh approval. This closes the basic safety loop around the source command execution path before adding persistence/hardening coverage.
+
+Implemented artifacts:
+- Recovery now preserves redacted `sourceCommand` provenance from the denied task to the recovered task.
+- Targeted checks: `openclaw-source-command-denial-recovery`, `observer-openclaw-source-command-denial-recovery`.
+- Observer verification uses the existing deny, recover, approve, operator, command ledger, capability history, task history, and audit visibility paths.
+
+Governance boundaries:
+- Denied source command tasks fail without command execution.
+- Recovery does not inherit approval from the denied task.
+- Recovery creates a fresh pending approval and blocks on `policy_requires_approval`.
+- Only the recovered, freshly approved task may execute.
+- Command transcript ledger must contain only the approved recovered execution and retain source command provenance.
+- Does not expose package script bodies, prompt bodies, source file bodies, or old tool bodies.
+
+Local verification target:
+- `npm run typecheck`.
+- `git diff --check`.
+- Targeted milestone checks on NixOS.
+
+NixOS targeted milestone command:
+
+```bash
+cd /home/edvulcan/OpenClaw_On_NixOS && \
+git pull origin main && \
+OPENCLAW_MILESTONE_CHECKS=openclaw-source-command-denial-recovery,observer-openclaw-source-command-denial-recovery npm run dev:milestone-check:unix
+```
+
+Next intended slice after this passes:
+- Add command hardening for source-derived commands: duplicate approval/denial safety, duplicate recovery safety, and chained recovery.
+- Then add restart persistence coverage for source command provenance and recovered command transcripts.

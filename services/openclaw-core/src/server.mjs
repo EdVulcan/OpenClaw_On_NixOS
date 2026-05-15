@@ -7942,6 +7942,10 @@ function createTask(body, options = {}) {
     workView: null,
     lastAction: null,
     outcome: null,
+    sourceCommand:
+      body.sourceCommand && typeof body.sourceCommand === "object"
+        ? clonePlainObject(body.sourceCommand)
+        : null,
     recovery:
       body.recovery && typeof body.recovery === "object"
         ? {
@@ -9131,6 +9135,9 @@ function recoverTask(sourceTask) {
   if (recoverableCapabilityPlan) {
     recoveryBody.plan = resetRecoveredPlan(sourceTask.plan);
     recoveryBody.policy = buildRecoveredPolicyRequest(sourceTask);
+  }
+  if (sourceTask.sourceCommand && typeof sourceTask.sourceCommand === "object") {
+    recoveryBody.sourceCommand = sourceTask.sourceCommand;
   }
 
   const recoveredTask = createTask(recoveryBody);
