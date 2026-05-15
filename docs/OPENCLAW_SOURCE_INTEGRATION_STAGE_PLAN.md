@@ -991,7 +991,7 @@ Next intended slice after this passes:
 
 ## 25. 2026-05-15 Step 8 Update: Source Integration Focused Regression
 
-Status: implemented_waiting_check.
+Status: passed.
 
 Slice: focused regression over the first real enhanced OpenClaw edit integration chain.
 
@@ -1007,6 +1007,7 @@ Recheck note:
 - 2026-05-15 13:12 +08:00 NixOS targeted milestone partially passed: `openclaw-source-integration-regression` passed, `observer-openclaw-source-integration-regression` failed in the first legacy Observer source-derived check.
 - Diagnosis: Observer had moved its sample patch draft to the new source-authored endpoint, so the older static client visibility token `deriveProposalFromSource=true` disappeared even though the underlying source-derived draft API still worked.
 - Fix: keep the source-authored endpoint as the active UI path while adding an explicit source-derived compatibility marker in the Observer patch panel output.
+- 2026-05-15 13:22 +08:00 NixOS targeted milestone passed: `openclaw-source-integration-regression`, `observer-openclaw-source-integration-regression`.
 
 Governance boundaries:
 - Regression remains read-only or approval-gated; it does not approve or execute pending mutation tasks.
@@ -1030,3 +1031,42 @@ OPENCLAW_MILESTONE_CHECKS=openclaw-source-integration-regression,observer-opencl
 Next intended slice after this passes:
 - Begin the next OpenClaw capability surface only after this focused regression passes.
 - Candidate: read-only shell/process command proposal absorption, still proposal-only before any execution expansion.
+
+## 26. 2026-05-15 Step 9 Update: Source-Derived Command Proposals
+
+Status: implemented_waiting_check.
+
+Slice: read-only shell/process command proposal absorption from enhanced `openclaw` source signals.
+
+Purpose: start the next OpenClaw capability surface after the edit integration regression passed. This slice absorbs command/shell/process vocabulary from enhanced OpenClaw tool and prompt surfaces into command proposal metadata only. It deliberately does not create tasks, approvals, or command execution.
+
+Implemented artifacts:
+- Source command proposal registry: `openclaw-source-command-proposals-v0`.
+- Core endpoint: `GET /plugins/native-adapter/source-command-proposals`.
+- Existing workspace command proposals remain available at `/workspaces/command-proposals`.
+- Observer panel: `OpenClaw Source Command Proposals`.
+- Targeted checks: `openclaw-source-command-proposals`, `observer-openclaw-source-command-proposals`.
+
+Governance boundaries:
+- Proposal-only: `canExecute=false`, `createsTask=false`, `createsApproval=false`.
+- Does not expose package script bodies, prompt bodies, source file bodies, or tool bodies.
+- Does not import or execute old `openclaw` modules.
+- Does not expand shell/process execution yet.
+- Future execution must go through separate plan/task/approval gates.
+
+Local verification target:
+- `npm run typecheck`.
+- `git diff --check`.
+- Targeted milestone checks on NixOS.
+
+NixOS targeted milestone command:
+
+```bash
+cd /home/edvulcan/OpenClaw_On_NixOS && \
+git pull origin main && \
+OPENCLAW_MILESTONE_CHECKS=openclaw-source-command-proposals,observer-openclaw-source-command-proposals npm run dev:milestone-check:unix
+```
+
+Next intended slice after this passes:
+- Add plan-only command proposal drafts derived from `openclaw-source-command-proposals-v0`.
+- Keep command task creation and execution deferred until the source-derived command plan has its own approval-gate checks.

@@ -642,6 +642,15 @@ function observerHtml() {
           <pre id="workspace-command-json">Loading workspace command proposals...</pre>
         </section>
         <section class="panel">
+          <h2>OpenClaw Source Command Proposals</h2>
+          <div class="metric"><span>Registry</span><span id="source-command-registry">openclaw-source-command-proposals-v0</span></div>
+          <div class="metric"><span>Total</span><span id="source-command-total">0</span></div>
+          <div class="metric"><span>Tools</span><span id="source-command-tools">0</span></div>
+          <div class="metric"><span>Prompt Files</span><span id="source-command-prompts">0</span></div>
+          <div class="metric"><span>Mode</span><span id="source-command-mode">proposal-only-source-absorbed</span></div>
+          <pre id="source-command-json">Loading source-derived command proposals...</pre>
+        </section>
+        <section class="panel">
           <h2>Workspace Command Plan Draft</h2>
           <div class="metric"><span>Registry</span><span id="workspace-command-plan-registry">workspace-command-plan-draft-v0</span></div>
           <div class="metric"><span>Proposal</span><span id="workspace-command-plan-proposal">openclaw:typecheck</span></div>
@@ -1048,6 +1057,12 @@ const workspaceCommandBuild = document.querySelector("#workspace-command-build")
 const workspaceCommandRuntime = document.querySelector("#workspace-command-runtime");
 const workspaceCommandMode = document.querySelector("#workspace-command-mode");
 const workspaceCommandJson = document.querySelector("#workspace-command-json");
+const sourceCommandRegistry = document.querySelector("#source-command-registry");
+const sourceCommandTotal = document.querySelector("#source-command-total");
+const sourceCommandTools = document.querySelector("#source-command-tools");
+const sourceCommandPrompts = document.querySelector("#source-command-prompts");
+const sourceCommandMode = document.querySelector("#source-command-mode");
+const sourceCommandJson = document.querySelector("#source-command-json");
 const workspaceCommandPlanRegistry = document.querySelector("#workspace-command-plan-registry");
 const workspaceCommandPlanProposal = document.querySelector("#workspace-command-plan-proposal");
 const workspaceCommandPlanDecision = document.querySelector("#workspace-command-plan-decision");
@@ -2186,6 +2201,38 @@ function renderWorkspaceCommandProposals(data) {
   ].join("\\n");
 }
 
+function renderSourceCommandProposals(data) {
+  const summary = data?.summary ?? {};
+  const signals = data?.sourceCommandSignals ?? {};
+  const toolSignals = signals.toolSignals ?? {};
+  const promptSignals = signals.promptSignals ?? {};
+  const items = Array.isArray(data?.items) ? data.items : [];
+  sourceCommandRegistry.textContent = data?.registry ?? "openclaw-source-command-proposals-v0";
+  sourceCommandTotal.textContent = String(summary.total ?? data?.count ?? 0);
+  sourceCommandTools.textContent = String(summary.matchedTools ?? toolSignals.matchedTools ?? 0);
+  sourceCommandPrompts.textContent = String(summary.promptSemanticFiles ?? promptSignals.matchedFiles ?? 0);
+  sourceCommandMode.textContent = data?.mode ?? "proposal-only-source-absorbed";
+
+  sourceCommandJson.textContent = [
+    "Source-derived command proposals: enhanced OpenClaw tool/prompt signals are absorbed into command proposal metadata only.",
+    "No command is executed, no task is created, and script/prompt/source bodies remain hidden.",
+    \`Registry: \${data?.registry ?? "openclaw-source-command-proposals-v0"}\`,
+    \`Mode: \${data?.mode ?? "proposal-only-source-absorbed"}\`,
+    \`Source Registry: \${data?.sourceRegistry ?? "workspace-command-proposals-v0"}\`,
+    \`Query: \${data?.query?.text ?? "command"} limit=\${data?.query?.limit ?? 12}\`,
+    \`Total: \${summary.total ?? data?.count ?? 0}\`,
+    \`Source Signals: registry=\${signals.registry ?? "openclaw-source-command-proposals-v0"} tools=\${toolSignals.matchedTools ?? 0} docs=\${toolSignals.matchedDocumentation ?? 0} promptFiles=\${promptSignals.matchedFiles ?? 0} commandVocabularyFiles=\${promptSignals.commandVocabularyFiles ?? 0}\`,
+    \`Governance: execute=\${Boolean(data?.governance?.canExecute)} mutate=\${Boolean(data?.governance?.canMutate)} createsTask=\${Boolean(data?.governance?.createsTask)} createsApproval=\${Boolean(data?.governance?.createsApproval)} scriptBody=\${Boolean(data?.governance?.exposesScriptBodies)} prompt=\${Boolean(data?.governance?.exposesPromptContent)} source=\${Boolean(data?.governance?.exposesSourceFileContent)}\`,
+    "",
+    ...items.slice(0, 8).map((entry) => {
+      const commandShape = [entry.command, ...(Array.isArray(entry.args) ? entry.args : [])].filter(Boolean).join(" ");
+      const sourceCommand = entry.sourceCommand ?? {};
+      const governance = entry.governance ?? {};
+      return \`[\${entry.risk ?? "unknown"}] \${entry.workspaceName ?? "workspace"}:\${entry.scriptName ?? "script"} \${commandShape} source=\${sourceCommand.registry ?? "none"} absorbed=\${Boolean(sourceCommand.absorbedFromEnhancedOpenClaw)} execute=\${Boolean(governance.canExecute)} task=\${Boolean(governance.canCreateTaskFromSourceAbsorption)} approval=\${Boolean(governance.requiresExplicitExecutionApproval)} scriptBody=\${Boolean(governance.exposesScriptBody)}\`;
+    }),
+  ].join("\\n");
+}
+
 function renderWorkspaceCommandPlanDraft(data) {
   const draft = data?.draft ?? {};
   const proposal = data?.proposal ?? {};
@@ -2393,6 +2440,20 @@ async function refreshWorkspaceCommandProposals() {
     workspaceCommandRuntime.textContent = "0";
     workspaceCommandMode.textContent = "unknown";
     workspaceCommandJson.textContent = "Unable to read workspace command proposals.";
+  }
+}
+
+async function refreshSourceCommandProposals() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/source-command-proposals?query=command&limit=12\`);
+    renderSourceCommandProposals(data);
+  } catch {
+    sourceCommandRegistry.textContent = "offline";
+    sourceCommandTotal.textContent = "0";
+    sourceCommandTools.textContent = "0";
+    sourceCommandPrompts.textContent = "0";
+    sourceCommandMode.textContent = "unknown";
+    sourceCommandJson.textContent = "Unable to read source-derived command proposals.";
   }
 }
 
@@ -4359,6 +4420,7 @@ await refreshNativePluginPreflight();
 await refreshNativePluginActivationPlan();
 await refreshNativePluginInvokePlan();
 await refreshWorkspaceCommandProposals();
+await refreshSourceCommandProposals();
 await refreshWorkspaceCommandPlanDraft();
 await refreshSystemState();
 await refreshHealState();
@@ -4406,6 +4468,7 @@ setInterval(refreshNativePluginPreflight, 5000);
 setInterval(refreshNativePluginActivationPlan, 5000);
 setInterval(refreshNativePluginInvokePlan, 5000);
 setInterval(refreshWorkspaceCommandProposals, 5000);
+setInterval(refreshSourceCommandProposals, 5000);
 setInterval(refreshWorkspaceCommandPlanDraft, 5000);
 setInterval(refreshSystemState, 5000);
 setInterval(refreshHealState, 5000);
