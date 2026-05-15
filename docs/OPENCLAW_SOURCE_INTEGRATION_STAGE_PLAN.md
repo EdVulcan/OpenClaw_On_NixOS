@@ -1,6 +1,6 @@
 # OpenClaw Source Integration Stage Plan
 
-更新时间：2026-05-15 11:26 +08:00
+更新时间：2026-05-15 12:05 +08:00
 
 本文档用于跟踪当前阶段：把旁路 `openclaw` 增强源码项目中的能力，受控接入 `OpenClawOnNixOS`。后续每推进一个接入切片，都必须同步更新本文件，避免路线漂移、重复准备层、或忘记阶段边界。
 
@@ -859,7 +859,7 @@ Next intended slice after this passes:
 
 ## 22. 2026-05-15 Step 5 Update: Prompt Semantics Edit Plan
 
-Status: implemented_waiting_check.
+Status: passed.
 
 Slice: `sense.openclaw.prompt_pack` plus `act.openclaw.workspace_patch_apply` semantic plan enrichment.
 
@@ -873,6 +873,9 @@ Implemented artifacts:
 - Observer panel: `OpenClaw Prompt Semantics`.
 - Observer patch panel shows `Edit Intent` and `Expected Checks`.
 - Targeted checks: `openclaw-prompt-semantics-edit-plan`, `observer-openclaw-prompt-semantics-edit-plan`.
+
+Recheck note:
+- 2026-05-15 12:01 +08:00 NixOS targeted milestone passed: `openclaw-prompt-semantics-edit-plan`, `observer-openclaw-prompt-semantics-edit-plan`.
 
 Governance boundaries:
 - Does not import or execute old `openclaw` modules.
