@@ -651,6 +651,15 @@ function observerHtml() {
           <pre id="source-command-json">Loading source-derived command proposals...</pre>
         </section>
         <section class="panel">
+          <h2>OpenClaw Source Command Plan</h2>
+          <div class="metric"><span>Registry</span><span id="source-command-plan-registry">openclaw-source-command-plan-draft-v0</span></div>
+          <div class="metric"><span>Proposal</span><span id="source-command-plan-proposal">openclaw:typecheck</span></div>
+          <div class="metric"><span>Decision</span><span id="source-command-plan-decision">require_approval</span></div>
+          <div class="metric"><span>Creates Task</span><span id="source-command-plan-task">false</span></div>
+          <div class="metric"><span>Mode</span><span id="source-command-plan-mode">plan-only-source-command</span></div>
+          <pre id="source-command-plan-json">Loading source-derived command plan...</pre>
+        </section>
+        <section class="panel">
           <h2>Workspace Command Plan Draft</h2>
           <div class="metric"><span>Registry</span><span id="workspace-command-plan-registry">workspace-command-plan-draft-v0</span></div>
           <div class="metric"><span>Proposal</span><span id="workspace-command-plan-proposal">openclaw:typecheck</span></div>
@@ -1063,6 +1072,12 @@ const sourceCommandTools = document.querySelector("#source-command-tools");
 const sourceCommandPrompts = document.querySelector("#source-command-prompts");
 const sourceCommandMode = document.querySelector("#source-command-mode");
 const sourceCommandJson = document.querySelector("#source-command-json");
+const sourceCommandPlanRegistry = document.querySelector("#source-command-plan-registry");
+const sourceCommandPlanProposal = document.querySelector("#source-command-plan-proposal");
+const sourceCommandPlanDecision = document.querySelector("#source-command-plan-decision");
+const sourceCommandPlanTask = document.querySelector("#source-command-plan-task");
+const sourceCommandPlanMode = document.querySelector("#source-command-plan-mode");
+const sourceCommandPlanJson = document.querySelector("#source-command-plan-json");
 const workspaceCommandPlanRegistry = document.querySelector("#workspace-command-plan-registry");
 const workspaceCommandPlanProposal = document.querySelector("#workspace-command-plan-proposal");
 const workspaceCommandPlanDecision = document.querySelector("#workspace-command-plan-decision");
@@ -2233,6 +2248,38 @@ function renderSourceCommandProposals(data) {
   ].join("\\n");
 }
 
+function renderSourceCommandPlanDraft(data) {
+  const proposal = data?.sourceCommandProposal ?? data?.proposal ?? {};
+  const sourceCommandPlan = data?.sourceCommandPlan ?? {};
+  const signals = data?.sourceCommandSignals ?? {};
+  const draft = data?.draft ?? {};
+  const governance = data?.governance ?? draft.governance ?? {};
+  const policyDecision = draft.policy?.decision ?? {};
+  const action = draft.action ?? {};
+  const params = action.params ?? {};
+  const commandShape = [params.command, ...(Array.isArray(params.args) ? params.args : [])].filter(Boolean).join(" ");
+  sourceCommandPlanRegistry.textContent = data?.registry ?? "openclaw-source-command-plan-draft-v0";
+  sourceCommandPlanProposal.textContent = proposal.id ?? "none";
+  sourceCommandPlanDecision.textContent = policyDecision.decision ?? "unknown";
+  sourceCommandPlanTask.textContent = String(governance.createsTask ?? false);
+  sourceCommandPlanMode.textContent = data?.mode ?? "plan-only-source-command";
+
+  sourceCommandPlanJson.textContent = [
+    "Source-derived command plan: converts enhanced OpenClaw command proposal metadata into an inert approval-gated plan draft.",
+    "No task, approval, shell, or process execution is created here.",
+    \`Registry: \${data?.registry ?? "openclaw-source-command-plan-draft-v0"}\`,
+    \`Mode: \${data?.mode ?? "plan-only-source-command"}\`,
+    \`Source Registry: \${data?.sourceRegistry ?? "openclaw-source-command-proposals-v0"}\`,
+    \`Proposal: \${proposal.id ?? "none"} source=\${proposal.sourceCommand?.registry ?? "none"} absorbed=\${Boolean(proposal.sourceCommand?.absorbedFromEnhancedOpenClaw)}\`,
+    \`Command: \${commandShape || "none"} cwd=\${params.cwd ?? "unknown"} shell=\${Boolean(sourceCommandPlan.commandShape?.usesShell)}\`,
+    \`Policy: \${policyDecision.decision ?? "unknown"} reason=\${policyDecision.reason ?? "none"} risk=\${policyDecision.risk ?? proposal.risk ?? "unknown"}\`,
+    \`Signals: registry=\${signals.registry ?? "openclaw-source-command-proposals-v0"} tools=\${signals.toolSignals?.matchedTools ?? 0} prompts=\${signals.promptSignals?.matchedFiles ?? 0} commandVocabulary=\${signals.promptSignals?.commandVocabularyFiles ?? 0}\`,
+    \`Governance: execute=\${Boolean(governance.canExecute)} mutate=\${Boolean(governance.canMutate)} createsTask=\${Boolean(governance.createsTask)} createsApproval=\${Boolean(governance.createsApproval)} scriptBody=\${Boolean(governance.exposesScriptBodies ?? governance.exposesScriptBody)} prompt=\${Boolean(governance.exposesPromptContent)} source=\${Boolean(governance.exposesSourceFileContent)} explicitApproval=\${Boolean(governance.requiresExplicitApprovalBeforeExecution ?? governance.requiresExplicitApproval)}\`,
+    \`Capabilities: \${(draft.plan?.capabilitySummary?.ids ?? []).join(", ") || "none"}\`,
+    \`Approval Gates: \${draft.plan?.capabilitySummary?.approvalGates ?? 0}\`,
+  ].join("\\n");
+}
+
 function renderWorkspaceCommandPlanDraft(data) {
   const draft = data?.draft ?? {};
   const proposal = data?.proposal ?? {};
@@ -2454,6 +2501,20 @@ async function refreshSourceCommandProposals() {
     sourceCommandPrompts.textContent = "0";
     sourceCommandMode.textContent = "unknown";
     sourceCommandJson.textContent = "Unable to read source-derived command proposals.";
+  }
+}
+
+async function refreshSourceCommandPlanDraft() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/source-command-proposals/plan?proposalId=openclaw:typecheck&query=command\`);
+    renderSourceCommandPlanDraft(data);
+  } catch {
+    sourceCommandPlanRegistry.textContent = "offline";
+    sourceCommandPlanProposal.textContent = "none";
+    sourceCommandPlanDecision.textContent = "unknown";
+    sourceCommandPlanTask.textContent = "false";
+    sourceCommandPlanMode.textContent = "unknown";
+    sourceCommandPlanJson.textContent = "Unable to read source-derived command plan draft.";
   }
 }
 
@@ -4421,6 +4482,7 @@ await refreshNativePluginActivationPlan();
 await refreshNativePluginInvokePlan();
 await refreshWorkspaceCommandProposals();
 await refreshSourceCommandProposals();
+await refreshSourceCommandPlanDraft();
 await refreshWorkspaceCommandPlanDraft();
 await refreshSystemState();
 await refreshHealState();
@@ -4469,6 +4531,7 @@ setInterval(refreshNativePluginActivationPlan, 5000);
 setInterval(refreshNativePluginInvokePlan, 5000);
 setInterval(refreshWorkspaceCommandProposals, 5000);
 setInterval(refreshSourceCommandProposals, 5000);
+setInterval(refreshSourceCommandPlanDraft, 5000);
 setInterval(refreshWorkspaceCommandPlanDraft, 5000);
 setInterval(refreshSystemState, 5000);
 setInterval(refreshHealState, 5000);

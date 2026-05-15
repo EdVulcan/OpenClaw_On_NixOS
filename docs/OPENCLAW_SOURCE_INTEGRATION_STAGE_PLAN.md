@@ -1034,7 +1034,7 @@ Next intended slice after this passes:
 
 ## 26. 2026-05-15 Step 9 Update: Source-Derived Command Proposals
 
-Status: implemented_waiting_check.
+Status: passed.
 
 Slice: read-only shell/process command proposal absorption from enhanced `openclaw` source signals.
 
@@ -1046,6 +1046,9 @@ Implemented artifacts:
 - Existing workspace command proposals remain available at `/workspaces/command-proposals`.
 - Observer panel: `OpenClaw Source Command Proposals`.
 - Targeted checks: `openclaw-source-command-proposals`, `observer-openclaw-source-command-proposals`.
+
+Recheck note:
+- 2026-05-15 13:38 +08:00 NixOS targeted milestone passed: `openclaw-source-command-proposals`, `observer-openclaw-source-command-proposals`.
 
 Governance boundaries:
 - Proposal-only: `canExecute=false`, `createsTask=false`, `createsApproval=false`.
@@ -1070,3 +1073,42 @@ OPENCLAW_MILESTONE_CHECKS=openclaw-source-command-proposals,observer-openclaw-so
 Next intended slice after this passes:
 - Add plan-only command proposal drafts derived from `openclaw-source-command-proposals-v0`.
 - Keep command task creation and execution deferred until the source-derived command plan has its own approval-gate checks.
+
+## 27. 2026-05-15 Step 10 Update: Source-Derived Command Plan
+
+Status: implemented_waiting_check.
+
+Slice: plan-only shell/process command draft from enhanced `openclaw` source command proposals.
+
+Purpose: convert `openclaw-source-command-proposals-v0` into a governed command plan draft without creating tasks, approvals, shell execution, or process execution. This is the command-side equivalent of the earlier edit proposal enrichment step: source-derived metadata becomes an auditable plan shape, not an executable action.
+
+Implemented artifacts:
+- Source command plan registry: `openclaw-source-command-plan-draft-v0`.
+- Core endpoint: `GET /plugins/native-adapter/source-command-proposals/plan`.
+- Existing workspace command plan endpoint remains available at `/workspaces/command-proposals/plan`.
+- Observer panel: `OpenClaw Source Command Plan`.
+- Targeted checks: `openclaw-source-command-plan`, `observer-openclaw-source-command-plan`.
+
+Governance boundaries:
+- Plan-only: `canExecute=false`, `createsTask=false`, `createsApproval=false`.
+- Preserves explicit approval requirement for future execution.
+- Does not expose package script bodies, prompt bodies, source file bodies, or tool bodies.
+- Does not import or execute old `openclaw` modules.
+- Does not expand shell/process execution yet.
+
+Local verification target:
+- `npm run typecheck`.
+- `git diff --check`.
+- Targeted milestone checks on NixOS.
+
+NixOS targeted milestone command:
+
+```bash
+cd /home/edvulcan/OpenClaw_On_NixOS && \
+git pull origin main && \
+OPENCLAW_MILESTONE_CHECKS=openclaw-source-command-plan,observer-openclaw-source-command-plan npm run dev:milestone-check:unix
+```
+
+Next intended slice after this passes:
+- Add approval-gated source command task materialization only after confirming the plan-only boundary.
+- Keep actual command execution deferred behind the existing command approval chain.

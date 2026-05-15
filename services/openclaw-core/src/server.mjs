@@ -5732,6 +5732,101 @@ function buildWorkspaceCommandPlanDraft({ proposalId = null, workspaceId = null,
   };
 }
 
+function findSourceCommandProposal({
+  proposalId = null,
+  workspaceId = null,
+  scriptName = null,
+  workspacePath = null,
+  query = "command",
+} = {}) {
+  const proposals = buildOpenClawSourceCommandProposals({ workspacePath, query });
+  const match = proposals.items.find((item) => {
+    if (proposalId && item.id === proposalId) {
+      return true;
+    }
+    return workspaceId && scriptName && item.workspaceId === workspaceId && item.scriptName === scriptName;
+  }) ?? null;
+
+  return {
+    proposals,
+    proposal: match,
+  };
+}
+
+function buildOpenClawSourceCommandPlanDraft({
+  proposalId = null,
+  workspaceId = null,
+  scriptName = null,
+  workspacePath = null,
+  query = "command",
+} = {}) {
+  const { proposals, proposal } = findSourceCommandProposal({
+    proposalId,
+    workspaceId,
+    scriptName,
+    workspacePath,
+    query,
+  });
+  if (!proposal) {
+    throw new Error("OpenClaw source command proposal was not found.");
+  }
+  const draft = buildWorkspaceCommandPlanDraft({ proposalId: proposal.id });
+  const sourceCommandPlan = {
+    registry: "openclaw-source-command-plan-draft-v0",
+    mode: "plan-only-source-command",
+    sourceProposalRegistry: proposals.registry,
+    sourceSignalsRegistry: proposals.sourceCommandSignals?.registry ?? "openclaw-source-command-proposals-v0",
+    workspacePlanRegistry: draft.registry,
+    proposalId: proposal.id,
+    commandShape: {
+      command: proposal.command,
+      args: proposal.args,
+      cwd: proposal.cwd,
+      usesShell: proposal.usesShell === true,
+    },
+    contentExposed: false,
+  };
+
+  return {
+    ...draft,
+    registry: "openclaw-source-command-plan-draft-v0",
+    mode: "plan-only-source-command",
+    sourceRegistry: proposals.registry,
+    sourceCommandProposal: proposal,
+    sourceCommandSignals: proposals.sourceCommandSignals,
+    sourceCommandPlan,
+    draft: {
+      ...draft.draft,
+      governance: {
+        ...(draft.draft?.governance ?? {}),
+        mode: "source_command_plan_only",
+        sourceAbsorptionMode: "plan_only",
+        createsTask: false,
+        createsApproval: false,
+        canExecute: false,
+        canMutate: false,
+        requiresExplicitApproval: true,
+        exposesScriptBody: false,
+        exposesPromptContent: false,
+        exposesSourceFileContent: false,
+      },
+    },
+    governance: {
+      mode: "source_command_plan_only",
+      runtimeOwner: "openclaw_on_nixos",
+      sourceProposalRegistry: proposals.registry,
+      canExecute: false,
+      canMutate: false,
+      createsTask: false,
+      createsApproval: false,
+      exposesScriptBodies: false,
+      exposesPromptContent: false,
+      exposesSourceFileContent: false,
+      requiresExplicitApprovalBeforeExecution: true,
+    },
+  };
+}
+
 async function createWorkspaceCommandTask({ proposalId = null, workspaceId = null, scriptName = null, confirm = false } = {}) {
   if (confirm !== true) {
     throw new Error("Workspace command task creation requires confirm=true.");
@@ -10109,6 +10204,26 @@ const server = http.createServer(async (req, res) => {
         proposalId: requestUrl.searchParams.get("proposalId"),
         workspaceId: requestUrl.searchParams.get("workspaceId"),
         scriptName: requestUrl.searchParams.get("scriptName"),
+      });
+      sendJson(res, 200, {
+        ok: true,
+        ...draft,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 404, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/plugins/native-adapter/source-command-proposals/plan") {
+    try {
+      const draft = buildOpenClawSourceCommandPlanDraft({
+        proposalId: requestUrl.searchParams.get("proposalId"),
+        workspaceId: requestUrl.searchParams.get("workspaceId"),
+        scriptName: requestUrl.searchParams.get("scriptName"),
+        workspacePath: requestUrl.searchParams.get("workspacePath"),
+        query: requestUrl.searchParams.get("query") ?? "command",
       });
       sendJson(res, 200, {
         ok: true,
