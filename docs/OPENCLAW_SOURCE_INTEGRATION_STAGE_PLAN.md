@@ -1076,7 +1076,7 @@ Next intended slice after this passes:
 
 ## 27. 2026-05-15 Step 10 Update: Source-Derived Command Plan
 
-Status: implemented_waiting_check.
+Status: passed.
 
 Slice: plan-only shell/process command draft from enhanced `openclaw` source command proposals.
 
@@ -1088,6 +1088,9 @@ Implemented artifacts:
 - Existing workspace command plan endpoint remains available at `/workspaces/command-proposals/plan`.
 - Observer panel: `OpenClaw Source Command Plan`.
 - Targeted checks: `openclaw-source-command-plan`, `observer-openclaw-source-command-plan`.
+
+Recheck note:
+- 2026-05-15 13:47 +08:00 NixOS targeted milestone passed: `openclaw-source-command-plan`, `observer-openclaw-source-command-plan`.
 
 Governance boundaries:
 - Plan-only: `canExecute=false`, `createsTask=false`, `createsApproval=false`.
@@ -1112,3 +1115,44 @@ OPENCLAW_MILESTONE_CHECKS=openclaw-source-command-plan,observer-openclaw-source-
 Next intended slice after this passes:
 - Add approval-gated source command task materialization only after confirming the plan-only boundary.
 - Keep actual command execution deferred behind the existing command approval chain.
+
+## 28. 2026-05-15 Step 11 Update: Source-Derived Command Task
+
+Status: implemented_waiting_check.
+
+Slice: approval-gated task materialization for enhanced `openclaw` source-derived shell/process command proposals.
+
+Purpose: move the command capability surface from inert source-derived command plans into the governed task queue, without approving or executing the command. This is the command-side equivalent of the earlier source-authored edit task entrypoint: enhanced `openclaw` source semantics can now request a native OpenClawOnNixOS task, but policy still forces explicit user approval before any shell/process execution.
+
+Implemented artifacts:
+- Source command task registry: `openclaw-source-command-task-v0`.
+- Core endpoint: `POST /plugins/native-adapter/source-command-proposals/tasks`.
+- Source command task wrapper delegates to existing `workspace-command-task-v0` task materialization.
+- Observer source command plan panel now exposes `Create Source Command Approval Task`.
+- Targeted checks: `openclaw-source-command-task`, `observer-openclaw-source-command-task`.
+
+Governance boundaries:
+- Creates a queued task and pending approval only.
+- Does not approve the task.
+- Does not execute shell/process commands.
+- Does not add a new command execution path; execution remains delegated to `workspace-command-task-v0`.
+- Does not expose package script bodies, prompt bodies, source file bodies, or old tool bodies.
+- Operator must block on `policy_requires_approval` until a user approves.
+- Command transcript ledger must remain unchanged before approval.
+
+Local verification target:
+- `npm run typecheck`.
+- `git diff --check`.
+- Targeted milestone checks on NixOS.
+
+NixOS targeted milestone command:
+
+```bash
+cd /home/edvulcan/OpenClaw_On_NixOS && \
+git pull origin main && \
+OPENCLAW_MILESTONE_CHECKS=openclaw-source-command-task,observer-openclaw-source-command-task npm run dev:milestone-check:unix
+```
+
+Next intended slice after this passes:
+- Add approved execution for source-derived commands by reusing the existing workspace command approval/execution chain.
+- Keep denial/recovery/hardening as follow-up slices only after the first approved source command execution is proven.

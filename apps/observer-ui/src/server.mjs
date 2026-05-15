@@ -657,6 +657,9 @@ function observerHtml() {
           <div class="metric"><span>Decision</span><span id="source-command-plan-decision">require_approval</span></div>
           <div class="metric"><span>Creates Task</span><span id="source-command-plan-task">false</span></div>
           <div class="metric"><span>Mode</span><span id="source-command-plan-mode">plan-only-source-command</span></div>
+          <div class="actions tight">
+            <button id="source-command-task-button" class="secondary">Create Source Command Approval Task</button>
+          </div>
           <pre id="source-command-plan-json">Loading source-derived command plan...</pre>
         </section>
         <section class="panel">
@@ -1078,6 +1081,7 @@ const sourceCommandPlanDecision = document.querySelector("#source-command-plan-d
 const sourceCommandPlanTask = document.querySelector("#source-command-plan-task");
 const sourceCommandPlanMode = document.querySelector("#source-command-plan-mode");
 const sourceCommandPlanJson = document.querySelector("#source-command-plan-json");
+const sourceCommandTaskButton = document.querySelector("#source-command-task-button");
 const workspaceCommandPlanRegistry = document.querySelector("#workspace-command-plan-registry");
 const workspaceCommandPlanProposal = document.querySelector("#workspace-command-plan-proposal");
 const workspaceCommandPlanDecision = document.querySelector("#workspace-command-plan-decision");
@@ -3460,6 +3464,30 @@ async function createWorkspaceCommandApprovalTask() {
   await refreshWorkspaceCommandPlanDraft();
 }
 
+async function createSourceCommandApprovalTask() {
+  const result = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/source-command-proposals/tasks\`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      proposalId: "openclaw:typecheck",
+      query: "command",
+      confirm: true,
+    }),
+  });
+
+  taskHistoryFocus = "selected-task";
+  selectedHistoryTaskId = result.task?.id ?? null;
+  taskDetailIdInput.value = result.task?.id ?? "";
+  renderPlanPanel(result.task);
+  setControlMessage(\`Created approval-gated source command task \${result.task?.id ?? "unknown"} for openclaw:typecheck.\`);
+  await refreshRuntime();
+  await refreshTaskList();
+  await refreshTaskHistoryDetail();
+  await refreshApprovalState();
+  await refreshOperatorState();
+  await refreshSourceCommandPlanDraft();
+}
+
 async function createNativePluginInvokeApprovalTask() {
   const result = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/invoke-tasks\`, {
     method: "POST",
@@ -4137,6 +4165,12 @@ createPlannedTaskButton.addEventListener("click", () => {
 
 workspaceCommandTaskButton.addEventListener("click", () => {
   createWorkspaceCommandApprovalTask().catch((error) => {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  });
+});
+
+sourceCommandTaskButton.addEventListener("click", () => {
+  createSourceCommandApprovalTask().catch((error) => {
     setControlMessage(\`Request failed: \${formatError(error)}\`);
   });
 });

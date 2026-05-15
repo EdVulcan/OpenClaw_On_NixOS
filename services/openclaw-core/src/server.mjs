@@ -5873,6 +5873,76 @@ async function createWorkspaceCommandTask({ proposalId = null, workspaceId = nul
   };
 }
 
+async function createOpenClawSourceCommandTask({
+  proposalId = null,
+  workspaceId = null,
+  scriptName = null,
+  workspacePath = null,
+  query = "command",
+  confirm = false,
+} = {}) {
+  if (confirm !== true) {
+    throw new Error("OpenClaw source command task creation requires confirm=true.");
+  }
+
+  const sourceDraft = buildOpenClawSourceCommandPlanDraft({
+    proposalId,
+    workspaceId,
+    scriptName,
+    workspacePath,
+    query,
+  });
+  const sourceProposal = sourceDraft.sourceCommandProposal;
+  const workspaceTask = await createWorkspaceCommandTask({
+    proposalId: sourceProposal.id,
+    confirm: true,
+  });
+
+  return {
+    registry: "openclaw-source-command-task-v0",
+    mode: "approval-gated-source-command",
+    generatedAt: new Date().toISOString(),
+    sourceRegistry: sourceDraft.registry,
+    sourceMode: sourceDraft.mode,
+    sourceCommandProposal: sourceProposal,
+    sourceCommandSignals: sourceDraft.sourceCommandSignals,
+    sourceCommandPlan: sourceDraft.sourceCommandPlan,
+    sourceCommandTask: {
+      registry: "openclaw-source-command-task-v0",
+      mode: "approval-gated-source-command",
+      workspaceTaskRegistry: workspaceTask.registry,
+      proposalId: sourceProposal.id,
+      approvalId: workspaceTask.approval?.id ?? null,
+      taskId: workspaceTask.task?.id ?? null,
+      executed: false,
+      contentExposed: false,
+    },
+    workspaceCommandTask: {
+      registry: workspaceTask.registry,
+      mode: workspaceTask.mode,
+      sourceRegistry: workspaceTask.sourceRegistry,
+    },
+    task: workspaceTask.task,
+    approval: workspaceTask.approval,
+    governance: {
+      mode: "source_command_task_approval_gated",
+      runtimeOwner: "openclaw_on_nixos",
+      createsTask: true,
+      createsApproval: true,
+      canExecuteWithoutApproval: false,
+      canExecute: false,
+      canMutate: false,
+      executed: false,
+      requiresExplicitApproval: true,
+      requiresExplicitApprovalBeforeExecution: true,
+      delegatesExecutionTo: "workspace-command-task-v0",
+      exposesScriptBodies: false,
+      exposesPromptContent: false,
+      exposesSourceFileContent: false,
+    },
+  };
+}
+
 function redactPublicParams(params) {
   if (!params || typeof params !== "object" || Array.isArray(params)) {
     return params ?? {};
@@ -10232,6 +10302,41 @@ const server = http.createServer(async (req, res) => {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       sendJson(res, 404, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/plugins/native-adapter/source-command-proposals/tasks") {
+    try {
+      const body = await readJsonBody(req);
+      const result = await createOpenClawSourceCommandTask({
+        proposalId: typeof body.proposalId === "string" ? body.proposalId : null,
+        workspaceId: typeof body.workspaceId === "string" ? body.workspaceId : null,
+        scriptName: typeof body.scriptName === "string" ? body.scriptName : null,
+        workspacePath: typeof body.workspacePath === "string" ? body.workspacePath : null,
+        query: typeof body.query === "string" ? body.query : "command",
+        confirm: body.confirm === true,
+      });
+      sendJson(res, 201, {
+        ok: true,
+        registry: result.registry,
+        mode: result.mode,
+        generatedAt: result.generatedAt,
+        sourceRegistry: result.sourceRegistry,
+        sourceMode: result.sourceMode,
+        sourceCommandProposal: result.sourceCommandProposal,
+        sourceCommandSignals: result.sourceCommandSignals,
+        sourceCommandPlan: result.sourceCommandPlan,
+        sourceCommandTask: result.sourceCommandTask,
+        workspaceCommandTask: result.workspaceCommandTask,
+        task: serialiseTask(result.task),
+        approval: serialiseApproval(result.approval),
+        governance: result.governance,
+        summary: buildTaskSummary(),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
     }
     return;
   }
