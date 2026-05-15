@@ -1003,6 +1003,11 @@ Implemented artifacts:
 - Core regression covers source-derived edit proposals, target selection, prompt semantics, rationale/check/risk bundles, and source-authored edit task creation.
 - Observer regression covers the matching UI/API visibility and controls for the same chain.
 
+Recheck note:
+- 2026-05-15 13:12 +08:00 NixOS targeted milestone partially passed: `openclaw-source-integration-regression` passed, `observer-openclaw-source-integration-regression` failed in the first legacy Observer source-derived check.
+- Diagnosis: Observer had moved its sample patch draft to the new source-authored endpoint, so the older static client visibility token `deriveProposalFromSource=true` disappeared even though the underlying source-derived draft API still worked.
+- Fix: keep the source-authored endpoint as the active UI path while adding an explicit source-derived compatibility marker in the Observer patch panel output.
+
 Governance boundaries:
 - Regression remains read-only or approval-gated; it does not approve or execute pending mutation tasks.
 - Uses existing milestone fixtures and existing approval-gated task creation checks.
