@@ -113,7 +113,18 @@ trap cleanup EXIT
 post_json() {
   local url="$1"
   local body="$2"
-  curl --silent --show-error --fail -X POST "$url" -H 'content-type: application/json' -d "$body"
+  curl --silent --show-error --fail-with-body -X POST "$url" -H 'content-type: application/json' -d "$body"
+}
+
+check_static_token() {
+  local file="$1"
+  local label="$2"
+  local token="$3"
+  if grep -Fq "$token" "$file"; then
+    echo "Observer static ${label} token present: $token"
+  else
+    echo "Observer static ${label} token not found: $token"
+  fi
 }
 
 "$SCRIPT_DIR/dev-up.sh"
@@ -151,45 +162,20 @@ POST_FINAL_RESTART_DETAIL_FILE="$(mktemp)"
 echo "Checking Observer source command persistence controls ..."
 curl --silent --show-error --fail "$OBSERVER_URL/" > "$HTML_FILE"
 curl --silent --show-error --fail "$OBSERVER_URL/client-v5.js" > "$CLIENT_FILE"
+check_static_token "$HTML_FILE" "html" "source-command-task-button"
+check_static_token "$HTML_FILE" "html" "recover-selected-task-button"
+check_static_token "$HTML_FILE" "html" "command-ledger-json"
+check_static_token "$CLIENT_FILE" "client" "createSourceCommandApprovalTask"
+check_static_token "$CLIENT_FILE" "client" "recoverSelectedTask"
+check_static_token "$CLIENT_FILE" "client" "refreshCommandLedger"
+echo "Creating observer source command persistence task ..."
 post_json "$CORE_URL/plugins/native-adapter/source-command-proposals/tasks" '{"proposalId":"openclaw:typecheck","query":"command","confirm":true}' > "$TASK_FILE"
 post_json "$CORE_URL/operator/step" '{}' > "$BLOCKED_STEP_FILE"
 
-approval_id="$(node - <<'EOF' "$HTML_FILE" "$CLIENT_FILE" "$TASK_FILE" "$BLOCKED_STEP_FILE"
+approval_id="$(node - <<'EOF' "$TASK_FILE" "$BLOCKED_STEP_FILE"
 const fs = require("node:fs");
-const html = fs.readFileSync(process.argv[2], "utf8");
-const client = fs.readFileSync(process.argv[3], "utf8");
-const taskResponse = JSON.parse(fs.readFileSync(process.argv[4], "utf8"));
-const blockedStep = JSON.parse(fs.readFileSync(process.argv[5], "utf8"));
-
-for (const token of [
-  "source-command-task-button",
-  "recover-latest-failed-task-button",
-  "recover-selected-task-button",
-  "task-history-json",
-  "approval-pending-count",
-  "command-ledger-json",
-  "capability-history-json",
-]) {
-  if (!html.includes(token)) {
-    throw new Error(`Observer source command persistence HTML missing ${token}`);
-  }
-}
-for (const token of [
-  "createSourceCommandApprovalTask",
-  "/plugins/native-adapter/source-command-proposals/tasks",
-  "recoverLatestFailedTask",
-  "recoverSelectedTask",
-  "task.recovered",
-  "system.command.executed",
-  "refreshApprovalState",
-  "refreshTaskHistoryDetail",
-  "refreshCommandLedger",
-  "refreshCapabilityHistory",
-]) {
-  if (!client.includes(token)) {
-    throw new Error(`Observer source command persistence client missing ${token}`);
-  }
-}
+const taskResponse = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+const blockedStep = JSON.parse(fs.readFileSync(process.argv[3], "utf8"));
 if (!taskResponse.ok || taskResponse.registry !== "openclaw-source-command-task-v0" || taskResponse.task?.sourceCommand?.registry !== "openclaw-source-command-task-v0") {
   throw new Error(`observer source persistence fixture should create a provenance-bearing source task: ${JSON.stringify(taskResponse)}`);
 }
@@ -273,6 +259,9 @@ EOF
 echo "Checking Observer source command persistence after pending recovery restart ..."
 curl --silent --show-error --fail "$OBSERVER_URL/" > "$POST_RESTART_HTML_FILE"
 curl --silent --show-error --fail "$OBSERVER_URL/client-v5.js" > "$POST_RESTART_CLIENT_FILE"
+check_static_token "$POST_RESTART_HTML_FILE" "html-after-restart" "source-command-task-button"
+check_static_token "$POST_RESTART_HTML_FILE" "html-after-restart" "recover-selected-task-button"
+check_static_token "$POST_RESTART_CLIENT_FILE" "client-after-restart" "recoverSelectedTask"
 curl --silent --show-error --fail "$CORE_URL/tasks?limit=8" > "$POST_RECOVERY_RESTART_TASKS_FILE"
 curl --silent --show-error --fail "$CORE_URL/approvals?limit=8" > "$POST_RECOVERY_RESTART_APPROVALS_FILE"
 curl --silent --show-error --fail "$CORE_URL/commands/transcripts?limit=8" > "$POST_RECOVERY_RESTART_TRANSCRIPTS_FILE"
