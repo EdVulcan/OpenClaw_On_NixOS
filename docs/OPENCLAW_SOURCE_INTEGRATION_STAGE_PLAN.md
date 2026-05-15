@@ -1118,7 +1118,7 @@ Next intended slice after this passes:
 
 ## 28. 2026-05-15 Step 11 Update: Source-Derived Command Task
 
-Status: implemented_waiting_check.
+Status: passed.
 
 Slice: approval-gated task materialization for enhanced `openclaw` source-derived shell/process command proposals.
 
@@ -1130,6 +1130,9 @@ Implemented artifacts:
 - Source command task wrapper delegates to existing `workspace-command-task-v0` task materialization.
 - Observer source command plan panel now exposes `Create Source Command Approval Task`.
 - Targeted checks: `openclaw-source-command-task`, `observer-openclaw-source-command-task`.
+
+Recheck note:
+- 2026-05-15 14:00 +08:00 NixOS targeted milestone passed: `openclaw-source-command-task`, `observer-openclaw-source-command-task`.
 
 Governance boundaries:
 - Creates a queued task and pending approval only.
@@ -1156,3 +1159,41 @@ OPENCLAW_MILESTONE_CHECKS=openclaw-source-command-task,observer-openclaw-source-
 Next intended slice after this passes:
 - Add approved execution for source-derived commands by reusing the existing workspace command approval/execution chain.
 - Keep denial/recovery/hardening as follow-up slices only after the first approved source command execution is proven.
+
+## 29. 2026-05-15 Step 12 Update: Source-Derived Command Approved Execution
+
+Status: implemented_waiting_check.
+
+Slice: approved execution for enhanced `openclaw` source-derived shell/process command tasks.
+
+Purpose: prove that the source-derived command task created in Step 28 can execute only after explicit approval, while preserving the existing native command execution chain. This does not introduce a new shell/process runner; it tags the source-derived task with redacted provenance and then reuses `workspace-command-task-v0`, `act.system.command.execute`, command transcripts, capability history, and audit events.
+
+Implemented artifacts:
+- Source command task provenance persisted on the task as `sourceCommand`.
+- Command transcript records include source command provenance for executed source-derived command tasks.
+- Targeted checks: `openclaw-source-command-execute`, `observer-openclaw-source-command-execute`.
+- Observer execution verification uses the existing approval, operator, command ledger, and capability history controls.
+
+Governance boundaries:
+- Must block on `policy_requires_approval` before approval.
+- Executes only after a user approval transitions the task policy to audited execution.
+- Uses the existing allowlisted native command capability; no old `openclaw` command runner is imported or executed.
+- Command transcript ledger records the execution and task source provenance.
+- Does not expose package script bodies, prompt bodies, source file bodies, or old tool bodies.
+
+Local verification target:
+- `npm run typecheck`.
+- `git diff --check`.
+- Targeted milestone checks on NixOS.
+
+NixOS targeted milestone command:
+
+```bash
+cd /home/edvulcan/OpenClaw_On_NixOS && \
+git pull origin main && \
+OPENCLAW_MILESTONE_CHECKS=openclaw-source-command-execute,observer-openclaw-source-command-execute npm run dev:milestone-check:unix
+```
+
+Next intended slice after this passes:
+- Add denial/recovery coverage for source-derived command tasks.
+- Then add hardening/persistence coverage only if the first execution path remains stable.

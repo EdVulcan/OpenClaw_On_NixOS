@@ -5897,6 +5897,19 @@ async function createOpenClawSourceCommandTask({
     proposalId: sourceProposal.id,
     confirm: true,
   });
+  workspaceTask.task.sourceCommand = {
+    registry: "openclaw-source-command-task-v0",
+    sourceProposalRegistry: sourceDraft.sourceRegistry,
+    sourcePlanRegistry: sourceDraft.registry,
+    proposalId: sourceProposal.id,
+    sourceSignalsRegistry: sourceDraft.sourceCommandSignals?.registry ?? "openclaw-source-command-proposals-v0",
+    absorbedFromEnhancedOpenClaw: true,
+    contentExposed: false,
+    exposesScriptBodies: false,
+    exposesPromptContent: false,
+    exposesSourceFileContent: false,
+  };
+  persistState();
 
   return {
     registry: "openclaw-source-command-task-v0",
@@ -5986,6 +5999,7 @@ function serialiseTask(task) {
     workView: task.workView ?? null,
     lastAction: task.lastAction ?? null,
     outcome: task.outcome ?? null,
+    sourceCommand: task.sourceCommand ?? null,
     recovery: task.recovery ?? null,
     recoveredByTaskId: task.recoveredByTaskId ?? null,
     restorable: isRecoverableTask(task),
@@ -8369,6 +8383,7 @@ function buildCommandTranscriptRecords() {
       taskStatus: task.status,
       taskClosedAt: task.closedAt ?? null,
       taskUpdatedAt: task.updatedAt ?? null,
+      sourceCommand: task.sourceCommand ?? null,
       taskOutcome: task.outcome?.kind ?? task.status,
       index,
       state: classifyCommandTranscriptEntry(entry),
