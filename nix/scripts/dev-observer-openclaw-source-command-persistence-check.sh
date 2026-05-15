@@ -134,6 +134,11 @@ check_static_token() {
   fi
 }
 
+is_success_http_status() {
+  local status="$1"
+  [[ "$status" =~ ^2[0-9][0-9]$ ]]
+}
+
 "$SCRIPT_DIR/dev-up.sh"
 
 HTML_FILE="$(mktemp)"
@@ -177,14 +182,14 @@ check_static_token "$CLIENT_FILE" "client" "recoverSelectedTask"
 check_static_token "$CLIENT_FILE" "client" "refreshCommandLedger"
 echo "Creating observer source command persistence task ..."
 task_status="$(post_json_status "$CORE_URL/plugins/native-adapter/source-command-proposals/tasks" '{"proposalId":"openclaw:typecheck","query":"command","confirm":true}' "$TASK_FILE")"
-if [[ "$task_status" != "200" ]]; then
+if ! is_success_http_status "$task_status"; then
   echo "Observer source command task creation returned HTTP $task_status" >&2
   cat "$TASK_FILE" >&2 || true
   exit 1
 fi
 echo "Stepping observer source command task before approval ..."
 blocked_step_status="$(post_json_status "$CORE_URL/operator/step" '{}' "$BLOCKED_STEP_FILE")"
-if [[ "$blocked_step_status" != "200" ]]; then
+if ! is_success_http_status "$blocked_step_status"; then
   echo "Observer source command blocked operator step returned HTTP $blocked_step_status" >&2
   cat "$BLOCKED_STEP_FILE" >&2 || true
   exit 1
