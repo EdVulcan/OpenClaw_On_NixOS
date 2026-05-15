@@ -234,22 +234,55 @@ process.stdout.write(blockedStep.approval.id);
 EOF
 )"
 
-post_json "$CORE_URL/approvals/$approval_id/approve" '{"approvedBy":"dev-observer-openclaw-source-command-persistence-check","reason":"approve failing observer source command persistence fixture"}' > "$APPROVED_FILE"
-post_json "$CORE_URL/operator/step" '{}' > "$FAIL_STEP_FILE"
+echo "Approving observer source command persistence task $approval_id ..."
+approved_status="$(post_json_status "$CORE_URL/approvals/$approval_id/approve" '{"approvedBy":"dev-observer-openclaw-source-command-persistence-check","reason":"approve failing observer source command persistence fixture"}' "$APPROVED_FILE")"
+if ! is_success_http_status "$approved_status"; then
+  echo "Observer source command approval returned HTTP $approved_status" >&2
+  cat "$APPROVED_FILE" >&2 || true
+  exit 1
+fi
+echo "Executing approved observer source command persistence task ..."
+fail_step_status="$(post_json_status "$CORE_URL/operator/step" '{}' "$FAIL_STEP_FILE")"
+if ! is_success_http_status "$fail_step_status"; then
+  echo "Observer source command failing operator step returned HTTP $fail_step_status" >&2
+  cat "$FAIL_STEP_FILE" >&2 || true
+  exit 1
+fi
 
 failed_task_id="$(node - <<'EOF' "$APPROVED_FILE" "$FAIL_STEP_FILE"
 const fs = require("node:fs");
 const approved = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
 const failStep = JSON.parse(fs.readFileSync(process.argv[3], "utf8"));
+const fail = (message, details) => {
+  console.error("[observer-source-command-persistence-debug]", message);
+  console.error(JSON.stringify(details, null, 2));
+  throw new Error(message);
+};
+console.error("[observer-source-command-persistence-debug] approved shape", JSON.stringify({
+  ok: approved.ok ?? null,
+  approvalStatus: approved.approval?.status ?? null,
+  taskId: approved.task?.id ?? null,
+  taskStatus: approved.task?.status ?? null,
+  sourceRegistry: approved.task?.sourceCommand?.registry ?? null,
+}, null, 2));
+console.error("[observer-source-command-persistence-debug] failed step shape", JSON.stringify({
+  ok: failStep.ok ?? null,
+  ran: failStep.ran ?? null,
+  taskId: failStep.task?.id ?? null,
+  taskStatus: failStep.task?.status ?? null,
+  restorable: failStep.task?.restorable ?? null,
+  sourceRegistry: failStep.task?.sourceCommand?.registry ?? null,
+  reason: failStep.task?.outcome?.reason ?? null,
+}, null, 2));
 
 if (approved.approval?.status !== "approved" || approved.task?.sourceCommand?.registry !== "openclaw-source-command-task-v0") {
-  throw new Error(`observer approved source command should retain provenance: ${JSON.stringify(approved)}`);
+  fail("observer approved source command should retain provenance", approved);
 }
 if (!failStep.ok || failStep.ran !== true || failStep.task?.status !== "failed" || failStep.task?.restorable !== true || failStep.task?.sourceCommand?.registry !== "openclaw-source-command-task-v0") {
-  throw new Error(`observer approved source command should fail as recoverable with provenance: ${JSON.stringify(failStep)}`);
+  fail("observer approved source command should fail as recoverable with provenance", failStep);
 }
 if (!String(failStep.task?.outcome?.reason ?? "").includes("exit code 7")) {
-  throw new Error(`observer failed source command should explain exit code 7: ${JSON.stringify(failStep.task?.outcome)}`);
+  fail("observer failed source command should explain exit code 7", failStep.task?.outcome);
 }
 
 process.stdout.write(failStep.task.id);
