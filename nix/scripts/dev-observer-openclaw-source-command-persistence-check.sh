@@ -139,6 +139,20 @@ is_success_http_status() {
   [[ "$status" =~ ^2[0-9][0-9]$ ]]
 }
 
+extract_json_field() {
+  local file="$1"
+  local expression="$2"
+  node -e '
+const fs = require("node:fs");
+const data = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+const value = Function("data", `return (${process.argv[2]});`)(data);
+if (typeof value !== "string" || !value) {
+  throw new Error(`Unable to extract value with expression: ${process.argv[2]}`);
+}
+process.stdout.write(value);
+' "$file" "$expression"
+}
+
 "$SCRIPT_DIR/dev-up.sh"
 
 HTML_FILE="$(mktemp)"
@@ -302,7 +316,7 @@ curl --silent --show-error --fail "$CORE_URL/approvals?limit=8" > "$PRE_RESTART_
 curl --silent --show-error --fail "$CORE_URL/commands/transcripts?limit=8" > "$PRE_RESTART_TRANSCRIPTS_FILE"
 curl --silent --show-error --fail "$CORE_URL/capabilities/invocations?capabilityId=act.system.command.execute&limit=8" > "$PRE_RESTART_HISTORY_FILE"
 
-read -r recovered_task_id recovered_approval_id < <(node - <<'EOF' "$FAIL_STEP_FILE" "$RECOVERED_FILE" "$PRE_RESTART_TASKS_FILE" "$PRE_RESTART_APPROVALS_FILE" "$PRE_RESTART_TRANSCRIPTS_FILE" "$PRE_RESTART_HISTORY_FILE"
+node - <<'EOF' "$FAIL_STEP_FILE" "$RECOVERED_FILE" "$PRE_RESTART_TASKS_FILE" "$PRE_RESTART_APPROVALS_FILE" "$PRE_RESTART_TRANSCRIPTS_FILE" "$PRE_RESTART_HISTORY_FILE"
 const fs = require("node:fs");
 const failStep = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
 const recovered = JSON.parse(fs.readFileSync(process.argv[3], "utf8"));
@@ -352,10 +366,9 @@ if (transcripts.summary?.total !== 1 || transcripts.summary?.failed !== 1 || tra
 if (history.summary?.total !== 1 || history.summary?.invoked !== 1 || history.summary?.blocked !== 0) {
   fail("observer capability history should contain first source invocation before restart", history.summary);
 }
-
-process.stdout.write(`${recovered.task.id} ${recovered.task.approval.requestId}`);
 EOF
-)
+recovered_task_id="$(extract_json_field "$RECOVERED_FILE" "data.task.id")"
+recovered_approval_id="$(extract_json_field "$RECOVERED_FILE" "data.task.approval.requestId")"
 
 "$SCRIPT_DIR/dev-down.sh" >/dev/null
 "$SCRIPT_DIR/dev-up.sh" >/dev/null
