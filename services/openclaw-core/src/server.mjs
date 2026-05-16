@@ -2557,16 +2557,18 @@ function buildOpenClawNativePluginAdapterStatus() {
       "sense.openclaw.workspace_symbol_lookup",
       "sense.openclaw.workspace_edit_target_select",
       "sense.openclaw.prompt_pack",
+      "sense.openclaw.plugin_manifest_map",
       "act.openclaw.workspace_text_write",
       "act.openclaw.workspace_patch_apply",
       "plan.plugin.runtime_preflight",
     ],
     pendingCapabilities: ["act.plugin.capability.invoke"],
     summary: {
-      implemented: 9,
+      implemented: 10,
       pending: 1,
       canReadManifestMetadata: true,
       canReadToolCatalogMetadata: true,
+      canReadPluginManifestMapMetadata: true,
       canReadWorkspaceSemanticMetadata: true,
       canExecuteWorkspaceSymbolLookup: true,
       canSelectWorkspaceEditTargets: true,
@@ -2586,6 +2588,7 @@ function buildOpenClawNativePluginAdapterStatus() {
       "adapter shell is native to OpenClawOnNixOS",
       "manifest profile reads only bounded package metadata from reviewed plugin SDK paths",
       "tool catalog adapter reads only bounded enhanced OpenClaw tool metadata and never imports legacy tools",
+      "plugin manifest map reads only bounded extension manifest metadata and never exposes manifest bodies, auth env var names, or config schema bodies",
       "workspace semantic index emits derived counts only and never exposes file contents",
       "runtime preflight builds a governed execution envelope without loading plugin modules",
       "source contents, README text, script bodies, dependency versions, plugin code execution, and runtime activation remain blocked",
@@ -2686,6 +2689,219 @@ function buildNativePluginManifestProfile({ packagePath = null } = {}) {
       createsTask: false,
       createsApproval: false,
       sourcePackagePathReviewed: true,
+    },
+  };
+}
+
+function classifyPluginManifestEntry(manifest = {}, relativePath = "") {
+  const lower = `${manifest.id ?? ""} ${relativePath} ${safeObjectKeys(manifest.contracts).join(" ")}`.toLowerCase();
+  if (/(memory|lancedb|wiki)/u.test(lower)) {
+    return "memory";
+  }
+  if (/(search|web|browser|fetch|brave|duckduckgo|exa|firecrawl|tavily|perplexity|searxng|grok|xai|gemini|kimi|ollama)/u.test(lower)) {
+    return "search_and_web";
+  }
+  if (/(image|video|music|tts|voice|speech|audio|media|runway|elevenlabs|fal|minimax)/u.test(lower)) {
+    return "media";
+  }
+  if (/(chat|channel|discord|slack|telegram|zalo|whatsapp|matrix|signal|imessage|teams|line|feishu|qqbot)/u.test(lower)) {
+    return "channels";
+  }
+  if (/(openai|anthropic|qwen|deepseek|mistral|groq|bedrock|litellm|openrouter|model|llm|provider)/u.test(lower)) {
+    return "model_provider";
+  }
+  if (/(skill|agent|codex|opencode|kilocode|thread|task)/u.test(lower)) {
+    return "agent_workflow";
+  }
+  return "general_plugin";
+}
+
+function countNestedPropertyKeys(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return 0;
+  }
+  const properties = value.properties;
+  if (!properties || typeof properties !== "object" || Array.isArray(properties)) {
+    return 0;
+  }
+  return safeObjectKeys(properties).length;
+}
+
+function summarisePluginManifest(rootPath, absolutePath, manifest) {
+  const relativePath = path.relative(rootPath, absolutePath).replaceAll(path.sep, "/");
+  const stats = safeStat(absolutePath);
+  const contractKeys = safeObjectKeys(manifest.contracts);
+  const providerAuthEnvVars = manifest.providerAuthEnvVars && typeof manifest.providerAuthEnvVars === "object"
+    ? Object.values(manifest.providerAuthEnvVars).reduce((total, value) => total + (Array.isArray(value) ? value.length : 0), 0)
+    : 0;
+  const channelEnvVars = manifest.channelEnvVars && typeof manifest.channelEnvVars === "object"
+    ? Object.values(manifest.channelEnvVars).reduce((total, value) => total + (Array.isArray(value) ? value.length : 0), 0)
+    : 0;
+  const uiHints = manifest.uiHints && typeof manifest.uiHints === "object" && !Array.isArray(manifest.uiHints)
+    ? Object.values(manifest.uiHints)
+    : [];
+  const providerEndpoints = Array.isArray(manifest.providerEndpoints) ? manifest.providerEndpoints : [];
+  const configSchemaPropertyCount = countNestedPropertyKeys(manifest.configSchema);
+  const category = classifyPluginManifestEntry(manifest, relativePath);
+
+  return {
+    id: typeof manifest.id === "string" ? manifest.id : path.basename(path.dirname(absolutePath)),
+    relativePath,
+    extensionName: path.basename(path.dirname(absolutePath)),
+    category,
+    enabledByDefault: manifest.enabledByDefault === true,
+    manifestSizeBytes: stats?.size ?? null,
+    contractKeys,
+    contractCount: contractKeys.length,
+    providerCount: Array.isArray(manifest.providers) ? manifest.providers.length : 0,
+    providerEndpointCount: providerEndpoints.length,
+    providerEndpointHostCount: providerEndpoints.reduce((total, endpoint) => total + (Array.isArray(endpoint?.hosts) ? endpoint.hosts.length : 0), 0),
+    channelCount: Array.isArray(manifest.channels) ? manifest.channels.length : 0,
+    toolContractCount: Array.isArray(manifest.contracts?.tools) ? manifest.contracts.tools.length : 0,
+    uiHintCount: uiHints.length,
+    sensitiveUiHintCount: uiHints.filter((hint) => hint?.sensitive === true).length,
+    providerAuthEnvVarCount: providerAuthEnvVars,
+    channelEnvVarCount: channelEnvVars,
+    syntheticAuthRefCount: Array.isArray(manifest.syntheticAuthRefs) ? manifest.syntheticAuthRefs.length : 0,
+    providerAuthChoiceCount: Array.isArray(manifest.providerAuthChoices) ? manifest.providerAuthChoices.length : 0,
+    configSchemaPropertyCount,
+    hasConfigSchema: Boolean(manifest.configSchema),
+    hasConfigContracts: Boolean(manifest.configContracts),
+    contentRead: true,
+    contentExposed: false,
+    manifestBodyExposed: false,
+    authMaterialExposed: false,
+  };
+}
+
+function buildOpenClawPluginManifestMap({ workspacePath = null, query = null, limit = 80 } = {}) {
+  const { registry, item } = selectOpenClawToolCatalogWorkspace({ workspacePath });
+  const implementation = buildOpenClawNativePluginSdkContractImplementation({
+    packagePath: path.join(item.path, "packages", "plugin-sdk"),
+  });
+  const capability = implementation.contract?.capabilities?.find((entry) => entry.id === "sense.openclaw.plugin_manifest_map") ?? null;
+  const extensionsRoot = path.join(item.path, "extensions");
+  const rootStats = safeStat(extensionsRoot);
+  const safeLimit = normalisePositiveLimit(limit, 80, 200);
+  const safeQuery = typeof query === "string" && query.trim() ? query.trim().toLowerCase() : null;
+  const manifests = [];
+
+  if (rootStats?.isDirectory()) {
+    let entries = [];
+    try {
+      entries = readdirSync(extensionsRoot, { withFileTypes: true });
+    } catch {
+      entries = [];
+    }
+    for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
+      if (!entry.isDirectory() || TOOL_CATALOG_IGNORED_DIRECTORIES.has(entry.name)) {
+        continue;
+      }
+      const manifestPath = path.join(extensionsRoot, entry.name, "openclaw.plugin.json");
+      const manifest = readJsonFileIfPresent(manifestPath);
+      if (!manifest) {
+        continue;
+      }
+      const summary = summarisePluginManifest(item.path, manifestPath, manifest);
+      if (safeQuery && ![
+        summary.id,
+        summary.extensionName,
+        summary.category,
+        ...summary.contractKeys,
+      ].some((value) => String(value ?? "").toLowerCase().includes(safeQuery))) {
+        continue;
+      }
+      manifests.push(summary);
+      if (manifests.length >= safeLimit) {
+        break;
+      }
+    }
+  }
+
+  const byCategory = manifests.reduce((accumulator, manifest) => {
+    accumulator[manifest.category] = (accumulator[manifest.category] ?? 0) + 1;
+    return accumulator;
+  }, {});
+  const contractKeyCounts = manifests.reduce((accumulator, manifest) => {
+    for (const key of manifest.contractKeys) {
+      accumulator[key] = (accumulator[key] ?? 0) + 1;
+    }
+    return accumulator;
+  }, {});
+
+  return {
+    ok: true,
+    registry: "openclaw-plugin-manifest-map-v0",
+    mode: "read-only-plugin-manifest-absorption",
+    generatedAt: new Date().toISOString(),
+    sourceRegistries: [
+      registry.registry,
+      implementation.registry,
+      "openclaw-extension-manifests",
+    ],
+    capability: {
+      id: capability?.id ?? "sense.openclaw.plugin_manifest_map",
+      kind: capability?.kind ?? "sense",
+      risk: capability?.risk ?? "low",
+      approvalRequired: capability?.approval?.required === true,
+      runtimeOwner: capability?.runtimeOwner ?? "openclaw_on_nixos",
+    },
+    workspace: {
+      id: item.id,
+      name: item.name,
+      path: item.path,
+    },
+    roots: {
+      extensions: path.relative(item.path, extensionsRoot).replaceAll(path.sep, "/"),
+    },
+    filter: {
+      query: safeQuery,
+      limit: safeLimit,
+    },
+    manifests,
+    categories: Object.entries(byCategory)
+      .map(([category, count]) => ({ category, count }))
+      .sort((left, right) => right.count - left.count || left.category.localeCompare(right.category)),
+    contractKeyCounts,
+    summary: {
+      manifestCount: manifests.length,
+      categoryCount: Object.keys(byCategory).length,
+      enabledByDefaultCount: manifests.filter((manifest) => manifest.enabledByDefault).length,
+      providerCount: manifests.reduce((total, manifest) => total + manifest.providerCount, 0),
+      providerEndpointCount: manifests.reduce((total, manifest) => total + manifest.providerEndpointCount, 0),
+      channelCount: manifests.reduce((total, manifest) => total + manifest.channelCount, 0),
+      toolContractCount: manifests.reduce((total, manifest) => total + manifest.toolContractCount, 0),
+      sensitiveUiHintCount: manifests.reduce((total, manifest) => total + manifest.sensitiveUiHintCount, 0),
+      authReferenceCount: manifests.reduce((total, manifest) => total + manifest.providerAuthEnvVarCount + manifest.channelEnvVarCount + manifest.syntheticAuthRefCount, 0),
+      configSchemaCount: manifests.filter((manifest) => manifest.hasConfigSchema).length,
+      canReadManifestMetadata: true,
+      exposesManifestBodies: false,
+      exposesAuthEnvVarNames: false,
+      exposesConfigSchemaBodies: false,
+      canImportModule: false,
+      canExecutePluginCode: false,
+      canActivateRuntime: false,
+      canMutate: false,
+      createsTask: false,
+      createsApproval: false,
+    },
+    governance: {
+      mode: "plugin_manifest_map_read_only",
+      runtimeOwner: "openclaw_on_nixos",
+      sourceRegistry: "openclaw-extension-manifests",
+      canReadManifestMetadata: true,
+      canReadManifestBody: true,
+      exposesManifestBodies: false,
+      exposesAuthEnvVarNames: false,
+      exposesConfigSchemaBodies: false,
+      exposesSourceFileContent: false,
+      exposesScriptBodies: false,
+      canImportModule: false,
+      canExecutePluginCode: false,
+      canActivateRuntime: false,
+      canMutate: false,
+      createsTask: false,
+      createsApproval: false,
     },
   };
 }
@@ -6831,6 +7047,23 @@ function baseCapabilities() {
       description: "Execute a bounded read-only symbol lookup over enhanced OpenClaw workspace files without exposing function bodies or executing legacy code.",
     },
     {
+      id: "sense.openclaw.plugin_manifest_map",
+      name: "Native OpenClaw Plugin Manifest Map",
+      kind: "sensor",
+      service: "openclaw-core",
+      endpoint: `http://${host}:${port}/plugins/native-adapter/plugin-manifest-map`,
+      intents: [
+        "openclaw.plugin.manifest_map",
+        "openclaw.plugin-manifest-map",
+        "plugin.manifest_map",
+        "plugin-manifest-map",
+      ],
+      domains: ["body_internal"],
+      risk: "low",
+      governance: "audit_only",
+      description: "Map enhanced OpenClaw extension manifests into native registry candidates without exposing auth material, importing modules, or activating plugin runtimes.",
+    },
+    {
       id: "act.openclaw.workspace_text_write",
       name: "Native OpenClaw Workspace Text Write",
       kind: "actuator",
@@ -7244,6 +7477,14 @@ async function callCapabilityBackend(capability, request) {
 
   if (capability.id === "sense.openclaw.prompt_pack") {
     return buildNativeOpenClawPromptSemanticsProfile({
+      workspacePath: request.params.workspacePath,
+      query: request.params.query ?? request.params.q,
+      limit: request.params.limit,
+    });
+  }
+
+  if (capability.id === "sense.openclaw.plugin_manifest_map") {
+    return buildOpenClawPluginManifestMap({
       workspacePath: request.params.workspacePath,
       query: request.params.query ?? request.params.q,
       limit: request.params.limit,
@@ -9849,6 +10090,44 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === "GET" && requestUrl.pathname === "/plugins/openclaw-plugin-manifest-map") {
+    try {
+      sendJson(res, 200, buildOpenClawPluginManifestMap({
+        workspacePath: requestUrl.searchParams.get("workspacePath"),
+        query: requestUrl.searchParams.get("query") ?? requestUrl.searchParams.get("q"),
+        limit: requestUrl.searchParams.get("limit"),
+      }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/plugins/openclaw-plugin-manifest-map/summary") {
+    try {
+      const manifestMap = buildOpenClawPluginManifestMap({
+        workspacePath: requestUrl.searchParams.get("workspacePath"),
+        query: requestUrl.searchParams.get("query") ?? requestUrl.searchParams.get("q"),
+        limit: requestUrl.searchParams.get("limit"),
+      });
+      sendJson(res, 200, {
+        ok: manifestMap.ok,
+        registry: manifestMap.registry,
+        mode: manifestMap.mode,
+        generatedAt: manifestMap.generatedAt,
+        sourceRegistries: manifestMap.sourceRegistries,
+        capability: manifestMap.capability,
+        summary: manifestMap.summary,
+        governance: manifestMap.governance,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
   if (req.method === "GET" && requestUrl.pathname === "/plugins/openclaw-native-plugin-contract") {
     sendJson(res, 200, {
       ok: true,
@@ -9940,6 +10219,20 @@ const server = http.createServer(async (req, res) => {
       sendJson(res, 200, buildNativeOpenClawToolCatalogProfile({
         workspacePath: requestUrl.searchParams.get("workspacePath"),
         category: requestUrl.searchParams.get("category"),
+        query: requestUrl.searchParams.get("query") ?? requestUrl.searchParams.get("q"),
+        limit: requestUrl.searchParams.get("limit"),
+      }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 404, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/plugins/native-adapter/plugin-manifest-map") {
+    try {
+      sendJson(res, 200, buildOpenClawPluginManifestMap({
+        workspacePath: requestUrl.searchParams.get("workspacePath"),
         query: requestUrl.searchParams.get("query") ?? requestUrl.searchParams.get("q"),
         limit: requestUrl.searchParams.get("limit"),
       }));

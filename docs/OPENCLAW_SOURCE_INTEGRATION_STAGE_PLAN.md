@@ -1358,3 +1358,49 @@ OPENCLAW_MILESTONE_CHECKS=openclaw-source-command-regression,observer-openclaw-s
 Next intended slice after this passes:
 - Treat the source-derived command lane as stable enough for normal regression coverage.
 - Move to the next real enhanced OpenClaw absorption surface rather than adding more command-readiness layers.
+
+## 34. 2026-05-16 Step 17 Update: Plugin Manifest Map Absorption
+
+Status: implemented_waiting_check.
+
+Slice: read-only native absorption of enhanced `openclaw/extensions/*/openclaw.plugin.json` manifests.
+
+Purpose: move from command-lane completion to the next real enhanced OpenClaw absorption surface. This maps extension plugin manifests into native metadata candidates owned by `OpenClawOnNixOS`, without importing old plugin modules, exposing manifest bodies, leaking auth/config details, or activating any plugin runtime.
+
+Implemented artifacts:
+- Core API: `GET /plugins/openclaw-plugin-manifest-map`.
+- Core summary API: `GET /plugins/openclaw-plugin-manifest-map/summary`.
+- Native adapter API: `GET /plugins/native-adapter/plugin-manifest-map`.
+- Capability registry entry: `sense.openclaw.plugin_manifest_map`.
+- Capability backend support for `sense.openclaw.plugin_manifest_map`.
+- Observer panel: `OpenClaw Plugin Manifest Map`.
+- Targeted checks: `openclaw-plugin-manifest-map`, `observer-openclaw-plugin-manifest-map`.
+
+Governance boundaries:
+- Reads extension manifest files only to derive bounded metadata.
+- Does not expose manifest bodies.
+- Does not expose auth env var names.
+- Does not expose endpoint host/token details.
+- Does not expose config schema bodies or script bodies.
+- Does not import old `openclaw` modules.
+- Does not execute plugin code or activate plugin runtime.
+- Does not mutate, create tasks, or create approvals.
+
+Local verification target:
+- `npm run typecheck`.
+- `git diff --check`.
+- Bash syntax check for the new milestone scripts.
+- Targeted milestone checks on NixOS.
+
+NixOS targeted milestone command:
+
+```bash
+cd /home/edvulcan/OpenClaw_On_NixOS && \
+git pull origin main && \
+OPENCLAW_MILESTONE_CHECKS=openclaw-plugin-manifest-map,observer-openclaw-plugin-manifest-map npm run dev:milestone-check:unix
+```
+
+Next intended slice after this passes:
+- Use the manifest map to choose one safe plugin capability shape for a native planning/preflight path.
+- Do not activate plugin runtime yet.
+- Keep execution and mutation behind explicit approval/task boundaries.
