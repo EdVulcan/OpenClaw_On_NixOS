@@ -222,7 +222,7 @@ if (channelCandidate.proposedCapability.kind !== "act" || channelCandidate.propo
 if (!invoke.ok || invoke.result?.registry !== "openclaw-plugin-capability-plan-v0") {
   throw new Error(`capability invoke should return plugin capability plan: ${JSON.stringify(invoke)}`);
 }
-if ((history.items ?? []).length !== 1 || history.items[0]?.capabilityId !== "plan.openclaw.plugin_capability") {
+if ((history.items ?? []).length !== 1 || history.items[0]?.capability?.id !== "plan.openclaw.plugin_capability") {
   throw new Error(`plugin capability plan invoke should create one capability history item: ${JSON.stringify(history.items)}`);
 }
 if ((approvals.items ?? []).length !== 0) {
