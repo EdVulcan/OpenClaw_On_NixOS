@@ -1775,7 +1775,7 @@ Recheck note:
 
 ## 44. 2026-05-17 Step 27 Update: Search/Web Runtime Activation Hardening
 
-Status: local implementation ready; awaiting NixOS targeted milestone.
+Status: passed.
 
 Slice: hardening for native search/web runtime activation approvals and recovery chains.
 
@@ -1801,4 +1801,36 @@ Expected NixOS check:
 cd /home/edvulcan/OpenClaw_On_NixOS && \
 git pull origin main && \
 OPENCLAW_MILESTONE_CHECKS=openclaw-plugin-search-web-adapter-runtime-activation-hardening,observer-openclaw-plugin-search-web-adapter-runtime-activation-hardening npm run dev:milestone-check:unix
+```
+
+Recheck note:
+- 2026-05-17 17:20 +08:00 NixOS targeted milestone passed: `openclaw-plugin-search-web-adapter-runtime-activation-hardening`, `observer-openclaw-plugin-search-web-adapter-runtime-activation-hardening`.
+
+## 45. 2026-05-17 Step 28 Update: Search/Web Runtime Activation Persistence
+
+Status: local implementation ready; awaiting NixOS targeted milestone.
+
+Slice: restart persistence for native search/web runtime activation approval and recovery chains.
+
+Purpose: prove the activation workflow remains trustworthy across service restarts before any provider/network runtime is enabled. Pending activation approvals must survive restart, denied activation tasks must remain linked to recovered tasks, recovered fresh approvals must survive restart, and approved recovered activation tasks must remain deferred after restart.
+
+Implemented artifacts:
+- Targeted checks: `openclaw-plugin-search-web-adapter-runtime-activation-persistence`, `observer-openclaw-plugin-search-web-adapter-runtime-activation-persistence`.
+- Restart coverage for pending activation approvals.
+- Restart coverage for denied activation source tasks and recovered activation tasks.
+- Restart coverage for approved recovered activation tasks that remain `network_runtime_deferred`.
+
+Safety boundaries:
+- Persisted activation tasks do not execute network/provider code after restart.
+- Recovered activation tasks retain fresh approval IDs and recovery lineage after restart.
+- Approved recovered activation tasks remain queued and deferred at `search_web_network_runtime_adapter_deferred`.
+- Capability history remains empty across the persistence chain.
+- Query, endpoint hosts/tokens, auth env var names, source contents, script bodies, and package versions remain hidden.
+
+Expected NixOS check:
+
+```bash
+cd /home/edvulcan/OpenClaw_On_NixOS && \
+git pull origin main && \
+OPENCLAW_MILESTONE_CHECKS=openclaw-plugin-search-web-adapter-runtime-activation-persistence,observer-openclaw-plugin-search-web-adapter-runtime-activation-persistence npm run dev:milestone-check:unix
 ```
