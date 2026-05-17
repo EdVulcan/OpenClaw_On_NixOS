@@ -3080,6 +3080,226 @@ function buildOpenClawPluginCapabilityPlan({ workspacePath = null, query = null,
   };
 }
 
+function buildOpenClawPluginCandidateContractTests({
+  workspacePath = null,
+  category = "search_and_web",
+  query = null,
+  limit = 8,
+} = {}) {
+  const safeCategory = typeof category === "string" && category.trim()
+    ? category.trim()
+    : "search_and_web";
+  const safeLimit = normalisePositiveLimit(limit, 8, 40);
+  const capabilityPlan = buildOpenClawPluginCapabilityPlan({
+    workspacePath,
+    query: query ?? safeCategory,
+    limit: 80,
+  });
+  const candidates = (Array.isArray(capabilityPlan.candidates) ? capabilityPlan.candidates : [])
+    .filter((candidate) => candidate.category === safeCategory)
+    .slice(0, safeLimit);
+  const tests = candidates.flatMap((candidate) => {
+    const proposed = candidate.proposedCapability ?? {};
+    const gates = Array.isArray(candidate.gates) ? candidate.gates : [];
+    const runtimeGate = gates.find((gate) => gate.id === "runtime_adapter_required") ?? null;
+    const approvalGate = gates.find((gate) => gate.id === "explicit_approval_required") ?? null;
+    const nativeContractGate = gates.find((gate) => gate.id === "native_capability_contract_required") ?? null;
+    const sourcePrivacyLocked = candidate.contentExposed === false
+      && candidate.canImportModule === false
+      && candidate.canExecutePluginCode === false
+      && candidate.canActivateRuntime === false;
+    const expectedCrossBoundaryApproval = safeCategory === "search_and_web";
+
+    return [
+      {
+        id: `${candidate.id}:candidate_selected_from_manifest_plan`,
+        candidateId: candidate.id,
+        manifestId: candidate.manifestId,
+        required: true,
+        status: candidate.status === "blocked_pending_native_adapter" ? "passed" : "failed",
+        evidence: `category=${candidate.category}; status=${candidate.status}`,
+      },
+      {
+        id: `${candidate.id}:native_contract_fields_declared`,
+        candidateId: candidate.id,
+        manifestId: candidate.manifestId,
+        required: true,
+        status: typeof proposed.id === "string"
+          && proposed.id.length > 0
+          && typeof proposed.kind === "string"
+          && typeof proposed.risk === "string"
+          && Array.isArray(proposed.domains)
+          && proposed.domains.includes("body_internal")
+          && proposed.runtimeOwner === "openclaw_on_nixos"
+          && typeof proposed.approvalRequired === "boolean"
+          && proposed.auditLedger === "capability_history"
+          ? "passed"
+          : "failed",
+        evidence: `capability=${proposed.id ?? "missing"}; kind=${proposed.kind ?? "missing"}; risk=${proposed.risk ?? "missing"}`,
+      },
+      {
+        id: `${candidate.id}:runtime_adapter_gate_blocks_activation`,
+        candidateId: candidate.id,
+        manifestId: candidate.manifestId,
+        required: true,
+        status: runtimeGate?.required === true
+          && runtimeGate.status === "blocked"
+          && nativeContractGate?.status === "blocked"
+          ? "passed"
+          : "failed",
+        evidence: `runtimeGate=${runtimeGate?.status ?? "missing"}; nativeContractGate=${nativeContractGate?.status ?? "missing"}`,
+      },
+      {
+        id: `${candidate.id}:policy_approval_boundary_declared`,
+        candidateId: candidate.id,
+        manifestId: candidate.manifestId,
+        required: true,
+        status: expectedCrossBoundaryApproval
+          ? proposed.approvalRequired === true
+            && proposed.domains?.includes("cross_boundary")
+            && approvalGate?.required === true
+            && approvalGate.status === "blocked"
+            ? "passed"
+            : "failed"
+          : "passed",
+        evidence: `approval=${Boolean(proposed.approvalRequired)}; domains=${(proposed.domains ?? []).join(",")}; approvalGate=${approvalGate?.status ?? "missing"}`,
+      },
+      {
+        id: `${candidate.id}:source_privacy_boundary_locked`,
+        candidateId: candidate.id,
+        manifestId: candidate.manifestId,
+        required: true,
+        status: sourcePrivacyLocked ? "passed" : "failed",
+        evidence: `contentExposed=${Boolean(candidate.contentExposed)}; import=${Boolean(candidate.canImportModule)}; execute=${Boolean(candidate.canExecutePluginCode)}; activate=${Boolean(candidate.canActivateRuntime)}`,
+      },
+      {
+        id: `${candidate.id}:manifest_signals_are_metadata_only`,
+        candidateId: candidate.id,
+        manifestId: candidate.manifestId,
+        required: true,
+        status: typeof candidate.manifestId === "string"
+          && candidate.manifestId.length > 0
+          && candidate.category === safeCategory
+          && Array.isArray(candidate.signals?.contractKeys)
+          && Number.isFinite(candidate.signals?.providerCount)
+          && Number.isFinite(candidate.signals?.providerEndpointCount)
+          ? "passed"
+          : "failed",
+        evidence: `contracts=${(candidate.signals?.contractKeys ?? []).join(",")}; providers=${candidate.signals?.providerCount ?? 0}; endpoints=${candidate.signals?.providerEndpointCount ?? 0}`,
+      },
+    ];
+  });
+  const requiredTests = tests.filter((test) => test.required);
+  const passedRequired = requiredTests.filter((test) => test.status === "passed").length;
+  const failedRequired = requiredTests.length - passedRequired;
+
+  return {
+    ok: candidates.length > 0 && failedRequired === 0,
+    registry: "openclaw-plugin-candidate-contract-tests-v0",
+    mode: "candidate-native-adapter-contract-tests",
+    generatedAt: new Date().toISOString(),
+    sourceRegistries: [
+      capabilityPlan.registry,
+      "openclaw-plugin-manifest-map-v0",
+    ],
+    workspace: capabilityPlan.workspace,
+    filter: {
+      category: safeCategory,
+      query: typeof query === "string" && query.trim() ? query.trim() : null,
+      limit: safeLimit,
+    },
+    candidates: candidates.map((candidate) => ({
+      id: candidate.id,
+      manifestId: candidate.manifestId,
+      extensionName: candidate.extensionName,
+      sourceManifestPath: candidate.sourceManifestPath,
+      category: candidate.category,
+      proposedCapability: candidate.proposedCapability,
+      signals: candidate.signals,
+      gates: candidate.gates,
+      status: candidate.status,
+      canActivateRuntime: false,
+      canExecutePluginCode: false,
+      canImportModule: false,
+      contentExposed: false,
+    })),
+    adapterContracts: candidates.map((candidate) => ({
+      candidateId: candidate.id,
+      manifestId: candidate.manifestId,
+      category: candidate.category,
+      proposedCapabilityId: candidate.proposedCapability?.id ?? candidate.id,
+      expectedNativeSurfaces: [
+        "native_capability_contract",
+        "runtime_adapter_boundary",
+        "policy_approval_gate",
+        "capability_history_audit_binding",
+        "observer_visibility",
+      ],
+      mustDenyBeforeFutureImplementation: [
+        "import_old_openclaw_module",
+        "execute_plugin_code",
+        "activate_plugin_runtime",
+        "expose_manifest_body",
+        "expose_auth_env_var_names",
+        "create_task_without_explicit_approval",
+      ],
+      runtimeOwner: "openclaw_on_nixos",
+      approvalRequired: candidate.proposedCapability?.approvalRequired === true,
+      auditLedger: candidate.proposedCapability?.auditLedger ?? "capability_history",
+      implementationStatus: "contract_tests_ready_runtime_adapter_pending",
+    })),
+    tests,
+    summary: {
+      selectedCategory: safeCategory,
+      candidateCount: candidates.length,
+      adapterContractCount: candidates.length,
+      totalTests: tests.length,
+      requiredTests: requiredTests.length,
+      passedRequired,
+      failedRequired,
+      nativeAdapterContractTestsReady: candidates.length > 0 && failedRequired === 0,
+      runtimeAdapterImplemented: false,
+      requiresApproval: candidates.filter((candidate) => candidate.proposedCapability?.approvalRequired === true).length,
+      crossBoundaryCandidates: candidates.filter((candidate) => candidate.proposedCapability?.domains?.includes("cross_boundary")).length,
+      canReadManifestMetadata: true,
+      exposesManifestBodies: false,
+      exposesAuthEnvVarNames: false,
+      exposesConfigSchemaBodies: false,
+      canImportModule: false,
+      canExecutePluginCode: false,
+      canActivateRuntime: false,
+      canMutate: false,
+      createsTask: false,
+      createsApproval: false,
+      nextAllowedWork: [
+        "implement the selected candidate as a native OpenClawOnNixOS adapter contract",
+        "keep runtime execution behind explicit approval-gated task materialization",
+        "add preflight and runtime activation gates only after contract tests stay green",
+      ],
+    },
+    governance: {
+      mode: "plugin_candidate_contract_tests_read_only",
+      runtimeOwner: "openclaw_on_nixos",
+      sourceRegistry: capabilityPlan.registry,
+      selectedCategory: safeCategory,
+      canReadManifestMetadata: true,
+      exposesManifestBodies: false,
+      exposesAuthEnvVarNames: false,
+      exposesConfigSchemaBodies: false,
+      exposesSourceFileContent: false,
+      exposesScriptBodies: false,
+      canImportModule: false,
+      canExecutePluginCode: false,
+      canActivateRuntime: false,
+      canMutate: false,
+      createsTask: false,
+      createsApproval: false,
+      requiresExplicitApprovalBeforeExecution: true,
+      requiresNativeAdapterBeforeRuntimeActivation: true,
+    },
+  };
+}
+
 function normalisePositiveLimit(value, fallback = 20, max = 80) {
   const parsed = Number.parseInt(String(value ?? ""), 10);
   return Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, max) : fallback;
@@ -10454,6 +10674,21 @@ const server = http.createServer(async (req, res) => {
     try {
       sendJson(res, 200, buildOpenClawPluginCapabilityPlan({
         workspacePath: requestUrl.searchParams.get("workspacePath"),
+        query: requestUrl.searchParams.get("query") ?? requestUrl.searchParams.get("q"),
+        limit: requestUrl.searchParams.get("limit"),
+      }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 404, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/plugins/native-adapter/plugin-candidate-contract-tests") {
+    try {
+      sendJson(res, 200, buildOpenClawPluginCandidateContractTests({
+        workspacePath: requestUrl.searchParams.get("workspacePath"),
+        category: requestUrl.searchParams.get("category") ?? "search_and_web",
         query: requestUrl.searchParams.get("query") ?? requestUrl.searchParams.get("q"),
         limit: requestUrl.searchParams.get("limit"),
       }));

@@ -1410,7 +1410,7 @@ Next intended slice after this passes:
 
 ## 35. 2026-05-17 Step 18 Update: Plugin Capability Plan
 
-Status: implemented_waiting_check.
+Status: passed.
 
 Slice: manifest-derived native OpenClaw plugin capability planning.
 
@@ -1422,6 +1422,9 @@ Implemented artifacts:
 - Capability backend support for `plan.openclaw.plugin_capability`.
 - Observer panel: `OpenClaw Plugin Capability Plan`.
 - Targeted checks: `openclaw-plugin-capability-plan`, `observer-openclaw-plugin-capability-plan`.
+
+Recheck note:
+- 2026-05-17 15:11 +08:00 NixOS targeted milestone passed: `openclaw-plugin-capability-plan`, `observer-openclaw-plugin-capability-plan`.
 
 Governance boundaries:
 - Reads only manifest-derived metadata from the previous manifest map.
@@ -1449,3 +1452,51 @@ OPENCLAW_MILESTONE_CHECKS=openclaw-plugin-capability-plan,observer-openclaw-plug
 Next intended slice after this passes:
 - Select one blocked candidate category, likely `search_and_web` or `memory`, and write native adapter contract tests for that candidate.
 - Do not activate runtime or execute plugin code yet.
+
+## 36. 2026-05-17 Step 19 Update: Plugin Candidate Contract Tests
+
+Status: local implementation ready; awaiting NixOS targeted milestone.
+
+Slice: native adapter contract tests for the selected enhanced OpenClaw plugin candidate category `search_and_web`.
+
+Purpose: move from broad manifest-derived capability planning into a concrete candidate lane. This selects the blocked `search_and_web` plugin shape and turns its expected native adapter boundaries into testable contract output before any runtime adapter implementation, task materialization, plugin import, plugin execution, or runtime activation.
+
+Implemented artifacts:
+- Core API: `GET /plugins/native-adapter/plugin-candidate-contract-tests?category=search_and_web`.
+- Observer panel: `OpenClaw Plugin Candidate Contract Tests`.
+- Targeted checks: `openclaw-plugin-candidate-contract-tests`, `observer-openclaw-plugin-candidate-contract-tests`.
+
+Contract expectations now checked:
+- The selected candidate must come from `openclaw-plugin-capability-plan-v0`.
+- The candidate must remain blocked pending native adapter implementation.
+- The proposed capability must declare native contract fields, runtime owner, risk, domains, approval, and audit ledger.
+- `search_and_web` must stay cross-boundary and approval-gated, even when an individual provider's derived risk is low or medium.
+- Runtime adapter and native capability contract gates must remain blocked before implementation.
+- Manifest-derived signals remain metadata-only.
+
+Governance boundaries:
+- Reads only manifest-derived metadata from the previous capability plan.
+- Does not expose manifest bodies.
+- Does not expose auth env var names, endpoint hosts/tokens, schema bodies, source files, or script bodies.
+- Does not import old `openclaw` modules.
+- Does not execute plugin code or activate plugin runtime.
+- Direct endpoint reads do not create tasks, approvals, or capability invocations.
+
+Local verification target:
+- `npm run typecheck`.
+- `git diff --check`.
+- Bash syntax check for the new milestone scripts.
+- Targeted milestone checks on NixOS.
+
+NixOS targeted milestone command:
+
+```bash
+cd /home/edvulcan/OpenClaw_On_NixOS && \
+git pull origin main && \
+OPENCLAW_MILESTONE_CHECKS=openclaw-plugin-candidate-contract-tests,observer-openclaw-plugin-candidate-contract-tests npm run dev:milestone-check:unix
+```
+
+Next intended slice after this passes:
+- Implement the selected `search_and_web` native adapter contract shell inside `OpenClawOnNixOS`.
+- Keep actual command/network/plugin execution behind explicit approval-gated task materialization.
+- Add runtime preflight only after this candidate contract stays green.
