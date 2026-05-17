@@ -3978,6 +3978,185 @@ function buildOpenClawPluginSearchWebAdapterRuntimeActivationPlan({
   };
 }
 
+function buildOpenClawPluginSearchWebAdapterRuntimeActivationTaskDraft({
+  workspacePath = null,
+  providerContractId = null,
+  query = "openclaw native integration",
+  limit = 8,
+} = {}) {
+  const activationPlan = buildOpenClawPluginSearchWebAdapterRuntimeActivationPlan({
+    workspacePath,
+    providerContractId,
+    query,
+    limit,
+  });
+  const provider = activationPlan.provider ?? {};
+  const envelope = activationPlan.executionEnvelope ?? {};
+  const now = new Date().toISOString();
+  const policyRequest = {
+    intent: "plugin.search_web.runtime_activation",
+    domain: "cross_boundary",
+    risk: "high",
+    requiresApproval: true,
+    approved: false,
+    providerContractId: provider.id ?? null,
+    tags: ["openclaw_search_web_runtime_activation", "explicit_approval_required", "network_runtime_deferred"],
+  };
+  const policyDecision = {
+    id: randomUUID(),
+    at: now,
+    engine: "openclaw-plugin-search-web-adapter-runtime-activation-task-v0",
+    stage: "plugin_search_web.runtime_activation.task.materialize",
+    subject: {
+      taskId: null,
+      type: "openclaw_search_web_runtime_activation",
+      goal: `Prepare approved search/web runtime activation for ${provider.manifestId ?? "search/web provider"}`,
+      targetUrl: null,
+      intent: policyRequest.intent,
+    },
+    domain: policyRequest.domain,
+    risk: policyRequest.risk,
+    decision: "require_approval",
+    reason: "search_web_runtime_activation_requires_explicit_user_approval_before_network_runtime_enablement",
+    approved: false,
+    autonomyMode,
+    autonomous: false,
+  };
+  const blockedGateIds = (activationPlan.gates ?? [])
+    .filter((gate) => gate.required === true && gate.status === "blocked")
+    .map((gate) => gate.id);
+  const plan = {
+    planId: `plan-${randomUUID()}`,
+    strategy: "openclaw-search-web-runtime-activation-v0",
+    planner: "openclaw-plugin-search-web-adapter-runtime-activation-task-v0",
+    capabilityAware: true,
+    status: "planned",
+    goal: policyDecision.subject.goal,
+    targetUrl: null,
+    intent: policyRequest.intent,
+    createdAt: now,
+    updatedAt: now,
+    capabilitySummary: {
+      total: 3,
+      approvalGates: 2,
+      ids: [
+        "plan.openclaw.plugin_search_web_runtime_activation",
+        "govern.policy.evaluate",
+        "boundary.cross_domain.approval",
+      ],
+      byRisk: {
+        low: 1,
+        high: 2,
+      },
+    },
+    steps: [
+      {
+        id: "step-review-search-web-activation-plan",
+        kind: "openclaw.plugin.search_web_runtime_activation_plan",
+        phase: "reviewing_runtime_activation_plan",
+        title: "Review search/web runtime activation gates",
+        status: "pending",
+        capabilityId: "plan.openclaw.plugin_search_web_runtime_activation",
+        risk: "low",
+        governance: "audit_only",
+        requiresApproval: false,
+        params: {
+          providerContractId: provider.id ?? null,
+          manifestId: provider.manifestId ?? null,
+          status: activationPlan.status,
+          blockedGateIds,
+        },
+      },
+      {
+        id: "step-user-approval",
+        kind: "approval.gate",
+        phase: "waiting_for_approval",
+        title: "Wait for explicit user approval before any search/web runtime activation attempt",
+        status: "pending",
+        capabilityId: "govern.policy.evaluate",
+        risk: "high",
+        governance: "require_approval",
+        requiresApproval: true,
+      },
+      {
+        id: "step-defer-network-runtime-activation",
+        kind: "plugin.search_web.runtime_activation",
+        phase: "network_runtime_deferred",
+        title: "Defer search/web network runtime activation until sandbox/provider adapter exists",
+        status: "pending",
+        capabilityId: "boundary.cross_domain.approval",
+        risk: "high",
+        governance: "require_approval",
+        requiresApproval: true,
+        params: {
+          providerContractId: provider.id ?? null,
+          operation: envelope.operation ?? "search.query",
+          blockedGateIds,
+          canUseNetwork: false,
+          canExecutePluginCode: false,
+          canActivateRuntime: false,
+          queryContentExposed: false,
+        },
+      },
+    ],
+    governance: {
+      mode: "openclaw_search_web_runtime_activation_task_plan",
+      runtimeOwner: "openclaw_on_nixos",
+      canUseNetwork: false,
+      canImportModule: false,
+      canExecutePluginCode: false,
+      canActivateRuntime: false,
+      requiresExplicitApproval: true,
+      requiresRuntimeAdapterBeforeExecution: true,
+    },
+  };
+
+  return {
+    ok: true,
+    registry: "openclaw-plugin-search-web-adapter-runtime-activation-task-draft-v0",
+    mode: "approval-gated-search-web-runtime-activation-task-draft",
+    generatedAt: now,
+    sourceRegistry: activationPlan.registry,
+    sourceMode: activationPlan.mode,
+    adapter: activationPlan.adapter,
+    provider,
+    query: activationPlan.query,
+    activationPlan: {
+      registry: activationPlan.registry,
+      status: activationPlan.status,
+      activationReady: activationPlan.activationReady,
+      summary: activationPlan.summary,
+      gates: activationPlan.gates,
+      executionEnvelope: activationPlan.executionEnvelope,
+    },
+    plan,
+    policy: {
+      request: policyRequest,
+      decision: policyDecision,
+    },
+    governance: {
+      mode: "plugin_search_web_runtime_activation_task_draft",
+      runtimeOwner: "openclaw_on_nixos",
+      createsTask: false,
+      createsApproval: false,
+      canReadManifestMetadata: true,
+      canResolveProviderMetadata: true,
+      exposesManifestBodies: false,
+      exposesAuthEnvVarNames: false,
+      exposesEndpointHosts: false,
+      exposesSourceFileContent: false,
+      exposesQueryContent: false,
+      canUseNetwork: false,
+      canImportModule: false,
+      canExecutePluginCode: false,
+      canActivateRuntime: false,
+      canMutate: false,
+      requiresExplicitApprovalBeforeNetworkRuntimeActivation: true,
+      requiresRuntimeAdapterBeforeExecution: true,
+    },
+  };
+}
+
 async function createOpenClawPluginSearchWebAdapterTask({
   workspacePath = null,
   providerContractId = null,
@@ -4045,6 +4224,81 @@ async function createOpenClawPluginSearchWebAdapterTask({
       executed: false,
       requiresExplicitApprovalBeforeNetworkUse: true,
       requiresRuntimePreflightBeforeExecution: true,
+    },
+  };
+}
+
+async function createOpenClawPluginSearchWebAdapterRuntimeActivationTask({
+  workspacePath = null,
+  providerContractId = null,
+  query = "openclaw native integration",
+  limit = 8,
+  confirm = false,
+} = {}) {
+  if (confirm !== true) {
+    throw new Error("Search/web runtime activation task creation requires confirm=true.");
+  }
+
+  const draft = buildOpenClawPluginSearchWebAdapterRuntimeActivationTaskDraft({
+    workspacePath,
+    providerContractId,
+    query,
+    limit,
+  });
+  const task = createTask({
+    goal: draft.plan.goal,
+    type: "openclaw_search_web_runtime_activation",
+    workViewStrategy: "openclaw-search-web-runtime-activation",
+    plan: draft.plan,
+    policy: draft.policy.request,
+  }, { skipInitialPolicy: true });
+  task.policy = draft.policy;
+  const approval = createApprovalRequestForTask(task, draft.policy.decision);
+  const reclaimedTasks = supersedeOtherActiveTasks(task.id);
+  reconcileRuntimeState();
+  persistState();
+
+  await publishEvent("task.created", { task: serialiseTask(task), planner: "openclaw-plugin-search-web-adapter-runtime-activation-task-v0" });
+  await publishTaskApprovalIfPending(task);
+  await publishEvent("task.planned", { task: serialiseTask(task), plan: serialisePlanForPublic(task.plan) });
+  await Promise.all(reclaimedTasks.map((reclaimedTask) => publishEvent("task.phase_changed", {
+    task: serialiseTask(reclaimedTask),
+  })));
+
+  return {
+    ok: true,
+    registry: "openclaw-plugin-search-web-adapter-runtime-activation-task-v0",
+    mode: "approval-gated-search-web-runtime-activation-task",
+    generatedAt: new Date().toISOString(),
+    sourceRegistry: draft.registry,
+    sourceMode: draft.mode,
+    adapter: draft.adapter,
+    provider: draft.provider,
+    query: draft.query,
+    activationPlan: draft.activationPlan,
+    task,
+    approval,
+    governance: {
+      mode: "plugin_search_web_runtime_activation_task_approval_gated",
+      runtimeOwner: "openclaw_on_nixos",
+      createsTask: true,
+      createsApproval: true,
+      canExecuteWithoutApproval: false,
+      canReadManifestMetadata: true,
+      canResolveProviderMetadata: true,
+      exposesManifestBodies: false,
+      exposesAuthEnvVarNames: false,
+      exposesEndpointHosts: false,
+      exposesSourceFileContent: false,
+      exposesQueryContent: false,
+      canUseNetwork: false,
+      canImportModule: false,
+      canExecutePluginCode: false,
+      canActivateRuntime: false,
+      canMutate: false,
+      executed: false,
+      requiresExplicitApprovalBeforeNetworkRuntimeActivation: true,
+      requiresRuntimeAdapterBeforeExecution: true,
     },
   };
 }
@@ -7693,8 +7947,12 @@ function hasRecoverableCapabilityPlan(task) {
 }
 
 function hasRecoverableSearchWebAdapterPlan(task) {
-  return isOpenClawSearchWebAdapterTask(task)
-    && task?.plan?.governance?.requiresRuntimePreflightBeforeExecution === true
+  const hasDeferredBoundary = isOpenClawSearchWebAdapterTask(task)
+    ? task?.plan?.governance?.requiresRuntimePreflightBeforeExecution === true
+    : isOpenClawSearchWebRuntimeActivationTask(task)
+      ? task?.plan?.governance?.requiresRuntimeAdapterBeforeExecution === true
+      : false;
+  return hasDeferredBoundary
     && task?.plan?.governance?.canUseNetwork === false
     && task?.plan?.governance?.canExecutePluginCode === false;
 }
@@ -9660,6 +9918,11 @@ function isOpenClawSearchWebAdapterTask(task) {
     && task?.plan?.strategy === "openclaw-search-web-adapter-v0";
 }
 
+function isOpenClawSearchWebRuntimeActivationTask(task) {
+  return task?.type === "openclaw_search_web_runtime_activation"
+    && task?.plan?.strategy === "openclaw-search-web-runtime-activation-v0";
+}
+
 async function deferNativePluginCapabilityExecution(task) {
   if (!isActiveTask(task)) {
     throw new Error("Task is not active and cannot be deferred.");
@@ -9762,6 +10025,60 @@ async function deferOpenClawSearchWebAdapterExecution(task) {
       canActivateRuntime: false,
       executed: false,
       requiresRuntimePreflightBeforeExecution: true,
+    },
+  };
+}
+
+async function deferOpenClawSearchWebRuntimeActivation(task) {
+  if (!isActiveTask(task)) {
+    throw new Error("Task is not active and cannot be deferred.");
+  }
+
+  const policy = ensureTaskPolicy(task, { stage: "openclaw.search_web.runtime_activation.deferred" });
+  await publishEvent("policy.evaluated", { task: serialiseTask(task), policy: policy.decision });
+  const approval = task.approval?.requestId ? approvals.get(task.approval.requestId) : null;
+  const activationStep = (task.plan?.steps ?? []).find((step) => step.kind === "plugin.search_web.runtime_activation") ?? null;
+  const reason = "search_web_network_runtime_adapter_deferred";
+  const deferredTask = await setTaskPhase(task, "network_runtime_deferred", {
+    status: "queued",
+    details: {
+      executor: "openclaw-search-web-runtime-activation-v0",
+      reason,
+      providerContractId: activationStep?.params?.providerContractId ?? null,
+      operation: activationStep?.params?.operation ?? null,
+      blockedGateIds: activationStep?.params?.blockedGateIds ?? [],
+      queryContentExposed: false,
+      canUseNetwork: false,
+      canExecutePluginCode: false,
+      canActivateRuntime: false,
+      requiresRuntimeAdapterBeforeExecution: true,
+    },
+  });
+
+  await publishEvent("task.blocked", {
+    task: serialiseTask(deferredTask),
+    reason,
+    executor: "openclaw-search-web-runtime-activation-v0",
+  });
+
+  return {
+    task: deferredTask,
+    blocked: true,
+    reason,
+    actions: [],
+    capabilityInvocations: [],
+    commandTranscript: [],
+    verification: null,
+    policy: policy.decision,
+    approval: approval ? serialiseApproval(approval) : null,
+    governance: {
+      mode: "openclaw_search_web_network_runtime_adapter_deferred",
+      runtimeOwner: "openclaw_on_nixos",
+      canUseNetwork: false,
+      canExecutePluginCode: false,
+      canActivateRuntime: false,
+      executed: false,
+      requiresRuntimeAdapterBeforeExecution: true,
     },
   };
 }
@@ -10771,6 +11088,18 @@ async function executeTaskWithRecovery(task, options = {}) {
     };
   }
 
+  if (isOpenClawSearchWebRuntimeActivationTask(task)) {
+    const deferredExecution = await deferOpenClawSearchWebRuntimeActivation(task);
+    return {
+      finalExecution: deferredExecution,
+      attempts: [deferredExecution],
+      recovery: {
+        attempted: false,
+        maxAttempts: 0,
+      },
+    };
+  }
+
   if (shouldExecuteCapabilityPlan(task)) {
     const capabilityExecution = await executeCapabilityPlanTask(task, options);
     return {
@@ -11616,10 +11945,47 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === "GET" && requestUrl.pathname === "/plugins/native-adapter/plugin-search-web-adapter-runtime-activation-task-draft") {
+    try {
+      sendJson(res, 200, buildOpenClawPluginSearchWebAdapterRuntimeActivationTaskDraft({
+        workspacePath: requestUrl.searchParams.get("workspacePath"),
+        providerContractId: requestUrl.searchParams.get("providerContractId"),
+        query: requestUrl.searchParams.get("query") ?? "openclaw native integration",
+        limit: Number.parseInt(requestUrl.searchParams.get("limit") ?? "8", 10),
+      }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
   if (req.method === "POST" && requestUrl.pathname === "/plugins/native-adapter/plugin-search-web-adapter-tasks") {
     try {
       const body = await readJsonBody(req);
       const result = await createOpenClawPluginSearchWebAdapterTask({
+        workspacePath: body.workspacePath,
+        providerContractId: body.providerContractId,
+        query: body.query ?? body.q,
+        limit: body.limit,
+        confirm: body.confirm,
+      });
+      sendJson(res, 201, {
+        ...result,
+        task: serialiseTask(result.task),
+        approval: serialiseApproval(result.approval),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/plugins/native-adapter/plugin-search-web-adapter-runtime-activation-tasks") {
+    try {
+      const body = await readJsonBody(req);
+      const result = await createOpenClawPluginSearchWebAdapterRuntimeActivationTask({
         workspacePath: body.workspacePath,
         providerContractId: body.providerContractId,
         query: body.query ?? body.q,

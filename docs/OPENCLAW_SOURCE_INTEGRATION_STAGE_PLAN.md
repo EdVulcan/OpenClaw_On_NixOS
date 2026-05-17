@@ -1672,7 +1672,7 @@ Recheck note:
 
 ## 41. 2026-05-17 Step 24 Update: Search/Web Runtime Activation Plan
 
-Status: local implementation ready; awaiting NixOS targeted milestone.
+Status: passed.
 
 Slice: plan-only runtime activation gates for native search/web adapter invocation.
 
@@ -1703,3 +1703,38 @@ OPENCLAW_MILESTONE_CHECKS=openclaw-plugin-search-web-adapter-runtime-activation-
 Next intended slice after this passes:
 - Materialize search/web runtime activation as an approval-gated task shell.
 - Still keep actual provider/network execution disabled until the task shell and observer controls are proven stable.
+
+Recheck note:
+- 2026-05-17 16:38 +08:00 NixOS targeted milestone passed: `openclaw-plugin-search-web-adapter-runtime-activation-plan`, `observer-openclaw-plugin-search-web-adapter-runtime-activation-plan`.
+
+## 42. 2026-05-17 Step 25 Update: Search/Web Runtime Activation Task
+
+Status: local implementation ready; awaiting NixOS targeted milestone.
+
+Slice: approval-gated runtime activation task shell for native search/web adapter invocation.
+
+Purpose: materialize runtime activation as an explicit operator-visible task without enabling provider/network execution. This moves the search/web lane from plan-only activation gates into a real approval workflow: the task can be queued, blocked before approval, approved, and then deferred at the network runtime adapter boundary.
+
+Implemented artifacts:
+- Core API: `GET /plugins/native-adapter/plugin-search-web-adapter-runtime-activation-task-draft`.
+- Core API: `POST /plugins/native-adapter/plugin-search-web-adapter-runtime-activation-tasks`.
+- Observer control: `Create Search/Web Activation Task`.
+- Task type: `openclaw_search_web_runtime_activation`.
+- Deferred reason after approval: `search_web_network_runtime_adapter_deferred`.
+- Targeted checks: `openclaw-plugin-search-web-adapter-runtime-activation-task`, `observer-openclaw-plugin-search-web-adapter-runtime-activation-task`.
+
+Safety boundaries:
+- Activation task creation requires `confirm=true`.
+- The task creates one queued task and one pending approval.
+- Operator blocks before approval with `policy_requires_approval`.
+- After approval, operator remains blocked/deferred at the network runtime adapter boundary.
+- No capability invocation, network request, provider execution, old OpenClaw module import, mutation, or runtime activation occurs.
+- Query, endpoint hosts/tokens, auth env var names, source contents, script bodies, and package versions remain hidden.
+
+Expected NixOS check:
+
+```bash
+cd /home/edvulcan/OpenClaw_On_NixOS && \
+git pull origin main && \
+OPENCLAW_MILESTONE_CHECKS=openclaw-plugin-search-web-adapter-runtime-activation-task,observer-openclaw-plugin-search-web-adapter-runtime-activation-task npm run dev:milestone-check:unix
+```

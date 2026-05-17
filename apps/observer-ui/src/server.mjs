@@ -549,6 +549,9 @@ function observerHtml() {
           <div class="metric"><span>Required</span><span id="plugin-search-web-activation-required">0/0</span></div>
           <div class="metric"><span>Network</span><span id="plugin-search-web-activation-network">blocked</span></div>
           <div class="metric"><span>Runtime</span><span id="plugin-search-web-activation-runtime">disabled</span></div>
+          <div class="actions tight">
+            <button id="plugin-search-web-activation-task-button" class="secondary">Create Search/Web Activation Task</button>
+          </div>
           <pre id="plugin-search-web-activation-json">Loading OpenClaw search/web runtime activation plan...</pre>
         </section>
         <section class="panel">
@@ -1067,6 +1070,7 @@ const pluginSearchWebActivationRequired = document.querySelector("#plugin-search
 const pluginSearchWebActivationNetwork = document.querySelector("#plugin-search-web-activation-network");
 const pluginSearchWebActivationRuntime = document.querySelector("#plugin-search-web-activation-runtime");
 const pluginSearchWebActivationJson = document.querySelector("#plugin-search-web-activation-json");
+const pluginSearchWebActivationTaskButton = document.querySelector("#plugin-search-web-activation-task-button");
 const toolCatalogAdapterRegistry = document.querySelector("#tool-catalog-adapter-registry");
 const toolCatalogAdapterMatches = document.querySelector("#tool-catalog-adapter-matches");
 const toolCatalogAdapterCategories = document.querySelector("#tool-catalog-adapter-categories");
@@ -2000,7 +2004,7 @@ function renderPluginSearchWebRuntimeActivationPlan(data) {
 
   pluginSearchWebActivationJson.textContent = [
     "Search/Web runtime activation plan: records the remaining gates before native provider/network execution can be enabled.",
-    "This is plan-only: it creates no task, approval, network call, capability invocation, or provider execution.",
+    "This plan creates no task by itself; the activation task button materializes a separate approval-gated shell that still defers network/provider runtime.",
     \`Registry: \${data?.registry ?? "openclaw-plugin-search-web-adapter-runtime-activation-plan-v0"}\`,
     \`Mode: \${data?.mode ?? "activation-plan-only"}\`,
     \`Status: \${data?.status ?? "unknown"} activationReady=\${Boolean(data?.activationReady)}\`,
@@ -3890,6 +3894,30 @@ async function createPluginSearchWebApprovalTask() {
   await refreshPluginSearchWebAdapterContract();
 }
 
+async function createPluginSearchWebRuntimeActivationApprovalTask() {
+  const result = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/plugin-search-web-adapter-runtime-activation-tasks\`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      providerContractId: "openclaw.web-search",
+      query: "openclaw native integration",
+      confirm: true,
+    }),
+  });
+
+  taskHistoryFocus = "selected-task";
+  selectedHistoryTaskId = result.task?.id ?? null;
+  taskDetailIdInput.value = result.task?.id ?? "";
+  renderPlanPanel(result.task);
+  setControlMessage(\`Created approval-gated search/web runtime activation task \${result.task?.id ?? "unknown"}; network runtime remains deferred.\`);
+  await refreshRuntime();
+  await refreshTaskList();
+  await refreshTaskHistoryDetail();
+  await refreshApprovalState();
+  await refreshOperatorState();
+  await refreshPluginSearchWebRuntimeActivationPlan();
+}
+
 async function createSourceAuthoredEditApprovalTask() {
   const result = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/source-authored-edit-tasks\`, {
     method: "POST",
@@ -4562,6 +4590,12 @@ nativePluginInvokeTaskButton.addEventListener("click", () => {
 
 pluginSearchWebTaskButton.addEventListener("click", () => {
   createPluginSearchWebApprovalTask().catch((error) => {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  });
+});
+
+pluginSearchWebActivationTaskButton.addEventListener("click", () => {
+  createPluginSearchWebRuntimeActivationApprovalTask().catch((error) => {
     setControlMessage(\`Request failed: \${formatError(error)}\`);
   });
 });
