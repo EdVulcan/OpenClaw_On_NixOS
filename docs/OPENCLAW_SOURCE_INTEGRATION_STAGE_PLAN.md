@@ -1744,7 +1744,7 @@ Recheck note:
 
 ## 43. 2026-05-17 Step 26 Update: Search/Web Runtime Activation Denial Recovery
 
-Status: local implementation ready; awaiting NixOS targeted milestone.
+Status: passed.
 
 Slice: denial and fresh-approval recovery for native search/web runtime activation tasks.
 
@@ -1768,4 +1768,37 @@ Expected NixOS check:
 cd /home/edvulcan/OpenClaw_On_NixOS && \
 git pull origin main && \
 OPENCLAW_MILESTONE_CHECKS=openclaw-plugin-search-web-adapter-runtime-activation-denial-recovery,observer-openclaw-plugin-search-web-adapter-runtime-activation-denial-recovery npm run dev:milestone-check:unix
+```
+
+Recheck note:
+- 2026-05-17 17:08 +08:00 NixOS targeted milestone passed: `openclaw-plugin-search-web-adapter-runtime-activation-denial-recovery`, `observer-openclaw-plugin-search-web-adapter-runtime-activation-denial-recovery`.
+
+## 44. 2026-05-17 Step 27 Update: Search/Web Runtime Activation Hardening
+
+Status: local implementation ready; awaiting NixOS targeted milestone.
+
+Slice: hardening for native search/web runtime activation approvals and recovery chains.
+
+Purpose: close edge cases around approval-gated runtime activation before any real network/provider runtime exists. This verifies approval expiry, duplicate approval/denial clicks, duplicate recovery rejection, and chained recovery attempts while preserving the key boundary: every approved activation task still stops at `search_web_network_runtime_adapter_deferred`.
+
+Implemented artifacts:
+- Targeted checks: `openclaw-plugin-search-web-adapter-runtime-activation-hardening`, `observer-openclaw-plugin-search-web-adapter-runtime-activation-hardening`.
+- Expiry coverage for stale activation approvals.
+- Duplicate approval/denial safety for already-resolved activation approvals.
+- Duplicate recovery safety for failed activation tasks.
+- Multi-hop denial/recovery chain coverage for `openclaw_search_web_runtime_activation` tasks.
+
+Safety boundaries:
+- Expired activation approvals fail their active task and cannot be approved or denied later.
+- Approved activation approvals cannot be approved again or denied afterward.
+- A failed activation task can create only one direct recovery task.
+- Recovery chains preserve fresh approvals and attempt lineage.
+- Approved recovered activation tasks still do not use network, activate runtime, execute provider/plugin code, import old OpenClaw modules, mutate state, or expose query/endpoint/auth-env details.
+
+Expected NixOS check:
+
+```bash
+cd /home/edvulcan/OpenClaw_On_NixOS && \
+git pull origin main && \
+OPENCLAW_MILESTONE_CHECKS=openclaw-plugin-search-web-adapter-runtime-activation-hardening,observer-openclaw-plugin-search-web-adapter-runtime-activation-hardening npm run dev:milestone-check:unix
 ```
