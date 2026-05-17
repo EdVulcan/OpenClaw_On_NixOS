@@ -238,8 +238,9 @@ const raw = JSON.stringify({ html, client, denied, recovered, recoveredBlocked, 
 for (const token of [
   "plugin-search-web-task-button",
   "recover-selected-task-button",
-  "approval-list",
-  "task-list",
+  "approval-json",
+  "approval-pending-count",
+  "task-list-items",
 ]) {
   if (!html.includes(token)) {
     throw new Error(`Observer HTML missing ${token}`);
@@ -249,8 +250,8 @@ for (const token of [
   "/plugins/native-adapter/plugin-search-web-adapter-tasks",
   "createPluginSearchWebApprovalTask",
   "recoverSelectedTask",
-  "refreshApprovals",
-  "refreshTasks",
+  "refreshApprovalState",
+  "refreshTaskList",
 ]) {
   if (!client.includes(token)) {
     throw new Error(`Observer client missing ${token}`);
