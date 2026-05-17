@@ -383,7 +383,12 @@ if (history.summary?.total !== 0 || history.summary?.invoked !== 0 || history.su
 if (approvals.summary?.counts?.denied !== 2 || approvals.summary?.counts?.approved !== 2 || approvals.summary?.counts?.pending !== 0) {
   throw new Error(`approval summary should show duplicate-safe approvals and recovery chain: ${JSON.stringify(approvals.summary)}`);
 }
-if (tasks.summary?.counts?.failed !== 2 || tasks.summary?.counts?.queued !== 1 || tasks.summary?.counts?.recoverable !== 2) {
+if (
+  tasks.summary?.counts?.failed !== 2
+  || tasks.summary?.counts?.queued !== 1
+  || tasks.summary?.counts?.superseded !== 1
+  || tasks.summary?.counts?.recoverable < 3
+) {
   throw new Error(`task summary should show failed chain plus deferred recovered activation task: ${JSON.stringify(tasks.summary)}`);
 }
 const eventTypes = new Set((events.items ?? []).map((event) => event.type));
