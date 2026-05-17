@@ -1709,7 +1709,7 @@ Recheck note:
 
 ## 42. 2026-05-17 Step 25 Update: Search/Web Runtime Activation Task
 
-Status: local implementation ready; awaiting NixOS targeted milestone.
+Status: passed.
 
 Slice: approval-gated runtime activation task shell for native search/web adapter invocation.
 
@@ -1737,4 +1737,35 @@ Expected NixOS check:
 cd /home/edvulcan/OpenClaw_On_NixOS && \
 git pull origin main && \
 OPENCLAW_MILESTONE_CHECKS=openclaw-plugin-search-web-adapter-runtime-activation-task,observer-openclaw-plugin-search-web-adapter-runtime-activation-task npm run dev:milestone-check:unix
+```
+
+Recheck note:
+- 2026-05-17 16:59 +08:00 NixOS targeted milestone passed: `openclaw-plugin-search-web-adapter-runtime-activation-task`, `observer-openclaw-plugin-search-web-adapter-runtime-activation-task`.
+
+## 43. 2026-05-17 Step 26 Update: Search/Web Runtime Activation Denial Recovery
+
+Status: local implementation ready; awaiting NixOS targeted milestone.
+
+Slice: denial and fresh-approval recovery for native search/web runtime activation tasks.
+
+Purpose: prove that denied runtime activation tasks cannot inherit approval or enable network/provider runtime. A denied activation task must fail and become recoverable; recovery must create a fresh queued activation task and fresh pending approval; even after approval, operator execution must remain deferred at the network runtime adapter boundary.
+
+Implemented artifacts:
+- Recovery coverage for `openclaw_search_web_runtime_activation` tasks.
+- Targeted checks: `openclaw-plugin-search-web-adapter-runtime-activation-denial-recovery`, `observer-openclaw-plugin-search-web-adapter-runtime-activation-denial-recovery`.
+- Observer verification uses existing activation task, approval, recovery, task list, approval state, operator, and capability history surfaces.
+
+Safety boundaries:
+- Denied activation tasks do not become approved.
+- Recovered activation tasks do not reuse denied approval IDs.
+- Recovered activation tasks require fresh explicit approval.
+- Duplicate recovery for the same denied activation task is rejected.
+- Approved recovered activation tasks still do not use network, activate runtime, execute provider/plugin code, import old OpenClaw modules, mutate state, or expose query/endpoint/auth-env details.
+
+Expected NixOS check:
+
+```bash
+cd /home/edvulcan/OpenClaw_On_NixOS && \
+git pull origin main && \
+OPENCLAW_MILESTONE_CHECKS=openclaw-plugin-search-web-adapter-runtime-activation-denial-recovery,observer-openclaw-plugin-search-web-adapter-runtime-activation-denial-recovery npm run dev:milestone-check:unix
 ```
