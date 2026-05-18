@@ -2284,7 +2284,7 @@ Recheck note:
 
 ## 60. 2026-05-18 Step 43 Update: Native Plugin Runtime Adapter Hardening
 
-Status: local implementation ready; awaiting NixOS targeted milestone.
+Status: passed.
 
 Slice: approval expiry, duplicate clicks, duplicate recovery, and recovery chains for native runtime adapter implementation tasks.
 
@@ -2310,3 +2310,6 @@ cd /home/edvulcan/OpenClaw_On_NixOS && \
 git pull origin main && \
 OPENCLAW_MILESTONE_CHECKS=openclaw-native-plugin-runtime-adapter-hardening,observer-openclaw-native-plugin-runtime-adapter-hardening npm run dev:milestone-check:unix
 ```
+
+Recheck note:
+- 2026-05-18 17:41 +08:00 NixOS targeted milestone passed: `openclaw-native-plugin-runtime-adapter-hardening`, `observer-openclaw-native-plugin-runtime-adapter-hardening`.
