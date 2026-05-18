@@ -701,6 +701,9 @@ function observerHtml() {
           <div class="metric"><span>Required</span><span id="native-plugin-runtime-contract-required">0/0</span></div>
           <div class="metric"><span>Runtime</span><span id="native-plugin-runtime-contract-runtime">disabled</span></div>
           <div class="metric"><span>Mode</span><span id="native-plugin-runtime-contract-mode">runtime-adapter-contract</span></div>
+          <div class="actions tight">
+            <button id="native-plugin-runtime-adapter-task-button" type="button">Create Adapter Task</button>
+          </div>
           <pre id="native-plugin-runtime-contract-json">Loading native plugin runtime adapter contract...</pre>
         </section>
         <section class="panel">
@@ -1191,6 +1194,7 @@ const nativePluginRuntimeContractRequired = document.querySelector("#native-plug
 const nativePluginRuntimeContractRuntime = document.querySelector("#native-plugin-runtime-contract-runtime");
 const nativePluginRuntimeContractMode = document.querySelector("#native-plugin-runtime-contract-mode");
 const nativePluginRuntimeContractJson = document.querySelector("#native-plugin-runtime-contract-json");
+const nativePluginRuntimeAdapterTaskButton = document.querySelector("#native-plugin-runtime-adapter-task-button");
 const nativePluginInvokePlanRegistry = document.querySelector("#native-plugin-invoke-plan-registry");
 const nativePluginInvokePlanCapability = document.querySelector("#native-plugin-invoke-plan-capability");
 const nativePluginInvokePlanDecision = document.querySelector("#native-plugin-invoke-plan-decision");
@@ -4031,6 +4035,29 @@ async function createNativePluginRuntimeActivationApprovalTask() {
   await refreshNativePluginActivationPlan();
 }
 
+async function createNativePluginRuntimeAdapterApprovalTask() {
+  const result = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/runtime-adapter-tasks\`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      capabilityId: "act.plugin.capability.invoke",
+      confirm: true,
+    }),
+  });
+
+  taskHistoryFocus = "selected-task";
+  selectedHistoryTaskId = result.task?.id ?? null;
+  taskDetailIdInput.value = result.task?.id ?? "";
+  renderPlanPanel(result.task);
+  setControlMessage(\`Created approval-gated native plugin runtime adapter task \${result.task?.id ?? "unknown"}; implementation remains deferred.\`);
+  await refreshRuntime();
+  await refreshTaskList();
+  await refreshTaskHistoryDetail();
+  await refreshApprovalState();
+  await refreshOperatorState();
+  await refreshNativePluginRuntimeAdapterContract();
+}
+
 async function createPluginSearchWebApprovalTask() {
   const result = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/plugin-search-web-adapter-tasks\`, {
     method: "POST",
@@ -4774,6 +4801,12 @@ nativePluginInvokeTaskButton.addEventListener("click", () => {
 
 nativePluginActivationTaskButton.addEventListener("click", () => {
   createNativePluginRuntimeActivationApprovalTask().catch((error) => {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  });
+});
+
+nativePluginRuntimeAdapterTaskButton.addEventListener("click", () => {
+  createNativePluginRuntimeAdapterApprovalTask().catch((error) => {
     setControlMessage(\`Request failed: \${formatError(error)}\`);
   });
 });

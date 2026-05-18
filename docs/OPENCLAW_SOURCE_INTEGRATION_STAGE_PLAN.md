@@ -2191,7 +2191,7 @@ Recheck note:
 
 ## 57. 2026-05-18 Step 40 Update: Native Plugin Runtime Adapter Contract
 
-Status: local implementation ready; awaiting NixOS targeted milestone.
+Status: passed.
 
 Slice: native runtime adapter contract shell before OpenClaw plugin module loading.
 
@@ -2215,4 +2215,35 @@ Expected NixOS check:
 cd /home/edvulcan/OpenClaw_On_NixOS && \
 git pull origin main && \
 OPENCLAW_MILESTONE_CHECKS=openclaw-native-plugin-runtime-adapter-contract,observer-openclaw-native-plugin-runtime-adapter-contract npm run dev:milestone-check:unix
+```
+
+Recheck note:
+- 2026-05-18 17:05 +08:00 NixOS targeted milestone passed: `openclaw-native-plugin-runtime-adapter-contract`, `observer-openclaw-native-plugin-runtime-adapter-contract`.
+
+## 58. 2026-05-18 Step 41 Update: Native Plugin Runtime Adapter Task
+
+Status: local implementation ready; awaiting NixOS targeted milestone.
+
+Slice: approval-gated native runtime adapter implementation task shell.
+
+Purpose: materialize runtime adapter implementation as explicit operator-visible work without enabling plugin loading or execution. The task can be drafted, queued, blocked before approval, approved, and then deferred at the runtime adapter implementation boundary until a future sandboxed loader implementation exists.
+
+Implemented artifacts:
+- Core APIs: `GET /plugins/native-adapter/runtime-adapter-task-draft`, `POST /plugins/native-adapter/runtime-adapter-tasks`.
+- Observer control: `Create Adapter Task` in the `OpenClaw Native Runtime Adapter Contract` panel.
+- Targeted checks: `openclaw-native-plugin-runtime-adapter-task`, `observer-openclaw-native-plugin-runtime-adapter-task`.
+
+Safety boundaries:
+- Task materialization requires `confirm=true` and creates a pending approval.
+- Operator execution is blocked before approval.
+- Approved adapter tasks remain queued and deferred at `runtime_adapter_implementation_deferred`.
+- No plugin module import, plugin execution, runtime activation, mutation, command execution, or capability invocation occurs.
+- Source contents, README text, script bodies, dependency versions, package versions, and old OpenClaw module imports remain hidden/blocked.
+
+Expected NixOS check:
+
+```bash
+cd /home/edvulcan/OpenClaw_On_NixOS && \
+git pull origin main && \
+OPENCLAW_MILESTONE_CHECKS=openclaw-native-plugin-runtime-adapter-task,observer-openclaw-native-plugin-runtime-adapter-task npm run dev:milestone-check:unix
 ```
