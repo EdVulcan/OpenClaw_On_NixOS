@@ -2001,7 +2001,7 @@ Recheck note:
 
 ## 51. 2026-05-18 Step 34 Update: Search/Web Provider Runtime Sandbox Regression
 
-Status: local implementation ready; awaiting NixOS targeted milestone.
+Status: passed.
 
 Slice: focused regression for the completed native search/web provider sandbox approval and recovery chain.
 
@@ -2024,4 +2024,38 @@ Expected NixOS check:
 cd /home/edvulcan/OpenClaw_On_NixOS && \
 git pull origin main && \
 OPENCLAW_MILESTONE_CHECKS=openclaw-plugin-search-web-adapter-provider-runtime-sandbox-regression,observer-openclaw-plugin-search-web-adapter-provider-runtime-sandbox-regression npm run dev:milestone-check:unix
+```
+
+Recheck note:
+- 2026-05-18 15:36 +08:00 NixOS targeted milestone passed: `openclaw-plugin-search-web-adapter-provider-runtime-sandbox-regression`, `observer-openclaw-plugin-search-web-adapter-provider-runtime-sandbox-regression`.
+
+## 52. 2026-05-18 Step 35 Update: Native Plugin Runtime Activation Task
+
+Status: local implementation ready; awaiting NixOS targeted milestone.
+
+Slice: approval-gated runtime activation task shell for native OpenClaw plugin invocation.
+
+Purpose: move the generic native plugin runtime activation plan into an explicit operator-visible approval workflow without enabling runtime activation. The task can be drafted, materialized, blocked before approval, approved, and then deferred at the native runtime adapter boundary.
+
+Implemented artifacts:
+- Core API: `GET /plugins/native-adapter/runtime-activation-task-draft`.
+- Core API: `POST /plugins/native-adapter/runtime-activation-tasks`.
+- Observer control: `Create Activation Task`.
+- Task type: `native_plugin_runtime_activation`.
+- Deferred reason after approval: `native_plugin_runtime_activation_deferred`.
+- Targeted checks: `openclaw-native-plugin-runtime-activation-task`, `observer-openclaw-native-plugin-runtime-activation-task`.
+
+Safety boundaries:
+- Runtime activation task creation requires `confirm=true`.
+- The task creates a linked pending approval and blocks before approval.
+- Approval does not import modules, execute plugin code, activate runtime, mutate state, or expose source/script/dependency/package details.
+- Approved activation tasks remain queued and deferred at `runtime_activation_deferred` until a future sandboxed runtime adapter exists.
+- Capability history remains empty across the activation task flow.
+
+Expected NixOS check:
+
+```bash
+cd /home/edvulcan/OpenClaw_On_NixOS && \
+git pull origin main && \
+OPENCLAW_MILESTONE_CHECKS=openclaw-native-plugin-runtime-activation-task,observer-openclaw-native-plugin-runtime-activation-task npm run dev:milestone-check:unix
 ```

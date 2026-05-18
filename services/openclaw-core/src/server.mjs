@@ -7587,6 +7587,174 @@ function buildNativePluginRuntimeActivationPlan({ packagePath = null, capability
   };
 }
 
+function buildNativePluginRuntimeActivationTaskDraft({ packagePath = null, capabilityId = "act.plugin.capability.invoke" } = {}) {
+  const activationPlan = buildNativePluginRuntimeActivationPlan({ packagePath, capabilityId });
+  const now = new Date().toISOString();
+  const capability = activationPlan.capability ?? {};
+  const plugin = activationPlan.plugin ?? {};
+  const blockedGateIds = (activationPlan.gates ?? [])
+    .filter((gate) => gate.required === true && gate.status === "blocked")
+    .map((gate) => gate.id);
+  const policyRequest = {
+    intent: "plugin.runtime_activation",
+    domain: "cross_boundary",
+    risk: capability.risk ?? "high",
+    requiresApproval: true,
+    approved: false,
+    capabilityId: capability.id ?? capabilityId,
+    tags: ["native_plugin_runtime_activation", "explicit_approval_required", "runtime_adapter_deferred"],
+  };
+  const policyDecision = {
+    id: randomUUID(),
+    at: now,
+    engine: "openclaw-native-plugin-runtime-activation-task-v0",
+    stage: "native_plugin.runtime_activation.task.materialize",
+    subject: {
+      taskId: null,
+      type: "native_plugin_runtime_activation",
+      goal: `Prepare approved native plugin runtime activation for ${capability.id ?? capabilityId}`,
+      targetUrl: null,
+      intent: policyRequest.intent,
+    },
+    domain: policyRequest.domain,
+    risk: policyRequest.risk,
+    decision: "require_approval",
+    reason: "native_plugin_runtime_activation_requires_explicit_user_approval_before_runtime_enablement",
+    approved: false,
+    autonomyMode,
+    autonomous: false,
+  };
+  const plan = {
+    planId: `plan-${randomUUID()}`,
+    strategy: "native-plugin-runtime-activation-v0",
+    planner: "openclaw-native-plugin-runtime-activation-task-v0",
+    capabilityAware: true,
+    status: "planned",
+    goal: policyDecision.subject.goal,
+    targetUrl: null,
+    intent: policyRequest.intent,
+    createdAt: now,
+    updatedAt: now,
+    capabilitySummary: {
+      total: 3,
+      approvalGates: 2,
+      ids: [
+        "plan.openclaw.native_plugin_runtime_activation",
+        "govern.policy.evaluate",
+        capability.id ?? capabilityId,
+      ],
+      byRisk: {
+        low: 1,
+        [policyRequest.risk]: 2,
+      },
+    },
+    steps: [
+      {
+        id: "step-review-native-runtime-activation-plan",
+        kind: "openclaw.native_plugin.runtime_activation_plan",
+        phase: "reviewing_runtime_activation_plan",
+        title: "Review native plugin runtime activation gates",
+        status: "pending",
+        capabilityId: "plan.openclaw.native_plugin_runtime_activation",
+        risk: "low",
+        governance: "audit_only",
+        requiresApproval: false,
+        params: {
+          pluginId: plugin.id ?? null,
+          packageName: plugin.packageName ?? null,
+          capabilityId: capability.id ?? capabilityId,
+          status: activationPlan.status,
+          blockedGateIds,
+        },
+      },
+      {
+        id: "step-user-approval",
+        kind: "approval.gate",
+        phase: "waiting_for_approval",
+        title: "Wait for explicit user approval before any native plugin runtime activation attempt",
+        status: "pending",
+        capabilityId: "govern.policy.evaluate",
+        risk: policyRequest.risk,
+        governance: "require_approval",
+        requiresApproval: true,
+      },
+      {
+        id: "step-defer-native-runtime-activation",
+        kind: "plugin.runtime_activation",
+        phase: "runtime_activation_deferred",
+        title: "Defer native plugin runtime activation until sandboxed runtime loader exists",
+        status: "pending",
+        capabilityId: capability.id ?? capabilityId,
+        risk: policyRequest.risk,
+        governance: "require_approval",
+        requiresApproval: true,
+        params: {
+          pluginId: plugin.id ?? null,
+          packageName: plugin.packageName ?? null,
+          capabilityId: capability.id ?? capabilityId,
+          blockedGateIds,
+          canReadSourceFileContent: false,
+          canImportModule: false,
+          canExecutePluginCode: false,
+          canActivateRuntime: false,
+        },
+      },
+    ],
+    governance: {
+      mode: "native_plugin_runtime_activation_task_plan",
+      runtimeOwner: "openclaw_on_nixos",
+      canReadSourceFileContent: false,
+      canImportModule: false,
+      canExecutePluginCode: false,
+      canActivateRuntime: false,
+      canMutate: false,
+      requiresExplicitApproval: true,
+      requiresRuntimeAdapterBeforeExecution: true,
+    },
+  };
+
+  return {
+    ok: true,
+    registry: "openclaw-native-plugin-runtime-activation-task-draft-v0",
+    mode: "approval-gated-native-plugin-runtime-activation-task-draft",
+    generatedAt: now,
+    sourceRegistry: activationPlan.registry,
+    sourceMode: activationPlan.mode,
+    plugin,
+    capability,
+    activationPlan: {
+      registry: activationPlan.registry,
+      status: activationPlan.status,
+      activationReady: activationPlan.activationReady,
+      summary: activationPlan.summary,
+      gates: activationPlan.gates,
+      executionEnvelope: activationPlan.executionEnvelope,
+    },
+    plan,
+    policy: {
+      request: policyRequest,
+      decision: policyDecision,
+    },
+    governance: {
+      mode: "native_plugin_runtime_activation_task_draft",
+      runtimeOwner: "openclaw_on_nixos",
+      createsTask: false,
+      createsApproval: false,
+      canReadManifestMetadata: true,
+      canReadSourceFileContent: false,
+      exposesReadmeContent: false,
+      exposesScriptBodies: false,
+      exposesDependencyVersions: false,
+      canImportModule: false,
+      canExecutePluginCode: false,
+      canActivateRuntime: false,
+      canMutate: false,
+      requiresExplicitApprovalBeforeRuntimeActivation: true,
+      requiresRuntimeAdapterBeforeExecution: true,
+    },
+  };
+}
+
 function buildNativePluginInvokeTaskPlan(planEnvelope) {
   const now = new Date().toISOString();
   const capability = planEnvelope.capability ?? {};
@@ -7660,6 +7828,70 @@ function buildNativePluginInvokeTaskPlan(planEnvelope) {
       canExecutePluginCode: false,
       canActivateRuntime: false,
       requiresExplicitApproval: true,
+    },
+  };
+}
+
+async function createNativePluginRuntimeActivationTask({
+  packagePath = null,
+  capabilityId = "act.plugin.capability.invoke",
+  confirm = false,
+} = {}) {
+  if (confirm !== true) {
+    throw new Error("Native plugin runtime activation task creation requires confirm=true.");
+  }
+
+  const draft = buildNativePluginRuntimeActivationTaskDraft({ packagePath, capabilityId });
+  const task = createTask({
+    goal: draft.plan.goal,
+    type: "native_plugin_runtime_activation",
+    workViewStrategy: "native-plugin-runtime-activation",
+    plan: draft.plan,
+    policy: draft.policy.request,
+  }, { skipInitialPolicy: true });
+  task.policy = draft.policy;
+  const approval = createApprovalRequestForTask(task, draft.policy.decision);
+  const reclaimedTasks = supersedeOtherActiveTasks(task.id);
+  reconcileRuntimeState();
+  persistState();
+
+  await publishEvent("task.created", { task: serialiseTask(task), planner: "openclaw-native-plugin-runtime-activation-task-v0" });
+  await publishTaskApprovalIfPending(task);
+  await publishEvent("task.planned", { task: serialiseTask(task), plan: serialisePlanForPublic(task.plan) });
+  await Promise.all(reclaimedTasks.map((reclaimedTask) => publishEvent("task.phase_changed", {
+    task: serialiseTask(reclaimedTask),
+  })));
+
+  return {
+    ok: true,
+    registry: "openclaw-native-plugin-runtime-activation-task-v0",
+    mode: "approval-gated-native-plugin-runtime-activation-task",
+    generatedAt: new Date().toISOString(),
+    sourceRegistry: draft.registry,
+    sourceMode: draft.mode,
+    plugin: draft.plugin,
+    capability: draft.capability,
+    activationPlan: draft.activationPlan,
+    task,
+    approval,
+    governance: {
+      mode: "native_plugin_runtime_activation_task_approval_gated",
+      runtimeOwner: "openclaw_on_nixos",
+      createsTask: true,
+      createsApproval: true,
+      canExecuteWithoutApproval: false,
+      canReadManifestMetadata: true,
+      canReadSourceFileContent: false,
+      exposesReadmeContent: false,
+      exposesScriptBodies: false,
+      exposesDependencyVersions: false,
+      canImportModule: false,
+      canExecutePluginCode: false,
+      canActivateRuntime: false,
+      canMutate: false,
+      executed: false,
+      requiresExplicitApprovalBeforeRuntimeActivation: true,
+      requiresRuntimeAdapterBeforeExecution: true,
     },
   };
 }
@@ -10385,6 +10617,11 @@ function isNativePluginCapabilityTask(task) {
   return task?.type === "native_plugin_capability";
 }
 
+function isNativePluginRuntimeActivationTask(task) {
+  return task?.type === "native_plugin_runtime_activation"
+    && task?.plan?.strategy === "native-plugin-runtime-activation-v0";
+}
+
 function isOpenClawSearchWebAdapterTask(task) {
   return task?.type === "openclaw_search_web_adapter_invocation"
     && task?.plan?.strategy === "openclaw-search-web-adapter-v0";
@@ -10443,6 +10680,62 @@ async function deferNativePluginCapabilityExecution(task) {
     governance: {
       mode: "native_plugin_runtime_adapter_deferred",
       runtimeOwner: "openclaw_on_nixos",
+      canExecutePluginCode: false,
+      canActivateRuntime: false,
+      executed: false,
+      requiresRuntimeAdapterBeforeExecution: true,
+    },
+  };
+}
+
+async function deferNativePluginRuntimeActivation(task) {
+  if (!isActiveTask(task)) {
+    throw new Error("Task is not active and cannot be deferred.");
+  }
+
+  const policy = ensureTaskPolicy(task, { stage: "native_plugin.runtime_activation.deferred" });
+  await publishEvent("policy.evaluated", { task: serialiseTask(task), policy: policy.decision });
+  const approval = task.approval?.requestId ? approvals.get(task.approval.requestId) : null;
+  const activationStep = (task.plan?.steps ?? []).find((step) => step.kind === "plugin.runtime_activation") ?? null;
+  const reason = "native_plugin_runtime_activation_deferred";
+  const deferredTask = await setTaskPhase(task, "runtime_activation_deferred", {
+    status: "queued",
+    details: {
+      executor: "native-plugin-runtime-activation-v0",
+      reason,
+      pluginId: activationStep?.params?.pluginId ?? null,
+      packageName: activationStep?.params?.packageName ?? null,
+      capabilityId: activationStep?.params?.capabilityId ?? "act.plugin.capability.invoke",
+      blockedGateIds: activationStep?.params?.blockedGateIds ?? [],
+      canReadSourceFileContent: false,
+      canImportModule: false,
+      canExecutePluginCode: false,
+      canActivateRuntime: false,
+      requiresRuntimeAdapterBeforeExecution: true,
+    },
+  });
+
+  await publishEvent("task.blocked", {
+    task: serialiseTask(deferredTask),
+    reason,
+    executor: "native-plugin-runtime-activation-v0",
+  });
+
+  return {
+    task: deferredTask,
+    blocked: true,
+    reason,
+    actions: [],
+    capabilityInvocations: [],
+    commandTranscript: [],
+    verification: null,
+    policy: policy.decision,
+    approval: approval ? serialiseApproval(approval) : null,
+    governance: {
+      mode: "native_plugin_runtime_activation_deferred",
+      runtimeOwner: "openclaw_on_nixos",
+      canReadSourceFileContent: false,
+      canImportModule: false,
       canExecutePluginCode: false,
       canActivateRuntime: false,
       executed: false,
@@ -11603,6 +11896,18 @@ function serialiseExecutionResult(executionResult) {
 async function executeTaskWithRecovery(task, options = {}) {
   if (isNativePluginCapabilityTask(task)) {
     const deferredExecution = await deferNativePluginCapabilityExecution(task);
+    return {
+      finalExecution: deferredExecution,
+      attempts: [deferredExecution],
+      recovery: {
+        attempted: false,
+        maxAttempts: 0,
+      },
+    };
+  }
+
+  if (isNativePluginRuntimeActivationTask(task)) {
+    const deferredExecution = await deferNativePluginRuntimeActivation(task);
     return {
       finalExecution: deferredExecution,
       attempts: [deferredExecution],
@@ -12916,6 +13221,19 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === "GET" && requestUrl.pathname === "/plugins/native-adapter/runtime-activation-task-draft") {
+    try {
+      sendJson(res, 200, buildNativePluginRuntimeActivationTaskDraft({
+        packagePath: requestUrl.searchParams.get("packagePath"),
+        capabilityId: requestUrl.searchParams.get("capabilityId") ?? "act.plugin.capability.invoke",
+      }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
   if (req.method === "POST" && requestUrl.pathname === "/plugins/native-adapter/invoke-tasks") {
     try {
       const body = await readJsonBody(req);
@@ -12933,6 +13251,36 @@ const server = http.createServer(async (req, res) => {
         sourceMode: result.sourceMode,
         plugin: result.plugin,
         capability: result.capability,
+        task: serialiseTask(result.task),
+        approval: serialiseApproval(result.approval),
+        governance: result.governance,
+        summary: buildTaskSummary(),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/plugins/native-adapter/runtime-activation-tasks") {
+    try {
+      const body = await readJsonBody(req);
+      const result = await createNativePluginRuntimeActivationTask({
+        packagePath: typeof body.packagePath === "string" ? body.packagePath : null,
+        capabilityId: typeof body.capabilityId === "string" ? body.capabilityId : "act.plugin.capability.invoke",
+        confirm: body.confirm === true,
+      });
+      sendJson(res, 201, {
+        ok: true,
+        registry: result.registry,
+        mode: result.mode,
+        generatedAt: result.generatedAt,
+        sourceRegistry: result.sourceRegistry,
+        sourceMode: result.sourceMode,
+        plugin: result.plugin,
+        capability: result.capability,
+        activationPlan: result.activationPlan,
         task: serialiseTask(result.task),
         approval: serialiseApproval(result.approval),
         governance: result.governance,

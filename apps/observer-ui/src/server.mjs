@@ -689,6 +689,9 @@ function observerHtml() {
           <div class="metric"><span>Required</span><span id="native-plugin-activation-required">0/0</span></div>
           <div class="metric"><span>Runtime</span><span id="native-plugin-activation-runtime">disabled</span></div>
           <div class="metric"><span>Mode</span><span id="native-plugin-activation-mode">activation-plan-only</span></div>
+          <div class="actions tight">
+            <button id="native-plugin-activation-task-button" type="button">Create Activation Task</button>
+          </div>
           <pre id="native-plugin-activation-json">Loading native plugin runtime activation plan...</pre>
         </section>
         <section class="panel">
@@ -1172,6 +1175,7 @@ const nativePluginActivationRequired = document.querySelector("#native-plugin-ac
 const nativePluginActivationRuntime = document.querySelector("#native-plugin-activation-runtime");
 const nativePluginActivationMode = document.querySelector("#native-plugin-activation-mode");
 const nativePluginActivationJson = document.querySelector("#native-plugin-activation-json");
+const nativePluginActivationTaskButton = document.querySelector("#native-plugin-activation-task-button");
 const nativePluginInvokePlanRegistry = document.querySelector("#native-plugin-invoke-plan-registry");
 const nativePluginInvokePlanCapability = document.querySelector("#native-plugin-invoke-plan-capability");
 const nativePluginInvokePlanDecision = document.querySelector("#native-plugin-invoke-plan-decision");
@@ -3940,6 +3944,29 @@ async function createNativePluginInvokeApprovalTask() {
   await refreshNativePluginInvokePlan();
 }
 
+async function createNativePluginRuntimeActivationApprovalTask() {
+  const result = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/runtime-activation-tasks\`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      capabilityId: "act.plugin.capability.invoke",
+      confirm: true,
+    }),
+  });
+
+  taskHistoryFocus = "selected-task";
+  selectedHistoryTaskId = result.task?.id ?? null;
+  taskDetailIdInput.value = result.task?.id ?? "";
+  renderPlanPanel(result.task);
+  setControlMessage(\`Created approval-gated native plugin runtime activation task \${result.task?.id ?? "unknown"}; runtime remains deferred.\`);
+  await refreshRuntime();
+  await refreshTaskList();
+  await refreshTaskHistoryDetail();
+  await refreshApprovalState();
+  await refreshOperatorState();
+  await refreshNativePluginActivationPlan();
+}
+
 async function createPluginSearchWebApprovalTask() {
   const result = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/plugin-search-web-adapter-tasks\`, {
     method: "POST",
@@ -4677,6 +4704,12 @@ sourceCommandTaskButton.addEventListener("click", () => {
 
 nativePluginInvokeTaskButton.addEventListener("click", () => {
   createNativePluginInvokeApprovalTask().catch((error) => {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  });
+});
+
+nativePluginActivationTaskButton.addEventListener("click", () => {
+  createNativePluginRuntimeActivationApprovalTask().catch((error) => {
     setControlMessage(\`Request failed: \${formatError(error)}\`);
   });
 });
