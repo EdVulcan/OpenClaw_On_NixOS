@@ -2250,3 +2250,31 @@ OPENCLAW_MILESTONE_CHECKS=openclaw-native-plugin-runtime-adapter-task,observer-o
 
 Recheck note:
 - 2026-05-18 17:19 +08:00 NixOS targeted milestone passed: `openclaw-native-plugin-runtime-adapter-task`, `observer-openclaw-native-plugin-runtime-adapter-task`.
+
+## 59. 2026-05-18 Step 42 Update: Native Plugin Runtime Adapter Denial Recovery
+
+Status: local implementation ready; awaiting NixOS targeted milestone.
+
+Slice: denial and fresh-approval recovery for native runtime adapter implementation tasks.
+
+Purpose: prove denied runtime adapter implementation tasks cannot inherit approval or enable plugin loading. A denied adapter task must fail and become recoverable; recovery must create a fresh queued adapter task and fresh pending approval; even after approval, operator execution must remain deferred at `runtime_adapter_implementation_deferred`.
+
+Implemented artifacts:
+- Core denial/recovery check for `POST /plugins/native-adapter/runtime-adapter-tasks`.
+- Observer denial/recovery check for adapter task controls, approval state, task list, and recovery visibility.
+- Targeted checks: `openclaw-native-plugin-runtime-adapter-denial-recovery`, `observer-openclaw-native-plugin-runtime-adapter-denial-recovery`.
+
+Safety boundaries:
+- Denied adapter approvals cannot be reused by recovered tasks.
+- Recovered adapter tasks require fresh explicit approval.
+- Approved recovered adapter tasks remain queued and deferred at `runtime_adapter_implementation_deferred`.
+- Duplicate recovery is rejected after a recovery task exists.
+- No plugin module import, plugin execution, runtime activation, mutation, command execution, capability invocation, source exposure, script body exposure, or dependency/package version exposure occurs.
+
+Expected NixOS check:
+
+```bash
+cd /home/edvulcan/OpenClaw_On_NixOS && \
+git pull origin main && \
+OPENCLAW_MILESTONE_CHECKS=openclaw-native-plugin-runtime-adapter-denial-recovery,observer-openclaw-native-plugin-runtime-adapter-denial-recovery npm run dev:milestone-check:unix
+```
