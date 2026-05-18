@@ -2253,7 +2253,7 @@ Recheck note:
 
 ## 59. 2026-05-18 Step 42 Update: Native Plugin Runtime Adapter Denial Recovery
 
-Status: local implementation ready; awaiting NixOS targeted milestone.
+Status: passed.
 
 Slice: denial and fresh-approval recovery for native runtime adapter implementation tasks.
 
@@ -2278,3 +2278,6 @@ cd /home/edvulcan/OpenClaw_On_NixOS && \
 git pull origin main && \
 OPENCLAW_MILESTONE_CHECKS=openclaw-native-plugin-runtime-adapter-denial-recovery,observer-openclaw-native-plugin-runtime-adapter-denial-recovery npm run dev:milestone-check:unix
 ```
+
+Recheck note:
+- 2026-05-18 17:28 +08:00 NixOS targeted milestone passed: `openclaw-native-plugin-runtime-adapter-denial-recovery`, `observer-openclaw-native-plugin-runtime-adapter-denial-recovery`.
