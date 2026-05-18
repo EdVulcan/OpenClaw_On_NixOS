@@ -1969,7 +1969,7 @@ Recheck note:
 
 ## 50. 2026-05-18 Step 33 Update: Search/Web Provider Runtime Sandbox Persistence
 
-Status: local implementation ready; awaiting NixOS targeted milestone.
+Status: passed.
 
 Slice: restart persistence for native search/web provider sandbox approval and recovery chains.
 
@@ -1994,4 +1994,34 @@ Expected NixOS check:
 cd /home/edvulcan/OpenClaw_On_NixOS && \
 git pull origin main && \
 OPENCLAW_MILESTONE_CHECKS=openclaw-plugin-search-web-adapter-provider-runtime-sandbox-persistence,observer-openclaw-plugin-search-web-adapter-provider-runtime-sandbox-persistence npm run dev:milestone-check:unix
+```
+
+Recheck note:
+- 2026-05-18 15:22 +08:00 NixOS targeted milestone passed: `openclaw-plugin-search-web-adapter-provider-runtime-sandbox-persistence`, `observer-openclaw-plugin-search-web-adapter-provider-runtime-sandbox-persistence`.
+
+## 51. 2026-05-18 Step 34 Update: Search/Web Provider Runtime Sandbox Regression
+
+Status: local implementation ready; awaiting NixOS targeted milestone.
+
+Slice: focused regression for the completed native search/web provider sandbox approval and recovery chain.
+
+Purpose: lock the provider sandbox chain before moving toward any real runtime adapter. This regression replays the contract, task materialization, denial/recovery, hardening, and persistence checks as one targeted safety net while preserving the current boundary: no network, provider execution, runtime activation, old OpenClaw module import, mutation, or secret/content exposure.
+
+Implemented artifacts:
+- Targeted checks: `openclaw-plugin-search-web-adapter-provider-runtime-sandbox-regression`, `observer-openclaw-plugin-search-web-adapter-provider-runtime-sandbox-regression`.
+- Core regression chains provider sandbox contract -> task -> denial/recovery -> hardening -> persistence.
+- Observer regression chains the matching UI/API visibility checks for the same provider sandbox path.
+
+Safety boundaries:
+- Regression wrappers only run existing guarded provider sandbox milestone checks.
+- Provider sandbox tasks remain approval-gated, auditable, recoverable, and deferred after approval.
+- Approved provider sandbox tasks still do not use network, activate runtime, execute provider/plugin code, import old OpenClaw modules, mutate state, or expose query/endpoint/auth-env details.
+- Persistence coverage remains restart-based and keeps capability history empty for the sandbox path.
+
+Expected NixOS check:
+
+```bash
+cd /home/edvulcan/OpenClaw_On_NixOS && \
+git pull origin main && \
+OPENCLAW_MILESTONE_CHECKS=openclaw-plugin-search-web-adapter-provider-runtime-sandbox-regression,observer-openclaw-plugin-search-web-adapter-provider-runtime-sandbox-regression npm run dev:milestone-check:unix
 ```
