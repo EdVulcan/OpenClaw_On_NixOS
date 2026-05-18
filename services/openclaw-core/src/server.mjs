@@ -8648,6 +8648,15 @@ function hasRecoverableCapabilityPlan(task) {
   return task?.type === "system_task" && planCapabilityActionSteps(task).length > 0;
 }
 
+function hasRecoverableNativePluginRuntimeActivationPlan(task) {
+  return isNativePluginRuntimeActivationTask(task)
+    && task?.plan?.governance?.requiresRuntimeAdapterBeforeExecution === true
+    && task?.plan?.governance?.canReadSourceFileContent === false
+    && task?.plan?.governance?.canImportModule === false
+    && task?.plan?.governance?.canExecutePluginCode === false
+    && task?.plan?.governance?.canActivateRuntime === false;
+}
+
 function hasRecoverableSearchWebAdapterPlan(task) {
   const hasDeferredBoundary = isOpenClawSearchWebAdapterTask(task)
     ? task?.plan?.governance?.requiresRuntimePreflightBeforeExecution === true
@@ -8670,7 +8679,9 @@ function isRecoverableTask(task) {
     return true;
   }
 
-  return hasRecoverableCapabilityPlan(task) || hasRecoverableSearchWebAdapterPlan(task);
+  return hasRecoverableCapabilityPlan(task)
+    || hasRecoverableNativePluginRuntimeActivationPlan(task)
+    || hasRecoverableSearchWebAdapterPlan(task);
 }
 
 function compareTasksForDisplay(left, right) {
@@ -11778,8 +11789,11 @@ function recoverTask(sourceTask) {
 
   const recoveryAttempt = (sourceTask.recovery?.attempt ?? 0) + 1;
   const recoverableCapabilityPlan = hasRecoverableCapabilityPlan(sourceTask);
+  const recoverableNativePluginRuntimeActivationPlan = hasRecoverableNativePluginRuntimeActivationPlan(sourceTask);
   const recoverableSearchWebAdapterPlan = hasRecoverableSearchWebAdapterPlan(sourceTask);
-  const shouldRecoverExistingPlan = recoverableCapabilityPlan || recoverableSearchWebAdapterPlan;
+  const shouldRecoverExistingPlan = recoverableCapabilityPlan
+    || recoverableNativePluginRuntimeActivationPlan
+    || recoverableSearchWebAdapterPlan;
   const recoveryBody = {
     goal: sourceTask.goal,
     type: sourceTask.type,

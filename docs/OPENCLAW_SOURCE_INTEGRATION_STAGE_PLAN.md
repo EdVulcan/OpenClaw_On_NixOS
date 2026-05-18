@@ -2031,7 +2031,7 @@ Recheck note:
 
 ## 52. 2026-05-18 Step 35 Update: Native Plugin Runtime Activation Task
 
-Status: local implementation ready; awaiting NixOS targeted milestone.
+Status: passed.
 
 Slice: approval-gated runtime activation task shell for native OpenClaw plugin invocation.
 
@@ -2058,4 +2058,35 @@ Expected NixOS check:
 cd /home/edvulcan/OpenClaw_On_NixOS && \
 git pull origin main && \
 OPENCLAW_MILESTONE_CHECKS=openclaw-native-plugin-runtime-activation-task,observer-openclaw-native-plugin-runtime-activation-task npm run dev:milestone-check:unix
+```
+
+Recheck note:
+- 2026-05-18 16:04 +08:00 NixOS targeted milestone passed: `openclaw-native-plugin-runtime-activation-task`, `observer-openclaw-native-plugin-runtime-activation-task`.
+
+## 53. 2026-05-18 Step 36 Update: Native Plugin Runtime Activation Denial Recovery
+
+Status: local implementation ready; awaiting NixOS targeted milestone.
+
+Slice: denial and fresh-approval recovery for native OpenClaw plugin runtime activation tasks.
+
+Purpose: prove denied native runtime activation approvals cannot be reused or silently converted into runtime readiness. A denied activation task must fail and become recoverable; recovery must create a fresh queued activation task and fresh pending approval; even after approval, operator execution must remain deferred at `native_plugin_runtime_activation_deferred`.
+
+Implemented artifacts:
+- Recovery coverage for `native_plugin_runtime_activation` tasks.
+- Targeted checks: `openclaw-native-plugin-runtime-activation-denial-recovery`, `observer-openclaw-native-plugin-runtime-activation-denial-recovery`.
+- Native runtime activation tasks now participate in guarded recoverable-plan handling only when import, execution, activation, mutation, and source-content access remain disabled.
+
+Safety boundaries:
+- Denied native runtime activation tasks do not become approved.
+- Recovered native runtime activation tasks do not reuse denied approval IDs.
+- Recovered native runtime activation tasks require fresh explicit approval.
+- Duplicate recovery for the same denied native runtime activation task is rejected.
+- Approved recovered native runtime activation tasks still do not read source content, import modules, execute plugin code, activate runtime, mutate state, or expose source/script/dependency/package details.
+
+Expected NixOS check:
+
+```bash
+cd /home/edvulcan/OpenClaw_On_NixOS && \
+git pull origin main && \
+OPENCLAW_MILESTONE_CHECKS=openclaw-native-plugin-runtime-activation-denial-recovery,observer-openclaw-native-plugin-runtime-activation-denial-recovery npm run dev:milestone-check:unix
 ```
