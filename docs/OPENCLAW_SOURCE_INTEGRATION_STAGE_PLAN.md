@@ -2096,7 +2096,7 @@ Recheck note:
 
 ## 54. 2026-05-18 Step 37 Update: Native Plugin Runtime Activation Hardening
 
-Status: local implementation ready; awaiting NixOS targeted milestone.
+Status: passed.
 
 Slice: hardening for native OpenClaw plugin runtime activation approvals and recovery chains.
 
@@ -2122,4 +2122,36 @@ Expected NixOS check:
 cd /home/edvulcan/OpenClaw_On_NixOS && \
 git pull origin main && \
 OPENCLAW_MILESTONE_CHECKS=openclaw-native-plugin-runtime-activation-hardening,observer-openclaw-native-plugin-runtime-activation-hardening npm run dev:milestone-check:unix
+```
+
+Recheck note:
+- 2026-05-18 16:30 +08:00 NixOS targeted milestone passed: `openclaw-native-plugin-runtime-activation-hardening`, `observer-openclaw-native-plugin-runtime-activation-hardening`.
+
+## 55. 2026-05-18 Step 38 Update: Native Plugin Runtime Activation Persistence
+
+Status: local implementation ready; awaiting NixOS targeted milestone.
+
+Slice: restart persistence for native OpenClaw plugin runtime activation approval and recovery chains.
+
+Purpose: prove native plugin runtime activation state survives service restarts without weakening the deferred runtime boundary. A pending activation approval must remain pending after restart; a denied activation task must remain failed and recoverable; recovery must preserve lineage and create a fresh pending approval; an approved recovered task must remain deferred at `native_plugin_runtime_activation_deferred` after the final restart.
+
+Implemented artifacts:
+- Targeted checks: `openclaw-native-plugin-runtime-activation-persistence`, `observer-openclaw-native-plugin-runtime-activation-persistence`.
+- Persistence coverage for pending native runtime activation approvals.
+- Persistence coverage for denied source activation tasks and fresh recovered activation approvals.
+- Observer coverage for the same persisted approval, task list, and recovery surfaces.
+
+Safety boundaries:
+- Restart persistence does not import modules, execute plugin code, activate runtime, mutate workspace state, or expose source/script/dependency/package details.
+- Denied activation approvals cannot be reused after restart.
+- Recovered activation tasks require fresh explicit approval after restart.
+- Approved recovered activation tasks remain queued and deferred at `runtime_activation_deferred`.
+- Capability history remains empty across the persistence chain.
+
+Expected NixOS check:
+
+```bash
+cd /home/edvulcan/OpenClaw_On_NixOS && \
+git pull origin main && \
+OPENCLAW_MILESTONE_CHECKS=openclaw-native-plugin-runtime-activation-persistence,observer-openclaw-native-plugin-runtime-activation-persistence npm run dev:milestone-check:unix
 ```
