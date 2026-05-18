@@ -2129,7 +2129,7 @@ Recheck note:
 
 ## 55. 2026-05-18 Step 38 Update: Native Plugin Runtime Activation Persistence
 
-Status: local implementation ready; awaiting NixOS targeted milestone.
+Status: passed.
 
 Slice: restart persistence for native OpenClaw plugin runtime activation approval and recovery chains.
 
@@ -2154,4 +2154,34 @@ Expected NixOS check:
 cd /home/edvulcan/OpenClaw_On_NixOS && \
 git pull origin main && \
 OPENCLAW_MILESTONE_CHECKS=openclaw-native-plugin-runtime-activation-persistence,observer-openclaw-native-plugin-runtime-activation-persistence npm run dev:milestone-check:unix
+```
+
+Recheck note:
+- 2026-05-18 16:50 +08:00 NixOS targeted milestone passed: `openclaw-native-plugin-runtime-activation-persistence`, `observer-openclaw-native-plugin-runtime-activation-persistence`.
+
+## 56. 2026-05-18 Step 39 Update: Native Plugin Runtime Activation Regression
+
+Status: local implementation ready; awaiting NixOS targeted milestone.
+
+Slice: focused regression for native OpenClaw plugin runtime activation approval and recovery chains.
+
+Purpose: lock the native plugin runtime activation chain before moving toward any real runtime adapter. This regression replays the plan, approval-gated task, denial/recovery, hardening, and persistence checks as one targeted safety net while preserving the current boundary: no plugin module import, runtime activation, provider/network execution, mutation, or secret/source/script/package exposure.
+
+Implemented artifacts:
+- Core regression chain: plan -> task -> denial/recovery -> hardening -> persistence.
+- Observer regression chain for the same operator-visible activation controls and recovery surfaces.
+- Targeted checks: `openclaw-native-plugin-runtime-activation-regression`, `observer-openclaw-native-plugin-runtime-activation-regression`.
+
+Safety boundaries:
+- The regression invokes only already-gated checks and does not introduce a runtime loader.
+- Approved activation tasks remain deferred at `native_plugin_runtime_activation_deferred`.
+- Capability history remains empty anywhere activation would otherwise execute plugin capability code.
+- Restarted chains preserve approval status, failed source tasks, recovery lineage, and fresh approvals.
+
+Expected NixOS check:
+
+```bash
+cd /home/edvulcan/OpenClaw_On_NixOS && \
+git pull origin main && \
+OPENCLAW_MILESTONE_CHECKS=openclaw-native-plugin-runtime-activation-regression,observer-openclaw-native-plugin-runtime-activation-regression npm run dev:milestone-check:unix
 ```
