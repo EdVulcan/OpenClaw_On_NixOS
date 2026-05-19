@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+export OPENCLAW_CORE_PORT="${OPENCLAW_CORE_PORT:-5830}"
+export OPENCLAW_EVENT_HUB_PORT="${OPENCLAW_EVENT_HUB_PORT:-5831}"
+export OPENCLAW_SESSION_MANAGER_PORT="${OPENCLAW_SESSION_MANAGER_PORT:-5832}"
+export OPENCLAW_BROWSER_RUNTIME_PORT="${OPENCLAW_BROWSER_RUNTIME_PORT:-5833}"
+export OPENCLAW_SCREEN_SENSE_PORT="${OPENCLAW_SCREEN_SENSE_PORT:-5834}"
+export OPENCLAW_SCREEN_ACT_PORT="${OPENCLAW_SCREEN_ACT_PORT:-5835}"
+export OPENCLAW_SYSTEM_SENSE_PORT="${OPENCLAW_SYSTEM_SENSE_PORT:-5836}"
+export OPENCLAW_SYSTEM_HEAL_PORT="${OPENCLAW_SYSTEM_HEAL_PORT:-5837}"
+export OBSERVER_UI_PORT="${OBSERVER_UI_PORT:-5900}"
+export OPENCLAW_CORE_STATE_FILE="${OPENCLAW_CORE_STATE_FILE:-$REPO_ROOT/.artifacts/openclaw-core-systemd-unit-inventory-check.json}"
+export OPENCLAW_SYSTEM_HEAL_STATE_FILE="${OPENCLAW_SYSTEM_HEAL_STATE_FILE:-$REPO_ROOT/.artifacts/openclaw-system-heal-systemd-unit-inventory-check.json}"
+
+SYSTEM_URL="http://127.0.0.1:$OPENCLAW_SYSTEM_SENSE_PORT"
+
+"$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
+rm -f \
+  "$OPENCLAW_CORE_STATE_FILE" \
+  "$OPENCLAW_CORE_STATE_FILE.tmp" \
+  "$OPENCLAW_SYSTEM_HEAL_STATE_FILE" \
+  "$OPENCLAW_SYSTEM_HEAL_STATE_FILE.tmp"
+
+cleanup() {
+  "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
+}
+trap cleanup EXIT
+
+"$SCRIPT_DIR/dev-up.sh"
+
+inventory="$(curl --silent --fail "$SYSTEM_URL/system/systemd/units")"
+
+node - <<'EOF' "$inventory"
+const inventory = JSON.parse(process.argv[2]);
+const expectedUnits = [
+  "openclaw-event-hub.service",
+  "openclaw-core.service",
+  "openclaw-session-manager.service",
+  "openclaw-browser-runtime.service",
+  "openclaw-screen-sense.service",
+  "openclaw-screen-act.service",
+  "openclaw-system-sense.service",
+  "openclaw-system-heal.service",
+  "observer-ui.service",
+];
+
+if (!inventory.ok || inventory.registry !== "openclaw-systemd-unit-inventory-v0") {
+  throw new Error(`systemd unit inventory should expose the expected registry: ${JSON.stringify(inventory)}`);
+}
+if (inventory.mode !== "read_only" || inventory.canMutate !== false || inventory.canRestart !== false) {
+  throw new Error(`systemd unit inventory must remain read-only: ${JSON.stringify({
+    mode: inventory.mode,
+    canMutate: inventory.canMutate,
+    canRestart: inventory.canRestart,
+  })}`);
+}
+if (inventory.summary?.total < expectedUnits.length || inventory.summary?.planned < expectedUnits.length) {
+  throw new Error(`systemd unit inventory should include all OpenClaw planned units: ${JSON.stringify(inventory.summary)}`);
+}
+if (inventory.summary?.mutationEndpoints !== 0 || inventory.summary?.restartEndpoints !== 0) {
+  throw new Error(`systemd unit inventory should not expose mutation endpoints: ${JSON.stringify(inventory.summary)}`);
+}
+if (inventory.source?.kind !== "openclaw-body-systemd-inventory" || inventory.source?.evidence !== "read_only_body_governance") {
+  throw new Error(`systemd unit inventory should identify body governance evidence: ${JSON.stringify(inventory.source)}`);
+}
+if (inventory.governance?.hostMutation !== false || inventory.governance?.autonomy !== "observe_only") {
+  throw new Error(`systemd unit inventory governance should stay observe-only: ${JSON.stringify(inventory.governance)}`);
+}
+if (!Array.isArray(inventory.units)) {
+  throw new Error(`systemd unit inventory should expose unit items: ${JSON.stringify(inventory)}`);
+}
+
+for (const unitName of expectedUnits) {
+  const unit = inventory.units.find((item) => item.unit === unitName);
+  if (!unit) {
+    throw new Error(`systemd unit inventory missing ${unitName}: ${JSON.stringify(inventory.units)}`);
+  }
+  if (unit.canMutate !== false || unit.canRestart !== false || unit.bodyOwned !== true || unit.planned !== true) {
+    throw new Error(`systemd unit ${unitName} should be planned body inventory only: ${JSON.stringify(unit)}`);
+  }
+}
+
+if (inventory.next?.boundary !== "plan-only repair proposal before any host mutation") {
+  throw new Error(`systemd unit inventory should point to plan-only repair next: ${JSON.stringify(inventory.next)}`);
+}
+
+console.log(JSON.stringify({
+  openclawSystemdUnitInventory: {
+    status: "passed",
+    registry: inventory.registry,
+    mode: inventory.mode,
+    systemdAvailable: inventory.source.systemdAvailable,
+    total: inventory.summary.total,
+    plannedUnits: expectedUnits.length,
+    next: inventory.next.recommendedSlice,
+  },
+}, null, 2));
+EOF

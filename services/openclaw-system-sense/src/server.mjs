@@ -31,6 +31,7 @@ const commandAllowlist = (process.env.OPENCLAW_SYSTEM_COMMAND_ALLOWLIST ?? "echo
 const commandTimeoutMs = Number.parseInt(process.env.OPENCLAW_SYSTEM_COMMAND_TIMEOUT_MS ?? "3000", 10);
 const commandOutputLimit = Number.parseInt(process.env.OPENCLAW_SYSTEM_COMMAND_OUTPUT_LIMIT ?? "8192", 10);
 const execFileAsync = promisify(execFile);
+const SYSTEMD_UNIT_INVENTORY_REGISTRY = "openclaw-systemd-unit-inventory-v0";
 
 const serviceTargets = {
   core: process.env.OPENCLAW_CORE_URL ?? "http://127.0.0.1:4100",
@@ -41,6 +42,84 @@ const serviceTargets = {
   screenAct: process.env.OPENCLAW_SCREEN_ACT_URL ?? "http://127.0.0.1:4105",
   systemHeal: process.env.OPENCLAW_SYSTEM_HEAL_URL ?? "http://127.0.0.1:4107",
 };
+
+const openClawSystemdUnitSpecs = [
+  {
+    key: "eventHub",
+    name: "openclaw-event-hub",
+    description: "OpenClaw Event Hub",
+    component: "body",
+    url: serviceTargets.eventHub,
+    after: [],
+  },
+  {
+    key: "core",
+    name: "openclaw-core",
+    description: "OpenClaw Core Control Plane",
+    component: "body",
+    url: serviceTargets.core,
+    after: ["openclaw-event-hub"],
+  },
+  {
+    key: "sessionManager",
+    name: "openclaw-session-manager",
+    description: "OpenClaw AI Work View Session Manager",
+    component: "body",
+    url: serviceTargets.sessionManager,
+    after: ["openclaw-event-hub"],
+  },
+  {
+    key: "browserRuntime",
+    name: "openclaw-browser-runtime",
+    description: "OpenClaw Browser Runtime",
+    component: "body",
+    url: serviceTargets.browserRuntime,
+    after: ["openclaw-event-hub", "openclaw-session-manager"],
+  },
+  {
+    key: "screenSense",
+    name: "openclaw-screen-sense",
+    description: "OpenClaw Screen Sense",
+    component: "body",
+    url: serviceTargets.screenSense,
+    after: ["openclaw-event-hub", "openclaw-session-manager", "openclaw-browser-runtime"],
+  },
+  {
+    key: "screenAct",
+    name: "openclaw-screen-act",
+    description: "OpenClaw Screen Act",
+    component: "body",
+    url: serviceTargets.screenAct,
+    after: ["openclaw-event-hub", "openclaw-screen-sense", "openclaw-browser-runtime"],
+  },
+  {
+    key: "systemSense",
+    name: "openclaw-system-sense",
+    description: "OpenClaw System Sense",
+    component: "body",
+    url: `http://${host}:${port}`,
+    after: ["openclaw-event-hub", "openclaw-core"],
+  },
+  {
+    key: "systemHeal",
+    name: "openclaw-system-heal",
+    description: "OpenClaw System Heal",
+    component: "body",
+    url: serviceTargets.systemHeal,
+    after: ["openclaw-event-hub", "openclaw-system-sense"],
+  },
+  {
+    key: "observerUi",
+    name: "observer-ui",
+    description: "OpenClaw Observer UI",
+    component: "observer",
+    url: process.env.OBSERVER_UI_URL ?? `http://127.0.0.1:${process.env.OBSERVER_UI_PORT ?? "4170"}`,
+    after: ["openclaw-core", "openclaw-event-hub", "openclaw-session-manager"],
+  },
+].map((spec) => ({
+  ...spec,
+  unit: `${spec.name}.service`,
+}));
 
 const systemState = {
   timestamp: new Date().toISOString(),
@@ -803,6 +882,177 @@ async function checkService(name, baseUrl) {
   }
 }
 
+function parseSystemctlShow(output) {
+  return Object.fromEntries(
+    output
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const separator = line.indexOf("=");
+        if (separator === -1) {
+          return [line, ""];
+        }
+        return [line.slice(0, separator), line.slice(separator + 1)];
+      }),
+  );
+}
+
+async function detectSystemdAvailability() {
+  if (process.platform !== "linux") {
+    return {
+      available: false,
+      reason: `systemd inspection is only attempted on linux; current platform is ${process.platform}.`,
+    };
+  }
+
+  try {
+    const result = await execFileAsync("systemctl", ["--version"], {
+      timeout: serviceTimeoutMs,
+      windowsHide: true,
+      maxBuffer: 4096,
+    });
+    const firstLine = result.stdout.split(/\r?\n/).find(Boolean) ?? "systemctl";
+    return {
+      available: true,
+      version: firstLine,
+    };
+  } catch (error) {
+    return {
+      available: false,
+      reason: error instanceof Error ? error.message : "systemctl is unavailable.",
+    };
+  }
+}
+
+async function inspectSystemdUnit(spec, systemd) {
+  const baseUnit = {
+    key: spec.key,
+    name: spec.name,
+    unit: spec.unit,
+    description: spec.description,
+    component: spec.component,
+    bodyOwned: true,
+    planned: true,
+    url: spec.url,
+    after: spec.after,
+    canMutate: false,
+    canRestart: false,
+    status: "unknown",
+    loadState: "unknown",
+    activeState: "unknown",
+    subState: "unknown",
+    unitFileState: "unknown",
+    mainPid: null,
+    fragmentPath: null,
+    systemdObserved: false,
+  };
+
+  if (!systemd.available) {
+    return {
+      ...baseUnit,
+      observation: "planned_inventory_only",
+    };
+  }
+
+  try {
+    const result = await execFileAsync("systemctl", [
+      "show",
+      spec.unit,
+      "--property=Id",
+      "--property=LoadState",
+      "--property=ActiveState",
+      "--property=SubState",
+      "--property=UnitFileState",
+      "--property=FragmentPath",
+      "--property=Description",
+      "--property=MainPID",
+      "--property=ExecMainStatus",
+      "--no-pager",
+    ], {
+      timeout: serviceTimeoutMs,
+      windowsHide: true,
+      maxBuffer: 8192,
+    });
+    const properties = parseSystemctlShow(result.stdout);
+    return {
+      ...baseUnit,
+      description: properties.Description || baseUnit.description,
+      status: properties.ActiveState || "unknown",
+      loadState: properties.LoadState || "unknown",
+      activeState: properties.ActiveState || "unknown",
+      subState: properties.SubState || "unknown",
+      unitFileState: properties.UnitFileState || "unknown",
+      mainPid: Number.parseInt(properties.MainPID ?? "0", 10) || null,
+      execMainStatus: Number.parseInt(properties.ExecMainStatus ?? "0", 10) || 0,
+      fragmentPath: properties.FragmentPath || null,
+      systemdObserved: true,
+      observation: "systemctl_show_read_only",
+    };
+  } catch (error) {
+    return {
+      ...baseUnit,
+      systemdObserved: true,
+      observation: "systemctl_show_failed",
+      observationError: error instanceof Error ? error.message : "Unable to inspect unit.",
+    };
+  }
+}
+
+async function buildSystemdUnitInventory() {
+  const observedAt = new Date().toISOString();
+  const systemd = await detectSystemdAvailability();
+  const units = await Promise.all(openClawSystemdUnitSpecs.map((spec) => inspectSystemdUnit(spec, systemd)));
+  const active = units.filter((unit) => unit.activeState === "active").length;
+  const failed = units.filter((unit) => unit.activeState === "failed" || unit.subState === "failed").length;
+  const inactive = units.filter((unit) => unit.activeState === "inactive").length;
+  const observed = units.filter((unit) => unit.systemdObserved).length;
+
+  return {
+    ok: true,
+    registry: SYSTEMD_UNIT_INVENTORY_REGISTRY,
+    mode: "read_only",
+    canMutate: false,
+    canRestart: false,
+    observedAt,
+    source: {
+      service: "openclaw-system-sense",
+      kind: "openclaw-body-systemd-inventory",
+      evidence: "read_only_body_governance",
+      systemdAvailable: systemd.available,
+      systemdVersion: systemd.version ?? null,
+      unavailableReason: systemd.reason ?? null,
+      plannedFrom: "nix/modules/openclaw-body.nix serviceSpecs",
+    },
+    governance: {
+      domain: "body_internal",
+      risk: "low",
+      autonomy: "observe_only",
+      approvalRequired: false,
+      hostMutation: false,
+      readOnlyCommands: systemd.available ? ["systemctl --version", "systemctl show <unit>"] : [],
+      forbiddenActions: ["start", "stop", "restart", "reload", "enable", "disable"],
+    },
+    summary: {
+      total: units.length,
+      planned: units.filter((unit) => unit.planned).length,
+      observed,
+      active,
+      inactive,
+      failed,
+      unknown: Math.max(0, units.length - active - inactive - failed),
+      bodyOwned: units.filter((unit) => unit.bodyOwned).length,
+      mutationEndpoints: 0,
+      restartEndpoints: 0,
+    },
+    units,
+    next: {
+      recommendedSlice: "openclaw-systemd-repair-plan",
+      boundary: "plan-only repair proposal before any host mutation",
+    },
+  };
+}
+
 async function refreshSystemState() {
   const entries = await Promise.all(
     Object.entries(serviceTargets).map(async ([name, url]) => [name, await checkService(name, url)]),
@@ -897,6 +1147,12 @@ const server = http.createServer(async (req, res) => {
       ok: true,
       services: systemState.services,
     });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/system/systemd/units") {
+    const inventory = await buildSystemdUnitInventory();
+    sendJson(res, 200, inventory);
     return;
   }
 

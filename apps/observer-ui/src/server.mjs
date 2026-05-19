@@ -828,6 +828,14 @@ function observerHtml() {
           <div class="metric"><span>Body Uptime</span><span id="system-body-uptime">0s</span></div>
           <pre id="system-summary">Loading system state...</pre>
         </section>
+        <section class="panel" id="systemd-unit-inventory">
+          <h2>Systemd Unit Inventory</h2>
+          <div class="metric"><span>Total Units</span><span id="systemd-unit-total">0</span></div>
+          <div class="metric"><span>Active</span><span id="systemd-unit-active">0</span></div>
+          <div class="metric"><span>Observed</span><span id="systemd-unit-observed">0</span></div>
+          <div class="metric"><span>Mode</span><span id="systemd-unit-mode">read_only</span></div>
+          <pre id="systemd-unit-json">Loading read-only OpenClaw systemd unit inventory...</pre>
+        </section>
         <section class="panel">
           <h2>Heal History</h2>
           <div class="metric"><span>Entries</span><span id="heal-count">0</span></div>
@@ -928,6 +936,11 @@ const systemServicesOnline = document.querySelector("#system-services-online");
 const systemAlertCount = document.querySelector("#system-alert-count");
 const systemBodyUptime = document.querySelector("#system-body-uptime");
 const systemSummary = document.querySelector("#system-summary");
+const systemdUnitTotal = document.querySelector("#systemd-unit-total");
+const systemdUnitActive = document.querySelector("#systemd-unit-active");
+const systemdUnitObserved = document.querySelector("#systemd-unit-observed");
+const systemdUnitMode = document.querySelector("#systemd-unit-mode");
+const systemdUnitJson = document.querySelector("#systemd-unit-json");
 const healCount = document.querySelector("#heal-count");
 const healSummary = document.querySelector("#heal-summary");
 const maintenancePolicyEnabled = document.querySelector("#maintenance-policy-enabled");
@@ -3876,6 +3889,34 @@ async function refreshSystemState() {
   }
 }
 
+async function refreshSystemdUnitInventory() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.systemSenseUrl}/system/systemd/units\`);
+    const summary = data.summary ?? {};
+    const source = data.source ?? {};
+    const governance = data.governance ?? {};
+    const units = Array.isArray(data.units) ? data.units : [];
+    systemdUnitTotal.textContent = String(summary.total ?? units.length);
+    systemdUnitActive.textContent = String(summary.active ?? 0);
+    systemdUnitObserved.textContent = String(summary.observed ?? 0);
+    systemdUnitMode.textContent = data.mode ?? "read_only";
+    systemdUnitJson.textContent = [
+      \`Registry: \${data.registry ?? "unknown"}\`,
+      \`Mode: \${data.mode ?? "unknown"} canMutate=\${Boolean(data.canMutate)} canRestart=\${Boolean(data.canRestart)}\`,
+      \`Systemd: \${source.systemdAvailable ? source.systemdVersion ?? "available" : source.unavailableReason ?? "unavailable"}\`,
+      \`Governance: \${governance.autonomy ?? "observe_only"} domain=\${governance.domain ?? "body_internal"} mutation=\${Boolean(governance.hostMutation)}\`,
+      \`Units: \${units.map((unit) => \`\${unit.unit}:\${unit.activeState ?? unit.status ?? "unknown"}\`).join(", ")}\`,
+      \`Next: \${data.next?.recommendedSlice ?? "plan-only repair proposal"}\`,
+    ].join("\\n");
+  } catch {
+    systemdUnitTotal.textContent = "0";
+    systemdUnitActive.textContent = "0";
+    systemdUnitObserved.textContent = "0";
+    systemdUnitMode.textContent = "offline";
+    systemdUnitJson.textContent = "Unable to read OpenClaw systemd unit inventory.";
+  }
+}
+
 async function refreshHealState() {
   try {
     const data = await fetchJson(\`\${observerConfig.systemHealUrl}/heal/history\`);
@@ -5257,6 +5298,7 @@ await refreshSourceCommandProposals();
 await refreshSourceCommandPlanDraft();
 await refreshWorkspaceCommandPlanDraft();
 await refreshSystemState();
+await refreshSystemdUnitInventory();
 await refreshHealState();
 await refreshMaintenanceState();
 await refreshAuditState();
@@ -5315,6 +5357,7 @@ setInterval(refreshSourceCommandProposals, 5000);
 setInterval(refreshSourceCommandPlanDraft, 5000);
 setInterval(refreshWorkspaceCommandPlanDraft, 5000);
 setInterval(refreshSystemState, 5000);
+setInterval(refreshSystemdUnitInventory, 5000);
 setInterval(refreshHealState, 5000);
 setInterval(refreshMaintenanceState, 5000);
 setInterval(refreshAuditState, 5000);`;
