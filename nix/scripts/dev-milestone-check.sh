@@ -20,6 +20,7 @@ checks=(
   "openclaw-mvp-route-alignment|dev-openclaw-mvp-route-alignment-check.sh|Whitepaper-aligned MVP route checkpoint after the eye-hand recovery loop"
   "openclaw-system-health-self-heal-evidence|dev-openclaw-system-health-self-heal-evidence-check.sh|Body health snapshot drives conservative self-heal evidence"
   "openclaw-mvp-readiness|dev-openclaw-mvp-readiness-check.sh|First-stage MVP readiness regression across body, eyes, hands, recovery, and self-heal"
+  "openclaw-mvp-status|dev-openclaw-mvp-status-check.sh|First-stage MVP status, demo path, and next-phase boundary"
   "task-workbench|dev-task-workbench-check.sh|Task lifecycle, recovery, history, and work view coordination"
   "task-executor|dev-task-executor-check.sh|Executor verification, failed checks, manual and auto recovery"
   "persistence|dev-persistence-check.sh|Core task state persistence and recovery chains"
