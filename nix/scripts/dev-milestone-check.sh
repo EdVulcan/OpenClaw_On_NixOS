@@ -27,6 +27,7 @@ checks=(
   "openclaw-systemd-unit-inventory|dev-openclaw-systemd-unit-inventory-check.sh|Read-only OpenClaw systemd unit inventory for Phase 2 body governance"
   "openclaw-systemd-repair-plan|dev-openclaw-systemd-repair-plan-check.sh|Plan-only systemd repair proposal for one OpenClaw body unit"
   "openclaw-systemd-repair-dry-run|dev-openclaw-systemd-repair-dry-run-check.sh|Operator-visible dry-run envelope for OpenClaw systemd repair proposals"
+  "openclaw-systemd-repair-execution-route|dev-openclaw-systemd-repair-execution-route-check.sh|Route gate for operator-reviewed real OpenClaw systemd repair execution"
   "task-workbench|dev-task-workbench-check.sh|Task lifecycle, recovery, history, and work view coordination"
   "task-executor|dev-task-executor-check.sh|Executor verification, failed checks, manual and auto recovery"
   "persistence|dev-persistence-check.sh|Core task state persistence and recovery chains"

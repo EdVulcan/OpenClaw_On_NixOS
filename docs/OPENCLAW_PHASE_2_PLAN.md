@@ -105,6 +105,33 @@ Why this first:
 - It is demoable in Observer.
 - It keeps high-risk repair out of the first Phase 2 slice.
 
+## Track A Execution Route Gate
+
+Status after the first Track A block:
+
+- `openclaw-systemd-unit-inventory` is passed.
+- `observer-openclaw-systemd-unit-inventory` is passed.
+- `openclaw-systemd-repair-plan` is passed.
+- `observer-openclaw-systemd-repair-plan` is passed.
+- `openclaw-systemd-repair-dry-run` is passed.
+- `observer-openclaw-systemd-repair-dry-run` is passed.
+
+Decision:
+
+OpenClaw may begin planning the next Track A slice, `openclaw-systemd-repair-execution-task`, only as an operator-reviewed real systemd repair execution path.
+
+The next slice is allowed because it directly advances real NixOS/systemd repair semantics, but it must remain narrow:
+
+- One selected OpenClaw-owned body unit only.
+- Operator-visible command, target, risk, reason, and rollback note.
+- No automatic high-risk repair.
+- No blind restart.
+- No background scheduler.
+- No persistence, denial-recovery, duplicate-click, or approval-hardening loop.
+- No plugin/runtime adapter work.
+
+The next slice must not execute until its own milestone explicitly proves that execution is operator-reviewed and linked back to the passed inventory, repair plan, and dry-run envelope.
+
 ## Phase 2 Gate
 
 Before implementing any Phase 2 feature, confirm:
