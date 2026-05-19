@@ -11568,6 +11568,10 @@ async function executeSystemdRepairExecutionTask(task) {
   });
   const result = await runSystemdRepairCommand(runningTask);
   const commandTranscript = [buildSystemdRepairCommandTranscript(runningTask, result)];
+  const rollbackNote =
+    runningTask.systemdRepair?.evidence?.plan?.proposal?.rollbackNote
+    ?? runningTask.systemdRepair?.evidence?.dryRunEnvelope?.plan?.proposal?.rollbackNote
+    ?? null;
   const status = result.ok ? "completed" : "failed";
   const phase = result.ok ? "systemd_repair_execution_completed" : "systemd_repair_execution_failed";
   const updatedTask = await setTaskPhase(runningTask, phase, {
@@ -11613,7 +11617,7 @@ async function executeSystemdRepairExecutionTask(task) {
       executionSucceeded: result.ok,
       commandTranscript,
       result,
-      rollbackNote: updatedTask.systemdRepair?.evidence?.repairPlan?.proposal?.rollbackNote ?? null,
+      rollbackNote,
     },
     at: updatedTask.updatedAt,
   };
