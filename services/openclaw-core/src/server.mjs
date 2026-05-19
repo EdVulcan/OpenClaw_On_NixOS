@@ -9764,6 +9764,104 @@ function buildMvpRouteAlignment() {
   };
 }
 
+function taskTimeForDemo(task) {
+  const value = Date.parse(task?.closedAt ?? task?.updatedAt ?? task?.createdAt ?? "");
+  return Number.isFinite(value) ? value : 0;
+}
+
+function findLatestSystemdRepairDemoTask() {
+  return [...tasks.values()]
+    .filter((task) => task.type === "systemd_repair_execution_task")
+    .filter((task) => task.outcome?.details?.postExecutionVerification)
+    .sort((left, right) => taskTimeForDemo(right) - taskTimeForDemo(left))[0]
+    ?? null;
+}
+
+function buildPhase2RepairDemoStatus() {
+  const route = buildMvpRouteAlignment();
+  const latestTask = findLatestSystemdRepairDemoTask();
+  const verification = latestTask?.outcome?.details?.postExecutionVerification ?? null;
+  const transcript = latestTask?.outcome?.details?.commandTranscript?.[0] ?? null;
+  const checklist = [
+    {
+      id: "phase2-track-a-route",
+      label: "Whitepaper route remains Phase 2 Track A to Track B",
+      status: "passed",
+      evidence: "docs/OPENCLAW_PHASE_2_PLAN.md",
+    },
+    {
+      id: "operator-approved-real-execution",
+      label: "Operator-approved real systemd repair execution exists",
+      status: latestTask ? "passed" : "pending",
+      evidence: latestTask?.id ?? null,
+    },
+    {
+      id: "post-execution-body-verification",
+      label: "Post-execution body-state verification is attached",
+      status: verification ? "passed" : "pending",
+      evidence: verification?.registry ?? null,
+    },
+    {
+      id: "observer-visible-evidence",
+      label: "Observer can display task evidence without hidden actions",
+      status: "passed",
+      evidence: "observer-ui phase2 repair demo panel",
+    },
+  ];
+  const passed = checklist.filter((item) => item.status === "passed").length;
+
+  return {
+    ok: true,
+    registry: "openclaw-phase-2-repair-demo-status-v0",
+    mode: "observer_demo_status_read_only",
+    generatedAt: new Date().toISOString(),
+    status: latestTask && verification ? "demo_ready" : "waiting_for_repair_evidence",
+    track: {
+      phase: "phase-2",
+      track: "operator-observer-demo-experience",
+      sourceTrack: "real-nixos-systemd-repair-semantics",
+      whitepaperDirection: "make body capability explainable and observable",
+    },
+    route: {
+      registry: route.registry,
+      current: "phase-2-systemd-repair-evidence-demo",
+      previousMvpCurrent: route.mainline?.current ?? null,
+      nextRecommendedSlice: "operator-observer-demo-evidence-bundle",
+      avoidsSafetyBoundaryLoop: true,
+    },
+    checklist,
+    summary: {
+      passed,
+      total: checklist.length,
+      demoReady: latestTask && verification ? true : false,
+      latestTaskId: latestTask?.id ?? null,
+      latestOutcome: latestTask?.outcome?.kind ?? null,
+      targetUnit: verification?.targetUnit ?? latestTask?.systemdRepair?.target?.unit ?? "openclaw-browser-runtime.service",
+      command: transcript?.command ?? null,
+      exitCode: verification?.commandExitCode ?? transcript?.exitCode ?? null,
+      beforeActiveState: verification?.summary?.beforeActiveState ?? null,
+      afterActiveState: verification?.summary?.afterActiveState ?? null,
+      beforeServiceOk: verification?.summary?.beforeServiceOk ?? null,
+      afterServiceOk: verification?.summary?.afterServiceOk ?? null,
+      noAutomaticRecovery: verification?.summary?.noAutomaticRecovery === true,
+    },
+    evidence: {
+      task: latestTask ? serialiseTask(latestTask) : null,
+      postExecutionVerification: verification,
+      commandTranscript: transcript,
+    },
+    governance: {
+      readOnly: true,
+      createsTask: false,
+      createsApproval: false,
+      executesCommand: false,
+      mutatesHost: false,
+      triggersRecovery: false,
+      schedulesWork: false,
+    },
+  };
+}
+
 function baseCapabilities() {
   return [
     {
@@ -13503,6 +13601,11 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === "GET" && requestUrl.pathname === "/mvp/route") {
     sendJson(res, 200, buildMvpRouteAlignment());
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/phase-2/repair-demo-status") {
+    sendJson(res, 200, buildPhase2RepairDemoStatus());
     return;
   }
 

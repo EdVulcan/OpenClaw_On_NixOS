@@ -281,6 +281,14 @@ function observerHtml() {
           <div class="metric"><span>Next</span><span id="mvp-route-next">system-health-self-heal</span></div>
           <pre id="mvp-route-json">Loading MVP route alignment...</pre>
         </section>
+        <section class="panel" id="phase2-repair-demo-status-panel">
+          <h2>Phase 2 Repair Demo</h2>
+          <div class="metric"><span>Status</span><span id="phase2-repair-demo-status">loading</span></div>
+          <div class="metric"><span>Evidence</span><span id="phase2-repair-demo-evidence">0/0</span></div>
+          <div class="metric"><span>Target</span><span id="phase2-repair-demo-target">openclaw-browser-runtime.service</span></div>
+          <div class="metric"><span>Next</span><span id="phase2-repair-demo-next">demo evidence bundle</span></div>
+          <pre id="phase2-repair-demo-json">Loading Phase 2 repair demo status...</pre>
+        </section>
         <section class="panel">
           <h2>Controls</h2>
           <div class="control-stack">
@@ -940,6 +948,11 @@ const mvpRouteTrunk = document.querySelector("#mvp-route-trunk");
 const mvpRouteComplete = document.querySelector("#mvp-route-complete");
 const mvpRouteNext = document.querySelector("#mvp-route-next");
 const mvpRouteJson = document.querySelector("#mvp-route-json");
+const phase2RepairDemoStatus = document.querySelector("#phase2-repair-demo-status");
+const phase2RepairDemoEvidence = document.querySelector("#phase2-repair-demo-evidence");
+const phase2RepairDemoTarget = document.querySelector("#phase2-repair-demo-target");
+const phase2RepairDemoNext = document.querySelector("#phase2-repair-demo-next");
+const phase2RepairDemoJson = document.querySelector("#phase2-repair-demo-json");
 const screenWindow = document.querySelector("#screen-window");
 const screenSession = document.querySelector("#screen-session");
 const screenReadiness = document.querySelector("#screen-readiness");
@@ -3686,6 +3699,36 @@ async function refreshMvpRoute() {
   }
 }
 
+async function refreshPhase2RepairDemoStatus() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/phase-2/repair-demo-status\`);
+    const summary = data.summary ?? {};
+    const checklist = data.checklist ?? [];
+    phase2RepairDemoStatus.textContent = data.status ?? "unknown";
+    phase2RepairDemoEvidence.textContent = \`\${summary.passed ?? 0}/\${summary.total ?? checklist.length}\`;
+    phase2RepairDemoTarget.textContent = summary.targetUnit ?? "openclaw-browser-runtime.service";
+    phase2RepairDemoNext.textContent = data.route?.nextRecommendedSlice ?? "demo evidence bundle";
+    phase2RepairDemoJson.textContent = [
+      \`Registry: \${data.registry ?? "unknown"}\`,
+      \`Mode: \${data.mode ?? "unknown"} readOnly=\${Boolean(data.governance?.readOnly)} executesCommand=\${Boolean(data.governance?.executesCommand)}\`,
+      \`Status: \${data.status ?? "unknown"} demoReady=\${Boolean(summary.demoReady)}\`,
+      \`Task: \${summary.latestTaskId ?? "none"} outcome=\${summary.latestOutcome ?? "none"}\`,
+      \`Command: \${summary.command ?? "none"} exitCode=\${summary.exitCode ?? "none"}\`,
+      \`Body: before=\${summary.beforeActiveState ?? "unknown"} after=\${summary.afterActiveState ?? "unknown"} serviceOk=\${summary.beforeServiceOk ?? "unknown"}->\${summary.afterServiceOk ?? "unknown"}\`,
+      \`No Automatic Recovery: \${Boolean(summary.noAutomaticRecovery)}\`,
+      \`Next: \${data.route?.nextRecommendedSlice ?? "unknown"} avoidsSafetyBoundaryLoop=\${Boolean(data.route?.avoidsSafetyBoundaryLoop)}\`,
+      "",
+      ...(checklist.map((item) => \`[\${item.status ?? "unknown"}] \${item.id ?? "check"} :: \${item.label ?? "no label"} evidence=\${item.evidence ?? "none"}\`)),
+    ].join("\\n");
+  } catch {
+    phase2RepairDemoStatus.textContent = "offline";
+    phase2RepairDemoEvidence.textContent = "0/0";
+    phase2RepairDemoTarget.textContent = "offline";
+    phase2RepairDemoNext.textContent = "unknown";
+    phase2RepairDemoJson.textContent = "Unable to read Phase 2 repair demo status.";
+  }
+}
+
 async function refreshRuntime() {
   try {
     const data = await fetchJson(\`\${observerConfig.coreUrl}/state/runtime\`);
@@ -5408,6 +5451,7 @@ taskListItems.addEventListener("click", (event) => {
 
 await refreshHealth();
 await refreshMvpRoute();
+await refreshPhase2RepairDemoStatus();
 await refreshRuntime();
 await refreshTaskList();
 await refreshTaskHistoryDetail();
@@ -5469,6 +5513,7 @@ setControlMessage("Controls ready.");
 subscribeEvents();
 setInterval(refreshHealth, 5000);
 setInterval(refreshMvpRoute, 5000);
+setInterval(refreshPhase2RepairDemoStatus, 5000);
 setInterval(refreshRuntime, 5000);
 setInterval(refreshTaskList, 5000);
 setInterval(refreshTaskHistoryDetail, 5000);

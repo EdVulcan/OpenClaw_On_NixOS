@@ -162,6 +162,17 @@ This checkpoint is allowed because it closes the first Track A repair loop with 
 - Exposes Observer-visible post-execution verification fields.
 - Must not retry the restart, trigger automatic recovery, add persistence hardening, add denial recovery, add duplicate-click handling, or schedule background repair.
 
+Track B repair demo status checkpoint:
+
+After the first Track A repair loop is complete, `openclaw-phase-2-repair-demo-status` may expose a read-only demo status bundle for Observer.
+
+This checkpoint is allowed because it turns completed body capability evidence into an operator-visible demo surface:
+
+- Reads existing route, task history, command transcript, and post-execution verification evidence.
+- Exposes demo readiness, target unit, command result, before/after body state, checklist, and next demo slice.
+- Creates no task, no approval, no command execution, no host mutation, and no recovery action.
+- Must not add persistence hardening, denial recovery, duplicate-click handling, schedulers, plugin/runtime adapter work, or any hidden execution path.
+
 ## Phase 2 Gate
 
 Before implementing any Phase 2 feature, confirm:
