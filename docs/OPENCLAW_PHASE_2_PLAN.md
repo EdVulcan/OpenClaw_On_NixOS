@@ -132,6 +132,12 @@ The next slice is allowed because it directly advances real NixOS/systemd repair
 
 The next slice must not execute until its own milestone explicitly proves that execution is operator-reviewed and linked back to the passed inventory, repair plan, and dry-run envelope.
 
+Approved-deferred checkpoint:
+
+Before real host mutation, `openclaw-systemd-repair-approved-deferred` must prove that approval unlocks operator flow but still ends in a deferred execution shell with `hostMutation=false` and `executed=false`.
+
+This checkpoint is allowed because it validates the operator-reviewed task shell. It must not add persistence hardening, denial recovery, duplicate-click handling, schedulers, plugin/runtime adapter work, or real `systemctl restart` execution.
+
 ## Phase 2 Gate
 
 Before implementing any Phase 2 feature, confirm:
