@@ -90,8 +90,13 @@ const details = finalTask.outcome?.details ?? {};
 if (details.hostMutation !== false || details.executed !== false || details.futureExecutionRequiresSeparateMilestone !== true) {
   throw new Error(`approved deferred task must not mutate or execute: ${JSON.stringify(details)}`);
 }
-if (step.execution?.finalExecution?.execution?.mode !== "deferred_execution_shell") {
-  throw new Error(`operator execution should expose deferred execution shell: ${JSON.stringify(step.execution)}`);
+const deferredAttempt = (step.execution?.attempts ?? []).find(
+  (attempt) => attempt.taskId === finalTask.id
+    && attempt.status === "completed"
+    && attempt.phase === "systemd_repair_execution_deferred",
+);
+if (!deferredAttempt) {
+  throw new Error(`operator execution should record a completed deferred execution attempt: ${JSON.stringify(step.execution)}`);
 }
 
 console.log(JSON.stringify({
