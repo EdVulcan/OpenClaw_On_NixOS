@@ -853,6 +853,7 @@ function observerHtml() {
           <div class="metric"><span>Executed</span><span id="systemd-repair-execution-task-executed">false</span></div>
           <div class="actions tight">
             <button id="create-systemd-repair-execution-task-button" class="secondary">Create Repair Execution Task</button>
+            <button id="create-systemd-repair-real-execution-task-button" class="secondary">Create Real Repair Execution Task</button>
           </div>
           <pre id="systemd-repair-execution-task-json">Loading operator-reviewed systemd repair execution task draft...</pre>
         </section>
@@ -1011,6 +1012,7 @@ const stopButton = document.querySelector("#stop-button");
 const openWorkViewUrlButton = document.querySelector("#open-work-view-url-button");
 const workViewUrlInput = document.querySelector("#work-view-url-input");
 const createSystemdRepairExecutionTaskButton = document.querySelector("#create-systemd-repair-execution-task-button");
+const createSystemdRepairRealExecutionTaskButton = document.querySelector("#create-systemd-repair-real-execution-task-button");
 const taskPlanStatus = document.querySelector("#task-plan-status");
 const taskPlanCount = document.querySelector("#task-plan-count");
 const taskPlanPlanner = document.querySelector("#task-plan-planner");
@@ -4003,7 +4005,8 @@ async function refreshSystemdRepairExecutionTaskDraft() {
       \`Policy: \${draft.policy?.decision?.decision ?? "unknown"} risk=\${draft.policy?.decision?.risk ?? "unknown"}\`,
       \`Command: \${systemdRepair.command?.command ?? "systemctl"} \${(systemdRepair.command?.args ?? []).join(" ")}\`,
       \`Evidence: inventory=\${systemdRepair.inventoryRegistry ?? "unknown"} plan=\${systemdRepair.planRegistry ?? "unknown"} dryRun=\${systemdRepair.sourceRegistry ?? "unknown"}\`,
-      \`Execution: shellOnly=\${Boolean(systemdRepair.execution?.shellOnly)} executed=\${Boolean(systemdRepair.execution?.executed)} hostMutation=\${Boolean(systemdRepair.execution?.hostMutation)}\`,
+      \`Execution: shellOnly=\${Boolean(systemdRepair.execution?.shellOnly)} realExecutionEnabled=\${Boolean(systemdRepair.execution?.realExecutionEnabled)} executed=\${Boolean(systemdRepair.execution?.executed)} hostMutation=\${Boolean(systemdRepair.execution?.hostMutation)} hostMutationAttempted=\${Boolean(systemdRepair.execution?.hostMutationAttempted)}\`,
+      \`Real execution unit: \${systemdRepair.execution?.selectedRealExecutionUnit ?? "not-enabled"}\`,
     ].join("\\n");
   } catch {
     systemdRepairExecutionTaskRegistry.textContent = "offline";
@@ -4828,6 +4831,26 @@ async function createSystemdRepairExecutionTask() {
   return result;
 }
 
+async function createSystemdRepairRealExecutionTask() {
+  const result = await fetchJson(\`\${observerConfig.coreUrl}/system/systemd/repair-execution-tasks\`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      unit: "openclaw-browser-runtime.service",
+      confirm: true,
+      execute: true,
+    }),
+  });
+  setControlMessage(\`Real systemd repair execution task queued: \${result.task?.id ?? "unknown"} approval=\${result.approval?.id ?? "none"} realExecutionEnabled=\${Boolean(result.governance?.realExecutionEnabled)}\`);
+  await Promise.all([
+    refreshSystemdRepairExecutionTaskDraft(),
+    refreshTaskList(),
+    refreshApprovalState(),
+    refreshOperatorState(),
+  ]);
+  return result;
+}
+
 async function completeCurrentTask() {
   if (!currentTaskState?.id) {
     throw new Error("No active task to complete.");
@@ -4939,6 +4962,8 @@ function subscribeEvents() {
     "heal.diagnosed",
     "heal.started",
     "heal.completed",
+    "systemd.repair.execution_completed",
+    "systemd.repair.execution_failed",
     "maintenance.policy.updated",
     "maintenance.tick",
     "maintenance.started",
@@ -5194,6 +5219,12 @@ runMaintenanceButton.addEventListener("click", () => {
 
 createSystemdRepairExecutionTaskButton.addEventListener("click", () => {
   createSystemdRepairExecutionTask().catch((error) => {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  });
+});
+
+createSystemdRepairRealExecutionTaskButton.addEventListener("click", () => {
+  createSystemdRepairRealExecutionTask().catch((error) => {
     setControlMessage(\`Request failed: \${formatError(error)}\`);
   });
 });

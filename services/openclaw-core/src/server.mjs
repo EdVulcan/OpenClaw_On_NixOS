@@ -1,7 +1,9 @@
 import http from "node:http";
 import { createHash, randomUUID } from "node:crypto";
+import { execFile } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { promisify } from "node:util";
 import {
   OPENCLAW_NATIVE_PLUGIN_CONTRACT_VERSION,
   summariseOpenClawNativePluginContract,
@@ -60,6 +62,7 @@ const CAPABILITY_HEALTH_TIMEOUT_MS = Number.parseInt(
   10,
 );
 const APPROVAL_TTL_MS = parseOptionalPositiveInteger(process.env.OPENCLAW_APPROVAL_TTL_MS);
+const SYSTEMD_REPAIR_EXECUTION_TIMEOUT_MS = parseOptionalPositiveInteger(process.env.OPENCLAW_SYSTEMD_REPAIR_EXECUTION_TIMEOUT_MS) ?? 15000;
 const STATUS_PRIORITY = {
   running: 0,
   paused: 1,
@@ -69,6 +72,8 @@ const STATUS_PRIORITY = {
   superseded: 5,
 };
 const SYSTEMD_REPAIR_EXECUTION_TASK_REGISTRY = "openclaw-systemd-repair-execution-task-v0";
+const SYSTEMD_REPAIR_REAL_EXECUTION_UNIT = "openclaw-browser-runtime.service";
+const execFileAsync = promisify(execFile);
 
 function normaliseAutonomyMode(value) {
   const mode = typeof value === "string" && value.trim() ? value.trim() : "guardian";
@@ -8714,12 +8719,18 @@ function normaliseSystemdRepairUnit(value) {
   return unit.endsWith(".service") ? unit : `${unit}.service`;
 }
 
-async function buildSystemdRepairExecutionTaskDraft({ unit = null } = {}) {
+async function buildSystemdRepairExecutionTaskDraft({ unit = null, execute = false } = {}) {
   const targetUnit = normaliseSystemdRepairUnit(unit);
+  const realExecution = execute === true;
+  if (realExecution && targetUnit !== SYSTEMD_REPAIR_REAL_EXECUTION_UNIT) {
+    throw new Error(`Real systemd repair execution is limited to ${SYSTEMD_REPAIR_REAL_EXECUTION_UNIT}.`);
+  }
   const dryRunEnvelope = await fetchJson(`${systemSenseUrl}/system/systemd/repair-dry-run?unit=${encodeURIComponent(targetUnit)}`);
   const plan = dryRunEnvelope.plan;
   const command = dryRunEnvelope.dryRun;
-  const goal = `Operator-reviewed systemd repair execution task for ${targetUnit}`;
+  const goal = realExecution
+    ? `Operator-reviewed real systemd repair execution for ${targetUnit}`
+    : `Operator-reviewed systemd repair execution task for ${targetUnit}`;
   const policyRequest = {
     intent: "systemd.repair.execute",
     domain: "body_internal",
@@ -8740,7 +8751,7 @@ async function buildSystemdRepairExecutionTaskDraft({ unit = null } = {}) {
 
   return {
     registry: SYSTEMD_REPAIR_EXECUTION_TASK_REGISTRY,
-    mode: "operator-reviewed-execution-task-draft",
+    mode: realExecution ? "operator-reviewed-real-execution-task-draft" : "operator-reviewed-execution-task-draft",
     generatedAt: new Date().toISOString(),
     sourceRegistry: dryRunEnvelope.registry,
     target: dryRunEnvelope.target,
@@ -8773,13 +8784,16 @@ async function buildSystemdRepairExecutionTaskDraft({ unit = null } = {}) {
             risk: "high",
           },
           {
-            id: "defer-real-execution",
-            phase: "deferred_execution_shell",
-            title: "Defer real systemd restart to a future execution milestone",
+            id: realExecution ? "execute-systemd-restart" : "defer-real-execution",
+            phase: realExecution ? "operator_reviewed_real_execution" : "deferred_execution_shell",
+            title: realExecution
+              ? "Execute operator-approved systemd restart for the selected OpenClaw body unit"
+              : "Defer real systemd restart to a future execution milestone",
             status: "pending",
             command: command?.command ?? "systemctl",
             args: command?.args ?? ["restart", targetUnit],
             requiresApproval: true,
+            hostMutation: realExecution,
           },
         ],
       },
@@ -8796,17 +8810,20 @@ async function buildSystemdRepairExecutionTaskDraft({ unit = null } = {}) {
         command: {
           command: command?.command ?? "systemctl",
           args: command?.args ?? ["restart", targetUnit],
-          wouldExecute: false,
+          wouldExecute: realExecution,
         },
         evidence: {
           plan,
           dryRunEnvelope,
         },
         execution: {
-          shellOnly: true,
+          shellOnly: !realExecution,
+          realExecutionEnabled: realExecution,
           executed: false,
           hostMutation: false,
-          futureExecutionRequiresSeparateMilestone: true,
+          hostMutationAttempted: false,
+          futureExecutionRequiresSeparateMilestone: !realExecution,
+          selectedRealExecutionUnit: realExecution ? SYSTEMD_REPAIR_REAL_EXECUTION_UNIT : null,
         },
       },
     },
@@ -8816,18 +8833,19 @@ async function buildSystemdRepairExecutionTaskDraft({ unit = null } = {}) {
       canExecuteWithoutApproval: false,
       executed: false,
       hostMutation: false,
+      realExecutionEnabled: realExecution,
       requiresExplicitApproval: true,
       linkedEvidence: ["openclaw-systemd-unit-inventory-v0", "openclaw-systemd-repair-plan-v0", "openclaw-systemd-repair-dry-run-v0"],
     },
   };
 }
 
-async function createSystemdRepairExecutionTask({ unit = null, confirm = false } = {}) {
+async function createSystemdRepairExecutionTask({ unit = null, confirm = false, execute = false } = {}) {
   if (confirm !== true) {
     throw new Error("Systemd repair execution task creation requires confirm=true.");
   }
 
-  const draftEnvelope = await buildSystemdRepairExecutionTaskDraft({ unit });
+  const draftEnvelope = await buildSystemdRepairExecutionTaskDraft({ unit, execute });
   const draft = draftEnvelope.draft;
   const task = createTask({
     goal: draft.goal,
@@ -8852,7 +8870,7 @@ async function createSystemdRepairExecutionTask({ unit = null, confirm = false }
 
   return {
     registry: SYSTEMD_REPAIR_EXECUTION_TASK_REGISTRY,
-    mode: "operator-reviewed-execution-task",
+    mode: execute === true ? "operator-reviewed-real-execution-task" : "operator-reviewed-execution-task",
     generatedAt: new Date().toISOString(),
     sourceRegistry: draftEnvelope.sourceRegistry,
     target: draftEnvelope.target,
@@ -8866,8 +8884,9 @@ async function createSystemdRepairExecutionTask({ unit = null, confirm = false }
       canExecuteWithoutApproval: false,
       executed: false,
       hostMutation: false,
+      realExecutionEnabled: execute === true,
       requiresExplicitApproval: true,
-      futureExecutionRequiresSeparateMilestone: true,
+      futureExecutionRequiresSeparateMilestone: execute !== true,
     },
   };
 }
@@ -11461,6 +11480,173 @@ async function deferSystemdRepairExecutionTask(task) {
   };
 }
 
+function buildSystemdRepairCommandTranscript(task, result) {
+  const command = task.systemdRepair?.command ?? {};
+  const args = Array.isArray(command.args) ? command.args : [];
+  return {
+    stepId: "execute-systemd-restart",
+    actionKind: "systemd.repair.execute",
+    capabilityId: "act.system.heal",
+    invocationId: result.invocationId,
+    command: [command.command ?? "systemctl", ...args].join(" "),
+    skipped: false,
+    skipReason: null,
+    condition: null,
+    exitCode: result.exitCode,
+    timedOut: result.timedOut,
+    stdout: result.stdout,
+    stderr: result.stderr,
+  };
+}
+
+async function runSystemdRepairCommand(task) {
+  const command = task.systemdRepair?.command ?? {};
+  const executable = command.command ?? "systemctl";
+  const args = Array.isArray(command.args) ? command.args : ["restart", task.systemdRepair?.target?.unit ?? SYSTEMD_REPAIR_REAL_EXECUTION_UNIT];
+  const startedAt = new Date().toISOString();
+
+  try {
+    const result = await execFileAsync(executable, args, {
+      timeout: SYSTEMD_REPAIR_EXECUTION_TIMEOUT_MS,
+      windowsHide: true,
+      maxBuffer: 16384,
+    });
+    return {
+      invocationId: randomUUID(),
+      command: executable,
+      args,
+      startedAt,
+      completedAt: new Date().toISOString(),
+      exitCode: 0,
+      timedOut: false,
+      stdout: result.stdout ?? "",
+      stderr: result.stderr ?? "",
+      ok: true,
+    };
+  } catch (error) {
+    const exitCode = Number.isInteger(error?.code) ? error.code : 1;
+    return {
+      invocationId: randomUUID(),
+      command: executable,
+      args,
+      startedAt,
+      completedAt: new Date().toISOString(),
+      exitCode,
+      timedOut: error?.killed === true || error?.signal === "SIGTERM",
+      stdout: typeof error?.stdout === "string" ? error.stdout : "",
+      stderr: typeof error?.stderr === "string" && error.stderr.trim()
+        ? error.stderr
+        : error instanceof Error
+          ? error.message
+          : "systemctl restart failed.",
+      ok: false,
+    };
+  }
+}
+
+async function executeSystemdRepairExecutionTask(task) {
+  const targetUnit = task.systemdRepair?.target?.unit ?? null;
+  if (targetUnit !== SYSTEMD_REPAIR_REAL_EXECUTION_UNIT) {
+    throw new Error(`Real systemd repair execution is limited to ${SYSTEMD_REPAIR_REAL_EXECUTION_UNIT}.`);
+  }
+
+  const command = task.systemdRepair?.command ?? {};
+  const args = Array.isArray(command.args) ? command.args : [];
+  if (command.command !== "systemctl" || args[0] !== "restart" || args[1] !== SYSTEMD_REPAIR_REAL_EXECUTION_UNIT) {
+    throw new Error(`Unexpected systemd repair command: ${JSON.stringify(command)}`);
+  }
+
+  const runningTask = await setTaskPhase(task, "systemd_repair_execution_running", {
+    status: "running",
+    details: {
+      executor: "systemd-repair-execution-task-v0",
+      target: task.systemdRepair?.target ?? null,
+      command,
+      hostMutationAttempted: true,
+      executed: true,
+    },
+  });
+  const result = await runSystemdRepairCommand(runningTask);
+  const commandTranscript = [buildSystemdRepairCommandTranscript(runningTask, result)];
+  const status = result.ok ? "completed" : "failed";
+  const phase = result.ok ? "systemd_repair_execution_completed" : "systemd_repair_execution_failed";
+  const updatedTask = await setTaskPhase(runningTask, phase, {
+    status,
+    details: {
+      executor: "systemd-repair-execution-task-v0",
+      target: runningTask.systemdRepair?.target ?? null,
+      command,
+      hostMutation: true,
+      hostMutationAttempted: true,
+      executed: true,
+      commandTranscript,
+      result,
+    },
+  });
+  updatedTask.systemdRepair = {
+    ...(updatedTask.systemdRepair ?? {}),
+    execution: {
+      ...(updatedTask.systemdRepair?.execution ?? {}),
+      shellOnly: false,
+      realExecutionEnabled: true,
+      hostMutation: true,
+      hostMutationAttempted: true,
+      executed: true,
+      executionSucceeded: result.ok,
+      exitCode: result.exitCode,
+      completedAt: result.completedAt,
+    },
+  };
+  updatedTask.outcome = {
+    kind: result.ok ? "systemd_repair_execution_completed" : "systemd_repair_execution_failed",
+    summary: result.ok
+      ? `Operator-approved systemd restart completed for ${targetUnit}.`
+      : `Operator-approved systemd restart attempted for ${targetUnit} and exited with code ${result.exitCode}.`,
+    reason: result.ok ? null : "systemd_restart_nonzero_exit",
+    details: {
+      systemdRepair: updatedTask.systemdRepair,
+      target: updatedTask.systemdRepair?.target ?? null,
+      command,
+      hostMutation: true,
+      hostMutationAttempted: true,
+      executed: true,
+      executionSucceeded: result.ok,
+      commandTranscript,
+      result,
+      rollbackNote: updatedTask.systemdRepair?.evidence?.repairPlan?.proposal?.rollbackNote ?? null,
+    },
+    at: updatedTask.updatedAt,
+  };
+  updatedTask.closedAt = updatedTask.updatedAt;
+  reconcileRuntimeState();
+  persistState();
+  await publishEvent(result.ok ? "systemd.repair.execution_completed" : "systemd.repair.execution_failed", {
+    task: serialiseTask(updatedTask),
+    result,
+  });
+
+  return {
+    task: updatedTask,
+    policy: updatedTask.policy?.decision ?? null,
+    approval: updatedTask.approval ?? null,
+    blocked: false,
+    reason: null,
+    commandTranscript,
+    verification: { ok: result.ok, checks: [], failedChecks: result.ok ? [] : [{ name: "systemctl_restart_exit_code", expected: 0, actual: result.exitCode }] },
+    execution: {
+      mode: "operator_reviewed_real_systemd_restart",
+      target: updatedTask.systemdRepair?.target ?? null,
+      command,
+      hostMutation: true,
+      hostMutationAttempted: true,
+      executed: true,
+      executionSucceeded: result.ok,
+      exitCode: result.exitCode,
+      rollbackNote: updatedTask.outcome.details.rollbackNote,
+    },
+  };
+}
+
 async function deferNativePluginCapabilityExecution(task) {
   if (!isActiveTask(task)) {
     throw new Error("Task is not active and cannot be deferred.");
@@ -12914,7 +13100,9 @@ async function executeTaskWithRecovery(task, options = {}) {
   }
 
   if (isSystemdRepairExecutionTask(task)) {
-    const deferredExecution = await deferSystemdRepairExecutionTask(task);
+    const deferredExecution = task.systemdRepair?.execution?.realExecutionEnabled === true
+      ? await executeSystemdRepairExecutionTask(task)
+      : await deferSystemdRepairExecutionTask(task);
     return {
       finalExecution: deferredExecution,
       attempts: [deferredExecution],
@@ -14439,6 +14627,7 @@ const server = http.createServer(async (req, res) => {
     try {
       const result = await buildSystemdRepairExecutionTaskDraft({
         unit: requestUrl.searchParams.get("unit") ?? requestUrl.searchParams.get("target"),
+        execute: requestUrl.searchParams.get("execute") === "true",
       });
       sendJson(res, 200, {
         ok: true,
@@ -14457,6 +14646,7 @@ const server = http.createServer(async (req, res) => {
       const result = await createSystemdRepairExecutionTask({
         unit: typeof body.unit === "string" ? body.unit : null,
         confirm: body.confirm === true,
+        execute: body.execute === true,
       });
       sendJson(res, 201, {
         ok: true,

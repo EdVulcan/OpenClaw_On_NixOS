@@ -138,6 +138,18 @@ Before real host mutation, `openclaw-systemd-repair-approved-deferred` must prov
 
 This checkpoint is allowed because it validates the operator-reviewed task shell. It must not add persistence hardening, denial recovery, duplicate-click handling, schedulers, plugin/runtime adapter work, or real `systemctl restart` execution.
 
+Real execution checkpoint:
+
+After the approved-deferred checkpoint passes, `openclaw-systemd-repair-real-execution` may prove one operator-reviewed real repair execution attempt for `openclaw-browser-runtime.service`.
+
+This checkpoint is allowed because it is the narrow Track A transition from simulated repair semantics to real NixOS/systemd repair semantics. It must remain explicit and small:
+
+- Requires `execute=true` task materialization plus a separate approved approval request.
+- Executes only `systemctl restart openclaw-browser-runtime.service`.
+- Records command, target, exit code, stdout/stderr, result, and rollback note in task evidence.
+- Exposes Observer-visible real execution intent and result fields.
+- Must not add persistence hardening, denial recovery, duplicate-click handling, schedulers, plugin/runtime adapter work, or any automatic repair loop.
+
 ## Phase 2 Gate
 
 Before implementing any Phase 2 feature, confirm:
