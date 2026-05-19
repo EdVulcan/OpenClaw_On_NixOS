@@ -12447,15 +12447,24 @@ function resetRecoveredPlan(plan) {
   return recoveredPlan;
 }
 
-function buildRecoveryExecuteOptions(options, attempt) {
+function recoveryEvidenceTargetUrl(sourceTask) {
+  const targetUrl = sourceTask?.outcome?.details?.recoveryEvidence?.recommendation?.targetUrl;
+  return typeof targetUrl === "string" && targetUrl.trim() ? targetUrl.trim() : null;
+}
+
+function buildRecoveryExecuteOptions(options, attempt, sourceTask = null) {
   const recoveryOptions = options.recovery && typeof options.recovery === "object" ? options.recovery : {};
+  const evidenceTargetUrl = recoveryEvidenceTargetUrl(sourceTask);
   return {
     ...options,
     ...recoveryOptions,
     autoRecover: false,
+    recoveryEvidenceTargetUrl: evidenceTargetUrl,
     expectedUrl:
       typeof recoveryOptions.expectedUrl === "string" && recoveryOptions.expectedUrl.trim()
         ? recoveryOptions.expectedUrl.trim()
+        : evidenceTargetUrl
+          ? evidenceTargetUrl
         : typeof options.recoveryExpectedUrl === "string" && options.recoveryExpectedUrl.trim()
           ? options.recoveryExpectedUrl.trim()
           : options.targetUrl,
@@ -12614,6 +12623,7 @@ async function executeTaskWithRecovery(task, options = {}) {
   let sourceTask = firstExecution.task;
   const attempts = [firstExecution];
   const recoveredTaskIds = [];
+  const usedRecommendationTargetUrls = [];
 
   for (let attempt = 1; attempt <= maxRecoveryAttempts; attempt += 1) {
     const recoveredTask = recoverTask(sourceTask);
@@ -12629,7 +12639,11 @@ async function executeTaskWithRecovery(task, options = {}) {
       executor: "core-v3",
     });
 
-    const recoveryExecution = await executeTask(recoveredTask, buildRecoveryExecuteOptions(options, attempt));
+    const recoveryOptions = buildRecoveryExecuteOptions(options, attempt, sourceTask);
+    if (recoveryOptions.recoveryEvidenceTargetUrl) {
+      usedRecommendationTargetUrls.push(recoveryOptions.recoveryEvidenceTargetUrl);
+    }
+    const recoveryExecution = await executeTask(recoveredTask, recoveryOptions);
     attempts.push(recoveryExecution);
     sourceTask = recoveryExecution.task;
 
@@ -12643,6 +12657,8 @@ async function executeTaskWithRecovery(task, options = {}) {
           attempts: attempt,
           recoveredTaskIds,
           recoveredFromTaskId: firstExecution.task.id,
+          usedRecommendationTargetUrl: usedRecommendationTargetUrls.at(-1) ?? null,
+          usedRecommendationTargetUrls,
         },
       };
     }
@@ -12657,6 +12673,8 @@ async function executeTaskWithRecovery(task, options = {}) {
       attempts: maxRecoveryAttempts,
       recoveredTaskIds,
       recoveredFromTaskId: firstExecution.task.id,
+      usedRecommendationTargetUrl: usedRecommendationTargetUrls.at(-1) ?? null,
+      usedRecommendationTargetUrls,
     },
   };
 }
