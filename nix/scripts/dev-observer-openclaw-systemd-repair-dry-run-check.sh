@@ -57,7 +57,6 @@ const requiredClient = [
   "systemdRepairDryRunJson",
   "operator_visible_dry_run",
   "wouldExecute",
-  "no_restart_executed",
 ];
 
 for (const token of requiredHtml) {
@@ -78,6 +77,9 @@ if (envelope.canMutate !== false || envelope.canRestart !== false || envelope.dr
 }
 if (!envelope.dryRun?.checks?.some((check) => check.name === "operator_visible_before_mutation" && check.passed === true)) {
   throw new Error(`Observer dry-run source should show operator-visible check: ${JSON.stringify(envelope.dryRun?.checks)}`);
+}
+if (!envelope.dryRun?.checks?.some((check) => check.name === "no_restart_executed" && check.passed === true)) {
+  throw new Error(`Observer dry-run source should show no-restart execution evidence: ${JSON.stringify(envelope.dryRun?.checks)}`);
 }
 
 console.log(JSON.stringify({
