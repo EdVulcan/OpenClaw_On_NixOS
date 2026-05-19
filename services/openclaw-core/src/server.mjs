@@ -9474,6 +9474,110 @@ function buildOperatorState() {
   };
 }
 
+function buildMvpRouteAlignment() {
+  const phases = [
+    {
+      id: "phase-0-body",
+      label: "Body",
+      whitepaperConcept: "resident sovereign body",
+      status: "complete",
+      evidence: ["body-config", "state-settling", "service-health"],
+    },
+    {
+      id: "phase-1-eyes",
+      label: "Eyes",
+      whitepaperConcept: "AI-owned observable work view",
+      status: "complete",
+      evidence: [
+        "openclaw-ai-work-view-capture",
+        "openclaw-ai-work-view-capture-summary",
+        "screen-sense",
+      ],
+    },
+    {
+      id: "phase-2-hands",
+      label: "Hands",
+      whitepaperConcept: "screen action tied to observation",
+      status: "complete",
+      evidence: ["openclaw-eye-hand-action-evidence", "screen-act"],
+    },
+    {
+      id: "phase-3-observer",
+      label: "Observer",
+      whitepaperConcept: "visible and interruptible control plane",
+      status: "complete",
+      evidence: [
+        "observer-openclaw-ai-work-view-task-verification-summary",
+        "observer-openclaw-eye-hand-action-evidence",
+      ],
+    },
+    {
+      id: "phase-4-recovery",
+      label: "Recovery",
+      whitepaperConcept: "failed work carries evidence and recovery targets",
+      status: "complete",
+      evidence: [
+        "openclaw-eye-hand-recovery-evidence",
+        "openclaw-eye-hand-auto-recovery-execution",
+        "openclaw-eye-hand-recovery-regression",
+      ],
+    },
+    {
+      id: "phase-5-body-health-self-heal",
+      label: "Body Health",
+      whitepaperConcept: "basic system health and self-heal loop",
+      status: "next",
+      evidence: ["system-sense", "system-heal", "sovereign-maintenance"],
+    },
+  ];
+
+  return {
+    ok: true,
+    registry: "openclaw-mvp-route-alignment-v0",
+    whitepaper: {
+      thesis: "OpenClaw is a resident digital body with eyes, hands, observer visibility, and recovery responsibility under user sovereignty.",
+      mvpBoundary: "Build body, eyes, hands, observer window, and basic recovery before higher autonomy.",
+      sourceDocuments: [
+        "docs/OpenClaw body sovereignty whitepaper",
+        "docs/OpenClaw on NixOS MVP implementation route v1",
+      ],
+    },
+    mainline: {
+      current: "eye-hand-recovery-loop-complete",
+      trunk: "body-eyes-hands-observer-recovery",
+      completedCapabilities: [
+        "browser-runtime-backed AI work view capture",
+        "structured AI work view summaries",
+        "task verification records final observation evidence",
+        "screen actions link to final work view observations",
+        "failed tasks carry recovery evidence",
+        "auto recovery uses evidence-driven target URLs",
+      ],
+      nextRecommendedTrunk: "system-health-self-heal",
+      nextRecommendedMilestone: "basic body health and conservative self-heal evidence",
+    },
+    phases,
+    guardrails: {
+      afterEachMilestone: [
+        "re-read the whitepaper and MVP route before selecting the next slice",
+        "prefer one visible body-loop capability over another safety-chain increment",
+        "stop if the next task only adds approval expiry, duplicate click, or persistence hardening",
+      ],
+      avoidLoops: [
+        "plugin-runtime-adapter-hardening-loop",
+        "approval-boundary-expansion-loop",
+        "persistence-before-user-visible-body-progress",
+      ],
+    },
+    summary: {
+      totalPhases: phases.length,
+      complete: phases.filter((phase) => phase.status === "complete").length,
+      next: phases.find((phase) => phase.status === "next")?.id ?? null,
+      direction: "return-to-mvp-body-health",
+    },
+  };
+}
+
 function baseCapabilities() {
   return [
     {
@@ -12857,6 +12961,11 @@ const server = http.createServer(async (req, res) => {
       stateFilePath,
       autonomyMode,
     });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/mvp/route") {
+    sendJson(res, 200, buildMvpRouteAlignment());
     return;
   }
 

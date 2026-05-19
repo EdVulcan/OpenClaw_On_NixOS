@@ -274,6 +274,14 @@ function observerHtml() {
           <div class="metric"><span>Observer</span><span class="status-pill">active</span></div>
         </section>
         <section class="panel">
+          <h2>MVP Route</h2>
+          <div class="metric"><span>Current</span><span id="mvp-route-current">loading</span></div>
+          <div class="metric"><span>Trunk</span><span id="mvp-route-trunk">body-eyes-hands-observer-recovery</span></div>
+          <div class="metric"><span>Complete</span><span id="mvp-route-complete">0/0</span></div>
+          <div class="metric"><span>Next</span><span id="mvp-route-next">system-health-self-heal</span></div>
+          <pre id="mvp-route-json">Loading MVP route alignment...</pre>
+        </section>
+        <section class="panel">
           <h2>Controls</h2>
           <div class="control-stack">
             <div class="field">
@@ -898,6 +906,11 @@ const screenHealth = document.querySelector("#screen-health");
 const screenActHealth = document.querySelector("#screen-act-health");
 const systemHealthPill = document.querySelector("#system-health-pill");
 const systemHealHealth = document.querySelector("#system-heal-health");
+const mvpRouteCurrent = document.querySelector("#mvp-route-current");
+const mvpRouteTrunk = document.querySelector("#mvp-route-trunk");
+const mvpRouteComplete = document.querySelector("#mvp-route-complete");
+const mvpRouteNext = document.querySelector("#mvp-route-next");
+const mvpRouteJson = document.querySelector("#mvp-route-json");
 const screenWindow = document.querySelector("#screen-window");
 const screenSession = document.querySelector("#screen-session");
 const screenReadiness = document.querySelector("#screen-readiness");
@@ -3594,6 +3607,31 @@ async function refreshHealth() {
   }
 }
 
+async function refreshMvpRoute() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/mvp/route\`);
+    const summary = data.summary ?? {};
+    mvpRouteCurrent.textContent = data.mainline?.current ?? "unknown";
+    mvpRouteTrunk.textContent = data.mainline?.trunk ?? "unknown";
+    mvpRouteComplete.textContent = \`\${summary.complete ?? 0}/\${summary.totalPhases ?? 0}\`;
+    mvpRouteNext.textContent = data.mainline?.nextRecommendedTrunk ?? summary.next ?? "unknown";
+    mvpRouteJson.textContent = [
+      \`Registry: \${data.registry ?? "unknown"}\`,
+      \`MVP Boundary: \${data.whitepaper?.mvpBoundary ?? "unknown"}\`,
+      \`Current: \${data.mainline?.current ?? "unknown"}\`,
+      \`Next Recommended Trunk: \${data.mainline?.nextRecommendedTrunk ?? "unknown"}\`,
+      \`Next Milestone: \${data.mainline?.nextRecommendedMilestone ?? "unknown"}\`,
+      \`Guardrail: \${(data.guardrails?.afterEachMilestone ?? []).join("; ") || "none"}\`,
+      \`Avoid: \${(data.guardrails?.avoidLoops ?? []).join("; ") || "none"}\`,
+      "",
+      JSON.stringify(data.phases ?? [], null, 2),
+    ].join("\\n");
+  } catch {
+    mvpRouteCurrent.textContent = "offline";
+    mvpRouteJson.textContent = "Unable to read MVP route alignment.";
+  }
+}
+
 async function refreshRuntime() {
   try {
     const data = await fetchJson(\`\${observerConfig.coreUrl}/state/runtime\`);
@@ -5168,6 +5206,7 @@ taskListItems.addEventListener("click", (event) => {
 });
 
 await refreshHealth();
+await refreshMvpRoute();
 await refreshRuntime();
 await refreshTaskList();
 await refreshTaskHistoryDetail();
@@ -5225,6 +5264,7 @@ await loadRecentEvents();
 setControlMessage("Controls ready.");
 subscribeEvents();
 setInterval(refreshHealth, 5000);
+setInterval(refreshMvpRoute, 5000);
 setInterval(refreshRuntime, 5000);
 setInterval(refreshTaskList, 5000);
 setInterval(refreshTaskHistoryDetail, 5000);
