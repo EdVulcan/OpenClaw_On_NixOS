@@ -852,6 +852,14 @@ function observerHtml() {
           <div class="metric"><span>Mutation</span><span id="route-next-action-mutation">false</span></div>
           <pre id="route-next-action-json">Loading route-aware body governance recommendation...</pre>
         </section>
+        <section class="panel" id="conservative-recovery-policy">
+          <h2>Recovery Policy</h2>
+          <div class="metric"><span>Posture</span><span id="recovery-policy-posture">loading</span></div>
+          <div class="metric"><span>Creates Task</span><span id="recovery-policy-creates-task">false</span></div>
+          <div class="metric"><span>Executes Command</span><span id="recovery-policy-executes-command">false</span></div>
+          <div class="metric"><span>Mutation</span><span id="recovery-policy-mutation">false</span></div>
+          <pre id="recovery-policy-json">Loading conservative recovery policy explanation...</pre>
+        </section>
         <section class="panel" id="systemd-unit-inventory">
           <h2>Systemd Unit Inventory</h2>
           <div class="metric"><span>Total Units</span><span id="systemd-unit-total">0</span></div>
@@ -1004,6 +1012,11 @@ const routeNextActionPriority = document.querySelector("#route-next-action-prior
 const routeNextActionCreatesTask = document.querySelector("#route-next-action-creates-task");
 const routeNextActionMutation = document.querySelector("#route-next-action-mutation");
 const routeNextActionJson = document.querySelector("#route-next-action-json");
+const recoveryPolicyPosture = document.querySelector("#recovery-policy-posture");
+const recoveryPolicyCreatesTask = document.querySelector("#recovery-policy-creates-task");
+const recoveryPolicyExecutesCommand = document.querySelector("#recovery-policy-executes-command");
+const recoveryPolicyMutation = document.querySelector("#recovery-policy-mutation");
+const recoveryPolicyJson = document.querySelector("#recovery-policy-json");
 const systemdUnitTotal = document.querySelector("#systemd-unit-total");
 const systemdUnitActive = document.querySelector("#systemd-unit-active");
 const systemdUnitObserved = document.querySelector("#systemd-unit-observed");
@@ -4069,6 +4082,37 @@ async function refreshRouteAwareNextAction() {
   }
 }
 
+async function refreshConservativeRecoveryPolicy() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.systemSenseUrl}/system/route/recovery-policy\`);
+    const governance = data.governance ?? {};
+    const policy = data.policy ?? {};
+    const routeState = data.routeState ?? {};
+    const hardBoundaries = data.hardBoundaries ?? {};
+    recoveryPolicyPosture.textContent = policy.currentPosture ?? "unknown";
+    recoveryPolicyCreatesTask.textContent = String(Boolean(governance.createsTask));
+    recoveryPolicyExecutesCommand.textContent = String(Boolean(governance.executesCommand));
+    recoveryPolicyMutation.textContent = String(Boolean(governance.hostMutation));
+    recoveryPolicyJson.textContent = [
+      \`Registry: \${data.registry ?? "unknown"}\`,
+      \`Mode: \${data.mode ?? "unknown"} mutation=\${Boolean(governance.hostMutation)} createsTask=\${Boolean(governance.createsTask)} executesCommand=\${Boolean(governance.executesCommand)}\`,
+      \`Policy: \${policy.name ?? "unknown"} posture=\${policy.currentPosture ?? "unknown"}\`,
+      \`Reason: \${policy.currentReason ?? "none"}\`,
+      \`Route: action=\${routeState.action ?? "unknown"} priority=\${routeState.priority ?? "unknown"} degraded=\${routeState.degradedServices ?? 0} alerts=\${routeState.latestAlertCount ?? 0}\`,
+      \`Evidence: dependencyNodes=\${routeState.dependencyNodes ?? 0} highImpact=\${routeState.highImpactNodes ?? 0} healthSamples=\${routeState.healthSamples ?? 0}\`,
+      \`Rules: \${(data.rules ?? []).map((rule) => \`\${rule.id}:mutation=\${Boolean(rule.mutation)} createsTask=\${Boolean(rule.createsTask)}\`).join(", ")}\`,
+      \`Boundaries: noTask=\${Boolean(hardBoundaries.noTaskCreation)} noCommand=\${Boolean(hardBoundaries.noCommandExecution)} noMutation=\${Boolean(hardBoundaries.noHostMutation)} noScheduler=\${Boolean(hardBoundaries.noScheduler)}\`,
+      \`Next: \${data.next?.recommendedSlice ?? "body governance readiness"}\`,
+    ].join("\\n");
+  } catch {
+    recoveryPolicyPosture.textContent = "offline";
+    recoveryPolicyCreatesTask.textContent = "false";
+    recoveryPolicyExecutesCommand.textContent = "false";
+    recoveryPolicyMutation.textContent = "false";
+    recoveryPolicyJson.textContent = "Unable to read conservative recovery policy explanation.";
+  }
+}
+
 async function refreshSystemdUnitInventory() {
   try {
     const data = await fetchJson(\`\${observerConfig.systemSenseUrl}/system/systemd/units\`);
@@ -5633,6 +5677,7 @@ await refreshWorkspaceCommandPlanDraft();
 await refreshSystemState();
 await refreshHealthTrends();
 await refreshRouteAwareNextAction();
+await refreshConservativeRecoveryPolicy();
 await refreshSystemdUnitInventory();
 await refreshSystemdDependencyMap();
 await refreshSystemdRepairPlan();
@@ -5698,6 +5743,7 @@ setInterval(refreshWorkspaceCommandPlanDraft, 5000);
 setInterval(refreshSystemState, 5000);
 setInterval(refreshHealthTrends, 5000);
 setInterval(refreshRouteAwareNextAction, 5000);
+setInterval(refreshConservativeRecoveryPolicy, 5000);
 setInterval(refreshSystemdUnitInventory, 5000);
 setInterval(refreshSystemdDependencyMap, 5000);
 setInterval(refreshSystemdRepairPlan, 5000);

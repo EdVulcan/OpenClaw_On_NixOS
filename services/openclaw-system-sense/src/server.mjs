@@ -35,6 +35,7 @@ const SYSTEMD_UNIT_INVENTORY_REGISTRY = "openclaw-systemd-unit-inventory-v0";
 const SYSTEMD_DEPENDENCY_MAP_REGISTRY = "openclaw-systemd-dependency-map-v0";
 const HEALTH_TREND_SUMMARY_REGISTRY = "openclaw-health-trend-summary-v0";
 const ROUTE_AWARE_NEXT_ACTION_REGISTRY = "openclaw-route-aware-next-action-v0";
+const CONSERVATIVE_RECOVERY_POLICY_REGISTRY = "openclaw-conservative-recovery-policy-v0";
 const SYSTEMD_REPAIR_PLAN_REGISTRY = "openclaw-systemd-repair-plan-v0";
 const SYSTEMD_REPAIR_DRY_RUN_REGISTRY = "openclaw-systemd-repair-dry-run-v0";
 const MAX_HEALTH_TREND_SNAPSHOTS = 24;
@@ -1083,6 +1084,102 @@ async function buildRouteAwareNextActionRecommendation() {
   };
 }
 
+async function buildConservativeRecoveryPolicyExplanation() {
+  const routeRecommendation = await buildRouteAwareNextActionRecommendation();
+  const recommendation = routeRecommendation.recommendation ?? {};
+  const stableBody = recommendation.action === "continue-observe-body-governance";
+
+  return {
+    ok: true,
+    registry: CONSERVATIVE_RECOVERY_POLICY_REGISTRY,
+    mode: "read_only_policy_explanation",
+    generatedAt: new Date().toISOString(),
+    source: {
+      service: "openclaw-system-sense",
+      routeAwareRegistry: routeRecommendation.registry,
+      dependencyMapRegistry: routeRecommendation.source?.dependencyMapRegistry ?? null,
+      healthTrendRegistry: routeRecommendation.source?.healthTrendRegistry ?? null,
+      existingRepairRoute: "openclaw-systemd-repair-execution-route",
+      evidence: "conservative_recovery_policy_from_body_governance",
+    },
+    governance: {
+      domain: "body_internal",
+      risk: "low",
+      autonomy: "explain_only",
+      approvalRequired: false,
+      hostMutation: false,
+      canMutate: false,
+      createsTask: false,
+      createsApproval: false,
+      executesCommand: false,
+      triggersRecovery: false,
+      schedulesFollowUp: false,
+    },
+    policy: {
+      name: "observe-first operator-reviewed recovery",
+      summary: "OpenClaw may explain recovery choices from body evidence, but it must not create or execute recovery without a separate operator-reviewed repair route.",
+      currentPosture: stableBody ? "observe" : "review_before_repair_proposal",
+      currentReason: recommendation.reason ?? "No route-aware recommendation reason recorded.",
+      minimumEvidence: [
+        "recent health trend summary",
+        "OpenClaw-owned systemd dependency impact",
+        "Observer-visible repair plan or dry-run before host mutation",
+        "explicit operator approval before real restart",
+        "post-execution body-state verification after real repair",
+      ],
+    },
+    rules: [
+      {
+        id: "stable-body-observe",
+        condition: "Health trends are stable and no current body alerts are present.",
+        allowedAction: "continue observing body governance evidence",
+        mutation: false,
+        createsTask: false,
+      },
+      {
+        id: "degraded-body-review",
+        condition: "A service is degraded or body alerts are present.",
+        allowedAction: "review health trend and dependency impact evidence",
+        mutation: false,
+        createsTask: false,
+      },
+      {
+        id: "repair-proposal-gate",
+        condition: "A concrete OpenClaw-owned service remains degraded after review.",
+        allowedAction: "use the existing operator-reviewed repair route in a separate task",
+        mutation: true,
+        createsTask: false,
+        boundary: "this endpoint explains the gate only; it does not create approval, task, command, or recovery",
+      },
+    ],
+    routeState: {
+      action: recommendation.action ?? "unknown",
+      priority: recommendation.priority ?? "unknown",
+      targets: recommendation.targets ?? [],
+      dependencyNodes: routeRecommendation.evidence?.dependency?.nodes ?? 0,
+      highImpactNodes: routeRecommendation.evidence?.dependency?.highImpact ?? 0,
+      healthSamples: routeRecommendation.evidence?.health?.samples ?? 0,
+      degradedServices: routeRecommendation.evidence?.health?.degradedServices ?? 0,
+      latestAlertCount: routeRecommendation.evidence?.health?.latestAlertCount ?? 0,
+    },
+    hardBoundaries: {
+      noAutomaticRepair: true,
+      noTaskCreation: true,
+      noApprovalCreation: true,
+      noCommandExecution: true,
+      noHostMutation: true,
+      noScheduler: true,
+      noPersistenceHardening: true,
+      noDenialRecoveryLoop: true,
+      noPluginRuntimeWork: true,
+    },
+    next: {
+      recommendedSlice: "openclaw-body-governance-readiness",
+      boundary: "close Track C with a read-only body governance readiness bundle before broadening recovery actions",
+    },
+  };
+}
+
 async function checkService(name, baseUrl) {
   const startedAt = Date.now();
   const controller = new AbortController();
@@ -1692,6 +1789,12 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "GET" && requestUrl.pathname === "/system/route/next-action") {
     const recommendation = await buildRouteAwareNextActionRecommendation();
     sendJson(res, 200, recommendation);
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/system/route/recovery-policy") {
+    const policy = await buildConservativeRecoveryPolicyExplanation();
+    sendJson(res, 200, policy);
     return;
   }
 

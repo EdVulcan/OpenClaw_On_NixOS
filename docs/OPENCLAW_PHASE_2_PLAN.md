@@ -218,6 +218,17 @@ This checkpoint is allowed because it turns body evidence into governance judgme
 - Creates no task, no approval, no command execution, no host mutation, no scheduler, and no recovery action.
 - Must not add automatic repair, background maintenance, persistence hardening, denial recovery, duplicate-click handling, plugin/runtime adapter work, or arbitrary host control.
 
+Conservative recovery policy explanation checkpoint:
+
+After route-aware next-action recommendations pass, `openclaw-conservative-recovery-policy-explanation` may explain the conservative recovery policy that governs when OpenClaw can stay in observe/review mode versus when a separate operator-reviewed repair route is required.
+
+This checkpoint is allowed because it makes body governance understandable before broadening any recovery action:
+
+- Reads route-aware recommendation, dependency map, and health trend evidence only.
+- Explains observe-first recovery rules, minimum evidence, repair proposal gates, and hard boundaries.
+- Creates no task, no approval, no command execution, no host mutation, no scheduler, and no recovery action.
+- Must not add automatic repair, background maintenance, persistence hardening, denial recovery, duplicate-click handling, plugin/runtime adapter work, or arbitrary host control.
+
 ## Phase 2 Gate
 
 Before implementing any Phase 2 feature, confirm:
