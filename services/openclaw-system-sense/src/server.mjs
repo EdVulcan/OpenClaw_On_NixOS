@@ -32,6 +32,7 @@ const commandTimeoutMs = Number.parseInt(process.env.OPENCLAW_SYSTEM_COMMAND_TIM
 const commandOutputLimit = Number.parseInt(process.env.OPENCLAW_SYSTEM_COMMAND_OUTPUT_LIMIT ?? "8192", 10);
 const execFileAsync = promisify(execFile);
 const SYSTEMD_UNIT_INVENTORY_REGISTRY = "openclaw-systemd-unit-inventory-v0";
+const SYSTEMD_DEPENDENCY_MAP_REGISTRY = "openclaw-systemd-dependency-map-v0";
 const SYSTEMD_REPAIR_PLAN_REGISTRY = "openclaw-systemd-repair-plan-v0";
 const SYSTEMD_REPAIR_DRY_RUN_REGISTRY = "openclaw-systemd-repair-dry-run-v0";
 
@@ -1055,6 +1056,157 @@ async function buildSystemdUnitInventory() {
   };
 }
 
+function toUnitName(serviceName) {
+  return serviceName.endsWith(".service") ? serviceName : `${serviceName}.service`;
+}
+
+function buildDownstreamMap(edges) {
+  const downstream = new Map();
+  for (const edge of edges) {
+    const items = downstream.get(edge.from) ?? [];
+    items.push(edge.to);
+    downstream.set(edge.from, items);
+  }
+  return downstream;
+}
+
+function collectDownstreamUnits(unitName, downstreamMap, visited = new Set()) {
+  for (const child of downstreamMap.get(unitName) ?? []) {
+    if (visited.has(child)) {
+      continue;
+    }
+    visited.add(child);
+    collectDownstreamUnits(child, downstreamMap, visited);
+  }
+  return [...visited].sort();
+}
+
+function dependencyLayerForSpec(spec, specByUnit, memo = new Map()) {
+  if (memo.has(spec.unit)) {
+    return memo.get(spec.unit);
+  }
+  if (!Array.isArray(spec.after) || spec.after.length === 0) {
+    memo.set(spec.unit, 0);
+    return 0;
+  }
+  const upstreamLayers = spec.after
+    .map((name) => specByUnit.get(toUnitName(name)))
+    .filter(Boolean)
+    .map((upstream) => dependencyLayerForSpec(upstream, specByUnit, memo));
+  const layer = upstreamLayers.length === 0 ? 0 : Math.max(...upstreamLayers) + 1;
+  memo.set(spec.unit, layer);
+  return layer;
+}
+
+function classifyDependencyImpact(unitName, downstreamCount) {
+  if (unitName === "openclaw-event-hub.service") {
+    return "foundational";
+  }
+  if (unitName === "openclaw-core.service" || downstreamCount >= 3) {
+    return "high";
+  }
+  if (downstreamCount > 0) {
+    return "medium";
+  }
+  return "leaf";
+}
+
+async function buildSystemdDependencyMap() {
+  const generatedAt = new Date().toISOString();
+  const inventory = await buildSystemdUnitInventory();
+  const unitByName = new Map(inventory.units.map((unit) => [unit.unit, unit]));
+  const specByUnit = new Map(openClawSystemdUnitSpecs.map((spec) => [spec.unit, spec]));
+  const edges = openClawSystemdUnitSpecs.flatMap((spec) => {
+    return (spec.after ?? []).map((dependency) => ({
+      from: toUnitName(dependency),
+      to: spec.unit,
+      relation: "after",
+      direction: "upstream_to_dependent",
+      bodyOwned: true,
+      canMutate: false,
+      description: `${spec.unit} starts after ${toUnitName(dependency)}.`,
+    }));
+  });
+  const downstreamMap = buildDownstreamMap(edges);
+  const layerMemo = new Map();
+  const nodes = openClawSystemdUnitSpecs.map((spec) => {
+    const unit = unitByName.get(spec.unit) ?? {};
+    const upstream = (spec.after ?? []).map(toUnitName).sort();
+    const downstream = collectDownstreamUnits(spec.unit, downstreamMap);
+    return {
+      key: spec.key,
+      name: spec.name,
+      unit: spec.unit,
+      component: spec.component,
+      description: unit.description ?? spec.description,
+      activeState: unit.activeState ?? "unknown",
+      subState: unit.subState ?? "unknown",
+      systemdObserved: unit.systemdObserved === true,
+      upstream,
+      downstream,
+      dependencyLayer: dependencyLayerForSpec(spec, specByUnit, layerMemo),
+      impactRadius: downstream.length,
+      impactClass: classifyDependencyImpact(spec.unit, downstream.length),
+      canMutate: false,
+      canRestart: false,
+    };
+  });
+  const roots = nodes.filter((node) => node.upstream.length === 0).map((node) => node.unit).sort();
+  const leaves = nodes.filter((node) => node.downstream.length === 0).map((node) => node.unit).sort();
+  const startupLayers = nodes
+    .reduce((layers, node) => {
+      const key = String(node.dependencyLayer);
+      layers[key] = [...(layers[key] ?? []), node.unit].sort();
+      return layers;
+    }, {});
+
+  return {
+    ok: true,
+    registry: SYSTEMD_DEPENDENCY_MAP_REGISTRY,
+    mode: "read_only_body_governance",
+    generatedAt,
+    source: {
+      service: "openclaw-system-sense",
+      inventoryRegistry: inventory.registry,
+      inventoryObservedAt: inventory.observedAt,
+      plannedFrom: "nix/modules/openclaw-body.nix serviceSpecs",
+      evidence: "body_service_dependency_map",
+    },
+    governance: {
+      domain: "body_internal",
+      risk: "low",
+      autonomy: "observe_only",
+      approvalRequired: false,
+      hostMutation: false,
+      canMutate: false,
+      canRestart: false,
+      executesCommand: false,
+      readOnlySources: [inventory.registry, "serviceSpecs.after"],
+      forbiddenActions: ["start", "stop", "restart", "reload", "enable", "disable"],
+    },
+    summary: {
+      nodes: nodes.length,
+      edges: edges.length,
+      roots: roots.length,
+      leaves: leaves.length,
+      observed: nodes.filter((node) => node.systemdObserved).length,
+      active: nodes.filter((node) => node.activeState === "active").length,
+      highImpact: nodes.filter((node) => ["foundational", "high"].includes(node.impactClass)).length,
+      mutationEndpoints: 0,
+      restartEndpoints: 0,
+    },
+    roots,
+    leaves,
+    startupLayers,
+    nodes,
+    edges,
+    next: {
+      recommendedSlice: "openclaw-health-trend-summary",
+      boundary: "summarize existing health snapshots before recommending recovery choices",
+    },
+  };
+}
+
 function normaliseUnitName(value) {
   const raw = typeof value === "string" && value.trim()
     ? value.trim()
@@ -1321,6 +1473,12 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "GET" && requestUrl.pathname === "/system/systemd/units") {
     const inventory = await buildSystemdUnitInventory();
     sendJson(res, 200, inventory);
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/system/systemd/dependency-map") {
+    const dependencyMap = await buildSystemdDependencyMap();
+    sendJson(res, 200, dependencyMap);
     return;
   }
 

@@ -844,6 +844,14 @@ function observerHtml() {
           <div class="metric"><span>Mode</span><span id="systemd-unit-mode">read_only</span></div>
           <pre id="systemd-unit-json">Loading read-only OpenClaw systemd unit inventory...</pre>
         </section>
+        <section class="panel" id="systemd-dependency-map">
+          <h2>Body Dependency Map</h2>
+          <div class="metric"><span>Nodes</span><span id="systemd-dependency-node-count">0</span></div>
+          <div class="metric"><span>Edges</span><span id="systemd-dependency-edge-count">0</span></div>
+          <div class="metric"><span>Roots</span><span id="systemd-dependency-root-count">0</span></div>
+          <div class="metric"><span>High Impact</span><span id="systemd-dependency-high-impact">0</span></div>
+          <pre id="systemd-dependency-json">Loading read-only OpenClaw body dependency map...</pre>
+        </section>
         <section class="panel" id="systemd-repair-plan-panel">
           <h2>Systemd Repair Plan</h2>
           <div class="metric"><span>Target</span><span id="systemd-repair-plan-target">openclaw-browser-runtime.service</span></div>
@@ -975,6 +983,11 @@ const systemdUnitActive = document.querySelector("#systemd-unit-active");
 const systemdUnitObserved = document.querySelector("#systemd-unit-observed");
 const systemdUnitMode = document.querySelector("#systemd-unit-mode");
 const systemdUnitJson = document.querySelector("#systemd-unit-json");
+const systemdDependencyNodeCount = document.querySelector("#systemd-dependency-node-count");
+const systemdDependencyEdgeCount = document.querySelector("#systemd-dependency-edge-count");
+const systemdDependencyRootCount = document.querySelector("#systemd-dependency-root-count");
+const systemdDependencyHighImpact = document.querySelector("#systemd-dependency-high-impact");
+const systemdDependencyJson = document.querySelector("#systemd-dependency-json");
 const systemdRepairPlanTarget = document.querySelector("#systemd-repair-plan-target");
 const systemdRepairPlanRisk = document.querySelector("#systemd-repair-plan-risk");
 const systemdRepairPlanMode = document.querySelector("#systemd-repair-plan-mode");
@@ -4001,6 +4014,39 @@ async function refreshSystemdUnitInventory() {
   }
 }
 
+async function refreshSystemdDependencyMap() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.systemSenseUrl}/system/systemd/dependency-map\`);
+    const summary = data.summary ?? {};
+    const governance = data.governance ?? {};
+    const nodes = Array.isArray(data.nodes) ? data.nodes : [];
+    const edges = Array.isArray(data.edges) ? data.edges : [];
+    const highImpact = nodes
+      .filter((node) => node.impactClass === "foundational" || node.impactClass === "high")
+      .map((node) => \`\${node.unit}:\${node.impactRadius ?? 0}\`);
+    systemdDependencyNodeCount.textContent = String(summary.nodes ?? nodes.length);
+    systemdDependencyEdgeCount.textContent = String(summary.edges ?? edges.length);
+    systemdDependencyRootCount.textContent = String(summary.roots ?? data.roots?.length ?? 0);
+    systemdDependencyHighImpact.textContent = String(summary.highImpact ?? highImpact.length);
+    systemdDependencyJson.textContent = [
+      \`Registry: \${data.registry ?? "unknown"}\`,
+      \`Mode: \${data.mode ?? "unknown"} mutation=\${Boolean(governance.hostMutation)} canRestart=\${Boolean(governance.canRestart)}\`,
+      \`Roots: \${(data.roots ?? []).join(", ") || "none"}\`,
+      \`Leaves: \${(data.leaves ?? []).join(", ") || "none"}\`,
+      \`High impact: \${highImpact.join(", ") || "none"}\`,
+      \`Layers: \${Object.entries(data.startupLayers ?? {}).map(([layer, units]) => \`\${layer}=[\${units.join(", ")}]\`).join(" ")}\`,
+      \`Edges: \${edges.map((edge) => \`\${edge.from}->\${edge.to}\`).join(", ")}\`,
+      \`Next: \${data.next?.recommendedSlice ?? "health trend summary"}\`,
+    ].join("\\n");
+  } catch {
+    systemdDependencyNodeCount.textContent = "0";
+    systemdDependencyEdgeCount.textContent = "0";
+    systemdDependencyRootCount.textContent = "0";
+    systemdDependencyHighImpact.textContent = "0";
+    systemdDependencyJson.textContent = "Unable to read OpenClaw body dependency map.";
+  }
+}
+
 async function refreshSystemdRepairPlan() {
   try {
     const [plan, dryRun] = await Promise.all([
@@ -5503,6 +5549,7 @@ await refreshSourceCommandPlanDraft();
 await refreshWorkspaceCommandPlanDraft();
 await refreshSystemState();
 await refreshSystemdUnitInventory();
+await refreshSystemdDependencyMap();
 await refreshSystemdRepairPlan();
 await refreshSystemdRepairExecutionTaskDraft();
 await refreshHealState();
@@ -5565,6 +5612,7 @@ setInterval(refreshSourceCommandPlanDraft, 5000);
 setInterval(refreshWorkspaceCommandPlanDraft, 5000);
 setInterval(refreshSystemState, 5000);
 setInterval(refreshSystemdUnitInventory, 5000);
+setInterval(refreshSystemdDependencyMap, 5000);
 setInterval(refreshSystemdRepairPlan, 5000);
 setInterval(refreshSystemdRepairExecutionTaskDraft, 5000);
 setInterval(refreshHealState, 5000);

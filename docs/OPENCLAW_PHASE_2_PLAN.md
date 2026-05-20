@@ -185,6 +185,17 @@ This checkpoint is allowed because repeated OS password prompts block the Phase 
 - Is disabled by default and requires an explicit OpenClaw service user.
 - Must not grant passwordless `ALL`, arbitrary `systemctl`, shell access, plugin/runtime execution, background repair, denial recovery, duplicate-click handling, or persistence hardening.
 
+Body service dependency map checkpoint:
+
+After the repair demo path is usable on a real NixOS body, `openclaw-body-service-dependency-map` may expose a read-only dependency graph for OpenClaw-owned body services.
+
+This checkpoint is allowed because it advances Track C body governance: OpenClaw should understand how its organs depend on each other before it recommends broader recovery choices.
+
+- Reads existing OpenClaw service specs and systemd inventory evidence.
+- Exposes nodes, upstream dependencies, downstream impact, startup layers, roots, leaves, and high-impact body services.
+- Creates no task, no approval, no command execution, no host mutation, and no repair action.
+- Must not add automatic restart, background repair, persistence hardening, denial recovery, duplicate-click handling, plugin/runtime adapter work, or arbitrary systemd control.
+
 ## Phase 2 Gate
 
 Before implementing any Phase 2 feature, confirm:
