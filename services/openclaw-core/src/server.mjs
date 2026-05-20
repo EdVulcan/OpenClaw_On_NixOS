@@ -63,6 +63,10 @@ const CAPABILITY_HEALTH_TIMEOUT_MS = Number.parseInt(
 );
 const APPROVAL_TTL_MS = parseOptionalPositiveInteger(process.env.OPENCLAW_APPROVAL_TTL_MS);
 const SYSTEMD_REPAIR_EXECUTION_TIMEOUT_MS = parseOptionalPositiveInteger(process.env.OPENCLAW_SYSTEMD_REPAIR_EXECUTION_TIMEOUT_MS) ?? 15000;
+const SYSTEMD_REPAIR_RESTART_HELPER = normaliseOptionalString(process.env.OPENCLAW_SYSTEMD_REPAIR_RESTART_HELPER);
+const SYSTEMD_REPAIR_RESTART_HELPER_SUDO =
+  normaliseOptionalString(process.env.OPENCLAW_SYSTEMD_REPAIR_RESTART_HELPER_SUDO) ?? "sudo";
+const SYSTEMD_REPAIR_AUTH_DELEGATION = normaliseOptionalString(process.env.OPENCLAW_SYSTEMD_REPAIR_AUTH_DELEGATION);
 const STATUS_PRIORITY = {
   running: 0,
   paused: 1,
@@ -90,6 +94,10 @@ function parseOptionalPositiveInteger(value) {
 
   const parsed = Number.parseInt(value, 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function normaliseOptionalString(value) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
 function uniqueResolvedPaths(paths) {
@@ -8824,6 +8832,19 @@ async function buildSystemdRepairExecutionTaskDraft({ unit = null, execute = fal
           hostMutationAttempted: false,
           futureExecutionRequiresSeparateMilestone: !realExecution,
           selectedRealExecutionUnit: realExecution ? SYSTEMD_REPAIR_REAL_EXECUTION_UNIT : null,
+          authDelegation: SYSTEMD_REPAIR_RESTART_HELPER
+            ? {
+                mode: SYSTEMD_REPAIR_AUTH_DELEGATION ?? "external-fixed-helper",
+                helperConfigured: true,
+                passwordlessExpected: SYSTEMD_REPAIR_AUTH_DELEGATION === "sudo-nopasswd-fixed-helper",
+                scope: "restart openclaw-browser-runtime.service only",
+              }
+            : {
+                mode: "direct-systemctl",
+                helperConfigured: false,
+                passwordlessExpected: false,
+                scope: "host policy decides whether authentication is required",
+              },
         },
       },
     },
@@ -11581,12 +11602,15 @@ async function deferSystemdRepairExecutionTask(task) {
 function buildSystemdRepairCommandTranscript(task, result) {
   const command = task.systemdRepair?.command ?? {};
   const args = Array.isArray(command.args) ? command.args : [];
+  const actualArgs = Array.isArray(result.args) ? result.args : [];
   return {
     stepId: "execute-systemd-restart",
     actionKind: "systemd.repair.execute",
     capabilityId: "act.system.heal",
     invocationId: result.invocationId,
     command: [command.command ?? "systemctl", ...args].join(" "),
+    actualCommand: [result.command ?? command.command ?? "systemctl", ...actualArgs].join(" "),
+    authDelegation: result.authDelegation ?? null,
     skipped: false,
     skipReason: null,
     condition: null,
@@ -11599,8 +11623,30 @@ function buildSystemdRepairCommandTranscript(task, result) {
 
 async function runSystemdRepairCommand(task) {
   const command = task.systemdRepair?.command ?? {};
-  const executable = command.command ?? "systemctl";
-  const args = Array.isArray(command.args) ? command.args : ["restart", task.systemdRepair?.target?.unit ?? SYSTEMD_REPAIR_REAL_EXECUTION_UNIT];
+  const requestedArgs = Array.isArray(command.args) ? command.args : ["restart", task.systemdRepair?.target?.unit ?? SYSTEMD_REPAIR_REAL_EXECUTION_UNIT];
+  const useRestartHelper =
+    SYSTEMD_REPAIR_RESTART_HELPER
+    && task.systemdRepair?.target?.unit === SYSTEMD_REPAIR_REAL_EXECUTION_UNIT
+    && command.command === "systemctl"
+    && requestedArgs[0] === "restart"
+    && requestedArgs[1] === SYSTEMD_REPAIR_REAL_EXECUTION_UNIT;
+  const executable = useRestartHelper ? SYSTEMD_REPAIR_RESTART_HELPER_SUDO : command.command ?? "systemctl";
+  const args = useRestartHelper ? ["-n", SYSTEMD_REPAIR_RESTART_HELPER] : requestedArgs;
+  const authDelegation = useRestartHelper
+    ? {
+        mode: SYSTEMD_REPAIR_AUTH_DELEGATION ?? "external-fixed-helper",
+        helper: SYSTEMD_REPAIR_RESTART_HELPER,
+        sudo: SYSTEMD_REPAIR_RESTART_HELPER_SUDO,
+        passwordPromptAllowed: false,
+        scope: "restart openclaw-browser-runtime.service only",
+      }
+    : {
+        mode: "direct-systemctl",
+        helper: null,
+        sudo: null,
+        passwordPromptAllowed: true,
+        scope: "host policy decides whether authentication is required",
+      };
   const startedAt = new Date().toISOString();
 
   try {
@@ -11613,6 +11659,9 @@ async function runSystemdRepairCommand(task) {
       invocationId: randomUUID(),
       command: executable,
       args,
+      requestedCommand: command.command ?? "systemctl",
+      requestedArgs,
+      authDelegation,
       startedAt,
       completedAt: new Date().toISOString(),
       exitCode: 0,
@@ -11627,6 +11676,9 @@ async function runSystemdRepairCommand(task) {
       invocationId: randomUUID(),
       command: executable,
       args,
+      requestedCommand: command.command ?? "systemctl",
+      requestedArgs,
+      authDelegation,
       startedAt,
       completedAt: new Date().toISOString(),
       exitCode,
@@ -11808,6 +11860,7 @@ async function executeSystemdRepairExecutionTask(task) {
       executionSucceeded: result.ok,
       exitCode: result.exitCode,
       completedAt: result.completedAt,
+      authDelegation: result.authDelegation ?? null,
     },
   };
   updatedTask.outcome = {
@@ -11824,6 +11877,7 @@ async function executeSystemdRepairExecutionTask(task) {
       hostMutationAttempted: true,
       executed: true,
       executionSucceeded: result.ok,
+      authDelegation: result.authDelegation ?? null,
       commandTranscript,
       result,
       postExecutionVerification,
@@ -11856,6 +11910,7 @@ async function executeSystemdRepairExecutionTask(task) {
       executed: true,
       executionSucceeded: result.ok,
       exitCode: result.exitCode,
+      authDelegation: result.authDelegation ?? null,
       postExecutionVerification,
       rollbackNote: updatedTask.outcome.details.rollbackNote,
     },

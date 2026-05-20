@@ -173,6 +173,18 @@ This checkpoint is allowed because it turns completed body capability evidence i
 - Creates no task, no approval, no command execution, no host mutation, and no recovery action.
 - Must not add persistence hardening, denial recovery, duplicate-click handling, schedulers, plugin/runtime adapter work, or any hidden execution path.
 
+Repair auth delegation checkpoint:
+
+If the operator sees a password prompt for every approved repair action, `openclaw-systemd-repair-auth-delegation` may prove a narrow NixOS authorization bridge for the existing real repair demo path.
+
+This checkpoint is allowed because repeated OS password prompts block the Phase 2 operator demo experience after the real repair loop is already approved and visible. It must remain a least-privilege integration, not a new autonomy or hardening loop:
+
+- Delegates only the already-approved `openclaw-browser-runtime.service` restart path.
+- Keeps OpenClaw operator approval separate from host OS authorization.
+- Uses a fixed helper that accepts no arguments and executes only `systemctl restart openclaw-browser-runtime.service`.
+- Is disabled by default and requires an explicit OpenClaw service user.
+- Must not grant passwordless `ALL`, arbitrary `systemctl`, shell access, plugin/runtime execution, background repair, denial recovery, duplicate-click handling, or persistence hardening.
+
 ## Phase 2 Gate
 
 Before implementing any Phase 2 feature, confirm:

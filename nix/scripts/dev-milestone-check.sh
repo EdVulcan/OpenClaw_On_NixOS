@@ -33,6 +33,7 @@ checks=(
   "openclaw-systemd-repair-real-execution|dev-openclaw-systemd-repair-real-execution-check.sh|Operator-approved real OpenClaw systemd repair execution attempt"
   "openclaw-systemd-repair-post-verification|dev-openclaw-systemd-repair-post-verification-check.sh|Post-execution body-state verification for real OpenClaw systemd repair"
   "openclaw-phase-2-repair-demo-status|dev-openclaw-phase-2-repair-demo-status-check.sh|Read-only Phase 2 repair demo status and evidence bundle"
+  "openclaw-systemd-repair-auth-delegation|dev-openclaw-systemd-repair-auth-delegation-check.sh|Narrow passwordless authorization bridge for approved OpenClaw systemd repair"
   "task-workbench|dev-task-workbench-check.sh|Task lifecycle, recovery, history, and work view coordination"
   "task-executor|dev-task-executor-check.sh|Executor verification, failed checks, manual and auto recovery"
   "persistence|dev-persistence-check.sh|Core task state persistence and recovery chains"

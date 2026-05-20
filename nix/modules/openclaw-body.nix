@@ -101,6 +101,17 @@ let
 
   urlFor = port: "http://${cfg.connectHost}:${toString port}";
 
+  systemdRepairRestartHelper = pkgs.writeShellScriptBin "openclaw-systemd-repair-restart-browser-runtime" ''
+    set -euo pipefail
+
+    if [ "$#" -ne 0 ]; then
+      echo "openclaw-systemd-repair-restart-browser-runtime accepts no arguments" >&2
+      exit 64
+    fi
+
+    exec ${pkgs.systemd}/bin/systemctl restart openclaw-browser-runtime.service
+  '';
+
   commonEnvironment = {
     OPENCLAW_CORE_URL = urlFor cfg.ports.core;
     OPENCLAW_EVENT_HUB_URL = urlFor cfg.ports.eventHub;
@@ -113,6 +124,10 @@ let
     OPENCLAW_CORE_STATE_FILE = "${cfg.stateDir}/openclaw-core-state.json";
     OPENCLAW_SYSTEM_HEAL_STATE_FILE = "${cfg.stateDir}/openclaw-system-heal-state.json";
     OPENCLAW_EVENT_LOG_FILE = "${cfg.stateDir}/openclaw-events.jsonl";
+  } // optionalAttrs cfg.systemdRepairAuthDelegation.enable {
+    OPENCLAW_SYSTEMD_REPAIR_RESTART_HELPER = "${systemdRepairRestartHelper}/bin/openclaw-systemd-repair-restart-browser-runtime";
+    OPENCLAW_SYSTEMD_REPAIR_RESTART_HELPER_SUDO = "${pkgs.sudo}/bin/sudo";
+    OPENCLAW_SYSTEMD_REPAIR_AUTH_DELEGATION = "sudo-nopasswd-fixed-helper";
   };
 
   mkService = spec: {
@@ -143,6 +158,7 @@ let
 
   owner = if cfg.user == null then "root" else cfg.user;
   group = if cfg.user == null then "root" else cfg.group;
+  delegationUser = if cfg.user == null then "openclaw" else cfg.user;
 in
 {
   options.services.openclaw = {
@@ -218,6 +234,10 @@ in
       description = "OpenClaw body log directory.";
     };
 
+    systemdRepairAuthDelegation = {
+      enable = mkEnableOption "passwordless OpenClaw-owned systemd repair delegation";
+    };
+
     ports = {
       core = mkOption { type = types.port; default = 4100; };
       eventHub = mkOption { type = types.port; default = 4101; };
@@ -240,6 +260,10 @@ in
       {
         assertion = cfg.components != [ ];
         message = "services.openclaw.components must enable at least one body component.";
+      }
+      {
+        assertion = !cfg.systemdRepairAuthDelegation.enable || cfg.user != null;
+        message = "services.openclaw.systemdRepairAuthDelegation.enable requires services.openclaw.user so delegation is scoped to one OpenClaw service account.";
       }
     ];
 
@@ -265,5 +289,17 @@ in
       name = spec.name;
       value = mkService spec;
     }) enabledSpecs);
+
+    security.sudo.extraRules = mkIf cfg.systemdRepairAuthDelegation.enable [
+      {
+        users = [ delegationUser ];
+        commands = [
+          {
+            command = "${systemdRepairRestartHelper}/bin/openclaw-systemd-repair-restart-browser-runtime";
+            options = [ "NOPASSWD" ];
+          }
+        ];
+      }
+    ];
   };
 }
