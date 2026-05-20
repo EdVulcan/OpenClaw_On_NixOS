@@ -229,6 +229,17 @@ This checkpoint is allowed because it makes body governance understandable befor
 - Creates no task, no approval, no command execution, no host mutation, no scheduler, and no recovery action.
 - Must not add automatic repair, background maintenance, persistence hardening, denial recovery, duplicate-click handling, plugin/runtime adapter work, or arbitrary host control.
 
+Body governance readiness checkpoint:
+
+After the conservative recovery policy explanation passes, `openclaw-body-governance-readiness` may close Track C with a read-only readiness bundle.
+
+This checkpoint is allowed because it verifies that body governance has enough evidence to support the next whitepaper route review:
+
+- Reads dependency map, health trend, route-aware recommendation, and conservative recovery policy evidence only.
+- Exposes readiness checks, current governance posture, completed Track C slices, and next route review boundary.
+- Creates no task, no approval, no command execution, no host mutation, no scheduler, and no recovery action.
+- Must not add automatic repair, background maintenance, persistence hardening, denial recovery, duplicate-click handling, plugin/runtime adapter work, or arbitrary host control.
+
 ## Phase 2 Gate
 
 Before implementing any Phase 2 feature, confirm:

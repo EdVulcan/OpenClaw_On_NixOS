@@ -860,6 +860,14 @@ function observerHtml() {
           <div class="metric"><span>Mutation</span><span id="recovery-policy-mutation">false</span></div>
           <pre id="recovery-policy-json">Loading conservative recovery policy explanation...</pre>
         </section>
+        <section class="panel" id="body-governance-readiness">
+          <h2>Body Governance Readiness</h2>
+          <div class="metric"><span>Ready</span><span id="body-governance-ready">false</span></div>
+          <div class="metric"><span>Checks</span><span id="body-governance-checks">0/0</span></div>
+          <div class="metric"><span>Posture</span><span id="body-governance-posture">loading</span></div>
+          <div class="metric"><span>Mutation</span><span id="body-governance-mutation">false</span></div>
+          <pre id="body-governance-json">Loading body governance readiness bundle...</pre>
+        </section>
         <section class="panel" id="systemd-unit-inventory">
           <h2>Systemd Unit Inventory</h2>
           <div class="metric"><span>Total Units</span><span id="systemd-unit-total">0</span></div>
@@ -1017,6 +1025,11 @@ const recoveryPolicyCreatesTask = document.querySelector("#recovery-policy-creat
 const recoveryPolicyExecutesCommand = document.querySelector("#recovery-policy-executes-command");
 const recoveryPolicyMutation = document.querySelector("#recovery-policy-mutation");
 const recoveryPolicyJson = document.querySelector("#recovery-policy-json");
+const bodyGovernanceReady = document.querySelector("#body-governance-ready");
+const bodyGovernanceChecks = document.querySelector("#body-governance-checks");
+const bodyGovernancePosture = document.querySelector("#body-governance-posture");
+const bodyGovernanceMutation = document.querySelector("#body-governance-mutation");
+const bodyGovernanceJson = document.querySelector("#body-governance-json");
 const systemdUnitTotal = document.querySelector("#systemd-unit-total");
 const systemdUnitActive = document.querySelector("#systemd-unit-active");
 const systemdUnitObserved = document.querySelector("#systemd-unit-observed");
@@ -4113,6 +4126,35 @@ async function refreshConservativeRecoveryPolicy() {
   }
 }
 
+async function refreshBodyGovernanceReadiness() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.systemSenseUrl}/system/route/body-governance-readiness\`);
+    const governance = data.governance ?? {};
+    const summary = data.summary ?? {};
+    const evidence = data.evidence ?? {};
+    const completedTrack = data.completedTrack ?? {};
+    bodyGovernanceReady.textContent = String(Boolean(summary.ready));
+    bodyGovernanceChecks.textContent = \`\${summary.passedChecks ?? 0}/\${summary.totalChecks ?? 0}\`;
+    bodyGovernancePosture.textContent = summary.currentPosture ?? "unknown";
+    bodyGovernanceMutation.textContent = String(Boolean(governance.hostMutation));
+    bodyGovernanceJson.textContent = [
+      \`Registry: \${data.registry ?? "unknown"}\`,
+      \`Mode: \${data.mode ?? "unknown"} ready=\${Boolean(summary.ready)} mutation=\${Boolean(governance.hostMutation)} createsTask=\${Boolean(governance.createsTask)} executesCommand=\${Boolean(governance.executesCommand)}\`,
+      \`Checks: \${summary.passedChecks ?? 0}/\${summary.totalChecks ?? 0} posture=\${summary.currentPosture ?? "unknown"} action=\${summary.routeAction ?? "unknown"} priority=\${summary.routePriority ?? "unknown"}\`,
+      \`Evidence: dependencyNodes=\${evidence.dependencyNodes ?? 0} highImpact=\${evidence.highImpactNodes ?? 0} healthSamples=\${evidence.healthSamples ?? 0} policyRules=\${evidence.policyRules ?? 0}\`,
+      \`Completed: \${completedTrack.name ?? "unknown"} claim=\${completedTrack.completionClaim ?? "unknown"}\`,
+      \`Slices: \${(completedTrack.completedSlices ?? []).join(", ")}\`,
+      \`Next: \${data.next?.recommendedSlice ?? "phase 2 route review"}\`,
+    ].join("\\n");
+  } catch {
+    bodyGovernanceReady.textContent = "false";
+    bodyGovernanceChecks.textContent = "0/0";
+    bodyGovernancePosture.textContent = "offline";
+    bodyGovernanceMutation.textContent = "false";
+    bodyGovernanceJson.textContent = "Unable to read body governance readiness bundle.";
+  }
+}
+
 async function refreshSystemdUnitInventory() {
   try {
     const data = await fetchJson(\`\${observerConfig.systemSenseUrl}/system/systemd/units\`);
@@ -5678,6 +5720,7 @@ await refreshSystemState();
 await refreshHealthTrends();
 await refreshRouteAwareNextAction();
 await refreshConservativeRecoveryPolicy();
+await refreshBodyGovernanceReadiness();
 await refreshSystemdUnitInventory();
 await refreshSystemdDependencyMap();
 await refreshSystemdRepairPlan();
@@ -5744,6 +5787,7 @@ setInterval(refreshSystemState, 5000);
 setInterval(refreshHealthTrends, 5000);
 setInterval(refreshRouteAwareNextAction, 5000);
 setInterval(refreshConservativeRecoveryPolicy, 5000);
+setInterval(refreshBodyGovernanceReadiness, 5000);
 setInterval(refreshSystemdUnitInventory, 5000);
 setInterval(refreshSystemdDependencyMap, 5000);
 setInterval(refreshSystemdRepairPlan, 5000);

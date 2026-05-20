@@ -36,6 +36,7 @@ const SYSTEMD_DEPENDENCY_MAP_REGISTRY = "openclaw-systemd-dependency-map-v0";
 const HEALTH_TREND_SUMMARY_REGISTRY = "openclaw-health-trend-summary-v0";
 const ROUTE_AWARE_NEXT_ACTION_REGISTRY = "openclaw-route-aware-next-action-v0";
 const CONSERVATIVE_RECOVERY_POLICY_REGISTRY = "openclaw-conservative-recovery-policy-v0";
+const BODY_GOVERNANCE_READINESS_REGISTRY = "openclaw-body-governance-readiness-v0";
 const SYSTEMD_REPAIR_PLAN_REGISTRY = "openclaw-systemd-repair-plan-v0";
 const SYSTEMD_REPAIR_DRY_RUN_REGISTRY = "openclaw-systemd-repair-dry-run-v0";
 const MAX_HEALTH_TREND_SNAPSHOTS = 24;
@@ -1180,6 +1181,109 @@ async function buildConservativeRecoveryPolicyExplanation() {
   };
 }
 
+async function buildBodyGovernanceReadiness() {
+  const recoveryPolicy = await buildConservativeRecoveryPolicyExplanation();
+  const routeState = recoveryPolicy.routeState ?? {};
+  const checks = [
+    {
+      id: "dependency-map",
+      label: "OpenClaw body service dependency map is available",
+      passed: routeState.dependencyNodes > 0,
+      evidence: recoveryPolicy.source?.dependencyMapRegistry ?? null,
+    },
+    {
+      id: "health-trends",
+      label: "Recent OpenClaw body health trend samples are available",
+      passed: routeState.healthSamples > 0,
+      evidence: recoveryPolicy.source?.healthTrendRegistry ?? null,
+    },
+    {
+      id: "route-aware-recommendation",
+      label: "Route-aware next-action recommendation is available",
+      passed: recoveryPolicy.source?.routeAwareRegistry === ROUTE_AWARE_NEXT_ACTION_REGISTRY,
+      evidence: recoveryPolicy.source?.routeAwareRegistry ?? null,
+    },
+    {
+      id: "conservative-policy",
+      label: "Conservative recovery policy explanation is available",
+      passed: recoveryPolicy.registry === CONSERVATIVE_RECOVERY_POLICY_REGISTRY,
+      evidence: recoveryPolicy.registry,
+    },
+    {
+      id: "no-hidden-execution",
+      label: "Body governance bundle remains read-only and non-executing",
+      passed: recoveryPolicy.governance?.createsTask === false
+        && recoveryPolicy.governance?.executesCommand === false
+        && recoveryPolicy.governance?.hostMutation === false
+        && recoveryPolicy.hardBoundaries?.noAutomaticRepair === true,
+      evidence: "hard_boundaries",
+    },
+  ];
+  const passedChecks = checks.filter((check) => check.passed).length;
+  const ready = passedChecks === checks.length;
+
+  return {
+    ok: true,
+    registry: BODY_GOVERNANCE_READINESS_REGISTRY,
+    mode: "read_only_track_c_readiness",
+    generatedAt: new Date().toISOString(),
+    source: {
+      service: "openclaw-system-sense",
+      dependencyMapRegistry: recoveryPolicy.source?.dependencyMapRegistry ?? null,
+      healthTrendRegistry: recoveryPolicy.source?.healthTrendRegistry ?? null,
+      routeAwareRegistry: recoveryPolicy.source?.routeAwareRegistry ?? null,
+      recoveryPolicyRegistry: recoveryPolicy.registry,
+      evidence: "track_c_body_governance_readiness_bundle",
+    },
+    governance: {
+      domain: "body_internal",
+      risk: "low",
+      autonomy: "readiness_report_only",
+      approvalRequired: false,
+      hostMutation: false,
+      canMutate: false,
+      createsTask: false,
+      createsApproval: false,
+      executesCommand: false,
+      triggersRecovery: false,
+      schedulesFollowUp: false,
+    },
+    summary: {
+      ready,
+      passedChecks,
+      totalChecks: checks.length,
+      currentPosture: recoveryPolicy.policy?.currentPosture ?? "unknown",
+      routeAction: routeState.action ?? "unknown",
+      routePriority: routeState.priority ?? "unknown",
+      degradedServices: routeState.degradedServices ?? 0,
+      latestAlertCount: routeState.latestAlertCount ?? 0,
+    },
+    checks,
+    evidence: {
+      dependencyNodes: routeState.dependencyNodes ?? 0,
+      highImpactNodes: routeState.highImpactNodes ?? 0,
+      healthSamples: routeState.healthSamples ?? 0,
+      policyRules: recoveryPolicy.rules?.length ?? 0,
+      hardBoundaries: recoveryPolicy.hardBoundaries,
+    },
+    completedTrack: {
+      id: "phase-2-track-c-body-governance",
+      name: "Body Governance Enhancement",
+      completedSlices: [
+        "openclaw-body-service-dependency-map",
+        "openclaw-health-trend-summary",
+        "openclaw-route-aware-next-action-recommendation",
+        "openclaw-conservative-recovery-policy-explanation",
+      ],
+      completionClaim: ready ? "track_c_readiness_bundle_passed" : "track_c_readiness_incomplete",
+    },
+    next: {
+      recommendedSlice: "openclaw-phase-2-route-review",
+      boundary: "review whitepaper route before opening the next Phase 2 body capability block",
+    },
+  };
+}
+
 async function checkService(name, baseUrl) {
   const startedAt = Date.now();
   const controller = new AbortController();
@@ -1795,6 +1899,12 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "GET" && requestUrl.pathname === "/system/route/recovery-policy") {
     const policy = await buildConservativeRecoveryPolicyExplanation();
     sendJson(res, 200, policy);
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/system/route/body-governance-readiness") {
+    const readiness = await buildBodyGovernanceReadiness();
+    sendJson(res, 200, readiness);
     return;
   }
 
