@@ -297,6 +297,14 @@ function observerHtml() {
           <div class="metric"><span>Mutation</span><span id="phase2-demo-control-room-mutation">false</span></div>
           <pre id="phase2-demo-control-room-json">Loading Phase 2 demo control room...</pre>
         </section>
+        <section class="panel" id="phase2-demo-walkthrough-panel">
+          <h2>Phase 2 Demo Walkthrough</h2>
+          <div class="metric"><span>Status</span><span id="phase2-demo-walkthrough-status">loading</span></div>
+          <div class="metric"><span>Steps</span><span id="phase2-demo-walkthrough-steps">0/0</span></div>
+          <div class="metric"><span>Control Room</span><span id="phase2-demo-walkthrough-control-room">false</span></div>
+          <div class="metric"><span>Mutation</span><span id="phase2-demo-walkthrough-mutation">false</span></div>
+          <pre id="phase2-demo-walkthrough-json">Loading Phase 2 demo walkthrough...</pre>
+        </section>
         <section class="panel">
           <h2>Controls</h2>
           <div class="control-stack">
@@ -1014,6 +1022,11 @@ const phase2DemoControlRoomPanels = document.querySelector("#phase2-demo-control
 const phase2DemoControlRoomSlice = document.querySelector("#phase2-demo-control-room-slice");
 const phase2DemoControlRoomMutation = document.querySelector("#phase2-demo-control-room-mutation");
 const phase2DemoControlRoomJson = document.querySelector("#phase2-demo-control-room-json");
+const phase2DemoWalkthroughStatus = document.querySelector("#phase2-demo-walkthrough-status");
+const phase2DemoWalkthroughSteps = document.querySelector("#phase2-demo-walkthrough-steps");
+const phase2DemoWalkthroughControlRoom = document.querySelector("#phase2-demo-walkthrough-control-room");
+const phase2DemoWalkthroughMutation = document.querySelector("#phase2-demo-walkthrough-mutation");
+const phase2DemoWalkthroughJson = document.querySelector("#phase2-demo-walkthrough-json");
 const screenWindow = document.querySelector("#screen-window");
 const screenSession = document.querySelector("#screen-session");
 const screenReadiness = document.querySelector("#screen-readiness");
@@ -3850,6 +3863,33 @@ async function refreshPhase2DemoControlRoom() {
   }
 }
 
+async function refreshPhase2DemoWalkthrough() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/phase-2/demo-walkthrough\`);
+    const summary = data.summary ?? {};
+    const governance = data.governance ?? {};
+    phase2DemoWalkthroughStatus.textContent = data.status ?? "unknown";
+    phase2DemoWalkthroughSteps.textContent = \`\${summary.readySteps ?? 0}/\${summary.totalSteps ?? 0}\`;
+    phase2DemoWalkthroughControlRoom.textContent = String(Boolean(summary.controlRoomReady));
+    phase2DemoWalkthroughMutation.textContent = String(Boolean(governance.mutatesHost));
+    phase2DemoWalkthroughJson.textContent = [
+      \`Registry: \${data.registry ?? "unknown"}\`,
+      \`Mode: \${data.mode ?? "unknown"} readOnly=\${Boolean(governance.readOnly)} createsTask=\${Boolean(governance.createsTask)} executesCommand=\${Boolean(governance.executesCommand)} mutatesHost=\${Boolean(governance.mutatesHost)}\`,
+      \`Status: \${data.status ?? "unknown"} ready=\${Boolean(summary.ready)} steps=\${summary.readySteps ?? 0}/\${summary.totalSteps ?? 0}\`,
+      \`Evidence: controlRoomReady=\${Boolean(summary.controlRoomReady)} bodyGovernanceReady=\${Boolean(summary.bodyGovernanceReady)} repairDemoReady=\${Boolean(summary.repairDemoReady)}\`,
+      \`Steps: \${(data.steps ?? []).map((step) => \`\${step.id}=\${step.status}\`).join(", ")}\`,
+      \`Script: \${(data.script ?? []).join(" | ")}\`,
+      \`Next: \${data.next?.recommendedSlice ?? "demo readiness exit"}\`,
+    ].join("\\n");
+  } catch {
+    phase2DemoWalkthroughStatus.textContent = "offline";
+    phase2DemoWalkthroughSteps.textContent = "0/0";
+    phase2DemoWalkthroughControlRoom.textContent = "false";
+    phase2DemoWalkthroughMutation.textContent = "false";
+    phase2DemoWalkthroughJson.textContent = "Unable to read Phase 2 demo walkthrough.";
+  }
+}
+
 async function refreshRuntime() {
   try {
     const data = await fetchJson(\`\${observerConfig.coreUrl}/state/runtime\`);
@@ -5753,6 +5793,7 @@ await refreshHealth();
 await refreshMvpRoute();
 await refreshPhase2RepairDemoStatus();
 await refreshPhase2DemoControlRoom();
+await refreshPhase2DemoWalkthrough();
 await refreshRuntime();
 await refreshTaskList();
 await refreshTaskHistoryDetail();
@@ -5822,6 +5863,7 @@ setInterval(refreshHealth, 5000);
 setInterval(refreshMvpRoute, 5000);
 setInterval(refreshPhase2RepairDemoStatus, 5000);
 setInterval(refreshPhase2DemoControlRoom, 5000);
+setInterval(refreshPhase2DemoWalkthrough, 5000);
 setInterval(refreshRuntime, 5000);
 setInterval(refreshTaskList, 5000);
 setInterval(refreshTaskHistoryDetail, 5000);

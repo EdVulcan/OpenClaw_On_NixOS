@@ -9995,6 +9995,92 @@ async function buildPhase2DemoControlRoom() {
   };
 }
 
+async function buildPhase2DemoWalkthrough() {
+  const controlRoom = await buildPhase2DemoControlRoom();
+  const ready = controlRoom.summary?.ready === true;
+  const steps = [
+    {
+      id: "open-observer",
+      title: "Open the Observer UI",
+      operatorAction: "Navigate to the Observer UI and confirm the control room panel is visible.",
+      expectedEvidence: "phase2-demo-control-room-panel",
+      status: ready ? "ready" : "waiting",
+    },
+    {
+      id: "explain-route",
+      title: "Explain the whitepaper route",
+      operatorAction: "Show MVP route, Phase 2 route review, and the selected Track B demo-control-room slice.",
+      expectedEvidence: controlRoom.evidence?.routeReview?.selectedSlice ?? "openclaw-phase-2-demo-control-room",
+      status: controlRoom.summary?.selectedSlice === "openclaw-phase-2-demo-control-room" ? "ready" : "waiting",
+    },
+    {
+      id: "show-body-governance",
+      title: "Show body governance readiness",
+      operatorAction: "Point to dependency, trend, recovery policy, and readiness panels as the body reasoning foundation.",
+      expectedEvidence: "openclaw-body-governance-readiness-v0",
+      status: controlRoom.summary?.bodyGovernanceReady ? "ready" : "waiting",
+    },
+    {
+      id: "show-repair-demo",
+      title: "Show repair demo status",
+      operatorAction: "Show whether real repair evidence is ready or still waiting; do not run hidden repair actions.",
+      expectedEvidence: controlRoom.evidence?.repairDemo?.targetUnit ?? "openclaw-browser-runtime.service",
+      status: controlRoom.evidence?.repairDemo?.status ? "ready" : "waiting",
+    },
+    {
+      id: "state-boundary",
+      title: "State the boundary",
+      operatorAction: "Say explicitly that this walkthrough creates no task, approval, command, host mutation, scheduler, or recovery action.",
+      expectedEvidence: "read_only_demo_walkthrough",
+      status: "ready",
+    },
+  ];
+  const readySteps = steps.filter((step) => step.status === "ready").length;
+
+  return {
+    ok: true,
+    registry: "openclaw-phase-2-demo-walkthrough-v0",
+    mode: "read_only_human_demo_walkthrough",
+    generatedAt: new Date().toISOString(),
+    status: readySteps === steps.length ? "walkthrough_ready" : "walkthrough_waiting_for_evidence",
+    source: {
+      service: "openclaw-core",
+      demoControlRoomRegistry: controlRoom.registry,
+      evidence: "phase_2_human_demo_walkthrough",
+    },
+    governance: {
+      readOnly: true,
+      createsTask: false,
+      createsApproval: false,
+      executesCommand: false,
+      mutatesHost: false,
+      triggersRecovery: false,
+      schedulesWork: false,
+    },
+    summary: {
+      ready: readySteps === steps.length,
+      readySteps,
+      totalSteps: steps.length,
+      selectedSlice: controlRoom.summary?.selectedSlice ?? "unknown",
+      controlRoomReady: ready,
+      repairDemoReady: controlRoom.summary?.repairDemoReady === true,
+      bodyGovernanceReady: controlRoom.summary?.bodyGovernanceReady === true,
+    },
+    steps,
+    script: [
+      "OpenClaw is now demonstrating a resident body loop, not a plugin/runtime adapter loop.",
+      "Track A proved a narrow operator-reviewed repair path.",
+      "Track C proved body governance evidence and route-aware recovery judgment.",
+      "Track B now packages those signals into an operator-visible demo surface.",
+      "No hidden mutation happens during this walkthrough.",
+    ],
+    next: {
+      recommendedSlice: "openclaw-phase-2-demo-readiness-exit",
+      boundary: "close the Track B demo block after the walkthrough is visible and read-only",
+    },
+  };
+}
+
 function baseCapabilities() {
   return [
     {
@@ -13778,6 +13864,11 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === "GET" && requestUrl.pathname === "/phase-2/demo-control-room") {
     sendJson(res, 200, await buildPhase2DemoControlRoom());
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/phase-2/demo-walkthrough") {
+    sendJson(res, 200, await buildPhase2DemoWalkthrough());
     return;
   }
 

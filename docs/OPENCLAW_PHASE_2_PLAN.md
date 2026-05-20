@@ -266,6 +266,17 @@ This checkpoint is allowed because it improves the human demo path without broad
 - Creates no task, no approval, no command execution, no host mutation, no scheduler, and no recovery action.
 - Must not add automatic repair, background maintenance, persistence hardening, denial recovery, duplicate-click handling, plugin/runtime adapter work, or arbitrary host control.
 
+Phase 2 demo walkthrough checkpoint:
+
+After the demo control room passes, `openclaw-phase-2-demo-walkthrough` may expose a human-readable walkthrough script for the operator demo.
+
+This checkpoint is allowed because it turns the control room into an explainable whitepaper-aligned demo without adding new capability:
+
+- Reads demo control room evidence only.
+- Exposes ordered demo steps, expected evidence, speaking script, and explicit no-mutation boundary.
+- Creates no task, no approval, no command execution, no host mutation, no scheduler, and no recovery action.
+- Must not add automatic repair, background maintenance, persistence hardening, denial recovery, duplicate-click handling, plugin/runtime adapter work, or arbitrary host control.
+
 ## Phase 2 Gate
 
 Before implementing any Phase 2 feature, confirm:
