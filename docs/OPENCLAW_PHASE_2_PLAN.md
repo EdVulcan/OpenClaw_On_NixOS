@@ -331,6 +331,17 @@ This checkpoint is allowed because the ledger schema and write gates are visible
 - Creates no task, no approval, no command execution, no host mutation, no scheduler, no durable storage write, and no recovery action.
 - Must not add append-only ledger writes, durable event storage, background persistence, automatic repair, denial recovery, duplicate-click handling, plugin/runtime adapter work, arbitrary host control, or broader mutation.
 
+Body evidence ledger storage root plan checkpoint:
+
+After the ledger route review selects implementation preparation, `openclaw-body-evidence-ledger-storage-root-plan` may propose the operator-visible storage root for future ledger records.
+
+This checkpoint is allowed because durable body memory needs a visible home before any directory creation or append:
+
+- Reads body evidence ledger route review only.
+- Exposes candidate roots, selected display path, path policy, pre-write checks, and next route-review boundary.
+- Creates no directory, no task, no approval, no command execution, no host mutation, no scheduler, no durable storage write, and no recovery action.
+- Must not add append-only ledger writes, durable event storage, background persistence, automatic repair, denial recovery, duplicate-click handling, plugin/runtime adapter work, arbitrary host control, or broader mutation.
+
 Body evidence timeline checkpoint:
 
 After the next capability route review selects Track C, `openclaw-body-evidence-timeline` may expose a read-only chronological memory spine for OpenClaw body evidence.

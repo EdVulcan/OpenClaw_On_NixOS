@@ -932,6 +932,14 @@ function observerHtml() {
           <div class="metric"><span>Mutation</span><span id="body-evidence-ledger-route-review-mutation">false</span></div>
           <pre id="body-evidence-ledger-route-review-json">Loading body evidence ledger route review...</pre>
         </section>
+        <section class="panel" id="body-evidence-ledger-storage-root-plan-panel">
+          <h2>Body Evidence Ledger Storage Root Plan</h2>
+          <div class="metric"><span>Plan Ready</span><span id="body-evidence-ledger-storage-root-plan-ready">false</span></div>
+          <div class="metric"><span>Selected Root</span><span id="body-evidence-ledger-storage-root-plan-root">loading</span></div>
+          <div class="metric"><span>Directory Created</span><span id="body-evidence-ledger-storage-root-plan-created">false</span></div>
+          <div class="metric"><span>Storage Written</span><span id="body-evidence-ledger-storage-root-plan-written">false</span></div>
+          <pre id="body-evidence-ledger-storage-root-plan-json">Loading body evidence ledger storage root plan...</pre>
+        </section>
         <section class="panel" id="phase-2-route-review">
           <h2>Phase 2 Route Review</h2>
           <div class="metric"><span>Selected Track</span><span id="phase-2-route-selected-track">loading</span></div>
@@ -1201,6 +1209,11 @@ const bodyEvidenceLedgerRouteReviewNext = document.querySelector("#body-evidence
 const bodyEvidenceLedgerRouteReviewWrite = document.querySelector("#body-evidence-ledger-route-review-write");
 const bodyEvidenceLedgerRouteReviewMutation = document.querySelector("#body-evidence-ledger-route-review-mutation");
 const bodyEvidenceLedgerRouteReviewJson = document.querySelector("#body-evidence-ledger-route-review-json");
+const bodyEvidenceLedgerStorageRootPlanReady = document.querySelector("#body-evidence-ledger-storage-root-plan-ready");
+const bodyEvidenceLedgerStorageRootPlanRoot = document.querySelector("#body-evidence-ledger-storage-root-plan-root");
+const bodyEvidenceLedgerStorageRootPlanCreated = document.querySelector("#body-evidence-ledger-storage-root-plan-created");
+const bodyEvidenceLedgerStorageRootPlanWritten = document.querySelector("#body-evidence-ledger-storage-root-plan-written");
+const bodyEvidenceLedgerStorageRootPlanJson = document.querySelector("#body-evidence-ledger-storage-root-plan-json");
 const phase2RouteSelectedTrack = document.querySelector("#phase-2-route-selected-track");
 const phase2RouteNextSlice = document.querySelector("#phase-2-route-next-slice");
 const phase2RouteCreatesTask = document.querySelector("#phase-2-route-creates-task");
@@ -4603,6 +4616,37 @@ async function refreshBodyEvidenceLedgerRouteReview() {
   }
 }
 
+async function refreshBodyEvidenceLedgerStorageRootPlan() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.systemSenseUrl}/system/route/body-evidence-ledger-storage-root-plan\`);
+    const summary = data.summary ?? {};
+    const governance = data.governance ?? {};
+    const plan = data.plan ?? {};
+    const selectedRoot = plan.selectedRoot ?? {};
+    const candidateRoots = Array.isArray(plan.candidateRoots) ? plan.candidateRoots : [];
+    bodyEvidenceLedgerStorageRootPlanReady.textContent = String(Boolean(summary.planReady));
+    bodyEvidenceLedgerStorageRootPlanRoot.textContent = summary.selectedDisplayPath ?? selectedRoot.displayPath ?? "unknown";
+    bodyEvidenceLedgerStorageRootPlanCreated.textContent = String(Boolean(summary.directoryCreated));
+    bodyEvidenceLedgerStorageRootPlanWritten.textContent = String(Boolean(summary.durableStorageWritten));
+    bodyEvidenceLedgerStorageRootPlanJson.textContent = [
+      \`Registry: \${data.registry ?? "unknown"}\`,
+      \`Mode: \${data.mode ?? "unknown"} planReady=\${Boolean(summary.planReady)} routeReviewReady=\${Boolean(summary.routeReviewReady)} directoryCreated=\${Boolean(summary.directoryCreated)} durableStorageWritten=\${Boolean(summary.durableStorageWritten)}\`,
+      \`Governance: canCreateDirectory=\${Boolean(governance.canCreateDirectory)} canWriteLedger=\${Boolean(governance.canWriteLedger)} createsTask=\${Boolean(governance.createsTask)} executesCommand=\${Boolean(governance.executesCommand)} mutation=\${Boolean(governance.hostMutation)} storageWritten=\${Boolean(governance.durableStorageWritten)}\`,
+      \`Selected: \${selectedRoot.id ?? "unknown"} path=\${selectedRoot.displayPath ?? "unknown"} policy=\${selectedRoot.rootPolicy ?? "unknown"}\`,
+      \`Candidates: \${candidateRoots.map((root) => \`\${root.id}:\${root.displayPath}:recommended=\${Boolean(root.recommended)}:createsNow=\${Boolean(root.createsDirectoryNow)}:writesNow=\${Boolean(root.writesRecordsNow)}\`).join(", ")}\`,
+      \`Path Policy: workspace=\${Boolean(plan.pathPolicy?.mustStayInsideWorkspace)} observerVisible=\${Boolean(plan.pathPolicy?.mustBeObserverVisible)} noCreate=\${Boolean(plan.pathPolicy?.mustNotCreateDirectoryInThisSlice)}\`,
+      \`Pre-write Checks: \${(plan.preWriteChecks ?? []).join(" | ")}\`,
+      \`Next: \${data.next?.recommendedSlice ?? "openclaw-body-evidence-ledger-storage-root-route-review"} boundary=\${data.next?.boundary ?? "route review before directory creation"}\`,
+    ].join("\\n");
+  } catch {
+    bodyEvidenceLedgerStorageRootPlanReady.textContent = "false";
+    bodyEvidenceLedgerStorageRootPlanRoot.textContent = "offline";
+    bodyEvidenceLedgerStorageRootPlanCreated.textContent = "false";
+    bodyEvidenceLedgerStorageRootPlanWritten.textContent = "false";
+    bodyEvidenceLedgerStorageRootPlanJson.textContent = "Unable to read body evidence ledger storage root plan.";
+  }
+}
+
 async function refreshPhase2RouteReview() {
   try {
     const data = await fetchJson(\`\${observerConfig.systemSenseUrl}/system/route/phase-2-review\`);
@@ -6432,6 +6476,7 @@ await refreshBodyEvidenceTimeline();
 await refreshBodyEvidenceTimelineReadiness();
 await refreshBodyEvidenceLedgerPlan();
 await refreshBodyEvidenceLedgerRouteReview();
+await refreshBodyEvidenceLedgerStorageRootPlan();
 await refreshPhase2RouteReview();
 await refreshSystemdRepairCandidates();
 await refreshSystemdRepairCandidatePlan();
@@ -6515,6 +6560,7 @@ setInterval(refreshBodyEvidenceTimeline, 5000);
 setInterval(refreshBodyEvidenceTimelineReadiness, 5000);
 setInterval(refreshBodyEvidenceLedgerPlan, 5000);
 setInterval(refreshBodyEvidenceLedgerRouteReview, 5000);
+setInterval(refreshBodyEvidenceLedgerStorageRootPlan, 5000);
 setInterval(refreshPhase2RouteReview, 5000);
 setInterval(refreshSystemdRepairCandidates, 5000);
 setInterval(refreshSystemdRepairCandidatePlan, 5000);

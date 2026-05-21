@@ -41,6 +41,7 @@ const BODY_EVIDENCE_TIMELINE_REGISTRY = "openclaw-body-evidence-timeline-v0";
 const BODY_EVIDENCE_TIMELINE_READINESS_REGISTRY = "openclaw-body-evidence-timeline-readiness-v0";
 const BODY_EVIDENCE_LEDGER_PLAN_REGISTRY = "openclaw-body-evidence-ledger-plan-v0";
 const BODY_EVIDENCE_LEDGER_ROUTE_REVIEW_REGISTRY = "openclaw-body-evidence-ledger-route-review-v0";
+const BODY_EVIDENCE_LEDGER_STORAGE_ROOT_PLAN_REGISTRY = "openclaw-body-evidence-ledger-storage-root-plan-v0";
 const PHASE_2_ROUTE_REVIEW_REGISTRY = "openclaw-phase-2-route-review-v0";
 const SYSTEMD_REPAIR_CANDIDATE_ASSESSMENT_REGISTRY = "openclaw-systemd-repair-candidate-assessment-v0";
 const SYSTEMD_REPAIR_CANDIDATE_PLAN_REGISTRY = "openclaw-systemd-repair-candidate-plan-v0";
@@ -2850,6 +2851,96 @@ async function buildBodyEvidenceLedgerRouteReview() {
   };
 }
 
+async function buildBodyEvidenceLedgerStorageRootPlan() {
+  const routeReview = await buildBodyEvidenceLedgerRouteReview();
+  const routeReady = routeReview.decision?.selectedSlice === "openclaw-body-evidence-ledger-storage-root-plan"
+    && routeReview.decision?.status === "selected";
+  const candidateRoots = [
+    {
+      id: "repo-artifacts-body-evidence-ledger",
+      label: "Repository artifact ledger root",
+      displayPath: ".artifacts/openclaw-body-evidence-ledger",
+      rootPolicy: "inside_openclaw_workspace",
+      recommended: true,
+      createsDirectoryNow: false,
+      writesRecordsNow: false,
+      operatorVisible: true,
+      reason: "Keeps early ledger evidence local to the OpenClaw workspace and visible to milestone artifacts.",
+    },
+    {
+      id: "user-configured-body-ledger-root",
+      label: "Operator configured body ledger root",
+      displayPath: "\${OPENCLAW_BODY_EVIDENCE_LEDGER_DIR}",
+      rootPolicy: "explicit_operator_configuration_required",
+      recommended: false,
+      createsDirectoryNow: false,
+      writesRecordsNow: false,
+      operatorVisible: true,
+      reason: "Useful later, but an implicit environment root would be less demoable than the repo artifact path.",
+    },
+  ];
+  const selectedRoot = candidateRoots.find((candidate) => candidate.recommended === true) ?? candidateRoots[0];
+
+  return {
+    ok: true,
+    registry: BODY_EVIDENCE_LEDGER_STORAGE_ROOT_PLAN_REGISTRY,
+    mode: "plan_only_body_evidence_ledger_storage_root",
+    generatedAt: new Date().toISOString(),
+    source: {
+      service: "openclaw-system-sense",
+      ledgerRouteReviewRegistry: routeReview.registry,
+      phase2Plan: "docs/OPENCLAW_PHASE_2_PLAN.md",
+      evidence: "body_evidence_ledger_storage_root_plan",
+    },
+    governance: {
+      domain: "body_internal",
+      risk: "low",
+      autonomy: "plan_only",
+      approvalRequired: false,
+      hostMutation: false,
+      canMutate: false,
+      canCreateDirectory: false,
+      canWriteLedger: false,
+      durableStorageWritten: false,
+      createsTask: false,
+      createsApproval: false,
+      executesCommand: false,
+      triggersRecovery: false,
+      schedulesFollowUp: false,
+    },
+    summary: {
+      planReady: routeReady,
+      routeReviewReady: routeReady,
+      selectedRootId: selectedRoot?.id ?? null,
+      selectedDisplayPath: selectedRoot?.displayPath ?? null,
+      candidateRootCount: candidateRoots.length,
+      directoryCreated: false,
+      durableStorageWritten: false,
+      hiddenMutation: false,
+    },
+    plan: {
+      intent: "body.evidence.ledger.storage_root.plan",
+      selectedRoot,
+      candidateRoots,
+      pathPolicy: {
+        mustStayInsideWorkspace: true,
+        mustBeObserverVisible: true,
+        mustNotUseHomeDirectoryByDefault: true,
+        mustNotCreateDirectoryInThisSlice: true,
+      },
+      preWriteChecks: [
+        "show resolved ledger root in Observer before any directory creation",
+        "prove the root is inside the OpenClaw workspace or an explicit operator-configured path",
+        "keep directory creation and first append in separate route-reviewed milestones",
+      ],
+    },
+    next: {
+      recommendedSlice: "openclaw-body-evidence-ledger-storage-root-route-review",
+      boundary: "review storage-root materialization before creating directories or writing ledger records",
+    },
+  };
+}
+
 function classifySystemdRepairRisk(unit) {
   if (unit.name === "openclaw-event-hub" || unit.name === "openclaw-core") {
     return "high";
@@ -3123,6 +3214,12 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "GET" && requestUrl.pathname === "/system/route/body-evidence-ledger-route-review") {
     const review = await buildBodyEvidenceLedgerRouteReview();
     sendJson(res, 200, review);
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/system/route/body-evidence-ledger-storage-root-plan") {
+    const plan = await buildBodyEvidenceLedgerStorageRootPlan();
+    sendJson(res, 200, plan);
     return;
   }
 
