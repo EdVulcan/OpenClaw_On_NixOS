@@ -39,6 +39,7 @@ const CONSERVATIVE_RECOVERY_POLICY_REGISTRY = "openclaw-conservative-recovery-po
 const BODY_GOVERNANCE_READINESS_REGISTRY = "openclaw-body-governance-readiness-v0";
 const BODY_EVIDENCE_TIMELINE_REGISTRY = "openclaw-body-evidence-timeline-v0";
 const BODY_EVIDENCE_TIMELINE_READINESS_REGISTRY = "openclaw-body-evidence-timeline-readiness-v0";
+const BODY_EVIDENCE_LEDGER_PLAN_REGISTRY = "openclaw-body-evidence-ledger-plan-v0";
 const PHASE_2_ROUTE_REVIEW_REGISTRY = "openclaw-phase-2-route-review-v0";
 const SYSTEMD_REPAIR_CANDIDATE_ASSESSMENT_REGISTRY = "openclaw-systemd-repair-candidate-assessment-v0";
 const SYSTEMD_REPAIR_CANDIDATE_PLAN_REGISTRY = "openclaw-systemd-repair-candidate-plan-v0";
@@ -2636,6 +2637,118 @@ async function buildBodyEvidenceTimelineReadiness() {
   };
 }
 
+async function buildBodyEvidenceLedgerPlan() {
+  const readiness = await buildBodyEvidenceTimelineReadiness();
+  const timelineReady = readiness.summary?.ready === true;
+  const plannedRecordSchema = {
+    version: "body-evidence-ledger-record-v0",
+    requiredFields: [
+      "id",
+      "recordedAt",
+      "sourceRegistry",
+      "sourceEndpoint",
+      "phase",
+      "evidenceType",
+      "summary",
+      "contentHash",
+      "governance",
+    ],
+    governanceFields: [
+      "hostMutation",
+      "executesCommand",
+      "createsTask",
+      "createsApproval",
+      "triggersRecovery",
+    ],
+    contentPolicy: "store summaries, registries, hashes, and source pointers first; raw payload archival requires separate route review",
+  };
+  const writeGates = [
+    {
+      id: "route-review-required",
+      label: "Durable ledger implementation requires a separate whitepaper route review",
+      passed: false,
+      requiredBeforeWrite: true,
+    },
+    {
+      id: "workspace-root-selection",
+      label: "Ledger storage root must be explicitly selected and shown in Observer",
+      passed: false,
+      requiredBeforeWrite: true,
+    },
+    {
+      id: "append-only-format",
+      label: "Ledger must be append-only with content hashes and no background scheduler",
+      passed: false,
+      requiredBeforeWrite: true,
+    },
+    {
+      id: "operator-visible-export",
+      label: "Observer must show ledger path, latest record, and export boundary before writes",
+      passed: false,
+      requiredBeforeWrite: true,
+    },
+  ];
+
+  return {
+    ok: true,
+    registry: BODY_EVIDENCE_LEDGER_PLAN_REGISTRY,
+    mode: "plan_only_body_evidence_ledger",
+    generatedAt: new Date().toISOString(),
+    source: {
+      service: "openclaw-system-sense",
+      timelineReadinessRegistry: readiness.registry,
+      evidence: "body_evidence_ledger_plan",
+    },
+    governance: {
+      domain: "body_internal",
+      risk: "medium",
+      autonomy: "plan_only",
+      approvalRequired: false,
+      hostMutation: false,
+      canMutate: false,
+      canWriteLedger: false,
+      canRestart: false,
+      createsTask: false,
+      createsApproval: false,
+      executesCommand: false,
+      triggersRecovery: false,
+      schedulesFollowUp: false,
+      durableStorageWritten: false,
+    },
+    summary: {
+      planReady: timelineReady,
+      timelineReady,
+      plannedSchema: plannedRecordSchema.version,
+      writeGateCount: writeGates.length,
+      requiredBeforeWrite: writeGates.filter((gate) => gate.requiredBeforeWrite).length,
+      durableStorageWritten: false,
+      hiddenMutation: false,
+    },
+    plan: {
+      intent: "body.evidence.ledger.plan",
+      storageMode: "append_only_jsonl_candidate",
+      implementationStatus: "not_implemented_plan_only",
+      plannedRecordSchema,
+      retentionPlan: {
+        defaultWindow: "operator-selected; no default pruning policy yet",
+        compaction: "future route-reviewed summary snapshots only",
+        rawPayloadArchival: "deferred",
+      },
+      writeGates,
+      verificationPlan: [
+        "prove ledger path is inside an approved OpenClaw body evidence root",
+        "append one synthetic ledger record in a future implementation milestone",
+        "verify record hash, schema version, source registry, and Observer visibility",
+        "prove no scheduler, no task creation, no command execution, and no host mutation beyond the approved ledger append",
+      ],
+    },
+    next: {
+      recommendedSlice: "openclaw-body-evidence-ledger-route-review",
+      boundary: "review the ledger implementation route before writing durable records or adding scheduling",
+    },
+  };
+}
+
 function classifySystemdRepairRisk(unit) {
   if (unit.name === "openclaw-event-hub" || unit.name === "openclaw-core") {
     return "high";
@@ -2897,6 +3010,12 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "GET" && requestUrl.pathname === "/system/route/body-evidence-timeline-readiness") {
     const readiness = await buildBodyEvidenceTimelineReadiness();
     sendJson(res, 200, readiness);
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/system/route/body-evidence-ledger-plan") {
+    const plan = await buildBodyEvidenceLedgerPlan();
+    sendJson(res, 200, plan);
     return;
   }
 

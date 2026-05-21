@@ -916,6 +916,14 @@ function observerHtml() {
           <div class="metric"><span>Mutation</span><span id="body-evidence-timeline-readiness-mutation">false</span></div>
           <pre id="body-evidence-timeline-readiness-json">Loading body evidence timeline readiness...</pre>
         </section>
+        <section class="panel" id="body-evidence-ledger-plan-panel">
+          <h2>Body Evidence Ledger Plan</h2>
+          <div class="metric"><span>Plan Ready</span><span id="body-evidence-ledger-plan-ready">false</span></div>
+          <div class="metric"><span>Schema</span><span id="body-evidence-ledger-plan-schema">loading</span></div>
+          <div class="metric"><span>Write Gates</span><span id="body-evidence-ledger-plan-gates">0</span></div>
+          <div class="metric"><span>Storage Written</span><span id="body-evidence-ledger-plan-written">false</span></div>
+          <pre id="body-evidence-ledger-plan-json">Loading body evidence ledger plan...</pre>
+        </section>
         <section class="panel" id="phase-2-route-review">
           <h2>Phase 2 Route Review</h2>
           <div class="metric"><span>Selected Track</span><span id="phase-2-route-selected-track">loading</span></div>
@@ -1175,6 +1183,11 @@ const bodyEvidenceTimelineReadinessChecks = document.querySelector("#body-eviden
 const bodyEvidenceTimelineReadinessLatest = document.querySelector("#body-evidence-timeline-readiness-latest");
 const bodyEvidenceTimelineReadinessMutation = document.querySelector("#body-evidence-timeline-readiness-mutation");
 const bodyEvidenceTimelineReadinessJson = document.querySelector("#body-evidence-timeline-readiness-json");
+const bodyEvidenceLedgerPlanReady = document.querySelector("#body-evidence-ledger-plan-ready");
+const bodyEvidenceLedgerPlanSchema = document.querySelector("#body-evidence-ledger-plan-schema");
+const bodyEvidenceLedgerPlanGates = document.querySelector("#body-evidence-ledger-plan-gates");
+const bodyEvidenceLedgerPlanWritten = document.querySelector("#body-evidence-ledger-plan-written");
+const bodyEvidenceLedgerPlanJson = document.querySelector("#body-evidence-ledger-plan-json");
 const phase2RouteSelectedTrack = document.querySelector("#phase-2-route-selected-track");
 const phase2RouteNextSlice = document.querySelector("#phase-2-route-next-slice");
 const phase2RouteCreatesTask = document.querySelector("#phase-2-route-creates-task");
@@ -4515,6 +4528,38 @@ async function refreshBodyEvidenceTimelineReadiness() {
   }
 }
 
+async function refreshBodyEvidenceLedgerPlan() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.systemSenseUrl}/system/route/body-evidence-ledger-plan\`);
+    const summary = data.summary ?? {};
+    const governance = data.governance ?? {};
+    const plan = data.plan ?? {};
+    const schema = plan.plannedRecordSchema ?? {};
+    const gates = Array.isArray(plan.writeGates) ? plan.writeGates : [];
+    bodyEvidenceLedgerPlanReady.textContent = String(Boolean(summary.planReady));
+    bodyEvidenceLedgerPlanSchema.textContent = summary.plannedSchema ?? schema.version ?? "unknown";
+    bodyEvidenceLedgerPlanGates.textContent = String(summary.writeGateCount ?? gates.length);
+    bodyEvidenceLedgerPlanWritten.textContent = String(Boolean(summary.durableStorageWritten));
+    bodyEvidenceLedgerPlanJson.textContent = [
+      \`Registry: \${data.registry ?? "unknown"}\`,
+      \`Mode: \${data.mode ?? "unknown"} planReady=\${Boolean(summary.planReady)} timelineReady=\${Boolean(summary.timelineReady)} durableStorageWritten=\${Boolean(summary.durableStorageWritten)}\`,
+      \`Governance: canWriteLedger=\${Boolean(governance.canWriteLedger)} createsTask=\${Boolean(governance.createsTask)} createsApproval=\${Boolean(governance.createsApproval)} executesCommand=\${Boolean(governance.executesCommand)} mutation=\${Boolean(governance.hostMutation)} storageWritten=\${Boolean(governance.durableStorageWritten)}\`,
+      \`Schema: \${schema.version ?? "unknown"} required=\${(schema.requiredFields ?? []).join(",")}\`,
+      \`Content: \${schema.contentPolicy ?? "unknown"}\`,
+      \`Storage: \${plan.storageMode ?? "unknown"} status=\${plan.implementationStatus ?? "unknown"}\`,
+      \`Write Gates: \${gates.map((gate) => \`\${gate.id}:required=\${Boolean(gate.requiredBeforeWrite)} passed=\${Boolean(gate.passed)}\`).join(", ")}\`,
+      \`Verification: \${(plan.verificationPlan ?? []).join(" | ")}\`,
+      \`Next: \${data.next?.recommendedSlice ?? "openclaw-body-evidence-ledger-route-review"} boundary=\${data.next?.boundary ?? "route review before writes"}\`,
+    ].join("\\n");
+  } catch {
+    bodyEvidenceLedgerPlanReady.textContent = "false";
+    bodyEvidenceLedgerPlanSchema.textContent = "offline";
+    bodyEvidenceLedgerPlanGates.textContent = "0";
+    bodyEvidenceLedgerPlanWritten.textContent = "false";
+    bodyEvidenceLedgerPlanJson.textContent = "Unable to read body evidence ledger plan.";
+  }
+}
+
 async function refreshPhase2RouteReview() {
   try {
     const data = await fetchJson(\`\${observerConfig.systemSenseUrl}/system/route/phase-2-review\`);
@@ -6342,6 +6387,7 @@ await refreshConservativeRecoveryPolicy();
 await refreshBodyGovernanceReadiness();
 await refreshBodyEvidenceTimeline();
 await refreshBodyEvidenceTimelineReadiness();
+await refreshBodyEvidenceLedgerPlan();
 await refreshPhase2RouteReview();
 await refreshSystemdRepairCandidates();
 await refreshSystemdRepairCandidatePlan();
@@ -6423,6 +6469,7 @@ setInterval(refreshConservativeRecoveryPolicy, 5000);
 setInterval(refreshBodyGovernanceReadiness, 5000);
 setInterval(refreshBodyEvidenceTimeline, 5000);
 setInterval(refreshBodyEvidenceTimelineReadiness, 5000);
+setInterval(refreshBodyEvidenceLedgerPlan, 5000);
 setInterval(refreshPhase2RouteReview, 5000);
 setInterval(refreshSystemdRepairCandidates, 5000);
 setInterval(refreshSystemdRepairCandidatePlan, 5000);
