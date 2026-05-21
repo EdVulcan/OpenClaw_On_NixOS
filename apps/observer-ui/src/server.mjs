@@ -4073,7 +4073,7 @@ async function refreshPhase2NextCapabilityRoute() {
     const decision = data.decision ?? {};
     const governance = data.governance ?? {};
     const evidence = data.evidence ?? {};
-    const nextSlice = data.next?.recommendedSlice ?? "openclaw-body-evidence-timeline";
+    const nextSlice = data.next?.recommendedSlice ?? "openclaw-body-evidence-ledger-plan";
     phase2NextCapabilityTrack.textContent = decision.selectedTrack ?? "unknown";
     phase2NextCapabilitySlice.textContent = decision.selectedSlice ?? nextSlice;
     phase2NextCapabilityCreatesTask.textContent = String(Boolean(governance.createsTask));
