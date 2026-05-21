@@ -78,7 +78,6 @@ const requiredClient = [
   "bodyEvidenceLedgerFirstRecordPlanWritten",
   "bodyEvidenceLedgerFirstRecordPlanJson",
   "openclaw-body-evidence-ledger-first-record-route-review",
-  "body_evidence_ledger_bootstrap",
 ];
 
 for (const token of requiredHtml) {
@@ -96,6 +95,7 @@ if (!plan.ok || plan.registry !== "openclaw-body-evidence-ledger-first-record-pl
 }
 if (plan.summary?.planReady !== true
   || plan.summary?.directoryExists !== true
+  || plan.summary?.plannedRecordType !== "body_evidence_ledger_bootstrap"
   || plan.summary?.durableStorageWritten !== false) {
   throw new Error(`Observer first record plan summary should be ready without writes: ${JSON.stringify(plan.summary)}`);
 }
