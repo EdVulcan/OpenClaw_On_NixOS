@@ -42,6 +42,7 @@ const SYSTEMD_REPAIR_CANDIDATE_ASSESSMENT_REGISTRY = "openclaw-systemd-repair-ca
 const SYSTEMD_REPAIR_CANDIDATE_PLAN_REGISTRY = "openclaw-systemd-repair-candidate-plan-v0";
 const SYSTEMD_REPAIR_CANDIDATE_TASK_ROUTE_REGISTRY = "openclaw-systemd-repair-candidate-task-route-v0";
 const SYSTEMD_REPAIR_CANDIDATE_READINESS_REGISTRY = "openclaw-systemd-repair-candidate-readiness-v0";
+const SYSTEMD_REPAIR_CANDIDATE_ROUTE_REVIEW_REGISTRY = "openclaw-systemd-repair-candidate-route-review-v0";
 const SYSTEMD_REPAIR_PLAN_REGISTRY = "openclaw-systemd-repair-plan-v0";
 const SYSTEMD_REPAIR_DRY_RUN_REGISTRY = "openclaw-systemd-repair-dry-run-v0";
 const MAX_HEALTH_TREND_SNAPSHOTS = 24;
@@ -2140,6 +2141,113 @@ async function buildSystemdRepairCandidateReadiness() {
   };
 }
 
+async function buildSystemdRepairCandidateRouteReview() {
+  const readiness = await buildSystemdRepairCandidateReadiness();
+  const ready = readiness.summary?.ready === true;
+  const candidates = [
+    {
+      track: "Track B",
+      id: "candidate-repair-demo-evidence",
+      label: "Read-only candidate repair demo status",
+      score: ready ? 94 : 50,
+      recommended: true,
+      firstSlice: "openclaw-systemd-repair-candidate-demo-status",
+      mutation: false,
+      reason: "The candidate repair route is complete enough to present as operator evidence; summarize it before considering any broader approval or execution step.",
+    },
+    {
+      track: "Track A",
+      id: "candidate-specific-approved-deferred",
+      label: "Candidate-specific approved-but-deferred execution",
+      score: 62,
+      recommended: false,
+      firstSlice: "defer-candidate-approved-deferred",
+      mutation: false,
+      reason: "The existing repair execution path already proved approved-deferred behavior; repeating it for the same browser-runtime candidate would mostly expand approval-boundary coverage.",
+    },
+    {
+      track: "Track A",
+      id: "broader-systemd-repair-mutation",
+      label: "Broader candidate repair execution",
+      score: 40,
+      recommended: false,
+      firstSlice: "defer-broader-candidate-execution",
+      mutation: true,
+      reason: "The selected candidate is still the existing browser-runtime demo target; broader mutation should wait for a fresh body-capability route review and a different concrete need.",
+    },
+    {
+      track: "Deferred Track",
+      id: "plugin-runtime-adapter",
+      label: "Plugin/runtime adapter work",
+      score: 15,
+      recommended: false,
+      firstSlice: "defer-plugin-runtime-adapter",
+      mutation: false,
+      reason: "Plugin/runtime adapter work is still not needed for this body repair candidate demonstration.",
+    },
+  ];
+
+  return {
+    ok: true,
+    registry: SYSTEMD_REPAIR_CANDIDATE_ROUTE_REVIEW_REGISTRY,
+    mode: "read_only_candidate_route_selection",
+    generatedAt: new Date().toISOString(),
+    source: {
+      service: "openclaw-system-sense",
+      candidateReadinessRegistry: readiness.registry,
+      phase2Plan: "docs/OPENCLAW_PHASE_2_PLAN.md",
+      evidence: "systemd_repair_candidate_route_review",
+    },
+    governance: {
+      domain: "body_internal",
+      risk: "low",
+      autonomy: "route_selection_only",
+      approvalRequired: false,
+      hostMutation: false,
+      canMutate: false,
+      canRestart: false,
+      createsTask: false,
+      createsApproval: false,
+      executesCommand: false,
+      triggersRecovery: false,
+      schedulesFollowUp: false,
+    },
+    decision: {
+      selectedTrack: "Track B: Operator/Observer Demo Experience",
+      selectedSlice: "openclaw-systemd-repair-candidate-demo-status",
+      status: ready ? "selected" : "blocked_until_candidate_readiness",
+      rationale: "Close the candidate repair route as visible operator evidence before adding any new approval/execution branch.",
+      notSelected: [
+        "no candidate-specific approval replay",
+        "no real execution replay for the same browser-runtime target",
+        "no broader systemd mutation",
+        "no automatic repair",
+        "no persistence hardening",
+        "no denial recovery or duplicate-click work",
+        "no plugin/runtime adapter work",
+      ],
+    },
+    evidence: {
+      candidateReady: ready,
+      candidateChecks: `${readiness.summary?.passedChecks ?? 0}/${readiness.summary?.totalChecks ?? 0}`,
+      selectedUnit: readiness.summary?.selectedUnit ?? null,
+      completedBlock: readiness.completedBlock,
+      hardBoundary: readiness.evidence?.hardBoundary ?? [],
+      routePriorityOrder: [
+        "present-completed-candidate-repair-route",
+        "defer-duplicate-approval-boundaries",
+        "defer-broader-host-mutation",
+        "plugin-runtime-adapter-deferred",
+      ],
+    },
+    candidates,
+    next: {
+      recommendedSlice: "openclaw-systemd-repair-candidate-demo-status",
+      boundary: "read-only demo status only; do not approve, execute, restart, recover, schedule, or broaden systemd control",
+    },
+  };
+}
+
 function classifySystemdRepairRisk(unit) {
   if (unit.name === "openclaw-event-hub" || unit.name === "openclaw-core") {
     return "high";
@@ -2451,6 +2559,12 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "GET" && requestUrl.pathname === "/system/systemd/repair-candidate-readiness") {
     const readiness = await buildSystemdRepairCandidateReadiness();
     sendJson(res, 200, readiness);
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/system/systemd/repair-candidate-route-review") {
+    const review = await buildSystemdRepairCandidateRouteReview();
+    sendJson(res, 200, review);
     return;
   }
 

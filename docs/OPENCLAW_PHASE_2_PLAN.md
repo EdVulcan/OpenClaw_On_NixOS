@@ -359,6 +359,22 @@ This checkpoint is allowed because it prevents drift: the candidate block must b
 - Creates no task, no approval, no command execution, no host mutation, no scheduler, and no recovery action.
 - Must not add automatic repair, background maintenance, persistence hardening, denial recovery, duplicate-click handling, plugin/runtime adapter work, or arbitrary host control.
 
+Systemd repair candidate route review checkpoint:
+
+After candidate readiness passes, `openclaw-systemd-repair-candidate-route-review` may decide the next step for the completed candidate repair block.
+
+Decision:
+
+Select Track B, `openclaw-systemd-repair-candidate-demo-status`, as the next slice.
+
+This checkpoint is allowed because the candidate repair route has reached a safe task-shell boundary, and the whitepaper-aligned next gain is to make the completed route understandable to the operator before adding any duplicate approval/execution branch:
+
+- Reads candidate readiness evidence only.
+- Selects a read-only candidate demo status bundle as the next slice.
+- Explains why candidate-specific approval replay, real execution replay for the same browser-runtime target, broader systemd mutation, plugin/runtime adapter work, persistence hardening, denial recovery, and duplicate-click handling are not selected.
+- Creates no task, no approval, no command execution, no host mutation, no scheduler, and no recovery action.
+- Must not add automatic repair, background maintenance, persistence hardening, denial recovery, duplicate-click handling, plugin/runtime adapter work, or arbitrary host control.
+
 ## Phase 2 Gate
 
 Before implementing any Phase 2 feature, confirm:
