@@ -975,6 +975,17 @@ function observerHtml() {
           <div class="metric"><span>Storage Written</span><span id="body-evidence-ledger-first-record-route-review-written">false</span></div>
           <pre id="body-evidence-ledger-first-record-route-review-json">Loading body evidence ledger first record route review...</pre>
         </section>
+        <section class="panel" id="body-evidence-ledger-first-record-task-panel">
+          <h2>Body Evidence Ledger First Record Task</h2>
+          <div class="metric"><span>Ready</span><span id="body-evidence-ledger-first-record-task-ready">false</span></div>
+          <div class="metric"><span>Record Type</span><span id="body-evidence-ledger-first-record-task-type">loading</span></div>
+          <div class="metric"><span>Approval</span><span id="body-evidence-ledger-first-record-task-approval">pending-after-create</span></div>
+          <div class="metric"><span>Record Appended</span><span id="body-evidence-ledger-first-record-task-appended">false</span></div>
+          <div class="actions tight">
+            <button id="create-body-evidence-ledger-first-record-task-button" class="secondary">Create First Record Task</button>
+          </div>
+          <pre id="body-evidence-ledger-first-record-task-json">Loading approval-gated first record task boundary...</pre>
+        </section>
         <section class="panel" id="phase-2-route-review">
           <h2>Phase 2 Route Review</h2>
           <div class="metric"><span>Selected Track</span><span id="phase-2-route-selected-track">loading</span></div>
@@ -1269,6 +1280,11 @@ const bodyEvidenceLedgerFirstRecordRouteReviewNext = document.querySelector("#bo
 const bodyEvidenceLedgerFirstRecordRouteReviewWrite = document.querySelector("#body-evidence-ledger-first-record-route-review-write");
 const bodyEvidenceLedgerFirstRecordRouteReviewWritten = document.querySelector("#body-evidence-ledger-first-record-route-review-written");
 const bodyEvidenceLedgerFirstRecordRouteReviewJson = document.querySelector("#body-evidence-ledger-first-record-route-review-json");
+const bodyEvidenceLedgerFirstRecordTaskReady = document.querySelector("#body-evidence-ledger-first-record-task-ready");
+const bodyEvidenceLedgerFirstRecordTaskType = document.querySelector("#body-evidence-ledger-first-record-task-type");
+const bodyEvidenceLedgerFirstRecordTaskApproval = document.querySelector("#body-evidence-ledger-first-record-task-approval");
+const bodyEvidenceLedgerFirstRecordTaskAppended = document.querySelector("#body-evidence-ledger-first-record-task-appended");
+const bodyEvidenceLedgerFirstRecordTaskJson = document.querySelector("#body-evidence-ledger-first-record-task-json");
 const phase2RouteSelectedTrack = document.querySelector("#phase-2-route-selected-track");
 const phase2RouteNextSlice = document.querySelector("#phase-2-route-next-slice");
 const phase2RouteCreatesTask = document.querySelector("#phase-2-route-creates-task");
@@ -1372,6 +1388,7 @@ const createSystemdRepairExecutionTaskButton = document.querySelector("#create-s
 const createSystemdRepairRealExecutionTaskButton = document.querySelector("#create-systemd-repair-real-execution-task-button");
 const createSystemdRepairCandidateTaskShellButton = document.querySelector("#create-systemd-repair-candidate-task-shell-button");
 const createBodyEvidenceLedgerDirectoryTaskButton = document.querySelector("#create-body-evidence-ledger-directory-task-button");
+const createBodyEvidenceLedgerFirstRecordTaskButton = document.querySelector("#create-body-evidence-ledger-first-record-task-button");
 const taskPlanStatus = document.querySelector("#task-plan-status");
 const taskPlanCount = document.querySelector("#task-plan-count");
 const taskPlanPlanner = document.querySelector("#task-plan-planner");
@@ -4826,6 +4843,37 @@ async function refreshBodyEvidenceLedgerFirstRecordRouteReview() {
   }
 }
 
+async function refreshBodyEvidenceLedgerFirstRecordTask() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.systemSenseUrl}/system/route/body-evidence-ledger-first-record-route-review\`);
+    const decision = data.decision ?? {};
+    const evidence = data.evidence ?? {};
+    const ready = decision.selectedSlice === "openclaw-body-evidence-ledger-first-record-task"
+      && decision.status === "selected"
+      && evidence.firstRecordPlanReady === true
+      && evidence.directoryExists === true;
+    bodyEvidenceLedgerFirstRecordTaskReady.textContent = String(ready);
+    bodyEvidenceLedgerFirstRecordTaskType.textContent = evidence.plannedRecordType ?? "unknown";
+    bodyEvidenceLedgerFirstRecordTaskApproval.textContent = ready ? "pending-after-create" : "route-blocked";
+    bodyEvidenceLedgerFirstRecordTaskAppended.textContent = "false";
+    bodyEvidenceLedgerFirstRecordTaskJson.textContent = [
+      "Registry: openclaw-body-evidence-ledger-first-record-task-v0",
+      \`Source Route: \${data.registry ?? "unknown"}\`,
+      \`Mode: approval-gated-ledger-first-record-task-shell ready=\${ready}\`,
+      \`Record: type=\${evidence.plannedRecordType ?? "unknown"} source=\${evidence.sourceRegistry ?? "unknown"} requiredFields=\${evidence.requiredFieldCount ?? 0} directoryExists=\${Boolean(evidence.directoryExists)} durableStorageWritten=\${Boolean(evidence.durableStorageWritten)}\`,
+      "Approval: creates pending medium-risk approval only after explicit button click",
+      "Governance: createsTaskOnClick=true createsApprovalOnClick=true canAppendLedgerRecord=false canWriteLedger=false mutation=false appended=false",
+      "Endpoint: /body/evidence-ledger/first-record-tasks",
+    ].join("\\n");
+  } catch {
+    bodyEvidenceLedgerFirstRecordTaskReady.textContent = "false";
+    bodyEvidenceLedgerFirstRecordTaskType.textContent = "offline";
+    bodyEvidenceLedgerFirstRecordTaskApproval.textContent = "route-blocked";
+    bodyEvidenceLedgerFirstRecordTaskAppended.textContent = "false";
+    bodyEvidenceLedgerFirstRecordTaskJson.textContent = "Unable to read body evidence ledger first record task boundary.";
+  }
+}
+
 async function refreshPhase2RouteReview() {
   try {
     const data = await fetchJson(\`\${observerConfig.systemSenseUrl}/system/route/phase-2-review\`);
@@ -6058,6 +6106,28 @@ async function createBodyEvidenceLedgerDirectoryTask() {
   return result;
 }
 
+async function createBodyEvidenceLedgerFirstRecordTask() {
+  const result = await fetchJson(\`\${observerConfig.coreUrl}/body/evidence-ledger/first-record-tasks\`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      confirm: true,
+    }),
+  });
+  setControlMessage(\`Body evidence ledger first record task queued: \${result.task?.id ?? "unknown"} approval=\${result.approval?.id ?? "none"} recordType=\${result.firstRecord?.plannedRecordType ?? "unknown"} appended=\${Boolean(result.firstRecord?.recordAppended)}\`);
+  taskHistoryFocus = "selected-task";
+  selectedHistoryTaskId = result.task?.id ?? null;
+  taskDetailIdInput.value = result.task?.id ?? "";
+  await Promise.all([
+    refreshBodyEvidenceLedgerFirstRecordTask(),
+    refreshTaskList(),
+    refreshTaskHistoryDetail(),
+    refreshApprovalState(),
+    refreshOperatorState(),
+  ]);
+  return result;
+}
+
 async function completeCurrentTask() {
   if (!currentTaskState?.id) {
     throw new Error("No active task to complete.");
@@ -6448,6 +6518,12 @@ createBodyEvidenceLedgerDirectoryTaskButton.addEventListener("click", () => {
   });
 });
 
+createBodyEvidenceLedgerFirstRecordTaskButton.addEventListener("click", () => {
+  createBodyEvidenceLedgerFirstRecordTask().catch((error) => {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  });
+});
+
 completeTaskButton.addEventListener("click", () => {
   completeCurrentTask().catch((error) => {
     setControlMessage(\`Request failed: \${formatError(error)}\`);
@@ -6688,6 +6764,7 @@ await refreshBodyEvidenceLedgerStorageRootRouteReview();
 await refreshBodyEvidenceLedgerDirectoryTask();
 await refreshBodyEvidenceLedgerFirstRecordPlan();
 await refreshBodyEvidenceLedgerFirstRecordRouteReview();
+await refreshBodyEvidenceLedgerFirstRecordTask();
 await refreshPhase2RouteReview();
 await refreshSystemdRepairCandidates();
 await refreshSystemdRepairCandidatePlan();
@@ -6776,6 +6853,7 @@ setInterval(refreshBodyEvidenceLedgerStorageRootRouteReview, 5000);
 setInterval(refreshBodyEvidenceLedgerDirectoryTask, 5000);
 setInterval(refreshBodyEvidenceLedgerFirstRecordPlan, 5000);
 setInterval(refreshBodyEvidenceLedgerFirstRecordRouteReview, 5000);
+setInterval(refreshBodyEvidenceLedgerFirstRecordTask, 5000);
 setInterval(refreshPhase2RouteReview, 5000);
 setInterval(refreshSystemdRepairCandidates, 5000);
 setInterval(refreshSystemdRepairCandidatePlan, 5000);

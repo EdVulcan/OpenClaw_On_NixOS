@@ -9077,6 +9077,130 @@ async function createBodyEvidenceLedgerDirectoryTaskShell({ confirm = false } = 
   };
 }
 
+async function createBodyEvidenceLedgerFirstRecordTaskShell({ confirm = false } = {}) {
+  if (confirm !== true) {
+    throw new Error("Body evidence ledger first record task shell creation requires confirm=true.");
+  }
+
+  const routeReview = await fetchJson(`${systemSenseUrl}/system/route/body-evidence-ledger-first-record-route-review`);
+  if (routeReview.decision?.selectedSlice !== "openclaw-body-evidence-ledger-first-record-task"
+    || routeReview.evidence?.firstRecordPlanReady !== true
+    || routeReview.evidence?.directoryExists !== true
+    || routeReview.evidence?.plannedRecordType !== "body_evidence_ledger_bootstrap") {
+    throw new Error("Body evidence ledger first record task shell requires a ready first-record route review.");
+  }
+  const policyRequest = {
+    intent: "body.evidence.ledger.record.append",
+    domain: "body_internal",
+    risk: "medium",
+    requiresApproval: true,
+    audit: true,
+    tags: ["body_evidence_ledger", "append_only", "durable_storage_candidate", "operator_reviewed"],
+  };
+  const recordType = routeReview.evidence?.plannedRecordType ?? "body_evidence_ledger_bootstrap";
+  const goal = `Append first OpenClaw body evidence ledger record of type ${recordType}`;
+  const policyDecision = evaluatePolicyIntent({
+    type: "body_evidence_ledger_first_record_task",
+    goal,
+    policy: policyRequest,
+  }, {
+    stage: "body_evidence_ledger_first_record_task.draft",
+    type: "body_evidence_ledger_first_record_task",
+    goal,
+  });
+  const firstRecord = {
+    registry: "openclaw-body-evidence-ledger-first-record-task-v0",
+    routeReviewRegistry: routeReview.registry,
+    plannedRecordType: recordType,
+    sourceRegistry: routeReview.evidence?.sourceRegistry ?? null,
+    requiredFieldCount: routeReview.evidence?.requiredFieldCount ?? 0,
+    directoryExists: routeReview.evidence?.directoryExists === true,
+    recordAppended: false,
+    durableStorageWritten: false,
+    appendExecutionEnabled: false,
+  };
+  const task = createTask({
+    goal,
+    type: "body_evidence_ledger_first_record_task",
+    workViewStrategy: "body-evidence-ledger-first-record",
+    policy: policyRequest,
+    plan: {
+      planner: "body-evidence-ledger-first-record-task-v0",
+      strategy: "approval-gated-ledger-first-record-task-shell",
+      summary: `Create an approval-gated task shell for the first ${recordType} ledger append; do not append the record in this milestone.`,
+      steps: [
+        {
+          id: "review-first-record-plan",
+          phase: "review_first_record_plan",
+          title: "Review planned bootstrap ledger record evidence",
+          status: "pending",
+          recordType,
+          sourceRegistry: firstRecord.sourceRegistry,
+          requiresApproval: false,
+        },
+        {
+          id: "operator-approval",
+          phase: "waiting_for_approval",
+          title: "Wait for operator approval before the first ledger append",
+          status: "pending",
+          capabilityId: "act.filesystem.append_jsonl",
+          requiresApproval: true,
+          risk: "medium",
+        },
+        {
+          id: "defer-first-record-append",
+          phase: "deferred_first_record_append_shell",
+          title: "Defer JSONL append execution to the approved append milestone",
+          status: "pending",
+          recordType,
+          requiresApproval: true,
+          executesNow: false,
+        },
+      ],
+    },
+  }, { skipInitialPolicy: true });
+  task.policy = {
+    request: policyRequest,
+    decision: policyDecision,
+  };
+  task.bodyEvidenceLedgerFirstRecord = firstRecord;
+  const approval = createApprovalRequestForTask(task, policyDecision);
+  const reclaimedTasks = supersedeOtherActiveTasks(task.id);
+  reconcileRuntimeState();
+  persistState();
+
+  await publishEvent("task.created", { task: serialiseTask(task), planner: "body-evidence-ledger-first-record-task-v0" });
+  await publishTaskApprovalIfPending(task);
+  await publishEvent("task.planned", { task: serialiseTask(task), plan: serialisePlanForPublic(task.plan) });
+  await Promise.all(reclaimedTasks.map((reclaimedTask) => publishEvent("task.phase_changed", {
+    task: serialiseTask(reclaimedTask),
+  })));
+
+  return {
+    registry: "openclaw-body-evidence-ledger-first-record-task-v0",
+    mode: "approval-gated-ledger-first-record-task-shell",
+    generatedAt: new Date().toISOString(),
+    sourceRegistry: routeReview.registry,
+    routeReview,
+    task,
+    approval,
+    firstRecord,
+    governance: {
+      createsTask: true,
+      createsApproval: true,
+      canExecuteWithoutApproval: false,
+      canAppendLedgerRecord: false,
+      canWriteLedger: false,
+      executed: false,
+      hostMutation: false,
+      recordAppended: false,
+      durableStorageWritten: false,
+      requiresExplicitApproval: true,
+      appendExecutionEnabled: false,
+    },
+  };
+}
+
 function redactPublicParams(params) {
   if (!params || typeof params !== "object" || Array.isArray(params)) {
     return params ?? {};
@@ -9124,6 +9248,7 @@ function serialiseTask(task) {
     systemdRepair: task.systemdRepair ?? null,
     systemdRepairCandidate: task.systemdRepairCandidate ?? null,
     bodyEvidenceLedgerDirectory: task.bodyEvidenceLedgerDirectory ?? null,
+    bodyEvidenceLedgerFirstRecord: task.bodyEvidenceLedgerFirstRecord ?? null,
     recovery: task.recovery ?? null,
     recoveredByTaskId: task.recoveredByTaskId ?? null,
     restorable: isRecoverableTask(task),
@@ -15712,6 +15837,32 @@ const server = http.createServer(async (req, res) => {
         sourceRegistry: result.sourceRegistry,
         routeReview: result.routeReview,
         ledgerDirectory: result.ledgerDirectory,
+        task: serialiseTask(result.task),
+        approval: serialiseApproval(result.approval),
+        governance: result.governance,
+        summary: buildTaskSummary(),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/body/evidence-ledger/first-record-tasks") {
+    try {
+      const body = await readJsonBody(req);
+      const result = await createBodyEvidenceLedgerFirstRecordTaskShell({
+        confirm: body.confirm === true,
+      });
+      sendJson(res, 201, {
+        ok: true,
+        registry: result.registry,
+        mode: result.mode,
+        generatedAt: result.generatedAt,
+        sourceRegistry: result.sourceRegistry,
+        routeReview: result.routeReview,
+        firstRecord: result.firstRecord,
         task: serialiseTask(result.task),
         approval: serialiseApproval(result.approval),
         governance: result.governance,
