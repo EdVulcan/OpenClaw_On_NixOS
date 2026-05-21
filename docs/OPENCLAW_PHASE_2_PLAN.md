@@ -388,6 +388,18 @@ This checkpoint is allowed because the storage root now exists, but the first du
 - Creates no task, no approval, no command execution, no host mutation, no scheduler, no durable record append, and no recovery action.
 - Must not write ledger records, add background persistence, automatic repair, denial recovery, duplicate-click handling, plugin/runtime adapter work, arbitrary host control, or broader mutation.
 
+Body evidence ledger first record route review checkpoint:
+
+After the first record plan passes, `openclaw-body-evidence-ledger-first-record-route-review` may choose the smallest operator-visible step toward the first append-only record.
+
+This checkpoint is allowed because the bootstrap record is planned and the ledger root exists, but the first durable JSONL append still needs an explicit approval-gated task shell:
+
+- Reads body evidence ledger first record plan only.
+- Selects an approval-gated first-record append task shell as the next slice.
+- Explains why background ledger writers, bulk evidence import, automatic repair, denial recovery, duplicate-click hardening, plugin/runtime adapter work, and broader host mutation are not selected.
+- Creates no task, no approval, no command execution, no host mutation, no scheduler, no durable record append, and no recovery action.
+- Must not write ledger records, add background persistence, bulk import, automatic repair, denial recovery, duplicate-click handling, plugin/runtime adapter work, arbitrary host control, or broader mutation.
+
 Body evidence timeline checkpoint:
 
 After the next capability route review selects Track C, `openclaw-body-evidence-timeline` may expose a read-only chronological memory spine for OpenClaw body evidence.

@@ -44,6 +44,7 @@ const BODY_EVIDENCE_LEDGER_ROUTE_REVIEW_REGISTRY = "openclaw-body-evidence-ledge
 const BODY_EVIDENCE_LEDGER_STORAGE_ROOT_PLAN_REGISTRY = "openclaw-body-evidence-ledger-storage-root-plan-v0";
 const BODY_EVIDENCE_LEDGER_STORAGE_ROOT_ROUTE_REVIEW_REGISTRY = "openclaw-body-evidence-ledger-storage-root-route-review-v0";
 const BODY_EVIDENCE_LEDGER_FIRST_RECORD_PLAN_REGISTRY = "openclaw-body-evidence-ledger-first-record-plan-v0";
+const BODY_EVIDENCE_LEDGER_FIRST_RECORD_ROUTE_REVIEW_REGISTRY = "openclaw-body-evidence-ledger-first-record-route-review-v0";
 const PHASE_2_ROUTE_REVIEW_REGISTRY = "openclaw-phase-2-route-review-v0";
 const SYSTEMD_REPAIR_CANDIDATE_ASSESSMENT_REGISTRY = "openclaw-systemd-repair-candidate-assessment-v0";
 const SYSTEMD_REPAIR_CANDIDATE_PLAN_REGISTRY = "openclaw-systemd-repair-candidate-plan-v0";
@@ -3130,6 +3131,108 @@ async function buildBodyEvidenceLedgerFirstRecordPlan() {
   };
 }
 
+async function buildBodyEvidenceLedgerFirstRecordRouteReview() {
+  const firstRecordPlan = await buildBodyEvidenceLedgerFirstRecordPlan();
+  const planReady = firstRecordPlan.summary?.planReady === true;
+  const candidates = [
+    {
+      track: "Track C",
+      id: "first-record-append-task",
+      label: "Approval-gated first ledger record append task shell",
+      score: planReady ? 96 : 45,
+      recommended: planReady,
+      firstSlice: "openclaw-body-evidence-ledger-first-record-task",
+      mutation: true,
+      durableWrite: true,
+      scheduler: false,
+      reason: planReady
+        ? "The bootstrap record is planned and the ledger root exists; the next step is an explicit append task shell, not a background writer."
+        : "First record append must stay blocked until the plan, timeline evidence, and ledger root are ready.",
+    },
+    {
+      track: "Deferred Track",
+      id: "background-ledger-writer",
+      label: "Background body evidence ledger writer",
+      score: 15,
+      recommended: false,
+      firstSlice: "defer-background-ledger-writer",
+      mutation: true,
+      durableWrite: true,
+      scheduler: true,
+      reason: "Background writers are deferred until at least one operator-visible append is proven and reviewed.",
+    },
+    {
+      track: "Deferred Track",
+      id: "bulk-evidence-import",
+      label: "Bulk evidence import",
+      score: 10,
+      recommended: false,
+      firstSlice: "defer-bulk-evidence-import",
+      mutation: true,
+      durableWrite: true,
+      scheduler: false,
+      reason: "Bulk import would skip the single-record bootstrap proof and make evidence provenance harder to audit.",
+    },
+  ];
+
+  return {
+    ok: true,
+    registry: BODY_EVIDENCE_LEDGER_FIRST_RECORD_ROUTE_REVIEW_REGISTRY,
+    mode: "read_only_body_evidence_ledger_first_record_route_review",
+    generatedAt: new Date().toISOString(),
+    source: {
+      service: "openclaw-system-sense",
+      firstRecordPlanRegistry: firstRecordPlan.registry,
+      phase2Plan: "docs/OPENCLAW_PHASE_2_PLAN.md",
+      evidence: "body_evidence_ledger_first_record_route_review",
+    },
+    governance: {
+      domain: "body_internal",
+      risk: "low",
+      autonomy: "route_selection_only",
+      approvalRequired: false,
+      hostMutation: false,
+      canMutate: false,
+      canAppendLedgerRecord: false,
+      canWriteLedger: false,
+      durableStorageWritten: false,
+      createsTask: false,
+      createsApproval: false,
+      executesCommand: false,
+      triggersRecovery: false,
+      schedulesFollowUp: false,
+    },
+    decision: {
+      selectedTrack: "Track C: Body Evidence Memory",
+      selectedSlice: "openclaw-body-evidence-ledger-first-record-task",
+      status: planReady ? "selected" : "blocked_until_first_record_plan_ready",
+      rationale: "Move from first-record planning to an approval-gated single append task shell; defer schedulers and bulk import.",
+      notSelected: [
+        "no background ledger writer",
+        "no bulk evidence import",
+        "no automatic repair",
+        "no denial recovery or duplicate-click hardening",
+        "no plugin/runtime adapter work",
+        "no broader host mutation",
+      ],
+    },
+    evidence: {
+      firstRecordPlanReady: planReady,
+      plannedRecordType: firstRecordPlan.summary?.plannedRecordType ?? null,
+      directoryExists: firstRecordPlan.summary?.directoryExists === true,
+      sourceRegistry: firstRecordPlan.plan?.plannedRecord?.sourceRegistry ?? null,
+      requiredFieldCount: firstRecordPlan.summary?.requiredFieldCount ?? 0,
+      durableStorageWritten: firstRecordPlan.summary?.durableStorageWritten === true,
+      preAppendChecks: firstRecordPlan.plan?.preAppendChecks ?? [],
+    },
+    candidates,
+    next: {
+      recommendedSlice: "openclaw-body-evidence-ledger-first-record-task",
+      boundary: "create an approval-gated first-record append task shell; do not add background writers or bulk import",
+    },
+  };
+}
+
 function classifySystemdRepairRisk(unit) {
   if (unit.name === "openclaw-event-hub" || unit.name === "openclaw-core") {
     return "high";
@@ -3421,6 +3524,12 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "GET" && requestUrl.pathname === "/system/route/body-evidence-ledger-first-record-plan") {
     const plan = await buildBodyEvidenceLedgerFirstRecordPlan();
     sendJson(res, 200, plan);
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/system/route/body-evidence-ledger-first-record-route-review") {
+    const review = await buildBodyEvidenceLedgerFirstRecordRouteReview();
+    sendJson(res, 200, review);
     return;
   }
 

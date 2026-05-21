@@ -967,6 +967,14 @@ function observerHtml() {
           <div class="metric"><span>Storage Written</span><span id="body-evidence-ledger-first-record-plan-written">false</span></div>
           <pre id="body-evidence-ledger-first-record-plan-json">Loading body evidence ledger first record plan...</pre>
         </section>
+        <section class="panel" id="body-evidence-ledger-first-record-route-review-panel">
+          <h2>Body Evidence Ledger First Record Route Review</h2>
+          <div class="metric"><span>Status</span><span id="body-evidence-ledger-first-record-route-review-status">loading</span></div>
+          <div class="metric"><span>Next Slice</span><span id="body-evidence-ledger-first-record-route-review-next">loading</span></div>
+          <div class="metric"><span>Can Append</span><span id="body-evidence-ledger-first-record-route-review-write">false</span></div>
+          <div class="metric"><span>Storage Written</span><span id="body-evidence-ledger-first-record-route-review-written">false</span></div>
+          <pre id="body-evidence-ledger-first-record-route-review-json">Loading body evidence ledger first record route review...</pre>
+        </section>
         <section class="panel" id="phase-2-route-review">
           <h2>Phase 2 Route Review</h2>
           <div class="metric"><span>Selected Track</span><span id="phase-2-route-selected-track">loading</span></div>
@@ -1256,6 +1264,11 @@ const bodyEvidenceLedgerFirstRecordPlanType = document.querySelector("#body-evid
 const bodyEvidenceLedgerFirstRecordPlanDirectory = document.querySelector("#body-evidence-ledger-first-record-plan-directory");
 const bodyEvidenceLedgerFirstRecordPlanWritten = document.querySelector("#body-evidence-ledger-first-record-plan-written");
 const bodyEvidenceLedgerFirstRecordPlanJson = document.querySelector("#body-evidence-ledger-first-record-plan-json");
+const bodyEvidenceLedgerFirstRecordRouteReviewStatus = document.querySelector("#body-evidence-ledger-first-record-route-review-status");
+const bodyEvidenceLedgerFirstRecordRouteReviewNext = document.querySelector("#body-evidence-ledger-first-record-route-review-next");
+const bodyEvidenceLedgerFirstRecordRouteReviewWrite = document.querySelector("#body-evidence-ledger-first-record-route-review-write");
+const bodyEvidenceLedgerFirstRecordRouteReviewWritten = document.querySelector("#body-evidence-ledger-first-record-route-review-written");
+const bodyEvidenceLedgerFirstRecordRouteReviewJson = document.querySelector("#body-evidence-ledger-first-record-route-review-json");
 const phase2RouteSelectedTrack = document.querySelector("#phase-2-route-selected-track");
 const phase2RouteNextSlice = document.querySelector("#phase-2-route-next-slice");
 const phase2RouteCreatesTask = document.querySelector("#phase-2-route-creates-task");
@@ -4782,6 +4795,37 @@ async function refreshBodyEvidenceLedgerFirstRecordPlan() {
   }
 }
 
+async function refreshBodyEvidenceLedgerFirstRecordRouteReview() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.systemSenseUrl}/system/route/body-evidence-ledger-first-record-route-review\`);
+    const governance = data.governance ?? {};
+    const decision = data.decision ?? {};
+    const evidence = data.evidence ?? {};
+    const candidates = Array.isArray(data.candidates) ? data.candidates : [];
+    bodyEvidenceLedgerFirstRecordRouteReviewStatus.textContent = decision.status ?? "unknown";
+    bodyEvidenceLedgerFirstRecordRouteReviewNext.textContent = decision.selectedSlice ?? data.next?.recommendedSlice ?? "unknown";
+    bodyEvidenceLedgerFirstRecordRouteReviewWrite.textContent = String(Boolean(governance.canAppendLedgerRecord));
+    bodyEvidenceLedgerFirstRecordRouteReviewWritten.textContent = String(Boolean(governance.durableStorageWritten));
+    bodyEvidenceLedgerFirstRecordRouteReviewJson.textContent = [
+      \`Registry: \${data.registry ?? "unknown"}\`,
+      \`Mode: \${data.mode ?? "unknown"} canAppendLedgerRecord=\${Boolean(governance.canAppendLedgerRecord)} canWriteLedger=\${Boolean(governance.canWriteLedger)} storageWritten=\${Boolean(governance.durableStorageWritten)} mutation=\${Boolean(governance.hostMutation)} createsTask=\${Boolean(governance.createsTask)} scheduler=\${Boolean(governance.schedulesFollowUp)}\`,
+      \`Decision: \${decision.status ?? "unknown"} track=\${decision.selectedTrack ?? "unknown"} slice=\${decision.selectedSlice ?? "unknown"}\`,
+      \`Rationale: \${decision.rationale ?? "none"}\`,
+      \`Avoid: \${(decision.notSelected ?? []).join(", ") || "none"}\`,
+      \`Evidence: planReady=\${Boolean(evidence.firstRecordPlanReady)} recordType=\${evidence.plannedRecordType ?? "unknown"} directoryExists=\${Boolean(evidence.directoryExists)} source=\${evidence.sourceRegistry ?? "unknown"} durableStorageWritten=\${Boolean(evidence.durableStorageWritten)}\`,
+      \`Pre-append Checks: \${(evidence.preAppendChecks ?? []).join(" | ")}\`,
+      \`Candidates: \${candidates.map((candidate) => \`\${candidate.id}:\${candidate.firstSlice}:recommended=\${Boolean(candidate.recommended)}:mutation=\${Boolean(candidate.mutation)}:write=\${Boolean(candidate.durableWrite)}:scheduler=\${Boolean(candidate.scheduler)}\`).join(", ")}\`,
+      \`Next: \${data.next?.recommendedSlice ?? "openclaw-body-evidence-ledger-first-record-task"} boundary=\${data.next?.boundary ?? "approval-gated task shell before first append"}\`,
+    ].join("\\n");
+  } catch {
+    bodyEvidenceLedgerFirstRecordRouteReviewStatus.textContent = "offline";
+    bodyEvidenceLedgerFirstRecordRouteReviewNext.textContent = "unknown";
+    bodyEvidenceLedgerFirstRecordRouteReviewWrite.textContent = "false";
+    bodyEvidenceLedgerFirstRecordRouteReviewWritten.textContent = "false";
+    bodyEvidenceLedgerFirstRecordRouteReviewJson.textContent = "Unable to read body evidence ledger first record route review.";
+  }
+}
+
 async function refreshPhase2RouteReview() {
   try {
     const data = await fetchJson(\`\${observerConfig.systemSenseUrl}/system/route/phase-2-review\`);
@@ -6643,6 +6687,7 @@ await refreshBodyEvidenceLedgerStorageRootPlan();
 await refreshBodyEvidenceLedgerStorageRootRouteReview();
 await refreshBodyEvidenceLedgerDirectoryTask();
 await refreshBodyEvidenceLedgerFirstRecordPlan();
+await refreshBodyEvidenceLedgerFirstRecordRouteReview();
 await refreshPhase2RouteReview();
 await refreshSystemdRepairCandidates();
 await refreshSystemdRepairCandidatePlan();
@@ -6730,6 +6775,7 @@ setInterval(refreshBodyEvidenceLedgerStorageRootPlan, 5000);
 setInterval(refreshBodyEvidenceLedgerStorageRootRouteReview, 5000);
 setInterval(refreshBodyEvidenceLedgerDirectoryTask, 5000);
 setInterval(refreshBodyEvidenceLedgerFirstRecordPlan, 5000);
+setInterval(refreshBodyEvidenceLedgerFirstRecordRouteReview, 5000);
 setInterval(refreshPhase2RouteReview, 5000);
 setInterval(refreshSystemdRepairCandidates, 5000);
 setInterval(refreshSystemdRepairCandidatePlan, 5000);
