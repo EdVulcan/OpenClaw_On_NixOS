@@ -19,7 +19,6 @@ export OPENCLAW_SYSTEM_HEAL_STATE_FILE="${OPENCLAW_SYSTEM_HEAL_STATE_FILE:-$REPO
 CORE_URL="http://127.0.0.1:$OPENCLAW_CORE_PORT"
 SYSTEM_URL="http://127.0.0.1:$OPENCLAW_SYSTEM_SENSE_PORT"
 OBSERVER_URL="http://127.0.0.1:$OBSERVER_UI_PORT"
-LEDGER_DIR="$REPO_ROOT/.artifacts/openclaw-body-evidence-ledger"
 
 "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 rm -f \
@@ -27,7 +26,6 @@ rm -f \
   "$OPENCLAW_CORE_STATE_FILE.tmp" \
   "$OPENCLAW_SYSTEM_HEAL_STATE_FILE" \
   "$OPENCLAW_SYSTEM_HEAL_STATE_FILE.tmp"
-rm -rf "$LEDGER_DIR"
 
 cleanup() {
   rm -f "${HTML_FILE:-}" "${CLIENT_FILE:-}"
@@ -42,16 +40,6 @@ post_json() {
   local payload="$2"
   curl --silent --fail -X POST "$url" -H 'content-type: application/json' --data "$payload"
 }
-
-created_directory="$(post_json "$CORE_URL/body/evidence-ledger/directory-tasks" '{"confirm":true}')"
-directory_approval_id="$(node -e 'const data = JSON.parse(process.argv[1]); process.stdout.write(data.approval.id)' "$created_directory")"
-post_json "$CORE_URL/approvals/$directory_approval_id/approve" '{"approvedBy":"observer-milestone-check","reason":"Approve bounded ledger directory creation before observer body evidence timeline."}' >/dev/null
-post_json "$CORE_URL/operator/step" '{}' >/dev/null
-
-created_record_task="$(post_json "$CORE_URL/body/evidence-ledger/first-record-tasks" '{"confirm":true}')"
-record_approval_id="$(node -e 'const data = JSON.parse(process.argv[1]); process.stdout.write(data.approval.id)' "$created_record_task")"
-post_json "$CORE_URL/approvals/$record_approval_id/approve" '{"approvedBy":"observer-milestone-check","reason":"Approve one bounded bootstrap append before observer body evidence timeline."}' >/dev/null
-post_json "$CORE_URL/operator/step" '{}' >/dev/null
 
 created_next_repair="$(post_json "$CORE_URL/system/systemd/next-repair-tasks" '{"confirm":true,"execute":true}')"
 next_repair_approval_id="$(node -e 'const data = JSON.parse(process.argv[1]); process.stdout.write(data.approval.id)' "$created_next_repair")"
