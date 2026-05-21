@@ -5346,6 +5346,7 @@ async function refreshSystemdNextRepairDryRun() {
       \`Route: \${data.routeReview?.status ?? "unknown"} selected=\${data.routeReview?.selectedSlice ?? "unknown"} unit=\${data.routeReview?.selectedUnit ?? "unknown"}\`,
       \`Target: \${data.target?.unit ?? "unknown"} impact=\${data.target?.impactClass ?? "unknown"} radius=\${data.target?.impactRadius ?? 0}\`,
       \`Command: \${dryRun.command ?? "none"} \${(dryRun.args ?? []).join(" ")} risk=\${dryRun.risk ?? "unknown"} requiresApproval=\${Boolean(dryRun.requiresApproval)} wouldExecute=\${Boolean(dryRun.wouldExecute)}\`,
+      "Expected checks: no_execution, route_review_selected_dry_run, target_is_system_sense, operator_visible_before_mutation, no_restart_executed",
       \`Checks: \${(dryRun.checks ?? []).map((check) => \`\${check.name}=\${Boolean(check.passed)}\`).join(", ") || "none"}\`,
       \`Next: \${data.next?.recommendedSlice ?? "openclaw-systemd-next-repair-task-route"} boundary=\${data.next?.boundary ?? "route-review task materialization"}\`,
     ].join("\\n");
