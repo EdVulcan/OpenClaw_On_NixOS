@@ -289,6 +289,14 @@ function observerHtml() {
           <div class="metric"><span>Next</span><span id="phase2-repair-demo-next">demo evidence bundle</span></div>
           <pre id="phase2-repair-demo-json">Loading Phase 2 repair demo status...</pre>
         </section>
+        <section class="panel" id="phase2-next-repair-demo-status-panel">
+          <h2>Phase 2 Next Repair Demo</h2>
+          <div class="metric"><span>Status</span><span id="phase2-next-repair-demo-status">loading</span></div>
+          <div class="metric"><span>Evidence</span><span id="phase2-next-repair-demo-evidence">0/0</span></div>
+          <div class="metric"><span>Target</span><span id="phase2-next-repair-demo-target">openclaw-system-sense.service</span></div>
+          <div class="metric"><span>Mutation</span><span id="phase2-next-repair-demo-mutation">false</span></div>
+          <pre id="phase2-next-repair-demo-json">Loading next repair demo status...</pre>
+        </section>
         <section class="panel" id="phase2-demo-control-room-panel">
           <h2>Phase 2 Demo Control Room</h2>
           <div class="metric"><span>Status</span><span id="phase2-demo-control-room-status">loading</span></div>
@@ -1246,6 +1254,11 @@ const phase2RepairDemoEvidence = document.querySelector("#phase2-repair-demo-evi
 const phase2RepairDemoTarget = document.querySelector("#phase2-repair-demo-target");
 const phase2RepairDemoNext = document.querySelector("#phase2-repair-demo-next");
 const phase2RepairDemoJson = document.querySelector("#phase2-repair-demo-json");
+const phase2NextRepairDemoStatus = document.querySelector("#phase2-next-repair-demo-status");
+const phase2NextRepairDemoEvidence = document.querySelector("#phase2-next-repair-demo-evidence");
+const phase2NextRepairDemoTarget = document.querySelector("#phase2-next-repair-demo-target");
+const phase2NextRepairDemoMutation = document.querySelector("#phase2-next-repair-demo-mutation");
+const phase2NextRepairDemoJson = document.querySelector("#phase2-next-repair-demo-json");
 const phase2DemoControlRoomStatus = document.querySelector("#phase2-demo-control-room-status");
 const phase2DemoControlRoomPanels = document.querySelector("#phase2-demo-control-room-panels");
 const phase2DemoControlRoomSlice = document.querySelector("#phase2-demo-control-room-slice");
@@ -4207,6 +4220,35 @@ async function refreshPhase2RepairDemoStatus() {
   }
 }
 
+async function refreshPhase2NextRepairDemoStatus() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/phase-2/next-repair-demo-status\`);
+    const summary = data.summary ?? {};
+    const governance = data.governance ?? {};
+    const checklist = data.checklist ?? [];
+    phase2NextRepairDemoStatus.textContent = data.status ?? "unknown";
+    phase2NextRepairDemoEvidence.textContent = \`\${summary.passedChecks ?? 0}/\${summary.totalChecks ?? checklist.length}\`;
+    phase2NextRepairDemoTarget.textContent = summary.targetUnit ?? "openclaw-system-sense.service";
+    phase2NextRepairDemoMutation.textContent = String(Boolean(governance.hostMutation));
+    phase2NextRepairDemoJson.textContent = [
+      \`Registry: \${data.registry ?? "unknown"}\`,
+      \`Mode: \${data.mode ?? "unknown"} readsTaskHistoryOnly=\${Boolean(governance.readsTaskHistoryOnly)} createsTask=\${Boolean(governance.createsTask)} executesCommand=\${Boolean(governance.executesCommand)} mutation=\${Boolean(governance.hostMutation)}\`,
+      \`Status: \${data.status ?? "unknown"} ready=\${Boolean(summary.ready)} target=\${summary.targetUnit ?? "unknown"}\`,
+      \`Outcome: \${summary.outcome ?? "none"} hostMutationAttempted=\${Boolean(summary.hostMutationAttempted)} executionSucceeded=\${summary.executionSucceeded ?? "unknown"}\`,
+      \`Command: \${summary.command ?? "none"} exitCode=\${summary.exitCode ?? "none"}\`,
+      \`Next: \${data.next?.recommendedSlice ?? "openclaw-body-evidence-timeline"} boundary=\${data.next?.boundary ?? "read-only body memory"}\`,
+      "",
+      ...(checklist.map((item) => \`[\${item.status ?? "unknown"}] \${item.id ?? "check"} :: \${item.label ?? "no label"} evidence=\${typeof item.evidence === "string" ? item.evidence : JSON.stringify(item.evidence ?? null)}\`)),
+    ].join("\\n");
+  } catch {
+    phase2NextRepairDemoStatus.textContent = "offline";
+    phase2NextRepairDemoEvidence.textContent = "0/0";
+    phase2NextRepairDemoTarget.textContent = "offline";
+    phase2NextRepairDemoMutation.textContent = "false";
+    phase2NextRepairDemoJson.textContent = "Unable to read Phase 2 next repair demo status.";
+  }
+}
+
 async function refreshPhase2DemoControlRoom() {
   try {
     const data = await fetchJson(\`\${observerConfig.coreUrl}/phase-2/demo-control-room\`);
@@ -7103,6 +7145,7 @@ taskListItems.addEventListener("click", (event) => {
 await refreshHealth();
 await refreshMvpRoute();
 await refreshPhase2RepairDemoStatus();
+await refreshPhase2NextRepairDemoStatus();
 await refreshPhase2DemoControlRoom();
 await refreshPhase2DemoWalkthrough();
 await refreshPhase2DemoReadinessExit();
@@ -7200,6 +7243,7 @@ subscribeEvents();
 setInterval(refreshHealth, 5000);
 setInterval(refreshMvpRoute, 5000);
 setInterval(refreshPhase2RepairDemoStatus, 5000);
+setInterval(refreshPhase2NextRepairDemoStatus, 5000);
 setInterval(refreshPhase2DemoControlRoom, 5000);
 setInterval(refreshPhase2DemoWalkthrough, 5000);
 setInterval(refreshPhase2DemoReadinessExit, 5000);

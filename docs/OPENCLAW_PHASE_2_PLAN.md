@@ -538,6 +538,18 @@ This checkpoint is allowed because it is the narrow Track A continuation from ap
 - Exposes Observer-visible real execution intent and result fields.
 - Must not add automatic repair, retries, denial recovery, duplicate-click handling, persistence hardening, schedulers, plugin/runtime adapter work, arbitrary host control, or broader mutation.
 
+Systemd next repair demo status checkpoint:
+
+After `openclaw-systemd-next-repair-real-execution` passes, `openclaw-systemd-next-repair-demo-status` may expose a read-only evidence bundle for the completed next repair block.
+
+This checkpoint is allowed because it closes the second Track A repair loop as operator-visible evidence before returning to read-only body memory:
+
+- Reads task history only.
+- Summarizes route evidence, approval state, command transcript, exit code, rollback note, and before/after body-state verification for `openclaw-system-sense.service`.
+- Exposes Observer-visible readiness and checklist fields.
+- Creates no task, no approval, no command execution, no restart, no host mutation, no scheduler, no recovery action, and no additional ledger write.
+- Must not add another execution attempt, automatic repair, retries, denial recovery, duplicate-click handling, persistence hardening, schedulers, plugin/runtime adapter work, arbitrary host control, or broader mutation.
+
 Body evidence timeline checkpoint:
 
 After the next capability route review selects Track C, `openclaw-body-evidence-timeline` may expose a read-only chronological memory spine for OpenClaw body evidence.

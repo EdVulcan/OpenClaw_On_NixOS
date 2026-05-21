@@ -10244,6 +10244,14 @@ function findLatestSystemdRepairDemoTask() {
     ?? null;
 }
 
+function findLatestSystemdNextRepairDemoTask() {
+  return [...tasks.values()]
+    .filter((task) => task.type === "systemd_next_repair_task")
+    .filter((task) => task.outcome?.details?.postExecutionVerification)
+    .sort((left, right) => taskTimeForDemo(right) - taskTimeForDemo(left))[0]
+    ?? null;
+}
+
 function buildPhase2RepairDemoStatus() {
   const route = buildMvpRouteAlignment();
   const latestTask = findLatestSystemdRepairDemoTask();
@@ -10325,6 +10333,85 @@ function buildPhase2RepairDemoStatus() {
       mutatesHost: false,
       triggersRecovery: false,
       schedulesWork: false,
+    },
+  };
+}
+
+function buildPhase2NextRepairDemoStatus() {
+  const latestTask = findLatestSystemdNextRepairDemoTask();
+  const verification = latestTask?.outcome?.details?.postExecutionVerification ?? null;
+  const transcript = latestTask?.outcome?.details?.commandTranscript?.[0] ?? null;
+  const checklist = [
+    {
+      id: "next-repair-route",
+      label: "Next repair route selected system-sense",
+      status: latestTask?.systemdNextRepair?.sourceRegistry === "openclaw-systemd-next-repair-task-route-v0" ? "passed" : "pending",
+      evidence: latestTask?.systemdNextRepair?.sourceRegistry ?? null,
+    },
+    {
+      id: "operator-approved-next-real-execution",
+      label: "Operator-approved next real execution attempt exists",
+      status: latestTask ? "passed" : "pending",
+      evidence: latestTask?.id ?? null,
+    },
+    {
+      id: "next-post-execution-verification",
+      label: "Before/after body-state verification is attached",
+      status: verification ? "passed" : "pending",
+      evidence: verification?.registry ?? null,
+    },
+    {
+      id: "no-hidden-follow-up",
+      label: "No recovery, retry, scheduler, or follow-up mutation is triggered",
+      status: verification?.governance?.triggersRecovery === false ? "passed" : "pending",
+      evidence: verification?.governance ?? null,
+    },
+  ];
+  const passed = checklist.filter((item) => item.status === "passed").length;
+
+  return {
+    ok: true,
+    registry: "openclaw-systemd-next-repair-demo-status-v0",
+    mode: "read_only_next_repair_demo_status",
+    generatedAt: new Date().toISOString(),
+    status: latestTask && verification ? "demo_ready" : "waiting_for_next_repair_evidence",
+    track: {
+      phase: "phase-2",
+      track: "real-nixos-systemd-repair-semantics",
+      whitepaperDirection: "make OpenClaw's body repair attempt explainable and observable",
+    },
+    checklist,
+    summary: {
+      ready: latestTask && verification && passed === checklist.length,
+      passedChecks: passed,
+      totalChecks: checklist.length,
+      targetUnit: latestTask?.systemdNextRepair?.target?.unit ?? "openclaw-system-sense.service",
+      outcome: latestTask?.outcome?.kind ?? null,
+      command: transcript?.command ?? null,
+      exitCode: transcript?.exitCode ?? null,
+      hostMutationAttempted: latestTask?.outcome?.details?.hostMutationAttempted === true,
+      executionSucceeded: latestTask?.outcome?.details?.executionSucceeded ?? null,
+    },
+    evidence: {
+      taskId: latestTask?.id ?? null,
+      approval: latestTask?.approval ?? null,
+      systemdNextRepair: latestTask?.systemdNextRepair ?? null,
+      commandTranscript: transcript ?? null,
+      postExecutionVerification: verification,
+      rollbackNote: latestTask?.outcome?.details?.rollbackNote ?? null,
+    },
+    governance: {
+      readsTaskHistoryOnly: true,
+      createsTask: false,
+      createsApproval: false,
+      executesCommand: false,
+      hostMutation: false,
+      triggersRecovery: false,
+      schedulesFollowUp: false,
+    },
+    next: {
+      recommendedSlice: "openclaw-body-evidence-timeline",
+      boundary: "return to read-only body memory; do not add another execution, recovery, or hardening loop",
     },
   };
 }
@@ -15043,6 +15130,11 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === "GET" && requestUrl.pathname === "/phase-2/repair-demo-status") {
     sendJson(res, 200, buildPhase2RepairDemoStatus());
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/phase-2/next-repair-demo-status") {
+    sendJson(res, 200, buildPhase2NextRepairDemoStatus());
     return;
   }
 
