@@ -17,6 +17,7 @@ export OBSERVER_UI_PORT="${OBSERVER_UI_PORT:-6440}"
 export OPENCLAW_CORE_STATE_FILE="${OPENCLAW_CORE_STATE_FILE:-$REPO_ROOT/.artifacts/openclaw-core-body-evidence-timeline-readiness-check.json}"
 export OPENCLAW_SYSTEM_HEAL_STATE_FILE="${OPENCLAW_SYSTEM_HEAL_STATE_FILE:-$REPO_ROOT/.artifacts/openclaw-system-heal-body-evidence-timeline-readiness-check.json}"
 
+CORE_URL="http://127.0.0.1:$OPENCLAW_CORE_PORT"
 SYSTEM_URL="http://127.0.0.1:$OPENCLAW_SYSTEM_SENSE_PORT"
 
 "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
@@ -32,6 +33,17 @@ cleanup() {
 trap cleanup EXIT
 
 "$SCRIPT_DIR/dev-up.sh"
+
+post_json() {
+  local url="$1"
+  local payload="$2"
+  curl --silent --fail -X POST "$url" -H 'content-type: application/json' --data "$payload"
+}
+
+created_next_repair="$(post_json "$CORE_URL/system/systemd/next-repair-tasks" '{"confirm":true,"execute":true}')"
+next_repair_approval_id="$(node -e 'const data = JSON.parse(process.argv[1]); process.stdout.write(data.approval.id)' "$created_next_repair")"
+post_json "$CORE_URL/approvals/$next_repair_approval_id/approve" '{"approvedBy":"milestone-check","reason":"Approve one next repair execution before body evidence timeline readiness."}' >/dev/null
+post_json "$CORE_URL/operator/step" '{}' >/dev/null
 
 curl --silent --fail "$SYSTEM_URL/system/health" >/dev/null
 readiness="$(curl --silent --fail "$SYSTEM_URL/system/route/body-evidence-timeline-readiness")"
@@ -56,7 +68,7 @@ if (!readiness.ok || readiness.registry !== "openclaw-body-evidence-timeline-rea
 }
 if (readiness.summary?.ready !== true
   || readiness.summary?.passedChecks !== readiness.summary?.totalChecks
-  || readiness.summary?.timelineEntries < 7
+  || readiness.summary?.timelineEntries < 8
   || readiness.summary?.hiddenMutation !== false) {
   throw new Error(`timeline readiness should show ready non-mutating memory: ${JSON.stringify(readiness.summary)}`);
 }
@@ -69,7 +81,8 @@ if (readiness.governance?.createsTask !== false
   throw new Error(`timeline readiness must not execute or schedule work: ${JSON.stringify(readiness.governance)}`);
 }
 if (!readiness.completedBlock?.completedSlices?.includes("openclaw-body-evidence-timeline")
-  || !readiness.completedBlock?.completedSlices?.includes("observer-openclaw-body-evidence-timeline")) {
+  || !readiness.completedBlock?.completedSlices?.includes("observer-openclaw-body-evidence-timeline")
+  || !readiness.completedBlock?.completedSlices?.includes("openclaw-systemd-next-repair-demo-status")) {
   throw new Error(`timeline readiness should list completed timeline slices: ${JSON.stringify(readiness.completedBlock)}`);
 }
 if (readiness.next?.recommendedSlice !== "openclaw-phase-2-next-capability-route-review") {

@@ -16,6 +16,7 @@ export OBSERVER_UI_PORT="${OBSERVER_UI_PORT:-6450}"
 export OPENCLAW_CORE_STATE_FILE="${OPENCLAW_CORE_STATE_FILE:-$REPO_ROOT/.artifacts/openclaw-core-observer-body-evidence-timeline-readiness-check.json}"
 export OPENCLAW_SYSTEM_HEAL_STATE_FILE="${OPENCLAW_SYSTEM_HEAL_STATE_FILE:-$REPO_ROOT/.artifacts/openclaw-system-heal-observer-body-evidence-timeline-readiness-check.json}"
 
+CORE_URL="http://127.0.0.1:$OPENCLAW_CORE_PORT"
 SYSTEM_URL="http://127.0.0.1:$OPENCLAW_SYSTEM_SENSE_PORT"
 OBSERVER_URL="http://127.0.0.1:$OBSERVER_UI_PORT"
 
@@ -33,6 +34,17 @@ cleanup() {
 trap cleanup EXIT
 
 "$SCRIPT_DIR/dev-up.sh"
+
+post_json() {
+  local url="$1"
+  local payload="$2"
+  curl --silent --fail -X POST "$url" -H 'content-type: application/json' --data "$payload"
+}
+
+created_next_repair="$(post_json "$CORE_URL/system/systemd/next-repair-tasks" '{"confirm":true,"execute":true}')"
+next_repair_approval_id="$(node -e 'const data = JSON.parse(process.argv[1]); process.stdout.write(data.approval.id)' "$created_next_repair")"
+post_json "$CORE_URL/approvals/$next_repair_approval_id/approve" '{"approvedBy":"observer-milestone-check","reason":"Approve one next repair execution before observer timeline readiness."}' >/dev/null
+post_json "$CORE_URL/operator/step" '{}' >/dev/null
 
 curl --silent --fail "$SYSTEM_URL/system/health" >/dev/null
 
@@ -66,6 +78,7 @@ const requiredClient = [
   "bodyEvidenceTimelineReadinessMutation",
   "bodyEvidenceTimelineReadinessJson",
   "openclaw-phase-2-next-capability-route-review",
+  "openclaw-systemd-next-repair-demo-status",
 ];
 
 for (const token of requiredHtml) {
@@ -81,7 +94,7 @@ for (const token of requiredClient) {
 if (!readiness.ok || readiness.registry !== "openclaw-body-evidence-timeline-readiness-v0") {
   throw new Error(`Observer source should expose timeline readiness registry: ${JSON.stringify(readiness)}`);
 }
-if (readiness.summary?.ready !== true || readiness.summary?.timelineEntries < 7) {
+if (readiness.summary?.ready !== true || readiness.summary?.timelineEntries < 8) {
   throw new Error(`Observer timeline readiness should be ready with entries: ${JSON.stringify(readiness.summary)}`);
 }
 if (readiness.governance?.createsTask !== false
