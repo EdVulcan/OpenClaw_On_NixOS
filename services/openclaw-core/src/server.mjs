@@ -12169,6 +12169,11 @@ function isSystemdRepairExecutionTask(task) {
     && task?.systemdRepair?.registry === SYSTEMD_REPAIR_EXECUTION_TASK_REGISTRY;
 }
 
+function isBodyEvidenceLedgerDirectoryTask(task) {
+  return task?.type === "body_evidence_ledger_directory_task"
+    && task?.bodyEvidenceLedgerDirectory?.registry === "openclaw-body-evidence-ledger-directory-task-v0";
+}
+
 async function deferSystemdRepairExecutionTask(task) {
   const deferredTask = await setTaskPhase(task, "systemd_repair_execution_deferred", {
     status: "completed",
@@ -12306,6 +12311,82 @@ async function runSystemdRepairCommand(task) {
       ok: false,
     };
   }
+}
+
+async function executeBodyEvidenceLedgerDirectoryTask(task) {
+  const directory = task.bodyEvidenceLedgerDirectory ?? {};
+  const displayPath = typeof directory.displayPath === "string" && directory.displayPath.trim()
+    ? directory.displayPath.trim()
+    : ".artifacts/openclaw-body-evidence-ledger";
+
+  await setTaskPhase(task, "body_evidence_ledger_directory_create", {
+    status: "running",
+    details: {
+      executor: "body-evidence-ledger-directory-task-v0",
+      target: displayPath,
+      hostMutation: true,
+      recordWritesEnabled: false,
+    },
+  });
+
+  const result = await postJson(`${systemSenseUrl}/system/files/mkdir`, {
+    path: displayPath,
+    recursive: true,
+    intent: "body.evidence.ledger.directory.create",
+  });
+  task.bodyEvidenceLedgerDirectory = {
+    ...directory,
+    resolvedPath: result.path ?? null,
+    allowedRoot: result.root ?? null,
+    directoryCreated: result.created === true,
+    directoryExists: true,
+    durableStorageWritten: false,
+    recordWritesEnabled: false,
+    mkdirResult: {
+      registry: "openclaw-body-evidence-ledger-directory-execution-v0",
+      mode: result.mode ?? "mkdir",
+      created: result.created === true,
+      recursive: result.recursive === true,
+      metadata: result.metadata ?? null,
+    },
+  };
+  const completedTask = completeTask(task, {
+    executor: "body-evidence-ledger-directory-task-v0",
+    summary: `Created OpenClaw body evidence ledger directory at ${displayPath}; no ledger records written.`,
+    target: displayPath,
+    result,
+    hostMutation: true,
+    directoryCreated: result.created === true,
+    directoryExists: true,
+    durableStorageWritten: false,
+    recordWritesEnabled: false,
+  });
+  await publishEvent("body_evidence_ledger.directory_created", {
+    task: serialiseTask(completedTask),
+    target: displayPath,
+    path: result.path ?? null,
+    created: result.created === true,
+  });
+
+  return {
+    task: completedTask,
+    policy: completedTask.policy?.decision ?? null,
+    approval: completedTask.approval ?? null,
+    actions: [],
+    capabilityInvocations: [],
+    verification: null,
+    execution: {
+      registry: "openclaw-body-evidence-ledger-directory-execution-v0",
+      mode: "approved_directory_creation",
+      target: displayPath,
+      path: result.path ?? null,
+      hostMutation: true,
+      directoryCreated: result.created === true,
+      directoryExists: true,
+      durableStorageWritten: false,
+      recordWritesEnabled: false,
+    },
+  };
 }
 
 function findSystemdVerificationUnit(inventory, targetUnit) {
@@ -13990,6 +14071,18 @@ async function executeTaskWithRecovery(task, options = {}) {
     return {
       finalExecution: deferredExecution,
       attempts: [deferredExecution],
+      recovery: {
+        attempted: false,
+        maxAttempts: 0,
+      },
+    };
+  }
+
+  if (isBodyEvidenceLedgerDirectoryTask(task)) {
+    const directoryExecution = await executeBodyEvidenceLedgerDirectoryTask(task);
+    return {
+      finalExecution: directoryExecution,
+      attempts: [directoryExecution],
       recovery: {
         attempted: false,
         maxAttempts: 0,
