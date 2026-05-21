@@ -502,6 +502,10 @@ Systemd next repair task route checkpoint:
 
 After `openclaw-systemd-next-repair-dry-run` passes, `openclaw-systemd-next-repair-task-route` may decide whether an approval-gated task shell can be materialized for the selected `openclaw-system-sense.service` repair.
 
+Decision:
+
+Select Track A, `openclaw-systemd-next-repair-task-shell`, as the next slice.
+
 This checkpoint is allowed because the dry-run is visible and non-mutating, but task creation and approval creation still need an explicit route gate:
 
 - Reads the next repair dry-run envelope only.
