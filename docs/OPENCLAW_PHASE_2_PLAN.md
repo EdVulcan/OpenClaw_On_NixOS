@@ -354,6 +354,17 @@ This checkpoint is allowed because the storage root is visible and workspace-bou
 - Creates no directory, no task, no approval, no command execution, no host mutation, no scheduler, no durable storage write, and no recovery action.
 - Must not add append-only ledger writes, durable event storage, background persistence, automatic repair, denial recovery, duplicate-click handling, plugin/runtime adapter work, arbitrary host control, or broader mutation.
 
+Body evidence ledger directory task checkpoint:
+
+After the storage root route review selects the task shell, `openclaw-body-evidence-ledger-directory-task` may create a queued task and pending approval for the selected ledger directory.
+
+This checkpoint is allowed because it moves from route selection into an explicit operator gate for the first real filesystem materialization step:
+
+- Reads body evidence ledger storage root route review only.
+- Creates a queued task and pending medium-risk approval for `.artifacts/openclaw-body-evidence-ledger`.
+- Does not create the directory, write ledger records, execute commands, schedule work, or trigger recovery.
+- Must remain limited to the selected workspace-bounded ledger root and must not add append-only ledger writes, durable event storage, background persistence, automatic repair, denial recovery, duplicate-click handling, plugin/runtime adapter work, arbitrary host control, or broader mutation.
+
 Body evidence timeline checkpoint:
 
 After the next capability route review selects Track C, `openclaw-body-evidence-timeline` may expose a read-only chronological memory spine for OpenClaw body evidence.

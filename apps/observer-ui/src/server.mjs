@@ -948,6 +948,17 @@ function observerHtml() {
           <div class="metric"><span>Storage Written</span><span id="body-evidence-ledger-storage-root-route-review-written">false</span></div>
           <pre id="body-evidence-ledger-storage-root-route-review-json">Loading body evidence ledger storage root route review...</pre>
         </section>
+        <section class="panel" id="body-evidence-ledger-directory-task-panel">
+          <h2>Body Evidence Ledger Directory Task</h2>
+          <div class="metric"><span>Ready</span><span id="body-evidence-ledger-directory-task-ready">false</span></div>
+          <div class="metric"><span>Target</span><span id="body-evidence-ledger-directory-task-target">loading</span></div>
+          <div class="metric"><span>Approval</span><span id="body-evidence-ledger-directory-task-approval">pending-after-create</span></div>
+          <div class="metric"><span>Directory Created</span><span id="body-evidence-ledger-directory-task-created">false</span></div>
+          <div class="actions tight">
+            <button id="create-body-evidence-ledger-directory-task-button" class="secondary">Create Ledger Directory Task</button>
+          </div>
+          <pre id="body-evidence-ledger-directory-task-json">Loading approval-gated ledger directory task boundary...</pre>
+        </section>
         <section class="panel" id="phase-2-route-review">
           <h2>Phase 2 Route Review</h2>
           <div class="metric"><span>Selected Track</span><span id="phase-2-route-selected-track">loading</span></div>
@@ -1227,6 +1238,11 @@ const bodyEvidenceLedgerStorageRootRouteReviewNext = document.querySelector("#bo
 const bodyEvidenceLedgerStorageRootRouteReviewCreate = document.querySelector("#body-evidence-ledger-storage-root-route-review-create");
 const bodyEvidenceLedgerStorageRootRouteReviewWritten = document.querySelector("#body-evidence-ledger-storage-root-route-review-written");
 const bodyEvidenceLedgerStorageRootRouteReviewJson = document.querySelector("#body-evidence-ledger-storage-root-route-review-json");
+const bodyEvidenceLedgerDirectoryTaskReady = document.querySelector("#body-evidence-ledger-directory-task-ready");
+const bodyEvidenceLedgerDirectoryTaskTarget = document.querySelector("#body-evidence-ledger-directory-task-target");
+const bodyEvidenceLedgerDirectoryTaskApproval = document.querySelector("#body-evidence-ledger-directory-task-approval");
+const bodyEvidenceLedgerDirectoryTaskCreated = document.querySelector("#body-evidence-ledger-directory-task-created");
+const bodyEvidenceLedgerDirectoryTaskJson = document.querySelector("#body-evidence-ledger-directory-task-json");
 const phase2RouteSelectedTrack = document.querySelector("#phase-2-route-selected-track");
 const phase2RouteNextSlice = document.querySelector("#phase-2-route-next-slice");
 const phase2RouteCreatesTask = document.querySelector("#phase-2-route-creates-task");
@@ -1329,6 +1345,7 @@ const workViewUrlInput = document.querySelector("#work-view-url-input");
 const createSystemdRepairExecutionTaskButton = document.querySelector("#create-systemd-repair-execution-task-button");
 const createSystemdRepairRealExecutionTaskButton = document.querySelector("#create-systemd-repair-real-execution-task-button");
 const createSystemdRepairCandidateTaskShellButton = document.querySelector("#create-systemd-repair-candidate-task-shell-button");
+const createBodyEvidenceLedgerDirectoryTaskButton = document.querySelector("#create-body-evidence-ledger-directory-task-button");
 const taskPlanStatus = document.querySelector("#task-plan-status");
 const taskPlanCount = document.querySelector("#task-plan-count");
 const taskPlanPlanner = document.querySelector("#task-plan-planner");
@@ -4691,6 +4708,36 @@ async function refreshBodyEvidenceLedgerStorageRootRouteReview() {
   }
 }
 
+async function refreshBodyEvidenceLedgerDirectoryTask() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.systemSenseUrl}/system/route/body-evidence-ledger-storage-root-route-review\`);
+    const decision = data.decision ?? {};
+    const evidence = data.evidence ?? {};
+    const ready = decision.selectedSlice === "openclaw-body-evidence-ledger-directory-task"
+      && decision.status === "selected"
+      && evidence.rootInsideWorkspace === true;
+    bodyEvidenceLedgerDirectoryTaskReady.textContent = String(ready);
+    bodyEvidenceLedgerDirectoryTaskTarget.textContent = evidence.selectedDisplayPath ?? "unknown";
+    bodyEvidenceLedgerDirectoryTaskApproval.textContent = ready ? "pending-after-create" : "route-blocked";
+    bodyEvidenceLedgerDirectoryTaskCreated.textContent = String(Boolean(evidence.directoryCreated));
+    bodyEvidenceLedgerDirectoryTaskJson.textContent = [
+      "Registry: openclaw-body-evidence-ledger-directory-task-v0",
+      \`Source Route: \${data.registry ?? "unknown"}\`,
+      \`Mode: approval-gated-ledger-directory-task-shell ready=\${ready}\`,
+      \`Target: \${evidence.selectedDisplayPath ?? "unknown"} insideWorkspace=\${Boolean(evidence.rootInsideWorkspace)} directoryCreated=\${Boolean(evidence.directoryCreated)} durableStorageWritten=\${Boolean(evidence.durableStorageWritten)}\`,
+      "Approval: creates pending medium-risk approval only after explicit button click",
+      "Governance: createsTaskOnClick=true createsApprovalOnClick=true canCreateDirectory=false canWriteLedger=false mutation=false executed=false",
+      "Endpoint: /body/evidence-ledger/directory-tasks",
+    ].join("\\n");
+  } catch {
+    bodyEvidenceLedgerDirectoryTaskReady.textContent = "false";
+    bodyEvidenceLedgerDirectoryTaskTarget.textContent = "offline";
+    bodyEvidenceLedgerDirectoryTaskApproval.textContent = "route-blocked";
+    bodyEvidenceLedgerDirectoryTaskCreated.textContent = "false";
+    bodyEvidenceLedgerDirectoryTaskJson.textContent = "Unable to read body evidence ledger directory task boundary.";
+  }
+}
+
 async function refreshPhase2RouteReview() {
   try {
     const data = await fetchJson(\`\${observerConfig.systemSenseUrl}/system/route/phase-2-review\`);
@@ -5901,6 +5948,28 @@ async function createSystemdRepairCandidateTaskShell() {
   return result;
 }
 
+async function createBodyEvidenceLedgerDirectoryTask() {
+  const result = await fetchJson(\`\${observerConfig.coreUrl}/body/evidence-ledger/directory-tasks\`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      confirm: true,
+    }),
+  });
+  setControlMessage(\`Body evidence ledger directory task queued: \${result.task?.id ?? "unknown"} approval=\${result.approval?.id ?? "none"} target=\${result.ledgerDirectory?.displayPath ?? "unknown"} mutation=\${Boolean(result.governance?.hostMutation)}\`);
+  taskHistoryFocus = "selected-task";
+  selectedHistoryTaskId = result.task?.id ?? null;
+  taskDetailIdInput.value = result.task?.id ?? "";
+  await Promise.all([
+    refreshBodyEvidenceLedgerDirectoryTask(),
+    refreshTaskList(),
+    refreshTaskHistoryDetail(),
+    refreshApprovalState(),
+    refreshOperatorState(),
+  ]);
+  return result;
+}
+
 async function completeCurrentTask() {
   if (!currentTaskState?.id) {
     throw new Error("No active task to complete.");
@@ -6285,6 +6354,12 @@ createSystemdRepairCandidateTaskShellButton.addEventListener("click", () => {
   });
 });
 
+createBodyEvidenceLedgerDirectoryTaskButton.addEventListener("click", () => {
+  createBodyEvidenceLedgerDirectoryTask().catch((error) => {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  });
+});
+
 completeTaskButton.addEventListener("click", () => {
   completeCurrentTask().catch((error) => {
     setControlMessage(\`Request failed: \${formatError(error)}\`);
@@ -6522,6 +6597,7 @@ await refreshBodyEvidenceLedgerPlan();
 await refreshBodyEvidenceLedgerRouteReview();
 await refreshBodyEvidenceLedgerStorageRootPlan();
 await refreshBodyEvidenceLedgerStorageRootRouteReview();
+await refreshBodyEvidenceLedgerDirectoryTask();
 await refreshPhase2RouteReview();
 await refreshSystemdRepairCandidates();
 await refreshSystemdRepairCandidatePlan();
@@ -6607,6 +6683,7 @@ setInterval(refreshBodyEvidenceLedgerPlan, 5000);
 setInterval(refreshBodyEvidenceLedgerRouteReview, 5000);
 setInterval(refreshBodyEvidenceLedgerStorageRootPlan, 5000);
 setInterval(refreshBodyEvidenceLedgerStorageRootRouteReview, 5000);
+setInterval(refreshBodyEvidenceLedgerDirectoryTask, 5000);
 setInterval(refreshPhase2RouteReview, 5000);
 setInterval(refreshSystemdRepairCandidates, 5000);
 setInterval(refreshSystemdRepairCandidatePlan, 5000);

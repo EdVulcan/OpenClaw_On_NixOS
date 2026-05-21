@@ -8957,6 +8957,126 @@ async function createSystemdRepairCandidateTaskShell({ confirm = false } = {}) {
   };
 }
 
+async function createBodyEvidenceLedgerDirectoryTaskShell({ confirm = false } = {}) {
+  if (confirm !== true) {
+    throw new Error("Body evidence ledger directory task shell creation requires confirm=true.");
+  }
+
+  const routeReview = await fetchJson(`${systemSenseUrl}/system/route/body-evidence-ledger-storage-root-route-review`);
+  if (routeReview.decision?.selectedSlice !== "openclaw-body-evidence-ledger-directory-task"
+    || routeReview.evidence?.rootInsideWorkspace !== true) {
+    throw new Error("Body evidence ledger directory task shell requires a workspace-bounded storage-root route review.");
+  }
+  const selectedDisplayPath = routeReview.evidence?.selectedDisplayPath ?? ".artifacts/openclaw-body-evidence-ledger";
+  const policyRequest = {
+    intent: "body.evidence.ledger.directory.create",
+    domain: "body_internal",
+    risk: "medium",
+    requiresApproval: true,
+    audit: true,
+    tags: ["body_evidence_ledger", "filesystem", "mkdir", "host_mutation_candidate"],
+  };
+  const goal = `Create OpenClaw body evidence ledger directory at ${selectedDisplayPath}`;
+  const policyDecision = evaluatePolicyIntent({
+    type: "body_evidence_ledger_directory_task",
+    goal,
+    policy: policyRequest,
+  }, {
+    stage: "body_evidence_ledger_directory_task.draft",
+    type: "body_evidence_ledger_directory_task",
+    goal,
+  });
+  const ledgerDirectory = {
+    registry: "openclaw-body-evidence-ledger-directory-task-v0",
+    routeReviewRegistry: routeReview.registry,
+    selectedRootId: routeReview.evidence?.selectedRootId ?? null,
+    displayPath: selectedDisplayPath,
+    rootInsideWorkspace: routeReview.evidence?.rootInsideWorkspace === true,
+    directoryCreated: false,
+    durableStorageWritten: false,
+    recordWritesEnabled: false,
+  };
+  const task = createTask({
+    goal,
+    type: "body_evidence_ledger_directory_task",
+    workViewStrategy: "body-evidence-ledger-directory",
+    policy: policyRequest,
+    plan: {
+      planner: "body-evidence-ledger-directory-task-v0",
+      strategy: "approval-gated-ledger-directory-task-shell",
+      summary: `Create an approval-gated task shell for ${selectedDisplayPath}; do not create the directory until approval.`,
+      steps: [
+        {
+          id: "review-storage-root",
+          phase: "review_ledger_storage_root",
+          title: "Review the selected workspace-bounded ledger root",
+          status: "pending",
+          displayPath: selectedDisplayPath,
+          requiresApproval: false,
+        },
+        {
+          id: "operator-approval",
+          phase: "waiting_for_approval",
+          title: "Wait for operator approval before creating the ledger directory",
+          status: "pending",
+          capabilityId: "act.filesystem.mkdir",
+          requiresApproval: true,
+          risk: "medium",
+        },
+        {
+          id: "defer-directory-create",
+          phase: "deferred_directory_creation_shell",
+          title: "Defer mkdir execution to the approved execution milestone",
+          status: "pending",
+          displayPath: selectedDisplayPath,
+          requiresApproval: true,
+          executesNow: false,
+        },
+      ],
+    },
+  }, { skipInitialPolicy: true });
+  task.policy = {
+    request: policyRequest,
+    decision: policyDecision,
+  };
+  task.bodyEvidenceLedgerDirectory = ledgerDirectory;
+  const approval = createApprovalRequestForTask(task, policyDecision);
+  const reclaimedTasks = supersedeOtherActiveTasks(task.id);
+  reconcileRuntimeState();
+  persistState();
+
+  await publishEvent("task.created", { task: serialiseTask(task), planner: "body-evidence-ledger-directory-task-v0" });
+  await publishTaskApprovalIfPending(task);
+  await publishEvent("task.planned", { task: serialiseTask(task), plan: serialisePlanForPublic(task.plan) });
+  await Promise.all(reclaimedTasks.map((reclaimedTask) => publishEvent("task.phase_changed", {
+    task: serialiseTask(reclaimedTask),
+  })));
+
+  return {
+    registry: "openclaw-body-evidence-ledger-directory-task-v0",
+    mode: "approval-gated-ledger-directory-task-shell",
+    generatedAt: new Date().toISOString(),
+    sourceRegistry: routeReview.registry,
+    routeReview,
+    task,
+    approval,
+    ledgerDirectory,
+    governance: {
+      createsTask: true,
+      createsApproval: true,
+      canExecuteWithoutApproval: false,
+      canCreateDirectory: false,
+      canWriteLedger: false,
+      executed: false,
+      hostMutation: false,
+      directoryCreated: false,
+      durableStorageWritten: false,
+      requiresExplicitApproval: true,
+      recordWritesEnabled: false,
+    },
+  };
+}
+
 function redactPublicParams(params) {
   if (!params || typeof params !== "object" || Array.isArray(params)) {
     return params ?? {};
@@ -9003,6 +9123,7 @@ function serialiseTask(task) {
     sourceCommand: task.sourceCommand ?? null,
     systemdRepair: task.systemdRepair ?? null,
     systemdRepairCandidate: task.systemdRepairCandidate ?? null,
+    bodyEvidenceLedgerDirectory: task.bodyEvidenceLedgerDirectory ?? null,
     recovery: task.recovery ?? null,
     recoveredByTaskId: task.recoveredByTaskId ?? null,
     restorable: isRecoverableTask(task),
@@ -15470,6 +15591,32 @@ const server = http.createServer(async (req, res) => {
         generatedAt: result.generatedAt,
         sourceRegistry: result.sourceRegistry,
         routeGate: result.routeGate,
+        task: serialiseTask(result.task),
+        approval: serialiseApproval(result.approval),
+        governance: result.governance,
+        summary: buildTaskSummary(),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/body/evidence-ledger/directory-tasks") {
+    try {
+      const body = await readJsonBody(req);
+      const result = await createBodyEvidenceLedgerDirectoryTaskShell({
+        confirm: body.confirm === true,
+      });
+      sendJson(res, 201, {
+        ok: true,
+        registry: result.registry,
+        mode: result.mode,
+        generatedAt: result.generatedAt,
+        sourceRegistry: result.sourceRegistry,
+        routeReview: result.routeReview,
+        ledgerDirectory: result.ledgerDirectory,
         task: serialiseTask(result.task),
         approval: serialiseApproval(result.approval),
         governance: result.governance,
