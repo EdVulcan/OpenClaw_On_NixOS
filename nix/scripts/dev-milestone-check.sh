@@ -47,6 +47,7 @@ checks=(
   "openclaw-systemd-repair-candidate-assessment|dev-openclaw-systemd-repair-candidate-assessment-check.sh|Read-only OpenClaw systemd repair candidate assessment"
   "openclaw-systemd-repair-candidate-plan|dev-openclaw-systemd-repair-candidate-plan-check.sh|Plan-only OpenClaw systemd repair candidate scope"
   "openclaw-systemd-repair-candidate-task-route|dev-openclaw-systemd-repair-candidate-task-route-check.sh|Read-only OpenClaw systemd repair candidate task route gate"
+  "openclaw-systemd-repair-candidate-task-shell|dev-openclaw-systemd-repair-candidate-task-shell-check.sh|Approval-gated OpenClaw systemd repair candidate task shell"
   "task-workbench|dev-task-workbench-check.sh|Task lifecycle, recovery, history, and work view coordination"
   "task-executor|dev-task-executor-check.sh|Executor verification, failed checks, manual and auto recovery"
   "persistence|dev-persistence-check.sh|Core task state persistence and recovery chains"

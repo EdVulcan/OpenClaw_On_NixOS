@@ -75,6 +75,9 @@ if (assessment.source?.inventoryRegistry !== "openclaw-systemd-unit-inventory-v0
 if (assessment.summary?.totalCandidates < 9 || assessment.summary?.existingDemoTargets < 1) {
   throw new Error(`repair candidate assessment should cover OpenClaw body candidates: ${JSON.stringify(assessment.summary)}`);
 }
+if (assessment.summary?.recommendedUnit !== "openclaw-browser-runtime.service") {
+  throw new Error(`repair candidate assessment should keep the existing demo target as the current recommended unit: ${JSON.stringify(assessment.summary)}`);
+}
 const demoCandidate = assessment.candidates?.find((candidate) => candidate.unit === "openclaw-browser-runtime.service");
 if (!demoCandidate || demoCandidate.assessment?.existingDemoTarget !== true || demoCandidate.governance?.canCreateTask !== false) {
   throw new Error(`repair candidate assessment should mark browser runtime as existing non-mutating demo target: ${JSON.stringify(demoCandidate)}`);

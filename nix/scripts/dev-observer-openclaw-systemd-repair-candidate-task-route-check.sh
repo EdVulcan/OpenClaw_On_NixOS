@@ -84,6 +84,10 @@ if (!routeGate.ok || routeGate.registry !== "openclaw-systemd-repair-candidate-t
 if (!routeGate.routeDecision?.targetUnit || !routeGate.routeDecision?.status) {
   throw new Error(`Observer-facing route gate should expose decision: ${JSON.stringify(routeGate.routeDecision)}`);
 }
+if (routeGate.routeDecision?.targetUnit !== "openclaw-browser-runtime.service"
+  || routeGate.routeDecision?.existingRouteAvailable !== true) {
+  throw new Error(`Observer-facing route gate should stay on the existing browser-runtime route: ${JSON.stringify(routeGate.routeDecision)}`);
+}
 if (routeGate.governance?.createsTask !== false
   || routeGate.governance?.hostMutation !== false
   || routeGate.governance?.executesCommand !== false

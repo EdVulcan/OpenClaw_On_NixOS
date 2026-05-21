@@ -1774,7 +1774,7 @@ async function buildSystemdRepairCandidateAssessment() {
           : 10;
     const score = impactWeight
       + (degraded ? 35 : 0)
-      + (existingDemoTarget ? 20 : 0)
+      + (existingDemoTarget ? 50 : 0)
       + Math.min(node.impactRadius ?? 0, 5);
     return {
       unit: node.unit,

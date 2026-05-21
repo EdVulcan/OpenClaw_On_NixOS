@@ -8912,6 +8912,51 @@ async function createSystemdRepairExecutionTask({ unit = null, confirm = false, 
   };
 }
 
+async function createSystemdRepairCandidateTaskShell({ confirm = false } = {}) {
+  if (confirm !== true) {
+    throw new Error("Systemd repair candidate task shell creation requires confirm=true.");
+  }
+
+  const routeGate = await fetchJson(`${systemSenseUrl}/system/systemd/repair-candidate-task-route`);
+  if (routeGate.routeDecision?.existingRouteAvailable !== true) {
+    throw new Error("Selected repair candidate is not covered by an existing operator-reviewed task route.");
+  }
+  const targetUnit = routeGate.routeDecision?.targetUnit ?? null;
+  const shell = await createSystemdRepairExecutionTask({
+    unit: targetUnit,
+    confirm: true,
+    execute: false,
+  });
+  shell.task.systemdRepairCandidate = {
+    registry: "openclaw-systemd-repair-candidate-task-shell-v0",
+    routeRegistry: routeGate.registry,
+    candidatePlanRegistry: routeGate.source?.candidatePlanRegistry ?? null,
+    targetUnit,
+    existingRoute: routeGate.routeDecision?.existingRoute ?? null,
+  };
+  persistState();
+
+  return {
+    registry: "openclaw-systemd-repair-candidate-task-shell-v0",
+    mode: "approval-gated-candidate-task-shell",
+    generatedAt: new Date().toISOString(),
+    sourceRegistry: routeGate.registry,
+    routeGate,
+    task: shell.task,
+    approval: shell.approval,
+    governance: {
+      createsTask: true,
+      createsApproval: true,
+      canExecuteWithoutApproval: false,
+      executed: false,
+      hostMutation: false,
+      realExecutionEnabled: false,
+      requiresExplicitApproval: true,
+      reusesExistingOperatorReviewedRoute: true,
+    },
+  };
+}
+
 function redactPublicParams(params) {
   if (!params || typeof params !== "object" || Array.isArray(params)) {
     return params ?? {};
@@ -15342,6 +15387,31 @@ const server = http.createServer(async (req, res) => {
         target: result.target,
         repairPlan: result.repairPlan,
         dryRunEnvelope: result.dryRunEnvelope,
+        task: serialiseTask(result.task),
+        approval: serialiseApproval(result.approval),
+        governance: result.governance,
+        summary: buildTaskSummary(),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/system/systemd/repair-candidate-tasks") {
+    try {
+      const body = await readJsonBody(req);
+      const result = await createSystemdRepairCandidateTaskShell({
+        confirm: body.confirm === true,
+      });
+      sendJson(res, 201, {
+        ok: true,
+        registry: result.registry,
+        mode: result.mode,
+        generatedAt: result.generatedAt,
+        sourceRegistry: result.sourceRegistry,
+        routeGate: result.routeGate,
         task: serialiseTask(result.task),
         approval: serialiseApproval(result.approval),
         governance: result.governance,

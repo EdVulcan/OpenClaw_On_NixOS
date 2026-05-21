@@ -336,6 +336,17 @@ This checkpoint is allowed because it checks the route before task materializati
 - Creates no task, no approval, no command execution, no host mutation, no scheduler, and no recovery action.
 - Must not add automatic repair, background maintenance, persistence hardening, denial recovery, duplicate-click handling, plugin/runtime adapter work, or arbitrary host control.
 
+Systemd repair candidate task shell checkpoint:
+
+After the candidate task route passes, `openclaw-systemd-repair-candidate-task-shell` may materialize the candidate as an approval-gated task shell using the existing operator-reviewed repair route.
+
+This checkpoint is allowed because it advances Track A from visible route gate to task materialization while still stopping before approval and execution:
+
+- Reads candidate task route evidence and reuses the existing browser-runtime repair execution task shell.
+- Creates a queued task and pending approval, but does not approve, execute, mutate host, schedule work, or trigger recovery.
+- Must remain limited to `openclaw-browser-runtime.service` until a future route review explicitly accepts another unit.
+- Must not add automatic repair, background maintenance, persistence hardening, denial recovery, duplicate-click handling, plugin/runtime adapter work, or arbitrary host control.
+
 ## Phase 2 Gate
 
 Before implementing any Phase 2 feature, confirm:

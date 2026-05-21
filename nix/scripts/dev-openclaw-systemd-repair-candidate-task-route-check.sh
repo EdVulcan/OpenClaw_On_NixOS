@@ -73,6 +73,11 @@ if (routeGate.source?.candidatePlanRegistry !== "openclaw-systemd-repair-candida
 if (!routeGate.routeDecision?.targetUnit || !routeGate.routeDecision?.status) {
   throw new Error(`candidate task route should expose route decision: ${JSON.stringify(routeGate.routeDecision)}`);
 }
+if (routeGate.routeDecision?.targetUnit !== "openclaw-browser-runtime.service"
+  || routeGate.routeDecision?.existingRouteAvailable !== true
+  || routeGate.routeDecision?.existingRoute !== "openclaw-systemd-repair-execution-task") {
+  throw new Error(`candidate task route should stay on the existing browser-runtime repair route: ${JSON.stringify(routeGate.routeDecision)}`);
+}
 if (!routeGate.requiredBeforeTaskCreation?.includes("explicit approval gate")) {
   throw new Error(`candidate task route should list approval prerequisite: ${JSON.stringify(routeGate.requiredBeforeTaskCreation)}`);
 }
