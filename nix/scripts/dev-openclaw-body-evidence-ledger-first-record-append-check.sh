@@ -106,12 +106,9 @@ if (details.recordAppended !== true
   || details.bulkImport !== false) {
   throw new Error(`append outcome should preserve no-background boundary: ${JSON.stringify(details)}`);
 }
-if (step.execution?.registry !== "openclaw-body-evidence-ledger-first-record-append-v0"
-  || step.execution?.recordAppended !== true
-  || step.execution?.durableStorageWritten !== true
-  || step.execution?.scheduler !== false
-  || step.execution?.backgroundWriter !== false) {
-  throw new Error(`operator step should expose append execution envelope: ${JSON.stringify(step.execution)}`);
+if (step.execution?.attempts?.[0]?.taskId !== finalTask.id
+  || step.execution?.attempts?.[0]?.status !== "completed") {
+  throw new Error(`operator step should expose completed append attempt summary: ${JSON.stringify(step.execution)}`);
 }
 const lines = String(ledgerRead.content ?? "").trim().split("\n").filter(Boolean);
 if (lines.length !== 1) {

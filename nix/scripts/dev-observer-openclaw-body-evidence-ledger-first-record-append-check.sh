@@ -98,10 +98,9 @@ if (finalTask?.status !== "completed"
   || firstRecord.appendResult?.registry !== "openclaw-body-evidence-ledger-first-record-append-v0") {
   throw new Error(`Observer-visible task should expose first record append evidence: ${JSON.stringify(finalTask)}`);
 }
-if (step.execution?.registry !== "openclaw-body-evidence-ledger-first-record-append-v0"
-  || step.execution?.recordAppended !== true
-  || step.execution?.durableStorageWritten !== true) {
-  throw new Error(`Observer-visible operator step should expose append execution: ${JSON.stringify(step.execution)}`);
+if (step.execution?.attempts?.[0]?.taskId !== finalTask.id
+  || step.execution?.attempts?.[0]?.status !== "completed") {
+  throw new Error(`Observer-visible operator step should expose completed append attempt summary: ${JSON.stringify(step.execution)}`);
 }
 const lines = String(ledgerRead.content ?? "").trim().split("\n").filter(Boolean);
 if (lines.length !== 1) {
