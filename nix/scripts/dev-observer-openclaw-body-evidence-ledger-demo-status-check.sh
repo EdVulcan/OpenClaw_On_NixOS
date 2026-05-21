@@ -82,7 +82,6 @@ const requiredClient = [
   "bodyEvidenceLedgerDemoStatusRecord",
   "bodyEvidenceLedgerDemoStatusMutation",
   "bodyEvidenceLedgerDemoStatusJson",
-  "No background ledger writer",
 ];
 
 for (const token of requiredHtml) {
@@ -103,6 +102,9 @@ if (status.summary?.demoReady !== true
   || typeof status.summary?.bootstrapRecordId !== "string"
   || typeof status.summary?.bootstrapRecordHash !== "string") {
   throw new Error(`Observer ledger demo status should be demo-ready with one record: ${JSON.stringify(status.summary)}`);
+}
+if (!status.demoNarrative?.some((line) => line.includes("No background ledger writer"))) {
+  throw new Error(`Observer ledger demo status should expose no-background narrative: ${JSON.stringify(status.demoNarrative)}`);
 }
 if (status.governance?.createsTask !== false
   || status.governance?.createsApproval !== false
