@@ -42,6 +42,7 @@ const BODY_EVIDENCE_TIMELINE_READINESS_REGISTRY = "openclaw-body-evidence-timeli
 const BODY_EVIDENCE_LEDGER_PLAN_REGISTRY = "openclaw-body-evidence-ledger-plan-v0";
 const BODY_EVIDENCE_LEDGER_ROUTE_REVIEW_REGISTRY = "openclaw-body-evidence-ledger-route-review-v0";
 const BODY_EVIDENCE_LEDGER_STORAGE_ROOT_PLAN_REGISTRY = "openclaw-body-evidence-ledger-storage-root-plan-v0";
+const BODY_EVIDENCE_LEDGER_STORAGE_ROOT_ROUTE_REVIEW_REGISTRY = "openclaw-body-evidence-ledger-storage-root-route-review-v0";
 const PHASE_2_ROUTE_REVIEW_REGISTRY = "openclaw-phase-2-route-review-v0";
 const SYSTEMD_REPAIR_CANDIDATE_ASSESSMENT_REGISTRY = "openclaw-systemd-repair-candidate-assessment-v0";
 const SYSTEMD_REPAIR_CANDIDATE_PLAN_REGISTRY = "openclaw-systemd-repair-candidate-plan-v0";
@@ -2941,6 +2942,108 @@ async function buildBodyEvidenceLedgerStorageRootPlan() {
   };
 }
 
+async function buildBodyEvidenceLedgerStorageRootRouteReview() {
+  const storageRootPlan = await buildBodyEvidenceLedgerStorageRootPlan();
+  const planReady = storageRootPlan.summary?.planReady === true;
+  const selectedRoot = storageRootPlan.plan?.selectedRoot ?? null;
+  const rootInsideWorkspace = selectedRoot?.rootPolicy === "inside_openclaw_workspace";
+  const candidates = [
+    {
+      track: "Track C",
+      id: "ledger-directory-creation-task",
+      label: "Approval-visible ledger directory creation task shell",
+      score: planReady && rootInsideWorkspace ? 96 : 48,
+      recommended: planReady && rootInsideWorkspace,
+      firstSlice: "openclaw-body-evidence-ledger-directory-task",
+      mutation: true,
+      durableWrite: false,
+      reason: planReady && rootInsideWorkspace
+        ? "The selected root is inside the OpenClaw workspace; the next useful step is a minimal operator-visible directory creation task shell."
+        : "Directory creation should stay blocked until the selected root is explicit and workspace-bounded.",
+    },
+    {
+      track: "Track C",
+      id: "direct-ledger-record-write",
+      label: "Direct ledger record write",
+      score: 20,
+      recommended: false,
+      firstSlice: "defer-direct-ledger-record-write",
+      mutation: true,
+      durableWrite: true,
+      reason: "Writing records before directory materialization and Observer verification would skip the visible body-memory setup path.",
+    },
+    {
+      track: "Deferred Track",
+      id: "ledger-scheduler",
+      label: "Background ledger scheduler",
+      score: 10,
+      recommended: false,
+      firstSlice: "defer-ledger-scheduler",
+      mutation: false,
+      durableWrite: false,
+      reason: "Schedulers are intentionally deferred until one manual ledger append is visible and verified.",
+    },
+  ];
+
+  return {
+    ok: true,
+    registry: BODY_EVIDENCE_LEDGER_STORAGE_ROOT_ROUTE_REVIEW_REGISTRY,
+    mode: "read_only_body_evidence_ledger_storage_root_route_review",
+    generatedAt: new Date().toISOString(),
+    source: {
+      service: "openclaw-system-sense",
+      storageRootPlanRegistry: storageRootPlan.registry,
+      phase2Plan: "docs/OPENCLAW_PHASE_2_PLAN.md",
+      evidence: "body_evidence_ledger_storage_root_route_review",
+    },
+    governance: {
+      domain: "body_internal",
+      risk: "low",
+      autonomy: "route_selection_only",
+      approvalRequired: false,
+      hostMutation: false,
+      canMutate: false,
+      canCreateDirectory: false,
+      canWriteLedger: false,
+      durableStorageWritten: false,
+      createsTask: false,
+      createsApproval: false,
+      executesCommand: false,
+      triggersRecovery: false,
+      schedulesFollowUp: false,
+    },
+    decision: {
+      selectedTrack: "Track C: Body Evidence Memory",
+      selectedSlice: "openclaw-body-evidence-ledger-directory-task",
+      status: planReady && rootInsideWorkspace ? "selected" : "blocked_until_workspace_bounded_root",
+      rationale: "Move from storage-root planning to a minimal, visible directory creation task shell before any ledger record write.",
+      notSelected: [
+        "no direct ledger record write",
+        "no background ledger scheduler",
+        "no automatic repair",
+        "no denial recovery or duplicate-click hardening",
+        "no plugin/runtime adapter work",
+        "no broader host mutation",
+      ],
+    },
+    evidence: {
+      storageRootPlanReady: planReady,
+      selectedRootId: storageRootPlan.summary?.selectedRootId ?? null,
+      selectedDisplayPath: storageRootPlan.summary?.selectedDisplayPath ?? null,
+      rootInsideWorkspace,
+      directoryCreated: storageRootPlan.summary?.directoryCreated === true,
+      durableStorageWritten: storageRootPlan.summary?.durableStorageWritten === true,
+      pathPolicy: storageRootPlan.plan?.pathPolicy ?? null,
+      preWriteChecks: storageRootPlan.plan?.preWriteChecks ?? [],
+    },
+    candidates,
+    next: {
+      recommendedSlice: "openclaw-body-evidence-ledger-directory-task",
+      boundary: "create only the selected ledger directory through an explicit task shell; do not write ledger records yet",
+    },
+  };
+}
+
 function classifySystemdRepairRisk(unit) {
   if (unit.name === "openclaw-event-hub" || unit.name === "openclaw-core") {
     return "high";
@@ -3220,6 +3323,12 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "GET" && requestUrl.pathname === "/system/route/body-evidence-ledger-storage-root-plan") {
     const plan = await buildBodyEvidenceLedgerStorageRootPlan();
     sendJson(res, 200, plan);
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/system/route/body-evidence-ledger-storage-root-route-review") {
+    const review = await buildBodyEvidenceLedgerStorageRootRouteReview();
+    sendJson(res, 200, review);
     return;
   }
 
