@@ -76,6 +76,7 @@ const STATUS_PRIORITY = {
   superseded: 5,
 };
 const SYSTEMD_REPAIR_EXECUTION_TASK_REGISTRY = "openclaw-systemd-repair-execution-task-v0";
+const SYSTEMD_NEXT_REPAIR_TASK_SHELL_REGISTRY = "openclaw-systemd-next-repair-task-shell-v0";
 const SYSTEMD_REPAIR_REAL_EXECUTION_UNIT = "openclaw-browser-runtime.service";
 const execFileAsync = promisify(execFile);
 
@@ -8957,6 +8958,145 @@ async function createSystemdRepairCandidateTaskShell({ confirm = false } = {}) {
   };
 }
 
+async function createSystemdNextRepairTaskShell({ confirm = false } = {}) {
+  if (confirm !== true) {
+    throw new Error("Next systemd repair task shell creation requires confirm=true.");
+  }
+
+  const routeGate = await fetchJson(`${systemSenseUrl}/system/systemd/next-repair-task-route`);
+  if (routeGate.routeDecision?.taskShellAllowed !== true
+    || routeGate.routeDecision?.selectedSlice !== "openclaw-systemd-next-repair-task-shell"
+    || routeGate.routeDecision?.targetUnit !== "openclaw-system-sense.service") {
+    throw new Error("Next systemd repair task shell requires the approved task route for openclaw-system-sense.service.");
+  }
+
+  const dryRunEvidence = routeGate.evidence ?? {};
+  const targetUnit = routeGate.routeDecision.targetUnit;
+  const command = {
+    command: dryRunEvidence.command ?? "systemctl",
+    args: Array.isArray(dryRunEvidence.args) && dryRunEvidence.args.length > 0
+      ? dryRunEvidence.args
+      : ["restart", targetUnit],
+    wouldExecute: false,
+  };
+  const goal = `Approval-gated next OpenClaw systemd repair task shell for ${targetUnit}`;
+  const policyRequest = {
+    intent: "systemd.next_repair.execute",
+    domain: "body_internal",
+    risk: "high",
+    requiresApproval: true,
+    audit: true,
+    tags: ["systemd", "repair", "host_mutation_candidate", "operator_reviewed", "next_repair"],
+  };
+  const policyDecision = evaluatePolicyIntent({
+    type: "systemd_next_repair_task",
+    goal,
+    policy: policyRequest,
+  }, {
+    stage: "systemd_next_repair_task_shell.draft",
+    type: "systemd_next_repair_task",
+    goal,
+  });
+  const plan = {
+    planner: "systemd-next-repair-task-shell-v0",
+    strategy: "approval-gated-next-systemd-repair-task-shell",
+    summary: `Create a queued approval-gated task shell for ${targetUnit}; do not approve or execute in this milestone.`,
+    steps: [
+      {
+        id: "review-next-repair-route",
+        phase: "review_next_repair_route",
+        title: "Review next repair route and dry-run evidence",
+        status: "pending",
+        targetUnit,
+        requiresApproval: false,
+      },
+      {
+        id: "operator-approval",
+        phase: "waiting_for_approval",
+        title: "Wait for operator approval before any systemd action",
+        status: "pending",
+        capabilityId: "act.system.heal",
+        requiresApproval: true,
+        risk: "high",
+      },
+      {
+        id: "defer-next-repair-execution",
+        phase: "next_repair_execution_deferred",
+        title: "Defer restart execution to a future route-reviewed milestone",
+        status: "pending",
+        command: command.command,
+        args: command.args,
+        requiresApproval: true,
+        hostMutation: false,
+      },
+    ],
+  };
+  const systemdNextRepair = {
+    registry: SYSTEMD_NEXT_REPAIR_TASK_SHELL_REGISTRY,
+    sourceRegistry: routeGate.registry,
+    dryRunRegistry: dryRunEvidence.dryRunRegistry ?? null,
+    target: {
+      unit: targetUnit,
+    },
+    command,
+    evidence: {
+      routeGate,
+      dryRun: dryRunEvidence,
+    },
+    execution: {
+      shellOnly: true,
+      realExecutionEnabled: false,
+      executed: false,
+      hostMutation: false,
+      hostMutationAttempted: false,
+      futureExecutionRequiresSeparateMilestone: true,
+    },
+  };
+  const task = createTask({
+    goal,
+    type: "systemd_next_repair_task",
+    workViewStrategy: "systemd-next-repair-task",
+    plan,
+    policy: policyRequest,
+    systemdNextRepair,
+  }, { skipInitialPolicy: true });
+  task.policy = {
+    request: policyRequest,
+    decision: policyDecision,
+  };
+  const approval = createApprovalRequestForTask(task, policyDecision);
+  const reclaimedTasks = supersedeOtherActiveTasks(task.id);
+  reconcileRuntimeState();
+  persistState();
+
+  await publishEvent("task.created", { task: serialiseTask(task), planner: plan.planner });
+  await publishTaskApprovalIfPending(task);
+  await publishEvent("task.planned", { task: serialiseTask(task), plan: serialisePlanForPublic(task.plan) });
+  await Promise.all(reclaimedTasks.map((reclaimedTask) => publishEvent("task.phase_changed", {
+    task: serialiseTask(reclaimedTask),
+  })));
+
+  return {
+    registry: SYSTEMD_NEXT_REPAIR_TASK_SHELL_REGISTRY,
+    mode: "approval-gated-next-systemd-repair-task-shell",
+    generatedAt: new Date().toISOString(),
+    sourceRegistry: routeGate.registry,
+    routeGate,
+    task,
+    approval,
+    governance: {
+      createsTask: true,
+      createsApproval: true,
+      canExecuteWithoutApproval: false,
+      executed: false,
+      hostMutation: false,
+      realExecutionEnabled: false,
+      requiresExplicitApproval: true,
+      futureExecutionRequiresSeparateMilestone: true,
+    },
+  };
+}
+
 async function createBodyEvidenceLedgerDirectoryTaskShell({ confirm = false } = {}) {
   if (confirm !== true) {
     throw new Error("Body evidence ledger directory task shell creation requires confirm=true.");
@@ -9246,6 +9386,7 @@ function serialiseTask(task) {
     outcome: task.outcome ?? null,
     sourceCommand: task.sourceCommand ?? null,
     systemdRepair: task.systemdRepair ?? null,
+    systemdNextRepair: task.systemdNextRepair ?? null,
     systemdRepairCandidate: task.systemdRepairCandidate ?? null,
     bodyEvidenceLedgerDirectory: task.bodyEvidenceLedgerDirectory ?? null,
     bodyEvidenceLedgerFirstRecord: task.bodyEvidenceLedgerFirstRecord ?? null,
@@ -12022,6 +12163,10 @@ function createTask(body, options = {}) {
     systemdRepair:
       body.systemdRepair && typeof body.systemdRepair === "object"
         ? clonePlainObject(body.systemdRepair)
+        : null,
+    systemdNextRepair:
+      body.systemdNextRepair && typeof body.systemdNextRepair === "object"
+        ? clonePlainObject(body.systemdNextRepair)
         : null,
     recovery:
       body.recovery && typeof body.recovery === "object"
@@ -16008,6 +16153,31 @@ const server = http.createServer(async (req, res) => {
     try {
       const body = await readJsonBody(req);
       const result = await createSystemdRepairCandidateTaskShell({
+        confirm: body.confirm === true,
+      });
+      sendJson(res, 201, {
+        ok: true,
+        registry: result.registry,
+        mode: result.mode,
+        generatedAt: result.generatedAt,
+        sourceRegistry: result.sourceRegistry,
+        routeGate: result.routeGate,
+        task: serialiseTask(result.task),
+        approval: serialiseApproval(result.approval),
+        governance: result.governance,
+        summary: buildTaskSummary(),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/system/systemd/next-repair-tasks") {
+    try {
+      const body = await readJsonBody(req);
+      const result = await createSystemdNextRepairTaskShell({
         confirm: body.confirm === true,
       });
       sendJson(res, 201, {

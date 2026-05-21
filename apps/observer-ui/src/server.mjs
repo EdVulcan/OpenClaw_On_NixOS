@@ -1109,6 +1109,17 @@ function observerHtml() {
           <div class="metric"><span>Mutation</span><span id="systemd-next-repair-task-route-mutation">false</span></div>
           <pre id="systemd-next-repair-task-route-json">Loading read-only next repair task route...</pre>
         </section>
+        <section class="panel" id="systemd-next-repair-task-shell-panel">
+          <h2>Next Repair Task Shell</h2>
+          <div class="metric"><span>Ready</span><span id="systemd-next-repair-task-shell-ready">loading</span></div>
+          <div class="metric"><span>Target</span><span id="systemd-next-repair-task-shell-target">openclaw-system-sense.service</span></div>
+          <div class="metric"><span>Approval</span><span id="systemd-next-repair-task-shell-approval">pending-after-create</span></div>
+          <div class="metric"><span>Mutation</span><span id="systemd-next-repair-task-shell-mutation">false</span></div>
+          <div class="actions tight">
+            <button id="create-systemd-next-repair-task-shell-button" class="secondary">Create Next Repair Task Shell</button>
+          </div>
+          <pre id="systemd-next-repair-task-shell-json">Loading approval-gated next repair task shell route...</pre>
+        </section>
         <section class="panel" id="systemd-unit-inventory">
           <h2>Systemd Unit Inventory</h2>
           <div class="metric"><span>Total Units</span><span id="systemd-unit-total">0</span></div>
@@ -1416,6 +1427,11 @@ const systemdNextRepairTaskRouteSlice = document.querySelector("#systemd-next-re
 const systemdNextRepairTaskRouteCreatesTask = document.querySelector("#systemd-next-repair-task-route-creates-task");
 const systemdNextRepairTaskRouteMutation = document.querySelector("#systemd-next-repair-task-route-mutation");
 const systemdNextRepairTaskRouteJson = document.querySelector("#systemd-next-repair-task-route-json");
+const systemdNextRepairTaskShellReady = document.querySelector("#systemd-next-repair-task-shell-ready");
+const systemdNextRepairTaskShellTarget = document.querySelector("#systemd-next-repair-task-shell-target");
+const systemdNextRepairTaskShellApproval = document.querySelector("#systemd-next-repair-task-shell-approval");
+const systemdNextRepairTaskShellMutation = document.querySelector("#systemd-next-repair-task-shell-mutation");
+const systemdNextRepairTaskShellJson = document.querySelector("#systemd-next-repair-task-shell-json");
 const systemdUnitTotal = document.querySelector("#systemd-unit-total");
 const systemdUnitActive = document.querySelector("#systemd-unit-active");
 const systemdUnitObserved = document.querySelector("#systemd-unit-observed");
@@ -1478,6 +1494,7 @@ const workViewUrlInput = document.querySelector("#work-view-url-input");
 const createSystemdRepairExecutionTaskButton = document.querySelector("#create-systemd-repair-execution-task-button");
 const createSystemdRepairRealExecutionTaskButton = document.querySelector("#create-systemd-repair-real-execution-task-button");
 const createSystemdRepairCandidateTaskShellButton = document.querySelector("#create-systemd-repair-candidate-task-shell-button");
+const createSystemdNextRepairTaskShellButton = document.querySelector("#create-systemd-next-repair-task-shell-button");
 const createBodyEvidenceLedgerDirectoryTaskButton = document.querySelector("#create-body-evidence-ledger-directory-task-button");
 const createBodyEvidenceLedgerFirstRecordTaskButton = document.querySelector("#create-body-evidence-ledger-first-record-task-button");
 const taskPlanStatus = document.querySelector("#task-plan-status");
@@ -5401,6 +5418,33 @@ async function refreshSystemdNextRepairTaskRoute() {
   }
 }
 
+async function refreshSystemdNextRepairTaskShell() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.systemSenseUrl}/system/systemd/next-repair-task-route\`);
+    const governance = data.governance ?? {};
+    const routeDecision = data.routeDecision ?? {};
+    const createShell = data.allowedNextActions?.find((action) => action.id === "create-task-shell") ?? {};
+    systemdNextRepairTaskShellReady.textContent = String(Boolean(routeDecision.taskShellAllowed));
+    systemdNextRepairTaskShellTarget.textContent = routeDecision.targetUnit ?? "openclaw-system-sense.service";
+    systemdNextRepairTaskShellApproval.textContent = createShell.createsApproval === true ? "pending-after-create" : "unavailable";
+    systemdNextRepairTaskShellMutation.textContent = String(Boolean(governance.hostMutation));
+    systemdNextRepairTaskShellJson.textContent = [
+      "Registry: openclaw-systemd-next-repair-task-shell-v0",
+      "Endpoint: /system/systemd/next-repair-tasks",
+      \`Route: \${data.registry ?? "unknown"} selected=\${routeDecision.selectedSlice ?? "unknown"} target=\${routeDecision.targetUnit ?? "unknown"}\`,
+      \`Create: allowed=\${Boolean(createShell.allowedNow)} createsTask=\${Boolean(createShell.createsTask)} createsApproval=\${Boolean(createShell.createsApproval)} approvalState=pending-after-create\`,
+      \`Boundary: executed=false hostMutation=\${Boolean(governance.hostMutation)} realExecutionEnabled=false\`,
+      \`Next: \${data.next?.recommendedSlice ?? "openclaw-systemd-next-repair-task-shell"}\`,
+    ].join("\\n");
+  } catch {
+    systemdNextRepairTaskShellReady.textContent = "false";
+    systemdNextRepairTaskShellTarget.textContent = "offline";
+    systemdNextRepairTaskShellApproval.textContent = "unavailable";
+    systemdNextRepairTaskShellMutation.textContent = "false";
+    systemdNextRepairTaskShellJson.textContent = "Unable to read next repair task shell route.";
+  }
+}
+
 async function refreshSystemdUnitInventory() {
   try {
     const data = await fetchJson(\`\${observerConfig.systemSenseUrl}/system/systemd/units\`);
@@ -6384,6 +6428,28 @@ async function createSystemdRepairCandidateTaskShell() {
   return result;
 }
 
+async function createSystemdNextRepairTaskShell() {
+  const result = await fetchJson(\`\${observerConfig.coreUrl}/system/systemd/next-repair-tasks\`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      confirm: true,
+    }),
+  });
+  setControlMessage(\`Next systemd repair task shell queued: \${result.task?.id ?? "unknown"} approval=\${result.approval?.id ?? "none"} approvalState=pending-after-create mutation=\${Boolean(result.governance?.hostMutation)}\`);
+  taskHistoryFocus = "selected-task";
+  selectedHistoryTaskId = result.task?.id ?? null;
+  taskDetailIdInput.value = result.task?.id ?? "";
+  await Promise.all([
+    refreshSystemdNextRepairTaskShell(),
+    refreshTaskList(),
+    refreshTaskHistoryDetail(),
+    refreshApprovalState(),
+    refreshOperatorState(),
+  ]);
+  return result;
+}
+
 async function createBodyEvidenceLedgerDirectoryTask() {
   const result = await fetchJson(\`\${observerConfig.coreUrl}/body/evidence-ledger/directory-tasks\`, {
     method: "POST",
@@ -6812,6 +6878,12 @@ createSystemdRepairCandidateTaskShellButton.addEventListener("click", () => {
   });
 });
 
+createSystemdNextRepairTaskShellButton.addEventListener("click", () => {
+  createSystemdNextRepairTaskShell().catch((error) => {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  });
+});
+
 createBodyEvidenceLedgerDirectoryTaskButton.addEventListener("click", () => {
   createBodyEvidenceLedgerDirectoryTask().catch((error) => {
     setControlMessage(\`Request failed: \${formatError(error)}\`);
@@ -7080,6 +7152,7 @@ await refreshSystemdNextRepairPlan();
 await refreshSystemdNextRepairRouteReview();
 await refreshSystemdNextRepairDryRun();
 await refreshSystemdNextRepairTaskRoute();
+await refreshSystemdNextRepairTaskShell();
 await refreshSystemdUnitInventory();
 await refreshSystemdDependencyMap();
 await refreshSystemdRepairPlan();
@@ -7176,6 +7249,7 @@ setInterval(refreshSystemdNextRepairPlan, 5000);
 setInterval(refreshSystemdNextRepairRouteReview, 5000);
 setInterval(refreshSystemdNextRepairDryRun, 5000);
 setInterval(refreshSystemdNextRepairTaskRoute, 5000);
+setInterval(refreshSystemdNextRepairTaskShell, 5000);
 setInterval(refreshSystemdUnitInventory, 5000);
 setInterval(refreshSystemdDependencyMap, 5000);
 setInterval(refreshSystemdRepairPlan, 5000);
