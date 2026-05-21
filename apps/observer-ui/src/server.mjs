@@ -1069,6 +1069,14 @@ function observerHtml() {
           <div class="metric"><span>Mutation</span><span id="systemd-repair-candidate-demo-status-mutation">false</span></div>
           <pre id="systemd-repair-candidate-demo-status-json">Loading repair candidate demo status...</pre>
         </section>
+        <section class="panel" id="systemd-next-repair-scope-review-panel">
+          <h2>Next Repair Scope Review</h2>
+          <div class="metric"><span>Ready</span><span id="systemd-next-repair-scope-review-ready">false</span></div>
+          <div class="metric"><span>Selected Unit</span><span id="systemd-next-repair-scope-review-unit">loading</span></div>
+          <div class="metric"><span>Candidates</span><span id="systemd-next-repair-scope-review-candidates">0</span></div>
+          <div class="metric"><span>Mutation</span><span id="systemd-next-repair-scope-review-mutation">false</span></div>
+          <pre id="systemd-next-repair-scope-review-json">Loading read-only next repair scope review...</pre>
+        </section>
         <section class="panel" id="systemd-unit-inventory">
           <h2>Systemd Unit Inventory</h2>
           <div class="metric"><span>Total Units</span><span id="systemd-unit-total">0</span></div>
@@ -1351,6 +1359,11 @@ const systemdRepairCandidateDemoStatusChecks = document.querySelector("#systemd-
 const systemdRepairCandidateDemoStatusTarget = document.querySelector("#systemd-repair-candidate-demo-status-target");
 const systemdRepairCandidateDemoStatusMutation = document.querySelector("#systemd-repair-candidate-demo-status-mutation");
 const systemdRepairCandidateDemoStatusJson = document.querySelector("#systemd-repair-candidate-demo-status-json");
+const systemdNextRepairScopeReviewReady = document.querySelector("#systemd-next-repair-scope-review-ready");
+const systemdNextRepairScopeReviewUnit = document.querySelector("#systemd-next-repair-scope-review-unit");
+const systemdNextRepairScopeReviewCandidates = document.querySelector("#systemd-next-repair-scope-review-candidates");
+const systemdNextRepairScopeReviewMutation = document.querySelector("#systemd-next-repair-scope-review-mutation");
+const systemdNextRepairScopeReviewJson = document.querySelector("#systemd-next-repair-scope-review-json");
 const systemdUnitTotal = document.querySelector("#systemd-unit-total");
 const systemdUnitActive = document.querySelector("#systemd-unit-active");
 const systemdUnitObserved = document.querySelector("#systemd-unit-observed");
@@ -5190,6 +5203,36 @@ async function refreshSystemdRepairCandidateDemoStatus() {
   }
 }
 
+async function refreshSystemdNextRepairScopeReview() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.systemSenseUrl}/system/systemd/next-repair-scope-review\`);
+    const summary = data.summary ?? {};
+    const governance = data.governance ?? {};
+    const decision = data.decision ?? {};
+    const evidence = data.evidence ?? {};
+    systemdNextRepairScopeReviewReady.textContent = String(Boolean(summary.ready));
+    systemdNextRepairScopeReviewUnit.textContent = summary.selectedUnit ?? decision.selectedUnit ?? "unknown";
+    systemdNextRepairScopeReviewCandidates.textContent = String(summary.candidateCount ?? data.candidates?.length ?? 0);
+    systemdNextRepairScopeReviewMutation.textContent = String(Boolean(governance.hostMutation));
+    systemdNextRepairScopeReviewJson.textContent = [
+      \`Registry: \${data.registry ?? "unknown"}\`,
+      \`Mode: \${data.mode ?? "unknown"} createsTask=\${Boolean(governance.createsTask)} createsApproval=\${Boolean(governance.createsApproval)} executesCommand=\${Boolean(governance.executesCommand)} mutation=\${Boolean(governance.hostMutation)} canRestart=\${Boolean(governance.canRestart)}\`,
+      \`Decision: \${decision.status ?? "unknown"} track=\${decision.selectedTrack ?? "unknown"} slice=\${decision.selectedSlice ?? "unknown"} unit=\${decision.selectedUnit ?? "unknown"}\`,
+      \`Rationale: \${decision.rationale ?? "none"}\`,
+      \`Avoid: \${(decision.notSelected ?? []).join(", ") || "none"}\`,
+      \`Evidence: ledgerDemoReady=\${Boolean(summary.ledgerDemoReady)} ledgerRegistry=\${evidence.ledgerDemo?.registry ?? "unknown"} recordCount=\${evidence.ledgerDemo?.recordCount ?? 0} completedDemoUnit=\${summary.completedDemoUnit ?? "unknown"}\`,
+      \`Candidates: \${(data.candidates ?? []).map((candidate) => \`\${candidate.unit}:score=\${candidate.score}:recommended=\${Boolean(candidate.recommended)}:mutation=\${Boolean(candidate.mutation)}\`).join(", ")}\`,
+      \`Next: \${data.next?.recommendedSlice ?? "openclaw-systemd-next-repair-plan"} boundary=\${data.next?.boundary ?? "plan-only repair scope"}\`,
+    ].join("\\n");
+  } catch {
+    systemdNextRepairScopeReviewReady.textContent = "false";
+    systemdNextRepairScopeReviewUnit.textContent = "offline";
+    systemdNextRepairScopeReviewCandidates.textContent = "0";
+    systemdNextRepairScopeReviewMutation.textContent = "false";
+    systemdNextRepairScopeReviewJson.textContent = "Unable to read next repair scope review.";
+  }
+}
+
 async function refreshSystemdUnitInventory() {
   try {
     const data = await fetchJson(\`\${observerConfig.systemSenseUrl}/system/systemd/units\`);
@@ -6864,6 +6907,7 @@ await refreshSystemdRepairCandidateTaskShell();
 await refreshSystemdRepairCandidateReadiness();
 await refreshSystemdRepairCandidateRouteReview();
 await refreshSystemdRepairCandidateDemoStatus();
+await refreshSystemdNextRepairScopeReview();
 await refreshSystemdUnitInventory();
 await refreshSystemdDependencyMap();
 await refreshSystemdRepairPlan();
@@ -6955,6 +6999,7 @@ setInterval(refreshSystemdRepairCandidateTaskShell, 5000);
 setInterval(refreshSystemdRepairCandidateReadiness, 5000);
 setInterval(refreshSystemdRepairCandidateRouteReview, 5000);
 setInterval(refreshSystemdRepairCandidateDemoStatus, 5000);
+setInterval(refreshSystemdNextRepairScopeReview, 5000);
 setInterval(refreshSystemdUnitInventory, 5000);
 setInterval(refreshSystemdDependencyMap, 5000);
 setInterval(refreshSystemdRepairPlan, 5000);

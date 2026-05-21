@@ -47,6 +47,7 @@ const BODY_EVIDENCE_LEDGER_FIRST_RECORD_PLAN_REGISTRY = "openclaw-body-evidence-
 const BODY_EVIDENCE_LEDGER_FIRST_RECORD_ROUTE_REVIEW_REGISTRY = "openclaw-body-evidence-ledger-first-record-route-review-v0";
 const BODY_EVIDENCE_LEDGER_READINESS_REGISTRY = "openclaw-body-evidence-ledger-readiness-v0";
 const BODY_EVIDENCE_LEDGER_DEMO_STATUS_REGISTRY = "openclaw-body-evidence-ledger-demo-status-v0";
+const SYSTEMD_NEXT_REPAIR_SCOPE_REVIEW_REGISTRY = "openclaw-systemd-next-repair-scope-review-v0";
 const PHASE_2_ROUTE_REVIEW_REGISTRY = "openclaw-phase-2-route-review-v0";
 const SYSTEMD_REPAIR_CANDIDATE_ASSESSMENT_REGISTRY = "openclaw-systemd-repair-candidate-assessment-v0";
 const SYSTEMD_REPAIR_CANDIDATE_PLAN_REGISTRY = "openclaw-systemd-repair-candidate-plan-v0";
@@ -3544,6 +3545,113 @@ async function buildBodyEvidenceLedgerDemoStatus() {
   };
 }
 
+async function buildSystemdNextRepairScopeReview() {
+  const inventory = await buildSystemdUnitInventory();
+  const dependencyMap = await buildSystemdDependencyMap();
+  const ledgerDemoStatus = await buildBodyEvidenceLedgerDemoStatus();
+  const nodeByUnit = new Map((dependencyMap.nodes ?? []).map((node) => [node.unit, node]));
+  const completedDemoUnit = "openclaw-browser-runtime.service";
+  const candidates = (inventory.units ?? [])
+    .filter((unit) => unit.component === "body")
+    .map((unit) => {
+      const node = nodeByUnit.get(unit.unit) ?? {};
+      const isCompletedDemoTarget = unit.unit === completedDemoUnit;
+      const isFoundational = ["openclaw-event-hub.service", "openclaw-core.service"].includes(unit.unit);
+      const isSelected = unit.unit === "openclaw-system-sense.service";
+      return {
+        unit: unit.unit,
+        component: unit.component,
+        activeState: unit.activeState,
+        subState: unit.subState,
+        impactClass: node.impactClass ?? "unknown",
+        impactRadius: node.impactRadius ?? 0,
+        dependencyLayer: node.dependencyLayer ?? null,
+        score: isSelected ? 96 : isCompletedDemoTarget ? 20 : isFoundational ? 45 : 70 - Math.min(20, node.impactRadius ?? 0),
+        recommended: isSelected,
+        mutation: false,
+        reason: isSelected
+          ? "System Sense is the body introspection organ that produced the ledger evidence; review its repair scope next before any new mutation."
+          : isCompletedDemoTarget
+            ? "Browser Runtime already served as the completed real repair demo target; do not loop back into it."
+            : isFoundational
+              ? "Foundational control-plane units are deferred until lower-risk body organs have a fresh scope review."
+              : "Candidate remains available for future route review, but System Sense is the narrowest next body-memory-adjacent scope.",
+      };
+    })
+    .sort((left, right) => right.score - left.score);
+  const selected = candidates.find((candidate) => candidate.recommended) ?? candidates[0] ?? null;
+  const reviewReady = ledgerDemoStatus.summary?.demoReady === true && selected?.unit === "openclaw-system-sense.service";
+
+  return {
+    ok: true,
+    registry: SYSTEMD_NEXT_REPAIR_SCOPE_REVIEW_REGISTRY,
+    mode: "read_only_next_systemd_repair_scope_review",
+    generatedAt: new Date().toISOString(),
+    source: {
+      service: "openclaw-system-sense",
+      inventoryRegistry: inventory.registry,
+      dependencyMapRegistry: dependencyMap.registry,
+      ledgerDemoStatusRegistry: ledgerDemoStatus.registry,
+      phase2Plan: "docs/OPENCLAW_PHASE_2_PLAN.md",
+      evidence: "systemd_next_repair_scope_review",
+    },
+    governance: {
+      domain: "body_internal",
+      risk: "low",
+      autonomy: "scope_review_only",
+      approvalRequired: false,
+      hostMutation: false,
+      canMutate: false,
+      canRestart: false,
+      createsTask: false,
+      createsApproval: false,
+      executesCommand: false,
+      triggersRecovery: false,
+      schedulesFollowUp: false,
+    },
+    decision: {
+      selectedTrack: "Track A: Real NixOS/systemd Repair Semantics",
+      selectedSlice: "openclaw-systemd-next-repair-plan",
+      selectedUnit: selected?.unit ?? null,
+      status: reviewReady ? "selected" : "blocked_until_ledger_demo_ready",
+      rationale: "Return to real systemd repair semantics with a read-only scope review anchored in durable body evidence; do not replay the completed browser-runtime demo path.",
+      notSelected: [
+        "no browser-runtime repair demo loop",
+        "no immediate repair task",
+        "no systemctl execution",
+        "no broader host mutation",
+        "no automatic repair",
+        "no plugin/runtime adapter work",
+        "no additional ledger writes",
+      ],
+    },
+    summary: {
+      ready: reviewReady,
+      selectedUnit: selected?.unit ?? null,
+      candidateCount: candidates.length,
+      ledgerDemoReady: ledgerDemoStatus.summary?.demoReady === true,
+      completedDemoUnit,
+      hiddenMutation: false,
+    },
+    candidates,
+    evidence: {
+      ledgerDemo: {
+        registry: ledgerDemoStatus.registry,
+        demoReady: ledgerDemoStatus.summary?.demoReady === true,
+        recordCount: ledgerDemoStatus.summary?.recordCount ?? 0,
+        bootstrapRecordId: ledgerDemoStatus.summary?.bootstrapRecordId ?? null,
+      },
+      selectedDependencyNode: selected ? nodeByUnit.get(selected.unit) ?? null : null,
+      inventorySummary: inventory.summary,
+      dependencySummary: dependencyMap.summary,
+    },
+    next: {
+      recommendedSlice: "openclaw-systemd-next-repair-plan",
+      boundary: "plan-only repair scope for the selected unit; do not create tasks, approvals, restarts, or host mutation",
+    },
+  };
+}
+
 function classifySystemdRepairRisk(unit) {
   if (unit.name === "openclaw-event-hub" || unit.name === "openclaw-core") {
     return "high";
@@ -3927,6 +4035,12 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "GET" && requestUrl.pathname === "/system/systemd/repair-candidate-demo-status") {
     const status = await buildSystemdRepairCandidateDemoStatus();
     sendJson(res, 200, status);
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/system/systemd/next-repair-scope-review") {
+    const review = await buildSystemdNextRepairScopeReview();
+    sendJson(res, 200, review);
     return;
   }
 
