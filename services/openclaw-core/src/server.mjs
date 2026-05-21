@@ -12170,8 +12170,7 @@ function isSystemdRepairExecutionTask(task) {
 }
 
 function isBodyEvidenceLedgerDirectoryTask(task) {
-  return task?.type === "body_evidence_ledger_directory_task"
-    && task?.bodyEvidenceLedgerDirectory?.registry === "openclaw-body-evidence-ledger-directory-task-v0";
+  return task?.type === "body_evidence_ledger_directory_task";
 }
 
 async function deferSystemdRepairExecutionTask(task) {
