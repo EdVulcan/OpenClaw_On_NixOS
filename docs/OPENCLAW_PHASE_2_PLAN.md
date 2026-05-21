@@ -348,6 +348,17 @@ This checkpoint is allowed because it advances Track A from visible route gate t
 - Must remain limited to `openclaw-browser-runtime.service` until a future route review explicitly accepts another unit.
 - Must not add automatic repair, background maintenance, persistence hardening, denial recovery, duplicate-click handling, plugin/runtime adapter work, or arbitrary host control.
 
+Systemd repair candidate readiness checkpoint:
+
+After the candidate task shell is visible in Observer, `openclaw-systemd-repair-candidate-readiness` may close this Track A candidate block with a read-only readiness bundle.
+
+This checkpoint is allowed because it prevents drift: the candidate block must be summarized and routed before any approval/execution broadening:
+
+- Reads candidate assessment, candidate plan, candidate task route, and candidate task shell boundary evidence only.
+- Exposes completed slices, passed checks, selected unit, no-mutation governance, and the next route-review boundary.
+- Creates no task, no approval, no command execution, no host mutation, no scheduler, and no recovery action.
+- Must not add automatic repair, background maintenance, persistence hardening, denial recovery, duplicate-click handling, plugin/runtime adapter work, or arbitrary host control.
+
 ## Phase 2 Gate
 
 Before implementing any Phase 2 feature, confirm:

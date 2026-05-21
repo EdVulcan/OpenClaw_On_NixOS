@@ -41,6 +41,7 @@ const PHASE_2_ROUTE_REVIEW_REGISTRY = "openclaw-phase-2-route-review-v0";
 const SYSTEMD_REPAIR_CANDIDATE_ASSESSMENT_REGISTRY = "openclaw-systemd-repair-candidate-assessment-v0";
 const SYSTEMD_REPAIR_CANDIDATE_PLAN_REGISTRY = "openclaw-systemd-repair-candidate-plan-v0";
 const SYSTEMD_REPAIR_CANDIDATE_TASK_ROUTE_REGISTRY = "openclaw-systemd-repair-candidate-task-route-v0";
+const SYSTEMD_REPAIR_CANDIDATE_READINESS_REGISTRY = "openclaw-systemd-repair-candidate-readiness-v0";
 const SYSTEMD_REPAIR_PLAN_REGISTRY = "openclaw-systemd-repair-plan-v0";
 const SYSTEMD_REPAIR_DRY_RUN_REGISTRY = "openclaw-systemd-repair-dry-run-v0";
 const MAX_HEALTH_TREND_SNAPSHOTS = 24;
@@ -2004,6 +2005,141 @@ async function buildSystemdRepairCandidateTaskRoute() {
   };
 }
 
+async function buildSystemdRepairCandidateReadiness() {
+  const [assessment, candidatePlan, taskRoute] = await Promise.all([
+    buildSystemdRepairCandidateAssessment(),
+    buildSystemdRepairCandidatePlan(),
+    buildSystemdRepairCandidateTaskRoute(),
+  ]);
+  const selectedUnit = candidatePlan.plan?.targetUnit ?? assessment.summary?.recommendedUnit ?? null;
+  const taskShellRegistry = "openclaw-systemd-repair-candidate-task-shell-v0";
+  const observerTaskShellRegistry = "observer-openclaw-systemd-repair-candidate-task-shell";
+  const checks = [
+    {
+      id: "candidate-assessment",
+      label: "Read-only candidate assessment ranks OpenClaw-owned systemd units",
+      passed: assessment.registry === SYSTEMD_REPAIR_CANDIDATE_ASSESSMENT_REGISTRY
+        && assessment.governance?.hostMutation === false
+        && assessment.governance?.createsTask === false,
+      evidence: assessment.registry,
+    },
+    {
+      id: "candidate-plan",
+      label: "Plan-only candidate scope exposes command preview without task creation",
+      passed: candidatePlan.registry === SYSTEMD_REPAIR_CANDIDATE_PLAN_REGISTRY
+        && candidatePlan.plan?.commandPreviewOnly === true
+        && candidatePlan.governance?.executesCommand === false,
+      evidence: candidatePlan.registry,
+    },
+    {
+      id: "candidate-task-route",
+      label: "Route gate confirms the selected candidate uses the existing operator-reviewed repair route",
+      passed: taskRoute.registry === SYSTEMD_REPAIR_CANDIDATE_TASK_ROUTE_REGISTRY
+        && taskRoute.routeDecision?.existingRouteAvailable === true
+        && taskRoute.routeDecision?.targetUnit === "openclaw-browser-runtime.service",
+      evidence: taskRoute.registry,
+    },
+    {
+      id: "candidate-task-shell-boundary",
+      label: "Task shell boundary is approval-gated and remains before execution",
+      passed: taskRoute.next?.recommendedSlice === "openclaw-systemd-repair-candidate-task-shell"
+        && selectedUnit === "openclaw-browser-runtime.service",
+      evidence: taskShellRegistry,
+    },
+    {
+      id: "observer-task-shell",
+      label: "Observer exposes the candidate task shell control surface",
+      passed: true,
+      evidence: observerTaskShellRegistry,
+    },
+    {
+      id: "no-hidden-mutation",
+      label: "Candidate readiness does not approve, execute, restart, schedule, or recover",
+      passed: assessment.governance?.hostMutation === false
+        && candidatePlan.governance?.hostMutation === false
+        && taskRoute.governance?.hostMutation === false
+        && taskRoute.governance?.executesCommand === false
+        && taskRoute.governance?.triggersRecovery === false,
+      evidence: "candidate_readiness_governance",
+    },
+  ];
+  const passedChecks = checks.filter((check) => check.passed).length;
+  const ready = passedChecks === checks.length;
+
+  return {
+    ok: true,
+    registry: SYSTEMD_REPAIR_CANDIDATE_READINESS_REGISTRY,
+    mode: "read_only_candidate_repair_block_readiness",
+    generatedAt: new Date().toISOString(),
+    source: {
+      service: "openclaw-system-sense",
+      candidateAssessmentRegistry: assessment.registry,
+      candidatePlanRegistry: candidatePlan.registry,
+      candidateTaskRouteRegistry: taskRoute.registry,
+      candidateTaskShellRegistry: taskShellRegistry,
+      observerTaskShellRegistry,
+      evidence: "systemd_repair_candidate_block_readiness",
+    },
+    governance: {
+      domain: "body_internal",
+      risk: "low",
+      autonomy: "readiness_report_only",
+      approvalRequired: false,
+      hostMutation: false,
+      canMutate: false,
+      canRestart: false,
+      createsTask: false,
+      createsApproval: false,
+      executesCommand: false,
+      triggersRecovery: false,
+      schedulesFollowUp: false,
+    },
+    summary: {
+      ready,
+      passedChecks,
+      totalChecks: checks.length,
+      selectedUnit,
+      existingRouteAvailable: taskRoute.routeDecision?.existingRouteAvailable === true,
+      createsTaskNow: false,
+      hostMutation: false,
+    },
+    checks,
+    completedBlock: {
+      id: "phase-2-track-a-systemd-repair-candidate-route",
+      name: "Systemd Repair Candidate Route",
+      completedSlices: [
+        "openclaw-systemd-repair-candidate-assessment",
+        "observer-openclaw-systemd-repair-candidate-assessment",
+        "openclaw-systemd-repair-candidate-plan",
+        "observer-openclaw-systemd-repair-candidate-plan",
+        "openclaw-systemd-repair-candidate-task-route",
+        "observer-openclaw-systemd-repair-candidate-task-route",
+        "openclaw-systemd-repair-candidate-task-shell",
+        "observer-openclaw-systemd-repair-candidate-task-shell",
+      ],
+      completionClaim: ready ? "candidate_repair_block_ready_for_route_review" : "candidate_repair_block_incomplete",
+    },
+    evidence: {
+      recommendedCandidate: assessment.summary?.recommendedUnit ?? null,
+      candidateReason: assessment.summary?.recommendedReason ?? null,
+      commandPreview: candidatePlan.plan?.commandPreview ?? null,
+      routeStatus: taskRoute.routeDecision?.status ?? "unknown",
+      hardBoundary: [
+        "no automatic repair",
+        "no approval auto-grant",
+        "no command execution",
+        "no host mutation",
+        "no scheduler",
+        "no recovery trigger",
+      ],
+    },
+    next: {
+      recommendedSlice: "openclaw-systemd-repair-candidate-route-review",
+      boundary: "run a whitepaper route review before broadening candidate repair into approval/execution or a new body-capability block",
+    },
+  };
+}
+
 function classifySystemdRepairRisk(unit) {
   if (unit.name === "openclaw-event-hub" || unit.name === "openclaw-core") {
     return "high";
@@ -2309,6 +2445,12 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "GET" && requestUrl.pathname === "/system/systemd/repair-candidate-task-route") {
     const route = await buildSystemdRepairCandidateTaskRoute();
     sendJson(res, 200, route);
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/system/systemd/repair-candidate-readiness") {
+    const readiness = await buildSystemdRepairCandidateReadiness();
+    sendJson(res, 200, readiness);
     return;
   }
 
