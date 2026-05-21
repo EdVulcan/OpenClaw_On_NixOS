@@ -46,9 +46,10 @@ const review = JSON.parse(process.argv[3]);
 for (const token of [
   "openclaw-phase-2-next-capability-route-review",
   "Phase 2 next capability route review checkpoint",
-  "openclaw-body-evidence-timeline",
+  "openclaw-body-evidence-ledger-plan",
   "Select Track A",
   "After `openclaw-systemd-repair-candidate-demo-status` is complete, select Track C",
+  "After `openclaw-body-evidence-timeline-readiness` is complete, select Track C",
   "Must not add automatic repair, background maintenance, persistence hardening",
 ]) {
   if (!plan.includes(token)) {
@@ -75,24 +76,27 @@ if (review.source?.demoReadinessExitRegistry !== "openclaw-phase-2-demo-readines
   throw new Error(`next capability route review should cite demo readiness exit: ${JSON.stringify(review.source)}`);
 }
 if (review.decision?.selectedTrack !== "Track C: Body Governance Enhancement"
-  || review.decision?.selectedSlice !== "openclaw-body-evidence-timeline") {
-  throw new Error(`next capability route review should select body evidence timeline after candidate demo: ${JSON.stringify(review.decision)}`);
+  || review.decision?.selectedSlice !== "openclaw-body-evidence-ledger-plan") {
+  throw new Error(`next capability route review should select body evidence ledger plan after timeline readiness: ${JSON.stringify(review.decision)}`);
 }
-for (const forbidden of ["repair candidate assessment loop", "candidate-specific approval replay", "plugin/runtime adapter", "automatic repair", "broader host mutation", "persistence hardening", "denial recovery"]) {
+for (const forbidden of ["repair candidate assessment loop", "body evidence timeline loop", "plugin/runtime adapter", "automatic repair", "broader host mutation", "durable storage implementation before a plan"]) {
   if (!review.decision?.notSelected?.some((item) => item.includes(forbidden))) {
     throw new Error(`next capability route review should explicitly avoid ${forbidden}: ${JSON.stringify(review.decision)}`);
   }
 }
 const selected = review.candidates?.find((candidate) => candidate.recommended === true);
-if (!selected || selected.track !== "Track C" || selected.firstSlice !== "openclaw-body-evidence-timeline" || selected.mutation !== false) {
-  throw new Error(`next capability route review should recommend non-mutating Track C body evidence timeline: ${JSON.stringify(review.candidates)}`);
+if (!selected || selected.track !== "Track C" || selected.firstSlice !== "openclaw-body-evidence-ledger-plan" || selected.mutation !== false) {
+  throw new Error(`next capability route review should recommend non-mutating Track C body evidence ledger plan: ${JSON.stringify(review.candidates)}`);
 }
 if (review.evidence?.candidateDemoReady !== true
   || review.evidence?.candidateDemoSelectedUnit !== "openclaw-browser-runtime.service") {
   throw new Error(`next capability route review should cite completed candidate demo status: ${JSON.stringify(review.evidence)}`);
 }
-if (review.next?.recommendedSlice !== "openclaw-body-evidence-timeline") {
-  throw new Error(`next capability route review should point to body evidence timeline next: ${JSON.stringify(review.next)}`);
+if (review.evidence?.bodyEvidenceTimelineReady !== true) {
+  throw new Error(`next capability route review should cite completed body evidence timeline readiness: ${JSON.stringify(review.evidence)}`);
+}
+if (review.next?.recommendedSlice !== "openclaw-body-evidence-ledger-plan") {
+  throw new Error(`next capability route review should point to body evidence ledger plan next: ${JSON.stringify(review.next)}`);
 }
 
 console.log(JSON.stringify({

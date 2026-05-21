@@ -298,11 +298,13 @@ Select Track A, `openclaw-systemd-repair-candidate-assessment`, as the next bloc
 
 After `openclaw-systemd-repair-candidate-demo-status` is complete, select Track C, `openclaw-body-evidence-timeline`, as the next block.
 
+After `openclaw-body-evidence-timeline-readiness` is complete, select Track C, `openclaw-body-evidence-ledger-plan`, as the next block.
+
 This checkpoint is allowed because Track B demo readiness is complete, and the whitepaper priority order points back to real NixOS/systemd repair semantics until the candidate repair route is demo-ready. Once that candidate route is complete, the next whitepaper-aligned gain is body evidence memory rather than repeating the same candidate assessment:
 
 - Reads demo readiness exit, candidate demo status when available, Phase 2 priority order, and existing route evidence only.
-- Selects Track A candidate assessment before candidate demo completion, then Track C body evidence timeline after candidate demo completion.
-- Explains why route loops, candidate-specific approval replay, plugin/runtime adapter work, automatic repair, broader mutation, persistence hardening, and denial recovery are not selected.
+- Selects Track A candidate assessment before candidate demo completion, Track C body evidence timeline after candidate demo completion, then Track C body evidence ledger plan after timeline readiness.
+- Explains why route loops, candidate-specific approval replay, durable storage implementation before a plan, plugin/runtime adapter work, automatic repair, broader mutation, persistence hardening, and denial recovery are not selected.
 - Creates no task, no approval, no command execution, no host mutation, no scheduler, and no recovery action.
 - Must not add automatic repair, background maintenance, persistence hardening, denial recovery, duplicate-click handling, plugin/runtime adapter work, or arbitrary host control.
 

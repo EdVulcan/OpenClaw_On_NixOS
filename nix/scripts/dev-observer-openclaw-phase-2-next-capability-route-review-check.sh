@@ -68,7 +68,8 @@ const requiredClient = [
   "phase2NextCapabilityJson",
   "demoExitChecks",
   "candidateDemoReady",
-  "openclaw-body-evidence-timeline",
+  "timelineReady",
+  "openclaw-body-evidence-ledger-plan",
 ];
 
 for (const token of requiredHtml) {
@@ -84,8 +85,8 @@ for (const token of requiredClient) {
 if (!review.ok || review.registry !== "openclaw-phase-2-next-capability-route-review-v0") {
   throw new Error(`Observer source should expose next capability route review registry: ${JSON.stringify(review)}`);
 }
-if (review.decision?.selectedSlice !== "openclaw-body-evidence-timeline") {
-  throw new Error(`Observer-facing next capability route should select body evidence timeline: ${JSON.stringify(review.decision)}`);
+if (review.decision?.selectedSlice !== "openclaw-body-evidence-ledger-plan") {
+  throw new Error(`Observer-facing next capability route should select body evidence ledger plan: ${JSON.stringify(review.decision)}`);
 }
 if (review.governance?.createsTask !== false
   || review.governance?.mutatesHost !== false
@@ -95,6 +96,9 @@ if (review.governance?.createsTask !== false
 }
 if (review.evidence?.candidateDemoReady !== true) {
   throw new Error(`Observer-facing next capability route should cite candidate demo readiness: ${JSON.stringify(review.evidence)}`);
+}
+if (review.evidence?.bodyEvidenceTimelineReady !== true) {
+  throw new Error(`Observer-facing next capability route should cite body evidence timeline readiness: ${JSON.stringify(review.evidence)}`);
 }
 
 console.log(JSON.stringify({

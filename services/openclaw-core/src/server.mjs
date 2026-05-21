@@ -10224,17 +10224,24 @@ async function buildPhase2NextCapabilityRouteReview() {
   const demoExit = await buildPhase2DemoReadinessExit();
   const demoReady = demoExit.summary?.ready === true;
   let candidateDemoStatus = null;
+  let bodyEvidenceTimelineReadiness = null;
   try {
     candidateDemoStatus = await fetchJson(`${systemSenseUrl}/system/systemd/repair-candidate-demo-status`);
   } catch {
     candidateDemoStatus = null;
   }
+  try {
+    bodyEvidenceTimelineReadiness = await fetchJson(`${systemSenseUrl}/system/route/body-evidence-timeline-readiness`);
+  } catch {
+    bodyEvidenceTimelineReadiness = null;
+  }
   const candidateDemoReady = candidateDemoStatus?.summary?.demoReady === true;
+  const bodyEvidenceTimelineReady = bodyEvidenceTimelineReadiness?.summary?.ready === true;
   const selectedTrack = candidateDemoReady
     ? "Track C: Body Governance Enhancement"
     : "Track A: Real NixOS/systemd Repair Semantics";
   const selectedSlice = candidateDemoReady
-    ? "openclaw-body-evidence-timeline"
+    ? (bodyEvidenceTimelineReady ? "openclaw-body-evidence-ledger-plan" : "openclaw-body-evidence-timeline")
     : "openclaw-systemd-repair-candidate-assessment";
   const candidates = [
     {
@@ -10254,10 +10261,22 @@ async function buildPhase2NextCapabilityRouteReview() {
       id: "body-governance-evidence-memory",
       label: "Read-only body evidence timeline",
       score: candidateDemoReady ? 97 : 64,
-      recommended: candidateDemoReady,
+      recommended: candidateDemoReady && !bodyEvidenceTimelineReady,
       firstSlice: "openclaw-body-evidence-timeline",
       mutation: false,
-      reason: "The repair candidate route is demo-ready; the next whitepaper-aligned gain is durable body evidence memory before any broader mutation.",
+      reason: bodyEvidenceTimelineReady
+        ? "The body evidence timeline is already ready; do not loop back into the same memory slice."
+        : "The repair candidate route is demo-ready; the next whitepaper-aligned gain is durable body evidence memory before any broader mutation.",
+    },
+    {
+      track: "Track C",
+      id: "durable-body-evidence-ledger",
+      label: "Read-only durable body evidence ledger plan",
+      score: bodyEvidenceTimelineReady ? 98 : 62,
+      recommended: bodyEvidenceTimelineReady,
+      firstSlice: "openclaw-body-evidence-ledger-plan",
+      mutation: false,
+      reason: "The in-process evidence timeline is ready; the next route-reviewed step is a plan-only durable ledger design, not persistence implementation.",
     },
     {
       track: "Track B",
@@ -10316,15 +10335,17 @@ async function buildPhase2NextCapabilityRouteReview() {
       selectedSlice,
       status: demoReady ? "selected" : "blocked_until_demo_exit_ready",
       rationale: candidateDemoReady
-        ? "The repair candidate route has been made demo-ready, so avoid looping back into the same candidate block and move to read-only body evidence memory."
+        ? (bodyEvidenceTimelineReady
+            ? "The body evidence timeline is ready, so avoid looping and plan durable evidence storage before implementing it."
+            : "The repair candidate route has been made demo-ready, so avoid looping back into the same candidate block and move to read-only body evidence memory.")
         : "Return to the highest-priority body capability track, but start with read-only candidate assessment before broadening real repair mutation.",
       notSelected: [
         candidateDemoReady ? "no repair candidate assessment loop" : "no additional demo polish before new body capability",
-        candidateDemoReady ? "no candidate-specific approval replay" : "no governance-only expansion before candidate assessment",
+        bodyEvidenceTimelineReady ? "no body evidence timeline loop" : "no candidate-specific approval replay",
         "no plugin/runtime adapter work",
         "no automatic repair",
         "no broader host mutation",
-        "no persistence hardening or denial recovery loop",
+        bodyEvidenceTimelineReady ? "no durable storage implementation before a plan" : "no persistence hardening or denial recovery loop",
       ],
     },
     evidence: {
@@ -10333,6 +10354,8 @@ async function buildPhase2NextCapabilityRouteReview() {
       candidateDemoReady,
       candidateDemoStatusRegistry: candidateDemoStatus?.registry ?? null,
       candidateDemoSelectedUnit: candidateDemoStatus?.summary?.selectedUnit ?? null,
+      bodyEvidenceTimelineReady,
+      bodyEvidenceTimelineReadinessRegistry: bodyEvidenceTimelineReadiness?.registry ?? null,
       completedDemoBlock: demoExit.completedBlock,
       priorityOrder: [
         "real-systemd-repair-semantics",
@@ -10344,8 +10367,10 @@ async function buildPhase2NextCapabilityRouteReview() {
     candidates,
     next: {
       recommendedSlice: selectedSlice,
-      boundary: candidateDemoReady
-        ? "read-only body evidence timeline only; do not create tasks, execute commands, mutate host, or schedule recovery"
+      boundary: bodyEvidenceTimelineReady
+        ? "plan-only durable evidence ledger design; do not write durable storage, schedule work, execute commands, or mutate host"
+        : candidateDemoReady
+          ? "read-only body evidence timeline only; do not create tasks, execute commands, mutate host, or schedule recovery"
         : "read-only candidate assessment only; do not create repair tasks or execute host mutation",
     },
   };

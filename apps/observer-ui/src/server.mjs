@@ -4084,7 +4084,7 @@ async function refreshPhase2NextCapabilityRoute() {
       \`Decision: \${decision.status ?? "unknown"} track=\${decision.selectedTrack ?? "unknown"} slice=\${decision.selectedSlice ?? "unknown"}\`,
       \`Rationale: \${decision.rationale ?? "none"}\`,
       \`Avoid: \${(decision.notSelected ?? []).join(", ") || "none"}\`,
-      \`Evidence: demoReady=\${Boolean(evidence.demoReady)} exitChecks=\${evidence.demoExitChecks ?? "0/0"} candidateDemoReady=\${Boolean(evidence.candidateDemoReady)} candidateUnit=\${evidence.candidateDemoSelectedUnit ?? "none"} completed=\${evidence.completedDemoBlock?.completionClaim ?? "unknown"}\`,
+      \`Evidence: demoReady=\${Boolean(evidence.demoReady)} exitChecks=\${evidence.demoExitChecks ?? "0/0"} candidateDemoReady=\${Boolean(evidence.candidateDemoReady)} timelineReady=\${Boolean(evidence.bodyEvidenceTimelineReady)} candidateUnit=\${evidence.candidateDemoSelectedUnit ?? "none"} completed=\${evidence.completedDemoBlock?.completionClaim ?? "unknown"}\`,
       \`Candidates: \${(data.candidates ?? []).map((candidate) => \`\${candidate.track}:\${candidate.firstSlice}:recommended=\${Boolean(candidate.recommended)}\`).join(", ")}\`,
       \`Next: \${nextSlice}\`,
     ].join("\\n");
