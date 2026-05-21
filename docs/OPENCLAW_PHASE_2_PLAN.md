@@ -317,6 +317,17 @@ This checkpoint is allowed because the whitepaper calls for a resident digital b
 - Creates no task, no approval, no command execution, no host mutation, no scheduler, no durable storage, and no recovery action.
 - Must not add automatic repair, background maintenance, persistence hardening, denial recovery, duplicate-click handling, plugin/runtime adapter work, arbitrary host control, or durable event storage.
 
+Body evidence timeline readiness checkpoint:
+
+After the body evidence timeline passes, `openclaw-body-evidence-timeline-readiness` may close the body evidence memory block with a read-only readiness bundle.
+
+This checkpoint is allowed because the evidence timeline should be summarized and routed before adding durable storage, schedulers, or new mutation:
+
+- Reads body evidence timeline evidence only.
+- Exposes required entries, phase coverage, non-mutating governance, memory purpose, completed slices, and next route-review boundary.
+- Creates no task, no approval, no command execution, no host mutation, no scheduler, no durable storage, and no recovery action.
+- Must not add automatic repair, background maintenance, persistence hardening, denial recovery, duplicate-click handling, plugin/runtime adapter work, arbitrary host control, or durable event storage.
+
 Systemd repair candidate assessment checkpoint:
 
 After the next capability route review selects Track A, `openclaw-systemd-repair-candidate-assessment` may rank OpenClaw-owned systemd units as read-only repair candidates.

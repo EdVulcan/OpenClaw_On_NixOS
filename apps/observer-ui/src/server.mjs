@@ -908,6 +908,14 @@ function observerHtml() {
           <div class="metric"><span>Mutation</span><span id="body-evidence-timeline-mutation">false</span></div>
           <pre id="body-evidence-timeline-json">Loading body evidence timeline...</pre>
         </section>
+        <section class="panel" id="body-evidence-timeline-readiness-panel">
+          <h2>Evidence Timeline Readiness</h2>
+          <div class="metric"><span>Ready</span><span id="body-evidence-timeline-readiness-ready">false</span></div>
+          <div class="metric"><span>Checks</span><span id="body-evidence-timeline-readiness-checks">0/0</span></div>
+          <div class="metric"><span>Latest</span><span id="body-evidence-timeline-readiness-latest">loading</span></div>
+          <div class="metric"><span>Mutation</span><span id="body-evidence-timeline-readiness-mutation">false</span></div>
+          <pre id="body-evidence-timeline-readiness-json">Loading body evidence timeline readiness...</pre>
+        </section>
         <section class="panel" id="phase-2-route-review">
           <h2>Phase 2 Route Review</h2>
           <div class="metric"><span>Selected Track</span><span id="phase-2-route-selected-track">loading</span></div>
@@ -1162,6 +1170,11 @@ const bodyEvidenceTimelineEntries = document.querySelector("#body-evidence-timel
 const bodyEvidenceTimelineLatest = document.querySelector("#body-evidence-timeline-latest");
 const bodyEvidenceTimelineMutation = document.querySelector("#body-evidence-timeline-mutation");
 const bodyEvidenceTimelineJson = document.querySelector("#body-evidence-timeline-json");
+const bodyEvidenceTimelineReadinessReady = document.querySelector("#body-evidence-timeline-readiness-ready");
+const bodyEvidenceTimelineReadinessChecks = document.querySelector("#body-evidence-timeline-readiness-checks");
+const bodyEvidenceTimelineReadinessLatest = document.querySelector("#body-evidence-timeline-readiness-latest");
+const bodyEvidenceTimelineReadinessMutation = document.querySelector("#body-evidence-timeline-readiness-mutation");
+const bodyEvidenceTimelineReadinessJson = document.querySelector("#body-evidence-timeline-readiness-json");
 const phase2RouteSelectedTrack = document.querySelector("#phase-2-route-selected-track");
 const phase2RouteNextSlice = document.querySelector("#phase-2-route-next-slice");
 const phase2RouteCreatesTask = document.querySelector("#phase-2-route-creates-task");
@@ -4475,6 +4488,33 @@ async function refreshBodyEvidenceTimeline() {
   }
 }
 
+async function refreshBodyEvidenceTimelineReadiness() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.systemSenseUrl}/system/route/body-evidence-timeline-readiness\`);
+    const summary = data.summary ?? {};
+    const governance = data.governance ?? {};
+    const checks = Array.isArray(data.checks) ? data.checks : [];
+    bodyEvidenceTimelineReadinessReady.textContent = String(Boolean(summary.ready));
+    bodyEvidenceTimelineReadinessChecks.textContent = \`\${summary.passedChecks ?? 0}/\${summary.totalChecks ?? checks.length}\`;
+    bodyEvidenceTimelineReadinessLatest.textContent = summary.latestEntryId ?? "unknown";
+    bodyEvidenceTimelineReadinessMutation.textContent = String(Boolean(governance.hostMutation));
+    bodyEvidenceTimelineReadinessJson.textContent = [
+      \`Registry: \${data.registry ?? "unknown"}\`,
+      \`Mode: \${data.mode ?? "unknown"} ready=\${Boolean(summary.ready)} checks=\${summary.passedChecks ?? 0}/\${summary.totalChecks ?? checks.length} entries=\${summary.timelineEntries ?? 0}\`,
+      \`Governance: createsTask=\${Boolean(governance.createsTask)} createsApproval=\${Boolean(governance.createsApproval)} executesCommand=\${Boolean(governance.executesCommand)} mutation=\${Boolean(governance.hostMutation)} recovery=\${Boolean(governance.triggersRecovery)}\`,
+      \`Checks: \${checks.map((check) => \`\${check.id}=\${Boolean(check.passed)}\`).join(", ")}\`,
+      \`Completed: \${data.completedBlock?.completionClaim ?? "unknown"} slices=\${(data.completedBlock?.completedSlices ?? []).join(", ")}\`,
+      \`Next: \${data.next?.recommendedSlice ?? "openclaw-phase-2-next-capability-route-review"} boundary=\${data.next?.boundary ?? "whitepaper route review"}\`,
+    ].join("\\n");
+  } catch {
+    bodyEvidenceTimelineReadinessReady.textContent = "false";
+    bodyEvidenceTimelineReadinessChecks.textContent = "0/0";
+    bodyEvidenceTimelineReadinessLatest.textContent = "offline";
+    bodyEvidenceTimelineReadinessMutation.textContent = "false";
+    bodyEvidenceTimelineReadinessJson.textContent = "Unable to read body evidence timeline readiness.";
+  }
+}
+
 async function refreshPhase2RouteReview() {
   try {
     const data = await fetchJson(\`\${observerConfig.systemSenseUrl}/system/route/phase-2-review\`);
@@ -6301,6 +6341,7 @@ await refreshRouteAwareNextAction();
 await refreshConservativeRecoveryPolicy();
 await refreshBodyGovernanceReadiness();
 await refreshBodyEvidenceTimeline();
+await refreshBodyEvidenceTimelineReadiness();
 await refreshPhase2RouteReview();
 await refreshSystemdRepairCandidates();
 await refreshSystemdRepairCandidatePlan();
@@ -6381,6 +6422,7 @@ setInterval(refreshRouteAwareNextAction, 5000);
 setInterval(refreshConservativeRecoveryPolicy, 5000);
 setInterval(refreshBodyGovernanceReadiness, 5000);
 setInterval(refreshBodyEvidenceTimeline, 5000);
+setInterval(refreshBodyEvidenceTimelineReadiness, 5000);
 setInterval(refreshPhase2RouteReview, 5000);
 setInterval(refreshSystemdRepairCandidates, 5000);
 setInterval(refreshSystemdRepairCandidatePlan, 5000);

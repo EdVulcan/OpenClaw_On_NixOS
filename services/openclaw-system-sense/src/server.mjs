@@ -38,6 +38,7 @@ const ROUTE_AWARE_NEXT_ACTION_REGISTRY = "openclaw-route-aware-next-action-v0";
 const CONSERVATIVE_RECOVERY_POLICY_REGISTRY = "openclaw-conservative-recovery-policy-v0";
 const BODY_GOVERNANCE_READINESS_REGISTRY = "openclaw-body-governance-readiness-v0";
 const BODY_EVIDENCE_TIMELINE_REGISTRY = "openclaw-body-evidence-timeline-v0";
+const BODY_EVIDENCE_TIMELINE_READINESS_REGISTRY = "openclaw-body-evidence-timeline-readiness-v0";
 const PHASE_2_ROUTE_REVIEW_REGISTRY = "openclaw-phase-2-route-review-v0";
 const SYSTEMD_REPAIR_CANDIDATE_ASSESSMENT_REGISTRY = "openclaw-systemd-repair-candidate-assessment-v0";
 const SYSTEMD_REPAIR_CANDIDATE_PLAN_REGISTRY = "openclaw-systemd-repair-candidate-plan-v0";
@@ -2525,6 +2526,116 @@ async function buildBodyEvidenceTimeline() {
   };
 }
 
+async function buildBodyEvidenceTimelineReadiness() {
+  const timeline = await buildBodyEvidenceTimeline();
+  const entryIds = new Set((timeline.entries ?? []).map((entry) => entry.id));
+  const requiredEntries = [
+    "body-dependency-map",
+    "health-trend-summary",
+    "route-aware-next-action",
+    "conservative-recovery-policy",
+    "body-governance-readiness",
+    "phase-2-route-review",
+    "systemd-repair-candidate-demo-status",
+  ];
+  const checks = [
+    {
+      id: "timeline-registry",
+      label: "Body evidence timeline registry is available",
+      passed: timeline.registry === BODY_EVIDENCE_TIMELINE_REGISTRY,
+      evidence: timeline.registry,
+    },
+    {
+      id: "required-entries",
+      label: "Timeline includes all required body evidence entries",
+      passed: requiredEntries.every((id) => entryIds.has(id)),
+      evidence: requiredEntries.join(","),
+    },
+    {
+      id: "phase-coverage",
+      label: "Timeline covers governance, route review, and repair candidate demo phases",
+      passed: ["body_governance", "route_review", "repair_candidate_demo"]
+        .every((phase) => timeline.summary?.phases?.includes(phase)),
+      evidence: (timeline.summary?.phases ?? []).join(","),
+    },
+    {
+      id: "non-mutating",
+      label: "Timeline and entries remain non-mutating",
+      passed: timeline.governance?.hostMutation === false
+        && timeline.governance?.executesCommand === false
+        && timeline.entries?.every((entry) => entry.mutation === false),
+      evidence: "timeline_governance",
+    },
+    {
+      id: "memory-purpose-visible",
+      label: "Timeline exposes operator memory purpose and use",
+      passed: typeof timeline.memoryModel?.purpose === "string"
+        && (timeline.memoryModel?.operatorUse ?? []).length >= 3,
+      evidence: timeline.memoryModel?.label ?? null,
+    },
+  ];
+  const passedChecks = checks.filter((check) => check.passed).length;
+  const ready = passedChecks === checks.length && timeline.summary?.timelineReady === true;
+
+  return {
+    ok: true,
+    registry: BODY_EVIDENCE_TIMELINE_READINESS_REGISTRY,
+    mode: "read_only_body_evidence_timeline_readiness",
+    generatedAt: new Date().toISOString(),
+    source: {
+      service: "openclaw-system-sense",
+      bodyEvidenceTimelineRegistry: timeline.registry,
+      evidence: "body_evidence_timeline_readiness",
+    },
+    governance: {
+      domain: "body_internal",
+      risk: "low",
+      autonomy: "readiness_report_only",
+      approvalRequired: false,
+      hostMutation: false,
+      canMutate: false,
+      canRestart: false,
+      createsTask: false,
+      createsApproval: false,
+      executesCommand: false,
+      triggersRecovery: false,
+      schedulesFollowUp: false,
+    },
+    summary: {
+      ready,
+      passedChecks,
+      totalChecks: checks.length,
+      timelineEntries: timeline.summary?.entries ?? 0,
+      latestEntryId: timeline.summary?.latestEntryId ?? null,
+      hiddenMutation: false,
+    },
+    checks,
+    completedBlock: {
+      id: "phase-2-track-c-body-evidence-memory",
+      name: "Body Evidence Memory",
+      completedSlices: [
+        "openclaw-body-evidence-timeline",
+        "observer-openclaw-body-evidence-timeline",
+      ],
+      completionClaim: ready ? "body_evidence_timeline_ready_for_route_review" : "body_evidence_timeline_incomplete",
+    },
+    evidence: {
+      timelineRegistry: timeline.registry,
+      entries: timeline.entries?.map((entry) => ({
+        id: entry.id,
+        registry: entry.registry,
+        phase: entry.phase,
+        mutation: entry.mutation,
+      })) ?? [],
+      memoryModel: timeline.memoryModel,
+    },
+    next: {
+      recommendedSlice: "openclaw-phase-2-next-capability-route-review",
+      boundary: "return to whitepaper route review before adding durable evidence storage, schedulers, or mutation",
+    },
+  };
+}
+
 function classifySystemdRepairRisk(unit) {
   if (unit.name === "openclaw-event-hub" || unit.name === "openclaw-core") {
     return "high";
@@ -2780,6 +2891,12 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "GET" && requestUrl.pathname === "/system/route/body-evidence-timeline") {
     const timeline = await buildBodyEvidenceTimeline();
     sendJson(res, 200, timeline);
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/system/route/body-evidence-timeline-readiness") {
+    const readiness = await buildBodyEvidenceTimelineReadiness();
+    sendJson(res, 200, readiness);
     return;
   }
 
