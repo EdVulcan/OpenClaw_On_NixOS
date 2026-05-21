@@ -288,6 +288,21 @@ This checkpoint is allowed because it confirms that the operator demo is ready b
 - Creates no task, no approval, no command execution, no host mutation, no scheduler, and no recovery action.
 - Must not add automatic repair, background maintenance, persistence hardening, denial recovery, duplicate-click handling, plugin/runtime adapter work, or arbitrary host control.
 
+Phase 2 next capability route review checkpoint:
+
+After the demo readiness exit passes, `openclaw-phase-2-next-capability-route-review` may choose the next body-capability block.
+
+Decision:
+
+Select Track A, `openclaw-systemd-repair-candidate-assessment`, as the next block.
+
+This checkpoint is allowed because Track B demo readiness is complete, and the whitepaper priority order now points back to real NixOS/systemd repair semantics. The first slice must be read-only candidate assessment, not broader mutation:
+
+- Reads demo readiness exit, Phase 2 priority order, and existing route evidence only.
+- Selects Track A candidate assessment and explains why additional demo polish, governance-only expansion, plugin/runtime adapter work, automatic repair, broader mutation, persistence hardening, and denial recovery are not selected.
+- Creates no task, no approval, no command execution, no host mutation, no scheduler, and no recovery action.
+- Must not add automatic repair, background maintenance, persistence hardening, denial recovery, duplicate-click handling, plugin/runtime adapter work, or arbitrary host control.
+
 ## Phase 2 Gate
 
 Before implementing any Phase 2 feature, confirm:

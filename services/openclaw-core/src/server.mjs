@@ -10174,6 +10174,105 @@ async function buildPhase2DemoReadinessExit() {
   };
 }
 
+async function buildPhase2NextCapabilityRouteReview() {
+  const demoExit = await buildPhase2DemoReadinessExit();
+  const demoReady = demoExit.summary?.ready === true;
+  const candidates = [
+    {
+      track: "Track A",
+      id: "real-systemd-repair-semantics",
+      label: "Read-only next repair candidate assessment",
+      score: demoReady ? 96 : 60,
+      recommended: true,
+      firstSlice: "openclaw-systemd-repair-candidate-assessment",
+      mutation: false,
+      reason: "Phase 2 now has demo readiness and body governance; the next body capability should return to real NixOS/systemd repair semantics without immediately broadening mutation.",
+    },
+    {
+      track: "Track B",
+      id: "operator-observer-demo-experience",
+      label: "Additional demo polish",
+      score: 55,
+      recommended: false,
+      firstSlice: "defer-additional-demo-polish",
+      mutation: false,
+      reason: "The demo block has an exit gate; more polish would be lower-value than advancing body capability.",
+    },
+    {
+      track: "Track C",
+      id: "body-governance-enhancement",
+      label: "Additional body governance summaries",
+      score: 65,
+      recommended: false,
+      firstSlice: "defer-governance-expansion",
+      mutation: false,
+      reason: "Track C readiness is already present and should now inform the next real repair candidate assessment.",
+    },
+    {
+      track: "Deferred Track",
+      id: "plugin-runtime-adapter",
+      label: "Plugin/runtime adapter work",
+      score: 20,
+      recommended: false,
+      firstSlice: "defer-plugin-runtime-adapter",
+      mutation: false,
+      reason: "Plugin/runtime adapter work still lacks a stronger visible body-capability need than next real repair candidate assessment.",
+    },
+  ];
+
+  return {
+    ok: true,
+    registry: "openclaw-phase-2-next-capability-route-review-v0",
+    mode: "read_only_next_capability_route_selection",
+    generatedAt: new Date().toISOString(),
+    source: {
+      service: "openclaw-core",
+      demoReadinessExitRegistry: demoExit.registry,
+      phase2Plan: "docs/OPENCLAW_PHASE_2_PLAN.md",
+      evidence: "phase_2_next_capability_route_review",
+    },
+    governance: {
+      readOnly: true,
+      createsTask: false,
+      createsApproval: false,
+      executesCommand: false,
+      mutatesHost: false,
+      triggersRecovery: false,
+      schedulesWork: false,
+    },
+    decision: {
+      selectedTrack: "Track A: Real NixOS/systemd Repair Semantics",
+      selectedSlice: "openclaw-systemd-repair-candidate-assessment",
+      status: demoReady ? "selected" : "blocked_until_demo_exit_ready",
+      rationale: "Return to the highest-priority body capability track, but start with read-only candidate assessment before broadening real repair mutation.",
+      notSelected: [
+        "no additional demo polish before new body capability",
+        "no governance-only expansion before candidate assessment",
+        "no plugin/runtime adapter work",
+        "no automatic repair",
+        "no broader host mutation",
+        "no persistence hardening or denial recovery loop",
+      ],
+    },
+    evidence: {
+      demoReady,
+      demoExitChecks: `${demoExit.summary?.passed ?? 0}/${demoExit.summary?.total ?? 0}`,
+      completedDemoBlock: demoExit.completedBlock,
+      priorityOrder: [
+        "real-systemd-repair-semantics",
+        "operator-observer-demo-experience",
+        "body-governance-enhancement",
+        "plugin-runtime-adapter-deferred",
+      ],
+    },
+    candidates,
+    next: {
+      recommendedSlice: "openclaw-systemd-repair-candidate-assessment",
+      boundary: "read-only candidate assessment only; do not create repair tasks or execute host mutation",
+    },
+  };
+}
+
 function baseCapabilities() {
   return [
     {
@@ -13967,6 +14066,11 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === "GET" && requestUrl.pathname === "/phase-2/demo-readiness-exit") {
     sendJson(res, 200, await buildPhase2DemoReadinessExit());
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/phase-2/next-capability-route-review") {
+    sendJson(res, 200, await buildPhase2NextCapabilityRouteReview());
     return;
   }
 

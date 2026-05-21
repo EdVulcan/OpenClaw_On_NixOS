@@ -313,6 +313,14 @@ function observerHtml() {
           <div class="metric"><span>Mutation</span><span id="phase2-demo-readiness-exit-mutation">false</span></div>
           <pre id="phase2-demo-readiness-exit-json">Loading Phase 2 demo readiness exit...</pre>
         </section>
+        <section class="panel" id="phase2-next-capability-route-panel">
+          <h2>Next Capability Route</h2>
+          <div class="metric"><span>Selected Track</span><span id="phase2-next-capability-track">loading</span></div>
+          <div class="metric"><span>Next Slice</span><span id="phase2-next-capability-slice">loading</span></div>
+          <div class="metric"><span>Creates Task</span><span id="phase2-next-capability-creates-task">false</span></div>
+          <div class="metric"><span>Mutation</span><span id="phase2-next-capability-mutation">false</span></div>
+          <pre id="phase2-next-capability-json">Loading Phase 2 next capability route review...</pre>
+        </section>
         <section class="panel">
           <h2>Controls</h2>
           <div class="control-stack">
@@ -1040,6 +1048,11 @@ const phase2DemoReadinessExitChecks = document.querySelector("#phase2-demo-readi
 const phase2DemoReadinessExitSafe = document.querySelector("#phase2-demo-readiness-exit-safe");
 const phase2DemoReadinessExitMutation = document.querySelector("#phase2-demo-readiness-exit-mutation");
 const phase2DemoReadinessExitJson = document.querySelector("#phase2-demo-readiness-exit-json");
+const phase2NextCapabilityTrack = document.querySelector("#phase2-next-capability-track");
+const phase2NextCapabilitySlice = document.querySelector("#phase2-next-capability-slice");
+const phase2NextCapabilityCreatesTask = document.querySelector("#phase2-next-capability-creates-task");
+const phase2NextCapabilityMutation = document.querySelector("#phase2-next-capability-mutation");
+const phase2NextCapabilityJson = document.querySelector("#phase2-next-capability-json");
 const screenWindow = document.querySelector("#screen-window");
 const screenSession = document.querySelector("#screen-session");
 const screenReadiness = document.querySelector("#screen-readiness");
@@ -3933,6 +3946,35 @@ async function refreshPhase2DemoReadinessExit() {
   }
 }
 
+async function refreshPhase2NextCapabilityRoute() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/phase-2/next-capability-route-review\`);
+    const decision = data.decision ?? {};
+    const governance = data.governance ?? {};
+    const evidence = data.evidence ?? {};
+    phase2NextCapabilityTrack.textContent = decision.selectedTrack ?? "unknown";
+    phase2NextCapabilitySlice.textContent = decision.selectedSlice ?? data.next?.recommendedSlice ?? "unknown";
+    phase2NextCapabilityCreatesTask.textContent = String(Boolean(governance.createsTask));
+    phase2NextCapabilityMutation.textContent = String(Boolean(governance.mutatesHost));
+    phase2NextCapabilityJson.textContent = [
+      \`Registry: \${data.registry ?? "unknown"}\`,
+      \`Mode: \${data.mode ?? "unknown"} readOnly=\${Boolean(governance.readOnly)} createsTask=\${Boolean(governance.createsTask)} executesCommand=\${Boolean(governance.executesCommand)} mutatesHost=\${Boolean(governance.mutatesHost)}\`,
+      \`Decision: \${decision.status ?? "unknown"} track=\${decision.selectedTrack ?? "unknown"} slice=\${decision.selectedSlice ?? "unknown"}\`,
+      \`Rationale: \${decision.rationale ?? "none"}\`,
+      \`Avoid: \${(decision.notSelected ?? []).join(", ") || "none"}\`,
+      \`Evidence: demoReady=\${Boolean(evidence.demoReady)} exitChecks=\${evidence.demoExitChecks ?? "0/0"} completed=\${evidence.completedDemoBlock?.completionClaim ?? "unknown"}\`,
+      \`Candidates: \${(data.candidates ?? []).map((candidate) => \`\${candidate.track}:\${candidate.firstSlice}:recommended=\${Boolean(candidate.recommended)}\`).join(", ")}\`,
+      \`Next: \${data.next?.recommendedSlice ?? "systemd repair candidate assessment"}\`,
+    ].join("\\n");
+  } catch {
+    phase2NextCapabilityTrack.textContent = "offline";
+    phase2NextCapabilitySlice.textContent = "unknown";
+    phase2NextCapabilityCreatesTask.textContent = "false";
+    phase2NextCapabilityMutation.textContent = "false";
+    phase2NextCapabilityJson.textContent = "Unable to read Phase 2 next capability route review.";
+  }
+}
+
 async function refreshRuntime() {
   try {
     const data = await fetchJson(\`\${observerConfig.coreUrl}/state/runtime\`);
@@ -5838,6 +5880,7 @@ await refreshPhase2RepairDemoStatus();
 await refreshPhase2DemoControlRoom();
 await refreshPhase2DemoWalkthrough();
 await refreshPhase2DemoReadinessExit();
+await refreshPhase2NextCapabilityRoute();
 await refreshRuntime();
 await refreshTaskList();
 await refreshTaskHistoryDetail();
@@ -5909,6 +5952,7 @@ setInterval(refreshPhase2RepairDemoStatus, 5000);
 setInterval(refreshPhase2DemoControlRoom, 5000);
 setInterval(refreshPhase2DemoWalkthrough, 5000);
 setInterval(refreshPhase2DemoReadinessExit, 5000);
+setInterval(refreshPhase2NextCapabilityRoute, 5000);
 setInterval(refreshRuntime, 5000);
 setInterval(refreshTaskList, 5000);
 setInterval(refreshTaskHistoryDetail, 5000);
