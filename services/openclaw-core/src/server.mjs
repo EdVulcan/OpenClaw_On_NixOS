@@ -10081,6 +10081,99 @@ async function buildPhase2DemoWalkthrough() {
   };
 }
 
+async function buildPhase2DemoReadinessExit() {
+  const walkthrough = await buildPhase2DemoWalkthrough();
+  const exitChecks = [
+    {
+      id: "control-room-ready",
+      label: "Phase 2 demo control room is ready",
+      passed: walkthrough.summary?.controlRoomReady === true,
+      evidence: walkthrough.source?.demoControlRoomRegistry ?? "openclaw-phase-2-demo-control-room-v0",
+    },
+    {
+      id: "walkthrough-ready",
+      label: "Human demo walkthrough steps are ready",
+      passed: walkthrough.summary?.ready === true,
+      evidence: walkthrough.registry,
+    },
+    {
+      id: "body-governance-visible",
+      label: "Body governance readiness is visible in the demo story",
+      passed: walkthrough.summary?.bodyGovernanceReady === true,
+      evidence: "openclaw-body-governance-readiness-v0",
+    },
+    {
+      id: "operator-boundary-visible",
+      label: "No-hidden-mutation boundary is visible in the walkthrough",
+      passed: (walkthrough.script ?? []).some((line) => line.includes("No hidden mutation")),
+      evidence: "walkthrough-script",
+    },
+    {
+      id: "read-only-exit",
+      label: "Exit gate remains read-only and non-executing",
+      passed: walkthrough.governance?.createsTask === false
+        && walkthrough.governance?.executesCommand === false
+        && walkthrough.governance?.mutatesHost === false
+        && walkthrough.governance?.triggersRecovery === false,
+      evidence: "exit-governance",
+    },
+  ];
+  const passed = exitChecks.filter((check) => check.passed).length;
+  const ready = passed === exitChecks.length;
+
+  return {
+    ok: true,
+    registry: "openclaw-phase-2-demo-readiness-exit-v0",
+    mode: "read_only_demo_block_exit",
+    generatedAt: new Date().toISOString(),
+    status: ready ? "phase_2_demo_block_ready" : "phase_2_demo_block_waiting",
+    source: {
+      service: "openclaw-core",
+      demoWalkthroughRegistry: walkthrough.registry,
+      demoControlRoomRegistry: walkthrough.source?.demoControlRoomRegistry ?? null,
+      evidence: "phase_2_track_b_demo_readiness_exit",
+    },
+    governance: {
+      readOnly: true,
+      createsTask: false,
+      createsApproval: false,
+      executesCommand: false,
+      mutatesHost: false,
+      triggersRecovery: false,
+      schedulesWork: false,
+    },
+    summary: {
+      ready,
+      passed,
+      total: exitChecks.length,
+      walkthroughStatus: walkthrough.status,
+      selectedSlice: walkthrough.summary?.selectedSlice ?? "unknown",
+      repairDemoReady: walkthrough.summary?.repairDemoReady === true,
+      bodyGovernanceReady: walkthrough.summary?.bodyGovernanceReady === true,
+    },
+    exitChecks,
+    completedBlock: {
+      id: "phase-2-track-b-demo-experience",
+      name: "Operator/Observer Demo Experience",
+      completedSlices: [
+        "openclaw-phase-2-route-review",
+        "openclaw-phase-2-demo-control-room",
+        "openclaw-phase-2-demo-walkthrough",
+      ],
+      completionClaim: ready ? "track_b_demo_readiness_exit_passed" : "track_b_demo_readiness_incomplete",
+    },
+    operatorOutcome: {
+      demoNarrative: "OpenClaw can now show a resident body loop, real repair evidence, body governance evidence, and the next-route decision from one Observer path.",
+      safeToDemo: ready,
+      hiddenMutation: false,
+    },
+    next: {
+      recommendedSlice: "openclaw-phase-2-next-capability-route-review",
+      boundary: "return to the whitepaper route before opening the next body capability block",
+    },
+  };
+}
+
 function baseCapabilities() {
   return [
     {
@@ -13869,6 +13962,11 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === "GET" && requestUrl.pathname === "/phase-2/demo-walkthrough") {
     sendJson(res, 200, await buildPhase2DemoWalkthrough());
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/phase-2/demo-readiness-exit") {
+    sendJson(res, 200, await buildPhase2DemoReadinessExit());
     return;
   }
 

@@ -277,6 +277,17 @@ This checkpoint is allowed because it turns the control room into an explainable
 - Creates no task, no approval, no command execution, no host mutation, no scheduler, and no recovery action.
 - Must not add automatic repair, background maintenance, persistence hardening, denial recovery, duplicate-click handling, plugin/runtime adapter work, or arbitrary host control.
 
+Phase 2 demo readiness exit checkpoint:
+
+After the demo walkthrough passes, `openclaw-phase-2-demo-readiness-exit` may close the Track B demo block with a read-only exit gate.
+
+This checkpoint is allowed because it confirms that the operator demo is ready before opening another body capability block:
+
+- Reads demo walkthrough and demo control room evidence only.
+- Exposes exit checks, safe-to-demo outcome, completed Track B slices, and next route-review boundary.
+- Creates no task, no approval, no command execution, no host mutation, no scheduler, and no recovery action.
+- Must not add automatic repair, background maintenance, persistence hardening, denial recovery, duplicate-click handling, plugin/runtime adapter work, or arbitrary host control.
+
 ## Phase 2 Gate
 
 Before implementing any Phase 2 feature, confirm:

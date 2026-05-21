@@ -305,6 +305,14 @@ function observerHtml() {
           <div class="metric"><span>Mutation</span><span id="phase2-demo-walkthrough-mutation">false</span></div>
           <pre id="phase2-demo-walkthrough-json">Loading Phase 2 demo walkthrough...</pre>
         </section>
+        <section class="panel" id="phase2-demo-readiness-exit-panel">
+          <h2>Phase 2 Demo Exit</h2>
+          <div class="metric"><span>Status</span><span id="phase2-demo-readiness-exit-status">loading</span></div>
+          <div class="metric"><span>Checks</span><span id="phase2-demo-readiness-exit-checks">0/0</span></div>
+          <div class="metric"><span>Safe To Demo</span><span id="phase2-demo-readiness-exit-safe">false</span></div>
+          <div class="metric"><span>Mutation</span><span id="phase2-demo-readiness-exit-mutation">false</span></div>
+          <pre id="phase2-demo-readiness-exit-json">Loading Phase 2 demo readiness exit...</pre>
+        </section>
         <section class="panel">
           <h2>Controls</h2>
           <div class="control-stack">
@@ -1027,6 +1035,11 @@ const phase2DemoWalkthroughSteps = document.querySelector("#phase2-demo-walkthro
 const phase2DemoWalkthroughControlRoom = document.querySelector("#phase2-demo-walkthrough-control-room");
 const phase2DemoWalkthroughMutation = document.querySelector("#phase2-demo-walkthrough-mutation");
 const phase2DemoWalkthroughJson = document.querySelector("#phase2-demo-walkthrough-json");
+const phase2DemoReadinessExitStatus = document.querySelector("#phase2-demo-readiness-exit-status");
+const phase2DemoReadinessExitChecks = document.querySelector("#phase2-demo-readiness-exit-checks");
+const phase2DemoReadinessExitSafe = document.querySelector("#phase2-demo-readiness-exit-safe");
+const phase2DemoReadinessExitMutation = document.querySelector("#phase2-demo-readiness-exit-mutation");
+const phase2DemoReadinessExitJson = document.querySelector("#phase2-demo-readiness-exit-json");
 const screenWindow = document.querySelector("#screen-window");
 const screenSession = document.querySelector("#screen-session");
 const screenReadiness = document.querySelector("#screen-readiness");
@@ -3890,6 +3903,36 @@ async function refreshPhase2DemoWalkthrough() {
   }
 }
 
+async function refreshPhase2DemoReadinessExit() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/phase-2/demo-readiness-exit\`);
+    const summary = data.summary ?? {};
+    const governance = data.governance ?? {};
+    const operatorOutcome = data.operatorOutcome ?? {};
+    const completedBlock = data.completedBlock ?? {};
+    phase2DemoReadinessExitStatus.textContent = data.status ?? "unknown";
+    phase2DemoReadinessExitChecks.textContent = \`\${summary.passed ?? 0}/\${summary.total ?? 0}\`;
+    phase2DemoReadinessExitSafe.textContent = String(Boolean(operatorOutcome.safeToDemo));
+    phase2DemoReadinessExitMutation.textContent = String(Boolean(governance.mutatesHost));
+    phase2DemoReadinessExitJson.textContent = [
+      \`Registry: \${data.registry ?? "unknown"}\`,
+      \`Mode: \${data.mode ?? "unknown"} readOnly=\${Boolean(governance.readOnly)} createsTask=\${Boolean(governance.createsTask)} executesCommand=\${Boolean(governance.executesCommand)} mutatesHost=\${Boolean(governance.mutatesHost)}\`,
+      \`Status: \${data.status ?? "unknown"} ready=\${Boolean(summary.ready)} checks=\${summary.passed ?? 0}/\${summary.total ?? 0}\`,
+      \`Outcome: safeToDemo=\${Boolean(operatorOutcome.safeToDemo)} hiddenMutation=\${Boolean(operatorOutcome.hiddenMutation)}\`,
+      \`Completed: \${completedBlock.name ?? "unknown"} claim=\${completedBlock.completionClaim ?? "unknown"}\`,
+      \`Slices: \${(completedBlock.completedSlices ?? []).join(", ")}\`,
+      \`Checks: \${(data.exitChecks ?? []).map((check) => \`\${check.id}=\${Boolean(check.passed)}\`).join(", ")}\`,
+      \`Next: \${data.next?.recommendedSlice ?? "next capability route review"}\`,
+    ].join("\\n");
+  } catch {
+    phase2DemoReadinessExitStatus.textContent = "offline";
+    phase2DemoReadinessExitChecks.textContent = "0/0";
+    phase2DemoReadinessExitSafe.textContent = "false";
+    phase2DemoReadinessExitMutation.textContent = "false";
+    phase2DemoReadinessExitJson.textContent = "Unable to read Phase 2 demo readiness exit.";
+  }
+}
+
 async function refreshRuntime() {
   try {
     const data = await fetchJson(\`\${observerConfig.coreUrl}/state/runtime\`);
@@ -5794,6 +5837,7 @@ await refreshMvpRoute();
 await refreshPhase2RepairDemoStatus();
 await refreshPhase2DemoControlRoom();
 await refreshPhase2DemoWalkthrough();
+await refreshPhase2DemoReadinessExit();
 await refreshRuntime();
 await refreshTaskList();
 await refreshTaskHistoryDetail();
@@ -5864,6 +5908,7 @@ setInterval(refreshMvpRoute, 5000);
 setInterval(refreshPhase2RepairDemoStatus, 5000);
 setInterval(refreshPhase2DemoControlRoom, 5000);
 setInterval(refreshPhase2DemoWalkthrough, 5000);
+setInterval(refreshPhase2DemoReadinessExit, 5000);
 setInterval(refreshRuntime, 5000);
 setInterval(refreshTaskList, 5000);
 setInterval(refreshTaskHistoryDetail, 5000);
