@@ -49,6 +49,7 @@ const BODY_EVIDENCE_LEDGER_READINESS_REGISTRY = "openclaw-body-evidence-ledger-r
 const BODY_EVIDENCE_LEDGER_DEMO_STATUS_REGISTRY = "openclaw-body-evidence-ledger-demo-status-v0";
 const SYSTEMD_NEXT_REPAIR_SCOPE_REVIEW_REGISTRY = "openclaw-systemd-next-repair-scope-review-v0";
 const SYSTEMD_NEXT_REPAIR_PLAN_REGISTRY = "openclaw-systemd-next-repair-plan-v0";
+const SYSTEMD_NEXT_REPAIR_ROUTE_REVIEW_REGISTRY = "openclaw-systemd-next-repair-route-review-v0";
 const PHASE_2_ROUTE_REVIEW_REGISTRY = "openclaw-phase-2-route-review-v0";
 const SYSTEMD_REPAIR_CANDIDATE_ASSESSMENT_REGISTRY = "openclaw-systemd-repair-candidate-assessment-v0";
 const SYSTEMD_REPAIR_CANDIDATE_PLAN_REGISTRY = "openclaw-systemd-repair-candidate-plan-v0";
@@ -3746,6 +3747,137 @@ async function buildSystemdNextRepairPlan() {
   };
 }
 
+async function buildSystemdNextRepairRouteReview() {
+  const repairPlan = await buildSystemdNextRepairPlan();
+  const planReady = repairPlan.plan?.targetUnit === "openclaw-system-sense.service"
+    && repairPlan.plan?.commandPreviewOnly === true
+    && repairPlan.governance?.hostMutation === false
+    && repairPlan.governance?.executesCommand === false;
+  const candidates = [
+    {
+      track: "Track A",
+      id: "next-repair-dry-run-envelope",
+      label: "Operator-visible dry-run envelope for the selected system-sense repair plan",
+      score: planReady ? 96 : 50,
+      recommended: true,
+      firstSlice: "openclaw-systemd-next-repair-dry-run",
+      mutation: false,
+      reason: planReady
+        ? "The selected system-sense repair scope has a plan-only command preview; the next smallest Track A step is a non-mutating dry-run envelope."
+        : "The dry-run route waits until the next repair plan is ready and non-mutating.",
+    },
+    {
+      track: "Track A",
+      id: "immediate-task-shell",
+      label: "Approval-gated task shell for the selected system-sense repair",
+      score: 58,
+      recommended: false,
+      firstSlice: "defer-next-repair-task-shell",
+      mutation: false,
+      reason: "Task materialization is too early; the selected unit needs an Observer-visible dry-run envelope first.",
+    },
+    {
+      track: "Track A",
+      id: "immediate-systemctl-execution",
+      label: "Immediate systemctl restart execution",
+      score: 20,
+      recommended: false,
+      firstSlice: "defer-next-repair-real-execution",
+      mutation: true,
+      reason: "Real restart would mutate the host and must wait for dry-run, task, approval, and verification slices.",
+    },
+    {
+      track: "Track B",
+      id: "browser-runtime-demo-replay",
+      label: "Replay the completed browser-runtime repair demo",
+      score: 18,
+      recommended: false,
+      firstSlice: "defer-browser-runtime-demo-replay",
+      mutation: false,
+      reason: "The browser-runtime repair demo is already complete; replaying it would slow Phase 2 progress.",
+    },
+    {
+      track: "Deferred Track",
+      id: "plugin-runtime-adapter",
+      label: "Plugin/runtime adapter work",
+      score: 10,
+      recommended: false,
+      firstSlice: "defer-plugin-runtime-adapter",
+      mutation: false,
+      reason: "Plugin/runtime adapter work is still not needed for this body repair route.",
+    },
+  ];
+
+  return {
+    ok: true,
+    registry: SYSTEMD_NEXT_REPAIR_ROUTE_REVIEW_REGISTRY,
+    mode: "read_only_next_systemd_repair_route_selection",
+    generatedAt: new Date().toISOString(),
+    source: {
+      service: "openclaw-system-sense",
+      nextRepairPlanRegistry: repairPlan.registry,
+      scopeReviewRegistry: repairPlan.source?.scopeReviewRegistry ?? null,
+      phase2Plan: "docs/OPENCLAW_PHASE_2_PLAN.md",
+      evidence: "systemd_next_repair_route_review",
+    },
+    governance: {
+      domain: "body_internal",
+      risk: "low",
+      autonomy: "route_selection_only",
+      approvalRequired: false,
+      hostMutation: false,
+      canMutate: false,
+      canRestart: false,
+      createsTask: false,
+      createsApproval: false,
+      executesCommand: false,
+      triggersRecovery: false,
+      schedulesFollowUp: false,
+    },
+    decision: {
+      selectedTrack: "Track A: Real NixOS/systemd Repair Semantics",
+      selectedSlice: "openclaw-systemd-next-repair-dry-run",
+      selectedUnit: repairPlan.plan?.targetUnit ?? null,
+      status: planReady ? "selected" : "blocked_until_next_repair_plan_ready",
+      rationale: "Advance the selected system-sense repair route by one non-mutating step: a dry-run envelope, not a task or restart.",
+      notSelected: [
+        "no immediate repair task",
+        "no approval creation",
+        "no systemctl execution",
+        "no host mutation",
+        "no browser-runtime repair demo replay",
+        "no automatic repair",
+        "no persistence hardening",
+        "no denial recovery or duplicate-click work",
+        "no plugin/runtime adapter work",
+      ],
+    },
+    evidence: {
+      planReady,
+      targetUnit: repairPlan.plan?.targetUnit ?? null,
+      commandPreview: repairPlan.plan?.commandPreview ?? null,
+      commandPreviewOnly: repairPlan.plan?.commandPreviewOnly === true,
+      planRegistry: repairPlan.registry,
+      scopeReviewRegistry: repairPlan.source?.scopeReviewRegistry ?? null,
+      requiredBeforeExecution: repairPlan.plan?.requiredBeforeExecution ?? [],
+      targetImpactClass: repairPlan.target?.impactClass ?? "unknown",
+      targetImpactRadius: repairPlan.target?.impactRadius ?? 0,
+      routePriorityOrder: [
+        "operator-visible-dry-run-envelope",
+        "defer-task-materialization",
+        "defer-host-mutation",
+        "avoid-completed-demo-replay",
+        "plugin-runtime-adapter-deferred",
+      ],
+    },
+    candidates,
+    next: {
+      recommendedSlice: "openclaw-systemd-next-repair-dry-run",
+      boundary: "operator-visible dry-run envelope only; do not create tasks, approvals, restarts, recovery actions, schedulers, or host mutation",
+    },
+  };
+}
+
 function classifySystemdRepairRisk(unit) {
   if (unit.name === "openclaw-event-hub" || unit.name === "openclaw-core") {
     return "high";
@@ -4141,6 +4273,12 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "GET" && requestUrl.pathname === "/system/systemd/next-repair-plan") {
     const plan = await buildSystemdNextRepairPlan();
     sendJson(res, 200, plan);
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/system/systemd/next-repair-route-review") {
+    const review = await buildSystemdNextRepairRouteReview();
+    sendJson(res, 200, review);
     return;
   }
 
