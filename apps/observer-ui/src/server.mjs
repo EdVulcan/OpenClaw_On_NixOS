@@ -1117,6 +1117,7 @@ function observerHtml() {
           <div class="metric"><span>Mutation</span><span id="systemd-next-repair-task-shell-mutation">false</span></div>
           <div class="actions tight">
             <button id="create-systemd-next-repair-task-shell-button" class="secondary">Create Next Repair Task Shell</button>
+            <button id="create-systemd-next-repair-real-execution-button" class="secondary">Create Next Repair Real Execution Task</button>
           </div>
           <pre id="systemd-next-repair-task-shell-json">Loading approval-gated next repair task shell route...</pre>
         </section>
@@ -1495,6 +1496,7 @@ const createSystemdRepairExecutionTaskButton = document.querySelector("#create-s
 const createSystemdRepairRealExecutionTaskButton = document.querySelector("#create-systemd-repair-real-execution-task-button");
 const createSystemdRepairCandidateTaskShellButton = document.querySelector("#create-systemd-repair-candidate-task-shell-button");
 const createSystemdNextRepairTaskShellButton = document.querySelector("#create-systemd-next-repair-task-shell-button");
+const createSystemdNextRepairRealExecutionButton = document.querySelector("#create-systemd-next-repair-real-execution-button");
 const createBodyEvidenceLedgerDirectoryTaskButton = document.querySelector("#create-body-evidence-ledger-directory-task-button");
 const createBodyEvidenceLedgerFirstRecordTaskButton = document.querySelector("#create-body-evidence-ledger-first-record-task-button");
 const taskPlanStatus = document.querySelector("#task-plan-status");
@@ -5430,6 +5432,7 @@ async function refreshSystemdNextRepairTaskShell() {
     systemdNextRepairTaskShellMutation.textContent = String(Boolean(governance.hostMutation));
     systemdNextRepairTaskShellJson.textContent = [
       "Registry: openclaw-systemd-next-repair-task-shell-v0",
+      "Real Execution Registry: openclaw-systemd-next-repair-real-execution-v0",
       "Endpoint: /system/systemd/next-repair-tasks",
       \`Route: \${data.registry ?? "unknown"} selected=\${routeDecision.selectedSlice ?? "unknown"} target=\${routeDecision.targetUnit ?? "unknown"}\`,
       \`Create: allowed=\${Boolean(createShell.allowedNow)} createsTask=\${Boolean(createShell.createsTask)} createsApproval=\${Boolean(createShell.createsApproval)} approvalState=pending-after-create\`,
@@ -6450,6 +6453,29 @@ async function createSystemdNextRepairTaskShell() {
   return result;
 }
 
+async function createSystemdNextRepairRealExecutionTask() {
+  const result = await fetchJson(\`\${observerConfig.coreUrl}/system/systemd/next-repair-tasks\`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      confirm: true,
+      execute: true,
+    }),
+  });
+  setControlMessage(\`Next systemd repair real execution task queued: \${result.task?.id ?? "unknown"} approval=\${result.approval?.id ?? "none"} realExecutionEnabled=\${Boolean(result.governance?.realExecutionEnabled)}\`);
+  taskHistoryFocus = "selected-task";
+  selectedHistoryTaskId = result.task?.id ?? null;
+  taskDetailIdInput.value = result.task?.id ?? "";
+  await Promise.all([
+    refreshSystemdNextRepairTaskShell(),
+    refreshTaskList(),
+    refreshTaskHistoryDetail(),
+    refreshApprovalState(),
+    refreshOperatorState(),
+  ]);
+  return result;
+}
+
 async function createBodyEvidenceLedgerDirectoryTask() {
   const result = await fetchJson(\`\${observerConfig.coreUrl}/body/evidence-ledger/directory-tasks\`, {
     method: "POST",
@@ -6607,6 +6633,8 @@ function subscribeEvents() {
     "heal.completed",
     "systemd.repair.execution_completed",
     "systemd.repair.execution_failed",
+    "systemd.next_repair.execution_completed",
+    "systemd.next_repair.execution_failed",
     "maintenance.policy.updated",
     "maintenance.tick",
     "maintenance.started",
@@ -6880,6 +6908,12 @@ createSystemdRepairCandidateTaskShellButton.addEventListener("click", () => {
 
 createSystemdNextRepairTaskShellButton.addEventListener("click", () => {
   createSystemdNextRepairTaskShell().catch((error) => {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  });
+});
+
+createSystemdNextRepairRealExecutionButton.addEventListener("click", () => {
+  createSystemdNextRepairRealExecutionTask().catch((error) => {
     setControlMessage(\`Request failed: \${formatError(error)}\`);
   });
 });

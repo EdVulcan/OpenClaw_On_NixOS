@@ -526,6 +526,18 @@ This checkpoint is allowed because it advances Track A from a read-only route to
 - Creates a task and approval only; it does not approve, execute a command, restart a service, recover a failed task, schedule follow-up work, mutate the host, or add another ledger write.
 - Must not approve the task, execute `systemctl`, add automatic repair, replay the browser-runtime demo, add persistence hardening, denial recovery, duplicate-click handling, plugin/runtime adapter work, arbitrary host control, or broader mutation.
 
+Systemd next repair real execution checkpoint:
+
+After `openclaw-systemd-next-repair-task-shell` passes, `openclaw-systemd-next-repair-real-execution` may prove one operator-approved real execution attempt for `openclaw-system-sense.service`.
+
+This checkpoint is allowed because it is the narrow Track A continuation from approval-gated task materialization to a visible body repair attempt:
+
+- Requires explicit `execute=true` task materialization and a separate approved approval request.
+- Executes only `systemctl restart openclaw-system-sense.service`.
+- Records command, target, exit code, stdout/stderr, result, rollback note, and before/after body-state verification evidence.
+- Exposes Observer-visible real execution intent and result fields.
+- Must not add automatic repair, retries, denial recovery, duplicate-click handling, persistence hardening, schedulers, plugin/runtime adapter work, arbitrary host control, or broader mutation.
+
 Body evidence timeline checkpoint:
 
 After the next capability route review selects Track C, `openclaw-body-evidence-timeline` may expose a read-only chronological memory spine for OpenClaw body evidence.

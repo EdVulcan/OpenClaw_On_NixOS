@@ -77,7 +77,9 @@ const STATUS_PRIORITY = {
 };
 const SYSTEMD_REPAIR_EXECUTION_TASK_REGISTRY = "openclaw-systemd-repair-execution-task-v0";
 const SYSTEMD_NEXT_REPAIR_TASK_SHELL_REGISTRY = "openclaw-systemd-next-repair-task-shell-v0";
+const SYSTEMD_NEXT_REPAIR_REAL_EXECUTION_REGISTRY = "openclaw-systemd-next-repair-real-execution-v0";
 const SYSTEMD_REPAIR_REAL_EXECUTION_UNIT = "openclaw-browser-runtime.service";
+const SYSTEMD_NEXT_REPAIR_REAL_EXECUTION_UNIT = "openclaw-system-sense.service";
 const execFileAsync = promisify(execFile);
 
 function normaliseAutonomyMode(value) {
@@ -8958,7 +8960,7 @@ async function createSystemdRepairCandidateTaskShell({ confirm = false } = {}) {
   };
 }
 
-async function createSystemdNextRepairTaskShell({ confirm = false } = {}) {
+async function createSystemdNextRepairTaskShell({ confirm = false, execute = false } = {}) {
   if (confirm !== true) {
     throw new Error("Next systemd repair task shell creation requires confirm=true.");
   }
@@ -8977,9 +8979,14 @@ async function createSystemdNextRepairTaskShell({ confirm = false } = {}) {
     args: Array.isArray(dryRunEvidence.args) && dryRunEvidence.args.length > 0
       ? dryRunEvidence.args
       : ["restart", targetUnit],
-    wouldExecute: false,
+    wouldExecute: execute === true,
   };
-  const goal = `Approval-gated next OpenClaw systemd repair task shell for ${targetUnit}`;
+  const registry = execute === true
+    ? SYSTEMD_NEXT_REPAIR_REAL_EXECUTION_REGISTRY
+    : SYSTEMD_NEXT_REPAIR_TASK_SHELL_REGISTRY;
+  const goal = execute === true
+    ? `Operator-approved real next OpenClaw systemd repair execution for ${targetUnit}`
+    : `Approval-gated next OpenClaw systemd repair task shell for ${targetUnit}`;
   const policyRequest = {
     intent: "systemd.next_repair.execute",
     domain: "body_internal",
@@ -8998,9 +9005,11 @@ async function createSystemdNextRepairTaskShell({ confirm = false } = {}) {
     goal,
   });
   const plan = {
-    planner: "systemd-next-repair-task-shell-v0",
-    strategy: "approval-gated-next-systemd-repair-task-shell",
-    summary: `Create a queued approval-gated task shell for ${targetUnit}; do not approve or execute in this milestone.`,
+    planner: execute === true ? "systemd-next-repair-real-execution-v0" : "systemd-next-repair-task-shell-v0",
+    strategy: execute === true ? "operator-reviewed-next-systemd-repair-real-execution" : "approval-gated-next-systemd-repair-task-shell",
+    summary: execute === true
+      ? `Create a queued approval-gated real execution task for ${targetUnit}; execute only after explicit approval.`
+      : `Create a queued approval-gated task shell for ${targetUnit}; do not approve or execute in this milestone.`,
     steps: [
       {
         id: "review-next-repair-route",
@@ -9020,19 +9029,21 @@ async function createSystemdNextRepairTaskShell({ confirm = false } = {}) {
         risk: "high",
       },
       {
-        id: "defer-next-repair-execution",
-        phase: "next_repair_execution_deferred",
-        title: "Defer restart execution to a future route-reviewed milestone",
+        id: execute === true ? "execute-next-systemd-restart" : "defer-next-repair-execution",
+        phase: execute === true ? "next_repair_operator_reviewed_real_execution" : "next_repair_execution_deferred",
+        title: execute === true
+          ? "Execute operator-approved systemd restart for the selected next OpenClaw body unit"
+          : "Defer restart execution to a future route-reviewed milestone",
         status: "pending",
         command: command.command,
         args: command.args,
         requiresApproval: true,
-        hostMutation: false,
+        hostMutation: execute === true,
       },
     ],
   };
   const systemdNextRepair = {
-    registry: SYSTEMD_NEXT_REPAIR_TASK_SHELL_REGISTRY,
+    registry,
     sourceRegistry: routeGate.registry,
     dryRunRegistry: dryRunEvidence.dryRunRegistry ?? null,
     target: {
@@ -9044,12 +9055,12 @@ async function createSystemdNextRepairTaskShell({ confirm = false } = {}) {
       dryRun: dryRunEvidence,
     },
     execution: {
-      shellOnly: true,
-      realExecutionEnabled: false,
+      shellOnly: execute !== true,
+      realExecutionEnabled: execute === true,
       executed: false,
       hostMutation: false,
       hostMutationAttempted: false,
-      futureExecutionRequiresSeparateMilestone: true,
+      futureExecutionRequiresSeparateMilestone: execute !== true,
     },
   };
   const task = createTask({
@@ -9077,8 +9088,10 @@ async function createSystemdNextRepairTaskShell({ confirm = false } = {}) {
   })));
 
   return {
-    registry: SYSTEMD_NEXT_REPAIR_TASK_SHELL_REGISTRY,
-    mode: "approval-gated-next-systemd-repair-task-shell",
+    registry,
+    mode: execute === true
+      ? "operator-reviewed-next-systemd-repair-real-execution-task"
+      : "approval-gated-next-systemd-repair-task-shell",
     generatedAt: new Date().toISOString(),
     sourceRegistry: routeGate.registry,
     routeGate,
@@ -9090,9 +9103,9 @@ async function createSystemdNextRepairTaskShell({ confirm = false } = {}) {
       canExecuteWithoutApproval: false,
       executed: false,
       hostMutation: false,
-      realExecutionEnabled: false,
+      realExecutionEnabled: execute === true,
       requiresExplicitApproval: true,
-      futureExecutionRequiresSeparateMilestone: true,
+      futureExecutionRequiresSeparateMilestone: execute !== true,
     },
   };
 }
@@ -12504,6 +12517,12 @@ function isSystemdRepairExecutionTask(task) {
     && task?.systemdRepair?.registry === SYSTEMD_REPAIR_EXECUTION_TASK_REGISTRY;
 }
 
+function isSystemdNextRepairTask(task) {
+  return task?.type === "systemd_next_repair_task"
+    && (task?.systemdNextRepair?.registry === SYSTEMD_NEXT_REPAIR_TASK_SHELL_REGISTRY
+      || task?.systemdNextRepair?.registry === SYSTEMD_NEXT_REPAIR_REAL_EXECUTION_REGISTRY);
+}
+
 function isBodyEvidenceLedgerDirectoryTask(task) {
   return task?.type === "body_evidence_ledger_directory_task";
 }
@@ -12558,12 +12577,13 @@ async function deferSystemdRepairExecutionTask(task) {
 }
 
 function buildSystemdRepairCommandTranscript(task, result) {
-  const command = task.systemdRepair?.command ?? {};
+  const repair = task.systemdRepair ?? task.systemdNextRepair ?? {};
+  const command = repair.command ?? {};
   const args = Array.isArray(command.args) ? command.args : [];
   const actualArgs = Array.isArray(result.args) ? result.args : [];
   return {
-    stepId: "execute-systemd-restart",
-    actionKind: "systemd.repair.execute",
+    stepId: task.systemdNextRepair ? "execute-next-systemd-restart" : "execute-systemd-restart",
+    actionKind: task.systemdNextRepair ? "systemd.next_repair.execute" : "systemd.repair.execute",
     capabilityId: "act.system.heal",
     invocationId: result.invocationId,
     command: [command.command ?? "systemctl", ...args].join(" "),
@@ -12580,11 +12600,12 @@ function buildSystemdRepairCommandTranscript(task, result) {
 }
 
 async function runSystemdRepairCommand(task) {
-  const command = task.systemdRepair?.command ?? {};
-  const requestedArgs = Array.isArray(command.args) ? command.args : ["restart", task.systemdRepair?.target?.unit ?? SYSTEMD_REPAIR_REAL_EXECUTION_UNIT];
+  const repair = task.systemdRepair ?? task.systemdNextRepair ?? {};
+  const command = repair.command ?? {};
+  const requestedArgs = Array.isArray(command.args) ? command.args : ["restart", repair.target?.unit ?? SYSTEMD_REPAIR_REAL_EXECUTION_UNIT];
   const useRestartHelper =
     SYSTEMD_REPAIR_RESTART_HELPER
-    && task.systemdRepair?.target?.unit === SYSTEMD_REPAIR_REAL_EXECUTION_UNIT
+    && repair.target?.unit === SYSTEMD_REPAIR_REAL_EXECUTION_UNIT
     && command.command === "systemctl"
     && requestedArgs[0] === "restart"
     && requestedArgs[1] === SYSTEMD_REPAIR_REAL_EXECUTION_UNIT;
@@ -13065,6 +13086,168 @@ async function executeSystemdRepairExecutionTask(task) {
     execution: {
       mode: "operator_reviewed_real_systemd_restart",
       target: updatedTask.systemdRepair?.target ?? null,
+      command,
+      hostMutation: true,
+      hostMutationAttempted: true,
+      executed: true,
+      executionSucceeded: result.ok,
+      exitCode: result.exitCode,
+      authDelegation: result.authDelegation ?? null,
+      postExecutionVerification,
+      rollbackNote: updatedTask.outcome.details.rollbackNote,
+    },
+  };
+}
+
+async function deferSystemdNextRepairTask(task) {
+  const deferredTask = await setTaskPhase(task, "systemd_next_repair_execution_deferred", {
+    status: "completed",
+    details: {
+      executor: "systemd-next-repair-task-shell-v0",
+      reason: "next_repair_task_shell_only",
+      target: task.systemdNextRepair?.target ?? null,
+      command: task.systemdNextRepair?.command ?? null,
+      hostMutation: false,
+      executed: false,
+    },
+  });
+  deferredTask.outcome = {
+    kind: "systemd_next_repair_execution_deferred",
+    summary: `Next OpenClaw systemd repair task shell for ${task.systemdNextRepair?.target?.unit ?? "unknown unit"} is ready; no restart executed.`,
+    details: {
+      systemdNextRepair: task.systemdNextRepair ?? null,
+      hostMutation: false,
+      executed: false,
+      futureExecutionRequiresSeparateMilestone: true,
+    },
+    at: deferredTask.updatedAt,
+  };
+  deferredTask.closedAt = deferredTask.updatedAt;
+  reconcileRuntimeState();
+  persistState();
+  await publishEvent("systemd.next_repair.execution_deferred", { task: serialiseTask(deferredTask) });
+
+  return {
+    task: deferredTask,
+    policy: deferredTask.policy?.decision ?? null,
+    approval: deferredTask.approval ?? null,
+    blocked: false,
+    reason: null,
+    execution: {
+      mode: "next_repair_deferred_execution_shell",
+      target: deferredTask.systemdNextRepair?.target ?? null,
+      command: deferredTask.systemdNextRepair?.command ?? null,
+      hostMutation: false,
+      executed: false,
+    },
+  };
+}
+
+async function executeSystemdNextRepairTask(task) {
+  const targetUnit = task.systemdNextRepair?.target?.unit ?? null;
+  if (targetUnit !== SYSTEMD_NEXT_REPAIR_REAL_EXECUTION_UNIT) {
+    throw new Error(`Next real systemd repair execution is limited to ${SYSTEMD_NEXT_REPAIR_REAL_EXECUTION_UNIT}.`);
+  }
+
+  const command = task.systemdNextRepair?.command ?? {};
+  const args = Array.isArray(command.args) ? command.args : [];
+  if (command.command !== "systemctl" || args[0] !== "restart" || args[1] !== SYSTEMD_NEXT_REPAIR_REAL_EXECUTION_UNIT) {
+    throw new Error(`Unexpected next systemd repair command: ${JSON.stringify(command)}`);
+  }
+
+  const beforeVerification = await captureSystemdRepairVerificationSnapshot(targetUnit, "before_next_real_execution");
+  const runningTask = await setTaskPhase(task, "systemd_next_repair_execution_running", {
+    status: "running",
+    details: {
+      executor: "systemd-next-repair-real-execution-v0",
+      target: task.systemdNextRepair?.target ?? null,
+      command,
+      hostMutationAttempted: true,
+      executed: true,
+    },
+  });
+  const result = await runSystemdRepairCommand(runningTask);
+  const commandTranscript = [buildSystemdRepairCommandTranscript(runningTask, result)];
+  const afterVerification = await captureSystemdRepairVerificationSnapshot(targetUnit, "after_next_real_execution");
+  const postExecutionVerification = buildSystemdRepairPostExecutionVerification(
+    targetUnit,
+    beforeVerification,
+    afterVerification,
+    result,
+  );
+  const rollbackNote = "If this restart degrades body health, inspect systemd status and verify health before attempting any further repair.";
+  const status = result.ok ? "completed" : "failed";
+  const phase = result.ok ? "systemd_next_repair_execution_completed" : "systemd_next_repair_execution_failed";
+  const updatedTask = await setTaskPhase(runningTask, phase, {
+    status,
+    details: {
+      executor: "systemd-next-repair-real-execution-v0",
+      target: runningTask.systemdNextRepair?.target ?? null,
+      command,
+      hostMutation: true,
+      hostMutationAttempted: true,
+      executed: true,
+      commandTranscript,
+      result,
+      postExecutionVerification,
+    },
+  });
+  updatedTask.systemdNextRepair = {
+    ...(updatedTask.systemdNextRepair ?? {}),
+    execution: {
+      ...(updatedTask.systemdNextRepair?.execution ?? {}),
+      shellOnly: false,
+      realExecutionEnabled: true,
+      hostMutation: true,
+      hostMutationAttempted: true,
+      executed: true,
+      executionSucceeded: result.ok,
+      exitCode: result.exitCode,
+      completedAt: result.completedAt,
+      authDelegation: result.authDelegation ?? null,
+    },
+  };
+  updatedTask.outcome = {
+    kind: result.ok ? "systemd_next_repair_execution_completed" : "systemd_next_repair_execution_failed",
+    summary: result.ok
+      ? `Operator-approved next systemd restart completed for ${targetUnit}.`
+      : `Operator-approved next systemd restart attempted for ${targetUnit} and exited with code ${result.exitCode}.`,
+    reason: result.ok ? null : "systemd_next_restart_nonzero_exit",
+    details: {
+      systemdNextRepair: updatedTask.systemdNextRepair,
+      target: updatedTask.systemdNextRepair?.target ?? null,
+      command,
+      hostMutation: true,
+      hostMutationAttempted: true,
+      executed: true,
+      executionSucceeded: result.ok,
+      authDelegation: result.authDelegation ?? null,
+      commandTranscript,
+      result,
+      postExecutionVerification,
+      rollbackNote,
+    },
+    at: updatedTask.updatedAt,
+  };
+  updatedTask.closedAt = updatedTask.updatedAt;
+  reconcileRuntimeState();
+  persistState();
+  await publishEvent(result.ok ? "systemd.next_repair.execution_completed" : "systemd.next_repair.execution_failed", {
+    task: serialiseTask(updatedTask),
+    result,
+  });
+
+  return {
+    task: updatedTask,
+    policy: updatedTask.policy?.decision ?? null,
+    approval: updatedTask.approval ?? null,
+    blocked: false,
+    reason: null,
+    commandTranscript,
+    verification: { ok: result.ok, checks: [], failedChecks: result.ok ? [] : [{ name: "systemctl_next_restart_exit_code", expected: 0, actual: result.exitCode }] },
+    execution: {
+      mode: "operator_reviewed_next_real_systemd_restart",
+      target: updatedTask.systemdNextRepair?.target ?? null,
       command,
       hostMutation: true,
       hostMutationAttempted: true,
@@ -14534,6 +14717,20 @@ async function executeTaskWithRecovery(task, options = {}) {
     const deferredExecution = task.systemdRepair?.execution?.realExecutionEnabled === true
       ? await executeSystemdRepairExecutionTask(task)
       : await deferSystemdRepairExecutionTask(task);
+    return {
+      finalExecution: deferredExecution,
+      attempts: [deferredExecution],
+      recovery: {
+        attempted: false,
+        maxAttempts: 0,
+      },
+    };
+  }
+
+  if (isSystemdNextRepairTask(task)) {
+    const deferredExecution = task.systemdNextRepair?.execution?.realExecutionEnabled === true
+      ? await executeSystemdNextRepairTask(task)
+      : await deferSystemdNextRepairTask(task);
     return {
       finalExecution: deferredExecution,
       attempts: [deferredExecution],
@@ -16179,6 +16376,7 @@ const server = http.createServer(async (req, res) => {
       const body = await readJsonBody(req);
       const result = await createSystemdNextRepairTaskShell({
         confirm: body.confirm === true,
+        execute: body.execute === true,
       });
       sendJson(res, 201, {
         ok: true,
