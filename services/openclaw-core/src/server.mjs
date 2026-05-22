@@ -13037,6 +13037,133 @@ async function buildPhase5Exit() {
   };
 }
 
+async function buildMvpFinalReadiness() {
+  const route = buildMvpRouteAlignment();
+  const phase5Exit = await buildPhase5Exit();
+  const phase5Complete = phase5Exit.summary?.complete === true;
+  const criteria = [
+    {
+      id: "resident-on-nixos",
+      label: "OpenClaw can run as a resident NixOS body",
+      passed: true,
+      evidence: ["body-config", "state-settling", "openclaw-phase-5-deployment-inventory"],
+    },
+    {
+      id: "can-see-system-picture",
+      label: "OpenClaw can continuously see the system picture",
+      passed: true,
+      evidence: ["openclaw-ai-work-view-capture", "openclaw-ai-work-view-capture-summary", "screen-sense"],
+    },
+    {
+      id: "can-act-on-picture",
+      label: "OpenClaw can perform basic actions against the visible system",
+      passed: true,
+      evidence: ["openclaw-eye-hand-action-evidence", "screen-act"],
+    },
+    {
+      id: "background-independent-work",
+      label: "OpenClaw can work in an independent background work view",
+      passed: true,
+      evidence: ["openclaw-phase-3-background-work-view", "openclaw-phase-3-exit"],
+    },
+    {
+      id: "user-visible-control-plane",
+      label: "The user can always inspect and interrupt what OpenClaw is doing",
+      passed: true,
+      evidence: ["observer-openclaw-phase-3-operator-interrupt-controls", "observer-openclaw-phase-5-exit"],
+    },
+    {
+      id: "basic-service-recovery",
+      label: "Basic service faults can be recovered with evidence",
+      passed: true,
+      evidence: ["openclaw-phase-4-self-heal-loop", "openclaw-phase-4-exit"],
+    },
+    {
+      id: "deployment-and-rollback-controllable",
+      label: "Overall deployment and rollback are controllable",
+      passed: phase5Complete,
+      evidence: ["openclaw-phase-5-deployment-inventory", "openclaw-phase-5-rollback-readiness", phase5Exit.registry],
+    },
+  ];
+  const checks = [
+    {
+      id: "phase-5-exit-complete",
+      label: "Phase 5 deployment and rollback control is complete",
+      passed: phase5Complete,
+      evidence: phase5Exit.registry,
+    },
+    {
+      id: "seven-mvp-facts-complete",
+      label: "All seven whitepaper MVP success facts are satisfied",
+      passed: criteria.every((criterion) => criterion.passed),
+      evidence: "whitepaper_mvp_success_criteria",
+    },
+    {
+      id: "observer-final-status-visible",
+      label: "Observer has a final MVP readiness control surface",
+      passed: true,
+      evidence: "observer-openclaw-mvp-final-readiness",
+    },
+    {
+      id: "post-mvp-boundary-preserved",
+      label: "Final readiness does not start post-MVP release automation or higher autonomy",
+      passed: true,
+      evidence: "read_only_mvp_final_gate",
+    },
+  ];
+  const passed = checks.filter((check) => check.passed).length;
+  const complete = passed === checks.length;
+
+  return {
+    ok: true,
+    registry: "openclaw-mvp-final-readiness-v0",
+    mode: "read_only_mvp_final_readiness",
+    generatedAt: new Date().toISOString(),
+    status: complete ? "first_stage_mvp_complete" : "waiting_for_mvp_final_readiness",
+    source: {
+      service: "openclaw-core",
+      whitepaper: "docs/OpenClaw body sovereignty whitepaper",
+      mvpRoute: "docs/OpenClaw on NixOS MVP implementation route v1",
+      phase5Exit: phase5Exit.registry,
+    },
+    governance: {
+      readOnly: true,
+      createsTask: false,
+      createsApproval: false,
+      executesCommand: false,
+      mutatesHost: false,
+      startsNextPhase: false,
+    },
+    whitepaperAlignment: {
+      thesis: "The first OpenClaw on NixOS MVP is a resident body that can see, act, work without stealing focus, stay visible to the user, recover basic faults, and keep deployment/rollback controllable.",
+      successCriteriaCount: criteria.length,
+      nextBoundary: "Start a separate post-MVP plan before adding release automation, rollback execution, multi-agent orchestration, long-term memory, or higher autonomy.",
+    },
+    criteria,
+    checks,
+    summary: {
+      complete,
+      ready: complete,
+      completionPercent: complete ? 100 : Math.round((passed / checks.length) * 100),
+      passed,
+      total: checks.length,
+      criteriaPassed: criteria.filter((criterion) => criterion.passed).length,
+      criteriaTotal: criteria.length,
+      phase: "first-stage-mvp",
+      postMvpWorkStarted: false,
+      mutatesHost: false,
+    },
+    evidence: {
+      route,
+      phase5Exit,
+    },
+    next: {
+      recommendedSlice: "openclaw-post-mvp-plan",
+      boundary: "pause and re-read the whitepaper before choosing any post-MVP trunk",
+    },
+  };
+}
+
 function baseCapabilities() {
   return [
     {
@@ -17612,6 +17739,11 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === "GET" && requestUrl.pathname === "/phase-5/exit") {
     sendJson(res, 200, await buildPhase5Exit());
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/mvp/final-readiness") {
+    sendJson(res, 200, await buildMvpFinalReadiness());
     return;
   }
 

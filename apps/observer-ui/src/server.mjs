@@ -450,6 +450,13 @@ function observerHtml() {
           <div class="metric"><span>Next</span><span id="phase5-exit-next">loading</span></div>
           <pre id="phase5-exit-json">Loading Phase 5 exit gate...</pre>
         </section>
+        <section class="panel" id="mvp-final-readiness-panel">
+          <h2>MVP Final Readiness</h2>
+          <div class="metric"><span>Complete</span><span id="mvp-final-complete">false</span></div>
+          <div class="metric"><span>Criteria</span><span id="mvp-final-criteria">0/0</span></div>
+          <div class="metric"><span>Next</span><span id="mvp-final-next">loading</span></div>
+          <pre id="mvp-final-json">Loading MVP final readiness...</pre>
+        </section>
         <section class="panel">
           <h2>Controls</h2>
           <div class="control-stack">
@@ -1522,6 +1529,10 @@ const phase5ExitComplete = document.querySelector("#phase5-exit-complete");
 const phase5ExitPercent = document.querySelector("#phase5-exit-percent");
 const phase5ExitNext = document.querySelector("#phase5-exit-next");
 const phase5ExitJson = document.querySelector("#phase5-exit-json");
+const mvpFinalComplete = document.querySelector("#mvp-final-complete");
+const mvpFinalCriteria = document.querySelector("#mvp-final-criteria");
+const mvpFinalNext = document.querySelector("#mvp-final-next");
+const mvpFinalJson = document.querySelector("#mvp-final-json");
 const screenWindow = document.querySelector("#screen-window");
 const screenSession = document.querySelector("#screen-session");
 const screenReadiness = document.querySelector("#screen-readiness");
@@ -5034,6 +5045,29 @@ async function refreshPhase5Exit() {
   }
 }
 
+async function refreshMvpFinalReadiness() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/mvp/final-readiness\`);
+    const summary = data.summary ?? {};
+    mvpFinalComplete.textContent = String(Boolean(summary.complete));
+    mvpFinalCriteria.textContent = (summary.criteriaPassed ?? 0) + "/" + (summary.criteriaTotal ?? 0);
+    mvpFinalNext.textContent = data.next?.recommendedSlice ?? "openclaw-post-mvp-plan";
+    mvpFinalJson.textContent = [
+      "Registry: " + (data.registry ?? "openclaw-mvp-final-readiness-v0"),
+      "Mode: " + (data.mode ?? "unknown") + " status=" + (data.status ?? "unknown"),
+      "Complete: " + Boolean(summary.complete) + " percent=" + (summary.completionPercent ?? 0),
+      "Criteria: " + (summary.criteriaPassed ?? 0) + "/" + (summary.criteriaTotal ?? 0),
+      "Boundary: " + (data.whitepaperAlignment?.nextBoundary ?? "post-MVP plan required"),
+      "Next: " + (data.next?.recommendedSlice ?? "openclaw-post-mvp-plan"),
+    ].join("\\n");
+  } catch {
+    mvpFinalComplete.textContent = "false";
+    mvpFinalCriteria.textContent = "0/0";
+    mvpFinalNext.textContent = "openclaw-post-mvp-plan";
+    mvpFinalJson.textContent = "Unable to read MVP final readiness.";
+  }
+}
+
 async function refreshRuntime() {
   try {
     const data = await fetchJson(\`\${observerConfig.coreUrl}/state/runtime\`);
@@ -8051,6 +8085,7 @@ await refreshPhase5DeploymentInventory();
 await refreshPhase5RollbackReadiness();
 await refreshPhase5ReleaseControlReadiness();
 await refreshPhase5Exit();
+await refreshMvpFinalReadiness();
 await refreshRuntime();
 await refreshTaskList();
 await refreshTaskHistoryDetail();
@@ -8172,6 +8207,7 @@ setInterval(refreshPhase5DeploymentInventory, 5000);
 setInterval(refreshPhase5RollbackReadiness, 5000);
 setInterval(refreshPhase5ReleaseControlReadiness, 5000);
 setInterval(refreshPhase5Exit, 5000);
+setInterval(refreshMvpFinalReadiness, 5000);
 setInterval(refreshRuntime, 5000);
 setInterval(refreshTaskList, 5000);
 setInterval(refreshTaskHistoryDetail, 5000);
