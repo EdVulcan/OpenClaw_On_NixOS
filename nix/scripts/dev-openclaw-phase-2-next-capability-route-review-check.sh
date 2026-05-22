@@ -19,6 +19,7 @@ export OPENCLAW_SYSTEM_HEAL_STATE_FILE="${OPENCLAW_SYSTEM_HEAL_STATE_FILE:-$REPO
 
 CORE_URL="http://127.0.0.1:$OPENCLAW_CORE_PORT"
 SYSTEM_URL="http://127.0.0.1:$OPENCLAW_SYSTEM_SENSE_PORT"
+LEDGER_DIR="$REPO_ROOT/.artifacts/openclaw-body-evidence-ledger"
 
 "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 rm -f \
@@ -26,6 +27,7 @@ rm -f \
   "$OPENCLAW_CORE_STATE_FILE.tmp" \
   "$OPENCLAW_SYSTEM_HEAL_STATE_FILE" \
   "$OPENCLAW_SYSTEM_HEAL_STATE_FILE.tmp"
+rm -rf "$LEDGER_DIR"
 
 cleanup() {
   "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
