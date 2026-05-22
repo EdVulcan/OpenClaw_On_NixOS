@@ -457,6 +457,13 @@ function observerHtml() {
           <div class="metric"><span>Next</span><span id="mvp-final-next">loading</span></div>
           <pre id="mvp-final-json">Loading MVP final readiness...</pre>
         </section>
+        <section class="panel" id="post-mvp-plan-panel">
+          <h2>Post-MVP Plan</h2>
+          <div class="metric"><span>Ready</span><span id="post-mvp-plan-ready">false</span></div>
+          <div class="metric"><span>Selected Trunk</span><span id="post-mvp-plan-trunk">loading</span></div>
+          <div class="metric"><span>Next</span><span id="post-mvp-plan-next">loading</span></div>
+          <pre id="post-mvp-plan-json">Loading post-MVP plan...</pre>
+        </section>
         <section class="panel">
           <h2>Controls</h2>
           <div class="control-stack">
@@ -1533,6 +1540,10 @@ const mvpFinalComplete = document.querySelector("#mvp-final-complete");
 const mvpFinalCriteria = document.querySelector("#mvp-final-criteria");
 const mvpFinalNext = document.querySelector("#mvp-final-next");
 const mvpFinalJson = document.querySelector("#mvp-final-json");
+const postMvpPlanReady = document.querySelector("#post-mvp-plan-ready");
+const postMvpPlanTrunk = document.querySelector("#post-mvp-plan-trunk");
+const postMvpPlanNext = document.querySelector("#post-mvp-plan-next");
+const postMvpPlanJson = document.querySelector("#post-mvp-plan-json");
 const screenWindow = document.querySelector("#screen-window");
 const screenSession = document.querySelector("#screen-session");
 const screenReadiness = document.querySelector("#screen-readiness");
@@ -5068,6 +5079,29 @@ async function refreshMvpFinalReadiness() {
   }
 }
 
+async function refreshPostMvpPlan() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/post-mvp/plan\`);
+    const summary = data.summary ?? {};
+    postMvpPlanReady.textContent = String(Boolean(summary.ready));
+    postMvpPlanTrunk.textContent = summary.selectedTrunk ?? "unknown";
+    postMvpPlanNext.textContent = data.next?.recommendedSlice ?? "openclaw-phase-6-consciousness-memory-plan";
+    postMvpPlanJson.textContent = [
+      "Registry: " + (data.registry ?? "openclaw-post-mvp-plan-v0"),
+      "Mode: " + (data.mode ?? "unknown") + " status=" + (data.status ?? "unknown"),
+      "Ready: " + Boolean(summary.ready) + " percent=" + (summary.completionPercent ?? 0),
+      "Theme: " + (data.whitepaperAlignment?.selectedTheme ?? "Give the body a memory-bearing task mind."),
+      "Selected: " + (summary.selectedTrunk ?? "unknown"),
+      "Next: " + (data.next?.recommendedSlice ?? "openclaw-phase-6-consciousness-memory-plan"),
+    ].join("\\n");
+  } catch {
+    postMvpPlanReady.textContent = "false";
+    postMvpPlanTrunk.textContent = "unknown";
+    postMvpPlanNext.textContent = "openclaw-phase-6-consciousness-memory-plan";
+    postMvpPlanJson.textContent = "Unable to read post-MVP plan.";
+  }
+}
+
 async function refreshRuntime() {
   try {
     const data = await fetchJson(\`\${observerConfig.coreUrl}/state/runtime\`);
@@ -8086,6 +8120,7 @@ await refreshPhase5RollbackReadiness();
 await refreshPhase5ReleaseControlReadiness();
 await refreshPhase5Exit();
 await refreshMvpFinalReadiness();
+await refreshPostMvpPlan();
 await refreshRuntime();
 await refreshTaskList();
 await refreshTaskHistoryDetail();
@@ -8208,6 +8243,7 @@ setInterval(refreshPhase5RollbackReadiness, 5000);
 setInterval(refreshPhase5ReleaseControlReadiness, 5000);
 setInterval(refreshPhase5Exit, 5000);
 setInterval(refreshMvpFinalReadiness, 5000);
+setInterval(refreshPostMvpPlan, 5000);
 setInterval(refreshRuntime, 5000);
 setInterval(refreshTaskList, 5000);
 setInterval(refreshTaskHistoryDetail, 5000);

@@ -13164,6 +13164,125 @@ async function buildMvpFinalReadiness() {
   };
 }
 
+async function buildPostMvpPlan() {
+  const finalReadiness = await buildMvpFinalReadiness();
+  const mvpComplete = finalReadiness.summary?.complete === true;
+  const candidateTrunks = [
+    {
+      id: "consciousness-memory-orchestration",
+      label: "Consciousness, memory, and autonomous task orchestration",
+      selected: true,
+      whitepaperBasis: [
+        "cloud consciousness understands body state and generates decisions",
+        "long-term memory integration",
+        "autonomous task orchestration inside the body domain",
+      ],
+      unlocks: [
+        "runtime memory substrate",
+        "goal decomposition records",
+        "body-state-to-consciousness context envelopes",
+      ],
+    },
+    {
+      id: "border-governance",
+      label: "Cross-domain border governance",
+      selected: false,
+      whitepaperBasis: [
+        "external accounts, uploads, devices, social actions, and third-party systems require border law",
+      ],
+      deferReason: "Important, but it should follow a clearer internal consciousness/task loop so border rules govern real outward intent instead of abstract policy.",
+    },
+    {
+      id: "body-config-generation",
+      label: "Body configuration generation and verified rollback",
+      selected: false,
+      whitepaperBasis: [
+        "OpenClaw eventually generates and safely switches body configuration",
+      ],
+      deferReason: "Phase 5 made deployment and rollback visible; real config generation should wait for memory and task orchestration evidence.",
+    },
+  ];
+  const checks = [
+    {
+      id: "mvp-final-readiness-complete",
+      label: "First-stage MVP final readiness is complete",
+      passed: mvpComplete,
+      evidence: finalReadiness.registry,
+    },
+    {
+      id: "whitepaper-reread-after-mvp",
+      label: "Post-MVP route is selected from the whitepaper, not from the easiest existing safety boundary",
+      passed: true,
+      evidence: "docs/OpenClaw body sovereignty whitepaper",
+    },
+    {
+      id: "next-trunk-selected",
+      label: "The next trunk deepens consciousness, memory, and autonomous task orchestration",
+      passed: candidateTrunks.some((trunk) => trunk.id === "consciousness-memory-orchestration" && trunk.selected),
+      evidence: "post_mvp_route_selection",
+    },
+    {
+      id: "no-hidden-implementation",
+      label: "Post-MVP plan does not implement memory, cloud calls, cross-domain behavior, rollback execution, or hidden automation yet",
+      passed: true,
+      evidence: "read_only_post_mvp_plan",
+    },
+  ];
+  const passed = checks.filter((check) => check.passed).length;
+  const ready = passed === checks.length;
+
+  return {
+    ok: true,
+    registry: "openclaw-post-mvp-plan-v0",
+    mode: "read_only_post_mvp_route_selection",
+    generatedAt: new Date().toISOString(),
+    status: ready ? "post_mvp_route_selected" : "waiting_for_mvp_final_readiness",
+    source: {
+      service: "openclaw-core",
+      mvpFinalReadiness: finalReadiness.registry,
+      postMvpPlan: "docs/OPENCLAW_POST_MVP_PLAN.md",
+      whitepaper: "docs/OpenClaw body sovereignty whitepaper",
+    },
+    governance: {
+      readOnly: true,
+      createsTask: false,
+      createsApproval: false,
+      executesCommand: false,
+      mutatesHost: false,
+      callsCloudModel: false,
+      writesMemory: false,
+      crossesDomain: false,
+      startsAutomation: false,
+    },
+    whitepaperAlignment: {
+      thesis: "After the resident body MVP, the next meaningful jump is connecting body state to consciousness-grade memory and task orchestration.",
+      selectedTheme: "Give the body a memory-bearing task mind.",
+      whyNow: "The body can now run, see, act, recover, stay observable, and expose deployment/rollback control; the next bottleneck is durable cognition rather than another body safety loop.",
+      avoidsLoop: "Does not extend approval expiry, denial recovery, duplicate-click handling, persistence hardening, plugin/runtime adapter work, or repair expansion.",
+    },
+    candidateTrunks,
+    selectedTrunk: candidateTrunks.find((trunk) => trunk.selected),
+    checks,
+    summary: {
+      ready,
+      passed,
+      total: checks.length,
+      completionPercent: Math.round((passed / checks.length) * 100),
+      mvpComplete,
+      selectedTrunk: candidateTrunks.find((trunk) => trunk.selected)?.id ?? null,
+      phase: "post-mvp-route",
+      mutatesHost: false,
+    },
+    evidence: {
+      finalReadiness,
+    },
+    next: {
+      recommendedSlice: "openclaw-phase-6-consciousness-memory-plan",
+      boundary: "start Phase 6 with a read-only consciousness/memory/task-orchestration plan before implementing durable memory writes or cloud-consciousness calls",
+    },
+  };
+}
+
 function baseCapabilities() {
   return [
     {
@@ -17744,6 +17863,11 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === "GET" && requestUrl.pathname === "/mvp/final-readiness") {
     sendJson(res, 200, await buildMvpFinalReadiness());
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/post-mvp/plan") {
+    sendJson(res, 200, await buildPostMvpPlan());
     return;
   }
 
