@@ -337,6 +337,14 @@ function observerHtml() {
           <div class="metric"><span>Mutation</span><span id="phase2-completion-readiness-mutation">false</span></div>
           <pre id="phase2-completion-readiness-json">Loading Phase 2 completion readiness...</pre>
         </section>
+        <section class="panel" id="phase2-exit-panel">
+          <h2>Phase 2 Exit</h2>
+          <div class="metric"><span>Complete</span><span id="phase2-exit-complete">false</span></div>
+          <div class="metric"><span>Percent</span><span id="phase2-exit-percent">0</span></div>
+          <div class="metric"><span>Next</span><span id="phase2-exit-next">loading</span></div>
+          <div class="metric"><span>Mutation</span><span id="phase2-exit-mutation">false</span></div>
+          <pre id="phase2-exit-json">Loading Phase 2 exit gate...</pre>
+        </section>
         <section class="panel">
           <h2>Controls</h2>
           <div class="control-stack">
@@ -1343,6 +1351,11 @@ const phase2CompletionReadinessChecks = document.querySelector("#phase2-completi
 const phase2CompletionReadinessPercent = document.querySelector("#phase2-completion-readiness-percent");
 const phase2CompletionReadinessMutation = document.querySelector("#phase2-completion-readiness-mutation");
 const phase2CompletionReadinessJson = document.querySelector("#phase2-completion-readiness-json");
+const phase2ExitComplete = document.querySelector("#phase2-exit-complete");
+const phase2ExitPercent = document.querySelector("#phase2-exit-percent");
+const phase2ExitNext = document.querySelector("#phase2-exit-next");
+const phase2ExitMutation = document.querySelector("#phase2-exit-mutation");
+const phase2ExitJson = document.querySelector("#phase2-exit-json");
 const screenWindow = document.querySelector("#screen-window");
 const screenSession = document.querySelector("#screen-session");
 const screenReadiness = document.querySelector("#screen-readiness");
@@ -4492,6 +4505,32 @@ async function refreshPhase2CompletionReadiness() {
   }
 }
 
+async function refreshPhase2Exit() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/phase-2/exit\`);
+    const summary = data.summary ?? {};
+    const governance = data.governance ?? {};
+    phase2ExitComplete.textContent = String(Boolean(summary.complete));
+    phase2ExitPercent.textContent = String(summary.completionPercent ?? 0);
+    phase2ExitNext.textContent = data.next?.recommendedSlice ?? "unknown";
+    phase2ExitMutation.textContent = String(Boolean(governance.mutatesHost));
+    phase2ExitJson.textContent = [
+      \`Registry: \${data.registry ?? "openclaw-phase-2-exit-v0"}\`,
+      \`Mode: \${data.mode ?? "unknown"} status=\${data.status ?? "unknown"} complete=\${Boolean(summary.complete)} percent=\${summary.completionPercent ?? 0}\`,
+      \`Readiness: status=\${summary.readinessStatus ?? "unknown"} checks=\${summary.passed ?? 0}/\${summary.total ?? 0} records=\${summary.durableBodyMemoryRecords ?? 0} followup=\${summary.followupRecordId ?? "none"}\`,
+      \`Completed: \${data.completedPhase?.completionClaim ?? "unknown"} tracks=\${(data.completedPhase?.completedTracks ?? []).length}\`,
+      \`Governance: readOnly=\${Boolean(governance.readOnly)} createsTask=\${Boolean(governance.createsTask)} createsApproval=\${Boolean(governance.createsApproval)} executesCommand=\${Boolean(governance.executesCommand)} mutatesHost=\${Boolean(governance.mutatesHost)} scheduler=\${Boolean(governance.schedulesWork)} backgroundWriter=\${Boolean(governance.backgroundWriter)} writesLedger=\${Boolean(governance.writesLedger)}\`,
+      \`Next: \${data.next?.recommendedSlice ?? "unknown"} boundary=\${data.next?.boundary ?? "unknown"}\`,
+    ].join("\\n");
+  } catch {
+    phase2ExitComplete.textContent = "false";
+    phase2ExitPercent.textContent = "0";
+    phase2ExitNext.textContent = "unknown";
+    phase2ExitMutation.textContent = "false";
+    phase2ExitJson.textContent = "Unable to read Phase 2 exit gate.";
+  }
+}
+
 async function refreshRuntime() {
   try {
     const data = await fetchJson(\`\${observerConfig.coreUrl}/state/runtime\`);
@@ -7487,6 +7526,7 @@ await refreshPhase2DemoWalkthrough();
 await refreshPhase2DemoReadinessExit();
 await refreshPhase2NextCapabilityRoute();
 await refreshPhase2CompletionReadiness();
+await refreshPhase2Exit();
 await refreshRuntime();
 await refreshTaskList();
 await refreshTaskHistoryDetail();
@@ -7592,6 +7632,7 @@ setInterval(refreshPhase2DemoWalkthrough, 5000);
 setInterval(refreshPhase2DemoReadinessExit, 5000);
 setInterval(refreshPhase2NextCapabilityRoute, 5000);
 setInterval(refreshPhase2CompletionReadiness, 5000);
+setInterval(refreshPhase2Exit, 5000);
 setInterval(refreshRuntime, 5000);
 setInterval(refreshTaskList, 5000);
 setInterval(refreshTaskHistoryDetail, 5000);

@@ -564,6 +564,18 @@ This checkpoint is allowed because Track A, Track B, and Track C have each produ
 - Creates no task, no approval, no command execution, no host mutation, no scheduler, no recovery action, no background writer, and no additional ledger record.
 - Must not add more body-memory records, repair executions, plugin/runtime adapter work, persistence hardening, denial recovery, duplicate-click handling, arbitrary host control, or broader mutation.
 
+Phase 2 exit checkpoint:
+
+After `openclaw-phase-2-completion-readiness` reports 100% readiness, `openclaw-phase-2-exit` may mark Phase 2 complete.
+
+This checkpoint is allowed because it is a read-only closeout gate, not a new capability slice:
+
+- Reads Phase 2 completion readiness only.
+- Confirms Track A real repair semantics, Track B Observer demo readiness, Track C body governance and durable body memory, and no hidden scheduler/background writer.
+- Declares Phase 2 complete and points future work to a separate Phase 3 plan.
+- Creates no task, no approval, no command execution, no host mutation, no scheduler, no recovery action, no background writer, and no additional ledger record.
+- Must not add more Phase 2 capability slices, repair executions, body-memory records, plugin/runtime adapter work, persistence hardening, denial recovery, duplicate-click handling, arbitrary host control, or broader mutation.
+
 Systemd next repair scope review checkpoint:
 
 After the next capability route review selects `openclaw-systemd-next-repair-scope-review`, the system may choose the next Track A repair scope from existing body evidence.

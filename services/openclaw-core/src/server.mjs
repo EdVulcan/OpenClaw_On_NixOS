@@ -11771,6 +11771,62 @@ async function buildPhase2CompletionReadiness() {
   };
 }
 
+async function buildPhase2Exit() {
+  const readiness = await buildPhase2CompletionReadiness();
+  const complete = readiness.summary?.ready === true
+    && readiness.summary?.completionPercent === 100
+    && readiness.governance?.readOnly === true;
+
+  return {
+    ok: true,
+    registry: "openclaw-phase-2-exit-v0",
+    mode: "read_only_phase_2_exit_gate",
+    generatedAt: new Date().toISOString(),
+    status: complete ? "phase_2_complete" : "waiting_for_completion_readiness",
+    source: {
+      service: "openclaw-core",
+      completionReadinessRegistry: readiness.registry,
+      phase2Plan: "docs/OPENCLAW_PHASE_2_PLAN.md",
+      evidence: "phase_2_exit_gate",
+    },
+    governance: {
+      readOnly: true,
+      createsTask: false,
+      createsApproval: false,
+      executesCommand: false,
+      mutatesHost: false,
+      triggersRecovery: false,
+      schedulesWork: false,
+      backgroundWriter: false,
+      writesLedger: false,
+    },
+    summary: {
+      complete,
+      completionPercent: complete ? 100 : readiness.summary?.completionPercent ?? 0,
+      readinessStatus: readiness.status,
+      passed: readiness.summary?.passed ?? 0,
+      total: readiness.summary?.total ?? 0,
+      durableBodyMemoryRecords: readiness.summary?.durableBodyMemoryRecords ?? 0,
+      followupRecordId: readiness.summary?.followupRecordId ?? null,
+      phase: "phase-2",
+      futurePlanRequired: true,
+    },
+    completedPhase: {
+      id: "phase-2",
+      name: "Resident Digital Body Phase 2",
+      completionClaim: complete ? "phase_2_complete" : "phase_2_incomplete",
+      completedTracks: readiness.completedTracks ?? [],
+    },
+    evidence: {
+      completionReadiness: readiness,
+    },
+    next: {
+      recommendedSlice: "openclaw-phase-3-plan",
+      boundary: "start a separate Phase 3 plan before adding new capability slices",
+    },
+  };
+}
+
 function baseCapabilities() {
   return [
     {
@@ -16266,6 +16322,11 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === "GET" && requestUrl.pathname === "/phase-2/completion-readiness") {
     sendJson(res, 200, await buildPhase2CompletionReadiness());
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/phase-2/exit") {
+    sendJson(res, 200, await buildPhase2Exit());
     return;
   }
 
