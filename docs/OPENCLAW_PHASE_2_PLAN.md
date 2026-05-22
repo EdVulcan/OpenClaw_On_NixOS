@@ -495,6 +495,22 @@ This checkpoint is allowed because the project needs a route pause before decidi
 - Creates no task, no approval, no command execution, no host mutation, no scheduler, no recovery action, no background writer, and no additional ledger record.
 - Must return to whitepaper route review before approving the task, appending a second record, adding background persistence, schedulers, automatic repair, denial recovery, duplicate-click handling, plugin/runtime adapter work, arbitrary host control, or broader mutation.
 
+Phase 2 next capability route review after follow-up ledger readiness checkpoint:
+
+After `openclaw-body-evidence-ledger-followup-record-readiness` passes, `openclaw-phase-2-next-capability-route-review-followup-readiness` may decide whether the already-visible follow-up ledger task shell should become the next body-memory route.
+
+Decision:
+
+Select Track C, `openclaw-body-evidence-ledger-followup-record-append-route-review`, as a future route-review slice only.
+
+This checkpoint is allowed because the follow-up task shell is visible and pending, but the second durable ledger record still needs a separate route review before any approval or append:
+
+- Reads body evidence ledger follow-up record readiness only.
+- Selects a future append route review for the pending `body_evidence_ledger_followup_record_task`.
+- Exposes task id, approval id, planned sequence 2, existing record count 1, and no-second-record evidence.
+- Creates no task, no approval, no command execution, no host mutation, no scheduler, no recovery action, no background writer, and no additional ledger record.
+- Must not approve the follow-up task, append the second record, add background persistence, schedulers, automatic repair, denial recovery, duplicate-click handling, plugin/runtime adapter work, arbitrary host control, or broader mutation.
+
 Systemd next repair scope review checkpoint:
 
 After the next capability route review selects `openclaw-systemd-next-repair-scope-review`, the system may choose the next Track A repair scope from existing body evidence.
