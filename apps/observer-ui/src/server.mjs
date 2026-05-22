@@ -380,6 +380,41 @@ function observerHtml() {
           <div class="metric"><span>Next</span><span id="phase3-exit-next">loading</span></div>
           <pre id="phase3-exit-json">Loading Phase 3 exit gate...</pre>
         </section>
+        <section class="panel" id="phase4-plan-panel">
+          <h2>Phase 4 Plan</h2>
+          <div class="metric"><span>Ready</span><span id="phase4-plan-ready">false</span></div>
+          <div class="metric"><span>Next</span><span id="phase4-plan-next">loading</span></div>
+          <div class="metric"><span>Real Host Repair</span><span id="phase4-plan-real-repair">false</span></div>
+          <pre id="phase4-plan-json">Loading Phase 4 plan...</pre>
+        </section>
+        <section class="panel" id="phase4-self-heal-loop-panel">
+          <h2>Phase 4 Self-Heal Loop</h2>
+          <div class="metric"><span>Ready</span><span id="phase4-self-heal-ready">false</span></div>
+          <div class="metric"><span>Executed</span><span id="phase4-self-heal-executed">0</span></div>
+          <div class="metric"><span>Skipped</span><span id="phase4-self-heal-skipped">0</span></div>
+          <pre id="phase4-self-heal-json">Loading Phase 4 self-heal loop...</pre>
+        </section>
+        <section class="panel" id="phase4-heal-history-evidence-panel">
+          <h2>Phase 4 Heal History Evidence</h2>
+          <div class="metric"><span>Ready</span><span id="phase4-history-ready">false</span></div>
+          <div class="metric"><span>Heal Items</span><span id="phase4-history-heal-count">0</span></div>
+          <div class="metric"><span>Maintenance Runs</span><span id="phase4-history-maintenance-count">0</span></div>
+          <pre id="phase4-history-json">Loading Phase 4 heal history evidence...</pre>
+        </section>
+        <section class="panel" id="phase4-completion-readiness-panel">
+          <h2>Phase 4 Completion Readiness</h2>
+          <div class="metric"><span>Ready</span><span id="phase4-readiness-ready">false</span></div>
+          <div class="metric"><span>Checks</span><span id="phase4-readiness-checks">0/0</span></div>
+          <div class="metric"><span>Percent</span><span id="phase4-readiness-percent">0</span></div>
+          <pre id="phase4-readiness-json">Loading Phase 4 completion readiness...</pre>
+        </section>
+        <section class="panel" id="phase4-exit-panel">
+          <h2>Phase 4 Exit</h2>
+          <div class="metric"><span>Complete</span><span id="phase4-exit-complete">false</span></div>
+          <div class="metric"><span>Percent</span><span id="phase4-exit-percent">0</span></div>
+          <div class="metric"><span>Next</span><span id="phase4-exit-next">loading</span></div>
+          <pre id="phase4-exit-json">Loading Phase 4 exit gate...</pre>
+        </section>
         <section class="panel">
           <h2>Controls</h2>
           <div class="control-stack">
@@ -1412,6 +1447,26 @@ const phase3ExitComplete = document.querySelector("#phase3-exit-complete");
 const phase3ExitPercent = document.querySelector("#phase3-exit-percent");
 const phase3ExitNext = document.querySelector("#phase3-exit-next");
 const phase3ExitJson = document.querySelector("#phase3-exit-json");
+const phase4PlanReady = document.querySelector("#phase4-plan-ready");
+const phase4PlanNext = document.querySelector("#phase4-plan-next");
+const phase4PlanRealRepair = document.querySelector("#phase4-plan-real-repair");
+const phase4PlanJson = document.querySelector("#phase4-plan-json");
+const phase4SelfHealReady = document.querySelector("#phase4-self-heal-ready");
+const phase4SelfHealExecuted = document.querySelector("#phase4-self-heal-executed");
+const phase4SelfHealSkipped = document.querySelector("#phase4-self-heal-skipped");
+const phase4SelfHealJson = document.querySelector("#phase4-self-heal-json");
+const phase4HistoryReady = document.querySelector("#phase4-history-ready");
+const phase4HistoryHealCount = document.querySelector("#phase4-history-heal-count");
+const phase4HistoryMaintenanceCount = document.querySelector("#phase4-history-maintenance-count");
+const phase4HistoryJson = document.querySelector("#phase4-history-json");
+const phase4ReadinessReady = document.querySelector("#phase4-readiness-ready");
+const phase4ReadinessChecks = document.querySelector("#phase4-readiness-checks");
+const phase4ReadinessPercent = document.querySelector("#phase4-readiness-percent");
+const phase4ReadinessJson = document.querySelector("#phase4-readiness-json");
+const phase4ExitComplete = document.querySelector("#phase4-exit-complete");
+const phase4ExitPercent = document.querySelector("#phase4-exit-percent");
+const phase4ExitNext = document.querySelector("#phase4-exit-next");
+const phase4ExitJson = document.querySelector("#phase4-exit-json");
 const screenWindow = document.querySelector("#screen-window");
 const screenSession = document.querySelector("#screen-session");
 const screenReadiness = document.querySelector("#screen-readiness");
@@ -4701,6 +4756,118 @@ async function refreshPhase3Exit() {
   }
 }
 
+async function refreshPhase4Plan() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/phase-4/plan\`);
+    const summary = data.summary ?? {};
+    const governance = data.governance ?? {};
+    phase4PlanReady.textContent = String(Boolean(summary.ready));
+    phase4PlanNext.textContent = data.next?.recommendedSlice ?? "openclaw-phase-4-self-heal-loop";
+    phase4PlanRealRepair.textContent = String(Boolean(governance.realHostRepair));
+    phase4PlanJson.textContent = [
+      "Registry: " + (data.registry ?? "openclaw-phase-4-plan-v0"),
+      "Mode: " + (data.mode ?? "unknown") + " status=" + (data.status ?? "unknown") + " ready=" + Boolean(summary.ready),
+      "Theme: " + (data.whitepaperAlignment?.phaseTheme ?? "Let it care for its body."),
+      "Slices: " + ((data.selectedSlices ?? []).join(", ") || "none"),
+      "Next: " + (data.next?.recommendedSlice ?? "unknown"),
+    ].join("\\n");
+  } catch {
+    phase4PlanReady.textContent = "false";
+    phase4PlanNext.textContent = "unknown";
+    phase4PlanRealRepair.textContent = "false";
+    phase4PlanJson.textContent = "Unable to read Phase 4 plan.";
+  }
+}
+
+async function refreshPhase4SelfHealLoop() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/phase-4/self-heal-loop\`);
+    const summary = data.summary ?? {};
+    phase4SelfHealReady.textContent = String(Boolean(summary.ready));
+    phase4SelfHealExecuted.textContent = String(summary.executedRepairs ?? 0);
+    phase4SelfHealSkipped.textContent = String(summary.skippedHighRisk ?? 0);
+    phase4SelfHealJson.textContent = [
+      "Registry: " + (data.registry ?? "openclaw-phase-4-self-heal-loop-v0"),
+      "Mode: " + (data.mode ?? "unknown") + " status=" + (data.status ?? "unknown"),
+      "Ready: " + Boolean(summary.ready) + " checks=" + (summary.passed ?? 0) + "/" + (summary.total ?? 0),
+      "Diagnosis: " + (data.diagnosis?.status ?? "unknown") + " steps=" + (data.diagnosis?.planSteps ?? 0),
+      "Maintenance: run=" + (data.maintenance?.latestRunId ?? "none") + " status=" + (data.maintenance?.status ?? "unknown") + " executed=" + (summary.executedRepairs ?? 0) + " skipped=" + (summary.skippedHighRisk ?? 0),
+    ].join("\\n");
+  } catch {
+    phase4SelfHealReady.textContent = "false";
+    phase4SelfHealExecuted.textContent = "0";
+    phase4SelfHealSkipped.textContent = "0";
+    phase4SelfHealJson.textContent = "Unable to read Phase 4 self-heal loop.";
+  }
+}
+
+async function refreshPhase4HealHistoryEvidence() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/phase-4/heal-history-evidence\`);
+    const summary = data.summary ?? {};
+    const history = data.history ?? {};
+    phase4HistoryReady.textContent = String(Boolean(summary.ready));
+    phase4HistoryHealCount.textContent = String(history.healCount ?? 0);
+    phase4HistoryMaintenanceCount.textContent = String(history.maintenanceCount ?? 0);
+    phase4HistoryJson.textContent = [
+      "Registry: " + (data.registry ?? "openclaw-phase-4-heal-history-evidence-v0"),
+      "Mode: " + (data.mode ?? "unknown") + " status=" + (data.status ?? "unknown"),
+      "Ready: " + Boolean(summary.ready) + " checks=" + (summary.passed ?? 0) + "/" + (summary.total ?? 0),
+      "History: heal=" + (history.healCount ?? 0) + " maintenance=" + (history.maintenanceCount ?? 0) + " latestRun=" + (history.latestRunId ?? "none"),
+      "Evidence: executed=" + (history.executedRepairs ?? 0) + " skipped=" + (history.skippedHighRisk ?? 0),
+    ].join("\\n");
+  } catch {
+    phase4HistoryReady.textContent = "false";
+    phase4HistoryHealCount.textContent = "0";
+    phase4HistoryMaintenanceCount.textContent = "0";
+    phase4HistoryJson.textContent = "Unable to read Phase 4 heal history evidence.";
+  }
+}
+
+async function refreshPhase4CompletionReadiness() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/phase-4/completion-readiness\`);
+    const summary = data.summary ?? {};
+    phase4ReadinessReady.textContent = String(Boolean(summary.ready));
+    phase4ReadinessChecks.textContent = (summary.passed ?? 0) + "/" + (summary.total ?? 0);
+    phase4ReadinessPercent.textContent = String(summary.completionPercent ?? 0);
+    phase4ReadinessJson.textContent = [
+      "Registry: " + (data.registry ?? "openclaw-phase-4-completion-readiness-v0"),
+      "Mode: " + (data.mode ?? "unknown") + " status=" + (data.status ?? "unknown"),
+      "Ready: " + Boolean(summary.ready) + " percent=" + (summary.completionPercent ?? 0),
+      "Evidence: services=" + (summary.servicesObserved ?? 0) + " executed=" + (summary.executedRepairs ?? 0) + " skipped=" + (summary.skippedHighRisk ?? 0),
+      "Tracks: " + ((data.completedTracks ?? []).map((track) => track.id + "=" + track.status).join(" | ") || "none"),
+    ].join("\\n");
+  } catch {
+    phase4ReadinessReady.textContent = "false";
+    phase4ReadinessChecks.textContent = "0/0";
+    phase4ReadinessPercent.textContent = "0";
+    phase4ReadinessJson.textContent = "Unable to read Phase 4 completion readiness.";
+  }
+}
+
+async function refreshPhase4Exit() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/phase-4/exit\`);
+    const summary = data.summary ?? {};
+    phase4ExitComplete.textContent = String(Boolean(summary.complete));
+    phase4ExitPercent.textContent = String(summary.completionPercent ?? 0);
+    phase4ExitNext.textContent = data.next?.recommendedSlice ?? "openclaw-phase-5-plan";
+    phase4ExitJson.textContent = [
+      "Registry: " + (data.registry ?? "openclaw-phase-4-exit-v0"),
+      "Mode: " + (data.mode ?? "unknown") + " status=" + (data.status ?? "unknown"),
+      "Complete: " + Boolean(summary.complete) + " percent=" + (summary.completionPercent ?? 0),
+      "Completed: " + (data.completedPhase?.completionClaim ?? "unknown"),
+      "Next: " + (data.next?.recommendedSlice ?? "openclaw-phase-5-plan"),
+    ].join("\\n");
+  } catch {
+    phase4ExitComplete.textContent = "false";
+    phase4ExitPercent.textContent = "0";
+    phase4ExitNext.textContent = "openclaw-phase-5-plan";
+    phase4ExitJson.textContent = "Unable to read Phase 4 exit gate.";
+  }
+}
+
 async function refreshRuntime() {
   try {
     const data = await fetchJson(\`\${observerConfig.coreUrl}/state/runtime\`);
@@ -7708,6 +7875,11 @@ await refreshPhase3BackgroundWorkView();
 await refreshPhase3OperatorInterruptControls();
 await refreshPhase3CompletionReadiness();
 await refreshPhase3Exit();
+await refreshPhase4Plan();
+await refreshPhase4SelfHealLoop();
+await refreshPhase4HealHistoryEvidence();
+await refreshPhase4CompletionReadiness();
+await refreshPhase4Exit();
 await refreshRuntime();
 await refreshTaskList();
 await refreshTaskHistoryDetail();
@@ -7819,6 +7991,11 @@ setInterval(refreshPhase3BackgroundWorkView, 5000);
 setInterval(refreshPhase3OperatorInterruptControls, 5000);
 setInterval(refreshPhase3CompletionReadiness, 5000);
 setInterval(refreshPhase3Exit, 5000);
+setInterval(refreshPhase4Plan, 5000);
+setInterval(refreshPhase4SelfHealLoop, 5000);
+setInterval(refreshPhase4HealHistoryEvidence, 5000);
+setInterval(refreshPhase4CompletionReadiness, 5000);
+setInterval(refreshPhase4Exit, 5000);
 setInterval(refreshRuntime, 5000);
 setInterval(refreshTaskList, 5000);
 setInterval(refreshTaskHistoryDetail, 5000);
