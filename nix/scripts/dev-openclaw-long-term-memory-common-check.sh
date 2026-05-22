@@ -43,9 +43,11 @@ ensure_approved_write() {
     return
   fi
 
-  local task approval_id
-  task="$(post_json "$CORE_URL/long-term-memory/write-tasks" '{"confirm":true}')"
-  approval_id="$(node -e 'const data=JSON.parse(process.argv[1]); if(!data.approval?.id) throw new Error("missing approval id"); console.log(data.approval.id)' "$task")"
+  local task_file approval_id
+  task_file="$(mktemp)"
+  post_json "$CORE_URL/long-term-memory/write-tasks" '{"confirm":true}' > "$task_file"
+  approval_id="$(node -e 'const fs=require("node:fs"); const data=JSON.parse(fs.readFileSync(process.argv[1], "utf8")); if(!data.approval?.id) throw new Error("missing approval id"); console.log(data.approval.id)' "$task_file")"
+  rm -f "$task_file"
   post_json "$CORE_URL/approvals/$approval_id/approve" '{"approvedBy":"phase-7-milestone-check","reason":"Approve one bounded OpenClaw long-term memory JSONL append."}' >/dev/null
   post_json "$CORE_URL/operator/step" '{}' >/dev/null
 }
