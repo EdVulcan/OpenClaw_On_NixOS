@@ -38,6 +38,11 @@ post_json() {
 
 "$SCRIPT_DIR/dev-up.sh"
 
+created_repair="$(post_json "$CORE_URL/system/systemd/repair-execution-tasks" '{"unit":"openclaw-browser-runtime.service","confirm":true,"execute":true}')"
+repair_approval_id="$(node -e 'const data = JSON.parse(process.argv[1]); process.stdout.write(data.approval.id)' "$created_repair")"
+post_json "$CORE_URL/approvals/$repair_approval_id/approve" '{"approvedBy":"milestone-check","reason":"Prepare first Track A repair demo evidence before Phase 2 completion readiness."}' >/dev/null
+post_json "$CORE_URL/operator/step" '{}' >/dev/null
+
 prepare_body_evidence_ledger_demo_status "$CORE_URL" "Prepare body evidence before Phase 2 completion readiness."
 created_record_task="$(post_json "$CORE_URL/body/evidence-ledger/followup-record-tasks" '{"confirm":true}')"
 record_task_id="$(node -e 'const data = JSON.parse(process.argv[1]); process.stdout.write(data.task.id)' "$created_record_task")"
