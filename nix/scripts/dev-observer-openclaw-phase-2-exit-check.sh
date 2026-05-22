@@ -26,7 +26,7 @@ rm -f "$OPENCLAW_CORE_STATE_FILE" "$OPENCLAW_CORE_STATE_FILE.tmp" "$OPENCLAW_SYS
 rm -rf "$LEDGER_DIR"
 
 cleanup() {
-  rm -f "${HTML_FILE:-}" "${CLIENT_FILE:-}"
+  rm -f "${HTML_FILE:-}" "${CLIENT_FILE:-}" "${EXIT_FILE:-}"
   "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -51,18 +51,19 @@ record_approval_id="$(node -e 'const data = JSON.parse(process.argv[1]); process
 post_json "$CORE_URL/body/evidence-ledger/followup-record-append" "{\"confirm\":true,\"taskId\":\"$record_task_id\"}" >/dev/null
 post_json "$CORE_URL/approvals/$record_approval_id/approve" '{"approvedBy":"observer-milestone-check","reason":"Approve follow-up append before observer Phase 2 exit."}' >/dev/null
 post_json "$CORE_URL/operator/step" '{}' >/dev/null
-exit_gate="$(curl --silent --fail "$CORE_URL/phase-2/exit")"
+EXIT_FILE="$(mktemp)"
+curl --silent --fail "$CORE_URL/phase-2/exit" > "$EXIT_FILE"
 
 HTML_FILE="$(mktemp)"
 CLIENT_FILE="$(mktemp)"
 curl --silent --fail "$OBSERVER_URL/" > "$HTML_FILE"
 curl --silent --fail "$OBSERVER_URL/client-v5.js" > "$CLIENT_FILE"
 
-node - <<'EOF' "$HTML_FILE" "$CLIENT_FILE" "$exit_gate"
+node - <<'EOF' "$HTML_FILE" "$CLIENT_FILE" "$EXIT_FILE"
 const fs = require("node:fs");
 const html = fs.readFileSync(process.argv[2], "utf8");
 const client = fs.readFileSync(process.argv[3], "utf8");
-const exitGate = JSON.parse(process.argv[4]);
+const exitGate = JSON.parse(fs.readFileSync(process.argv[4], "utf8"));
 
 for (const token of [
   "Phase 2 Exit",
