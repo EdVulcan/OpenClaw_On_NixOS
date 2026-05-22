@@ -506,6 +506,62 @@ function observerHtml() {
           <div class="metric"><span>Next</span><span id="phase6-exit-next">loading</span></div>
           <pre id="phase6-exit-json">Loading Phase 6 exit gate...</pre>
         </section>
+        <section class="panel" id="long-term-memory-write-plan-panel">
+          <h2>Long-term Memory Write Plan</h2>
+          <div class="metric"><span>Ready</span><span id="long-term-memory-plan-ready">false</span></div>
+          <div class="metric"><span>Scope</span><span id="long-term-memory-plan-scope">loading</span></div>
+          <div class="metric"><span>Writes Now</span><span id="long-term-memory-plan-writes">false</span></div>
+          <pre id="long-term-memory-plan-json">Loading long-term memory write plan...</pre>
+        </section>
+        <section class="panel" id="long-term-memory-schema-panel">
+          <h2>Long-term Memory Schema</h2>
+          <div class="metric"><span>Ready</span><span id="long-term-memory-schema-ready">false</span></div>
+          <div class="metric"><span>Fields</span><span id="long-term-memory-schema-fields">0</span></div>
+          <div class="metric"><span>Cloud Call</span><span id="long-term-memory-schema-cloud">false</span></div>
+          <pre id="long-term-memory-schema-json">Loading long-term memory schema...</pre>
+        </section>
+        <section class="panel" id="long-term-memory-proposal-panel">
+          <h2>Long-term Memory Proposal</h2>
+          <div class="metric"><span>Ready</span><span id="long-term-memory-proposal-ready">false</span></div>
+          <div class="metric"><span>Type</span><span id="long-term-memory-proposal-type">loading</span></div>
+          <div class="metric"><span>Bulk Import</span><span id="long-term-memory-proposal-bulk">false</span></div>
+          <pre id="long-term-memory-proposal-json">Loading long-term memory proposal...</pre>
+        </section>
+        <section class="panel" id="long-term-memory-write-route-review-panel">
+          <h2>Long-term Memory Write Route Review</h2>
+          <div class="metric"><span>Ready</span><span id="long-term-memory-route-ready">false</span></div>
+          <div class="metric"><span>Selected</span><span id="long-term-memory-route-selected">loading</span></div>
+          <div class="metric"><span>Writes Now</span><span id="long-term-memory-route-writes">false</span></div>
+          <pre id="long-term-memory-route-json">Loading long-term memory write route review...</pre>
+        </section>
+        <section class="panel" id="long-term-memory-write-task-panel">
+          <h2>Long-term Memory Write Task</h2>
+          <div class="metric"><span>Route Ready</span><span id="long-term-memory-task-ready">false</span></div>
+          <div class="metric"><span>Creates Task</span><span id="long-term-memory-task-creates">false</span></div>
+          <div class="metric"><span>Approval</span><span id="long-term-memory-task-approval">required</span></div>
+          <pre id="long-term-memory-task-json">Loading long-term memory write task boundary...</pre>
+        </section>
+        <section class="panel" id="long-term-memory-approved-write-panel">
+          <h2>Long-term Memory Approved Write</h2>
+          <div class="metric"><span>Records</span><span id="long-term-memory-approved-records">0</span></div>
+          <div class="metric"><span>Latest</span><span id="long-term-memory-approved-latest">none</span></div>
+          <div class="metric"><span>Cloud Call</span><span id="long-term-memory-approved-cloud">false</span></div>
+          <pre id="long-term-memory-approved-json">Loading approved long-term memory write evidence...</pre>
+        </section>
+        <section class="panel" id="long-term-memory-readback-panel">
+          <h2>Long-term Memory Readback</h2>
+          <div class="metric"><span>Ready</span><span id="long-term-memory-readback-ready">false</span></div>
+          <div class="metric"><span>Records</span><span id="long-term-memory-readback-records">0</span></div>
+          <div class="metric"><span>Hash</span><span id="long-term-memory-readback-hash">none</span></div>
+          <pre id="long-term-memory-readback-json">Loading long-term memory readback...</pre>
+        </section>
+        <section class="panel" id="long-term-memory-exit-panel">
+          <h2>Long-term Memory Exit</h2>
+          <div class="metric"><span>Complete</span><span id="long-term-memory-exit-complete">false</span></div>
+          <div class="metric"><span>Percent</span><span id="long-term-memory-exit-percent">0</span></div>
+          <div class="metric"><span>Next</span><span id="long-term-memory-exit-next">loading</span></div>
+          <pre id="long-term-memory-exit-json">Loading long-term memory exit gate...</pre>
+        </section>
         <section class="panel">
           <h2>Controls</h2>
           <div class="control-stack">
@@ -1610,6 +1666,38 @@ const phase6ExitComplete = document.querySelector("#phase6-exit-complete");
 const phase6ExitPercent = document.querySelector("#phase6-exit-percent");
 const phase6ExitNext = document.querySelector("#phase6-exit-next");
 const phase6ExitJson = document.querySelector("#phase6-exit-json");
+const longTermMemoryPlanReady = document.querySelector("#long-term-memory-plan-ready");
+const longTermMemoryPlanScope = document.querySelector("#long-term-memory-plan-scope");
+const longTermMemoryPlanWrites = document.querySelector("#long-term-memory-plan-writes");
+const longTermMemoryPlanJson = document.querySelector("#long-term-memory-plan-json");
+const longTermMemorySchemaReady = document.querySelector("#long-term-memory-schema-ready");
+const longTermMemorySchemaFields = document.querySelector("#long-term-memory-schema-fields");
+const longTermMemorySchemaCloud = document.querySelector("#long-term-memory-schema-cloud");
+const longTermMemorySchemaJson = document.querySelector("#long-term-memory-schema-json");
+const longTermMemoryProposalReady = document.querySelector("#long-term-memory-proposal-ready");
+const longTermMemoryProposalType = document.querySelector("#long-term-memory-proposal-type");
+const longTermMemoryProposalBulk = document.querySelector("#long-term-memory-proposal-bulk");
+const longTermMemoryProposalJson = document.querySelector("#long-term-memory-proposal-json");
+const longTermMemoryRouteReady = document.querySelector("#long-term-memory-route-ready");
+const longTermMemoryRouteSelected = document.querySelector("#long-term-memory-route-selected");
+const longTermMemoryRouteWrites = document.querySelector("#long-term-memory-route-writes");
+const longTermMemoryRouteJson = document.querySelector("#long-term-memory-route-json");
+const longTermMemoryTaskReady = document.querySelector("#long-term-memory-task-ready");
+const longTermMemoryTaskCreates = document.querySelector("#long-term-memory-task-creates");
+const longTermMemoryTaskApproval = document.querySelector("#long-term-memory-task-approval");
+const longTermMemoryTaskJson = document.querySelector("#long-term-memory-task-json");
+const longTermMemoryApprovedRecords = document.querySelector("#long-term-memory-approved-records");
+const longTermMemoryApprovedLatest = document.querySelector("#long-term-memory-approved-latest");
+const longTermMemoryApprovedCloud = document.querySelector("#long-term-memory-approved-cloud");
+const longTermMemoryApprovedJson = document.querySelector("#long-term-memory-approved-json");
+const longTermMemoryReadbackReady = document.querySelector("#long-term-memory-readback-ready");
+const longTermMemoryReadbackRecords = document.querySelector("#long-term-memory-readback-records");
+const longTermMemoryReadbackHash = document.querySelector("#long-term-memory-readback-hash");
+const longTermMemoryReadbackJson = document.querySelector("#long-term-memory-readback-json");
+const longTermMemoryExitComplete = document.querySelector("#long-term-memory-exit-complete");
+const longTermMemoryExitPercent = document.querySelector("#long-term-memory-exit-percent");
+const longTermMemoryExitNext = document.querySelector("#long-term-memory-exit-next");
+const longTermMemoryExitJson = document.querySelector("#long-term-memory-exit-json");
 const screenWindow = document.querySelector("#screen-window");
 const screenSession = document.querySelector("#screen-session");
 const screenReadiness = document.querySelector("#screen-readiness");
@@ -5298,6 +5386,182 @@ async function refreshPhase6Exit() {
   }
 }
 
+async function refreshLongTermMemoryWritePlan() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/long-term-memory/write-plan\`);
+    const summary = data.summary ?? {};
+    longTermMemoryPlanReady.textContent = String(Boolean(summary.ready));
+    longTermMemoryPlanScope.textContent = data.storage?.file ?? "unknown";
+    longTermMemoryPlanWrites.textContent = String(Boolean(summary.writesMemory));
+    longTermMemoryPlanJson.textContent = [
+      "Registry: " + (data.registry ?? "openclaw-long-term-memory-write-plan-v0"),
+      "Mode: " + (data.mode ?? "unknown") + " status=" + (data.status ?? "unknown"),
+      "Theme: " + (data.whitepaperAlignment?.phaseTheme ?? "Give the body its first governed long-term memory write."),
+      "Scope: " + (data.storage?.file ?? "unknown"),
+      "Next: " + (data.next?.recommendedSlice ?? "unknown"),
+    ].join("\\n");
+  } catch {
+    longTermMemoryPlanReady.textContent = "false";
+    longTermMemoryPlanScope.textContent = "unknown";
+    longTermMemoryPlanWrites.textContent = "false";
+    longTermMemoryPlanJson.textContent = "Unable to read long-term memory write plan.";
+  }
+}
+
+async function refreshLongTermMemorySchema() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/long-term-memory/schema\`);
+    const summary = data.summary ?? {};
+    longTermMemorySchemaReady.textContent = String(Boolean(summary.ready));
+    longTermMemorySchemaFields.textContent = String(summary.requiredFieldCount ?? 0);
+    longTermMemorySchemaCloud.textContent = String(Boolean(summary.callsCloudModel));
+    longTermMemorySchemaJson.textContent = [
+      "Registry: " + (data.registry ?? "openclaw-long-term-memory-schema-v0"),
+      "Mode: " + (data.mode ?? "unknown") + " status=" + (data.status ?? "unknown"),
+      "Schema: " + (data.schema?.id ?? "unknown"),
+      "Fields: " + ((data.schema?.requiredFields ?? []).join(", ") || "none"),
+      "Cloud Call: " + Boolean(summary.callsCloudModel),
+    ].join("\\n");
+  } catch {
+    longTermMemorySchemaReady.textContent = "false";
+    longTermMemorySchemaFields.textContent = "0";
+    longTermMemorySchemaCloud.textContent = "false";
+    longTermMemorySchemaJson.textContent = "Unable to read long-term memory schema.";
+  }
+}
+
+async function refreshLongTermMemoryProposal() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/long-term-memory/proposal\`);
+    const summary = data.summary ?? {};
+    longTermMemoryProposalReady.textContent = String(Boolean(summary.ready));
+    longTermMemoryProposalType.textContent = summary.memoryType ?? "unknown";
+    longTermMemoryProposalBulk.textContent = String(Boolean(summary.bulkImport));
+    longTermMemoryProposalJson.textContent = [
+      "Registry: " + (data.registry ?? "openclaw-long-term-memory-proposal-v0"),
+      "Mode: " + (data.mode ?? "unknown") + " status=" + (data.status ?? "unknown"),
+      "Proposal: " + (data.proposal?.id ?? "unknown"),
+      "Type: " + (summary.memoryType ?? "unknown"),
+      "Source: " + (data.proposal?.sourceRegistry ?? "unknown"),
+    ].join("\\n");
+  } catch {
+    longTermMemoryProposalReady.textContent = "false";
+    longTermMemoryProposalType.textContent = "unknown";
+    longTermMemoryProposalBulk.textContent = "false";
+    longTermMemoryProposalJson.textContent = "Unable to read long-term memory proposal.";
+  }
+}
+
+async function refreshLongTermMemoryWriteRouteReview() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/long-term-memory/write-route-review\`);
+    const summary = data.summary ?? {};
+    longTermMemoryRouteReady.textContent = String(Boolean(summary.ready));
+    longTermMemoryRouteSelected.textContent = summary.selectedSlice ?? "unknown";
+    longTermMemoryRouteWrites.textContent = String(Boolean(summary.writesMemory));
+    longTermMemoryRouteJson.textContent = [
+      "Registry: " + (data.registry ?? "openclaw-long-term-memory-write-route-review-v0"),
+      "Mode: " + (data.mode ?? "unknown") + " status=" + (data.status ?? "unknown"),
+      "Selected: " + (summary.selectedSlice ?? "unknown"),
+      "Can Append After Approval: " + Boolean(data.decision?.canAppendAfterApproval),
+      "Writes Now: " + Boolean(summary.writesMemory),
+    ].join("\\n");
+  } catch {
+    longTermMemoryRouteReady.textContent = "false";
+    longTermMemoryRouteSelected.textContent = "unknown";
+    longTermMemoryRouteWrites.textContent = "false";
+    longTermMemoryRouteJson.textContent = "Unable to read long-term memory write route review.";
+  }
+}
+
+async function refreshLongTermMemoryWriteTask() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/long-term-memory/write-route-review\`);
+    const summary = data.summary ?? {};
+    longTermMemoryTaskReady.textContent = String(Boolean(summary.ready));
+    longTermMemoryTaskCreates.textContent = "true";
+    longTermMemoryTaskApproval.textContent = data.decision?.canCreateTask === true ? "required" : "blocked";
+    longTermMemoryTaskJson.textContent = [
+      "Registry: openclaw-long-term-memory-write-task-v0",
+      "Route: " + (data.registry ?? "openclaw-long-term-memory-write-route-review-v0"),
+      "Ready: " + Boolean(summary.ready),
+      "Creates Task: true",
+      "Approval: required before JSONL append",
+    ].join("\\n");
+  } catch {
+    longTermMemoryTaskReady.textContent = "false";
+    longTermMemoryTaskCreates.textContent = "false";
+    longTermMemoryTaskApproval.textContent = "unknown";
+    longTermMemoryTaskJson.textContent = "Unable to read long-term memory write task boundary.";
+  }
+}
+
+async function refreshLongTermMemoryApprovedWrite() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/long-term-memory/readback\`);
+    const summary = data.summary ?? {};
+    longTermMemoryApprovedRecords.textContent = String(summary.recordCount ?? 0);
+    longTermMemoryApprovedLatest.textContent = summary.latestRecordId ?? "none";
+    longTermMemoryApprovedCloud.textContent = String(Boolean(summary.callsCloudModel));
+    longTermMemoryApprovedJson.textContent = [
+      "Registry: openclaw-long-term-memory-approved-write-v0",
+      "Readback: " + (data.registry ?? "openclaw-long-term-memory-readback-v0"),
+      "Records: " + (summary.recordCount ?? 0),
+      "Latest: " + (summary.latestRecordId ?? "none"),
+      "Cloud Call: " + Boolean(summary.callsCloudModel),
+    ].join("\\n");
+  } catch {
+    longTermMemoryApprovedRecords.textContent = "0";
+    longTermMemoryApprovedLatest.textContent = "none";
+    longTermMemoryApprovedCloud.textContent = "false";
+    longTermMemoryApprovedJson.textContent = "No approved long-term memory write evidence yet.";
+  }
+}
+
+async function refreshLongTermMemoryReadback() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/long-term-memory/readback\`);
+    const summary = data.summary ?? {};
+    longTermMemoryReadbackReady.textContent = String(Boolean(summary.ready));
+    longTermMemoryReadbackRecords.textContent = String(summary.recordCount ?? 0);
+    longTermMemoryReadbackHash.textContent = summary.latestContentHash ?? "none";
+    longTermMemoryReadbackJson.textContent = [
+      "Registry: " + (data.registry ?? "openclaw-long-term-memory-readback-v0"),
+      "Mode: " + (data.mode ?? "unknown") + " status=" + (data.status ?? "unknown"),
+      "Ready: " + Boolean(summary.ready) + " records=" + (summary.recordCount ?? 0),
+      "Latest: " + (summary.latestRecordId ?? "none"),
+      "Hash: " + (summary.latestContentHash ?? "none"),
+    ].join("\\n");
+  } catch {
+    longTermMemoryReadbackReady.textContent = "false";
+    longTermMemoryReadbackRecords.textContent = "0";
+    longTermMemoryReadbackHash.textContent = "none";
+    longTermMemoryReadbackJson.textContent = "Unable to read long-term memory readback.";
+  }
+}
+
+async function refreshLongTermMemoryExit() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/long-term-memory/exit\`);
+    const summary = data.summary ?? {};
+    longTermMemoryExitComplete.textContent = String(Boolean(summary.complete));
+    longTermMemoryExitPercent.textContent = String(summary.completionPercent ?? 0);
+    longTermMemoryExitNext.textContent = data.next?.recommendedSlice ?? "openclaw-cloud-consciousness-context-review";
+    longTermMemoryExitJson.textContent = [
+      "Registry: " + (data.registry ?? "openclaw-long-term-memory-exit-v0"),
+      "Mode: " + (data.mode ?? "unknown") + " status=" + (data.status ?? "unknown"),
+      "Complete: " + Boolean(summary.complete) + " percent=" + (summary.completionPercent ?? 0),
+      "Records: " + (summary.recordCount ?? 0),
+      "Next: " + (data.next?.recommendedSlice ?? "openclaw-cloud-consciousness-context-review"),
+    ].join("\\n");
+  } catch {
+    longTermMemoryExitComplete.textContent = "false";
+    longTermMemoryExitPercent.textContent = "0";
+    longTermMemoryExitNext.textContent = "openclaw-cloud-consciousness-context-review";
+    longTermMemoryExitJson.textContent = "Unable to read long-term memory exit gate.";
+  }
+}
+
 async function refreshRuntime() {
   try {
     const data = await fetchJson(\`\${observerConfig.coreUrl}/state/runtime\`);
@@ -8323,6 +8587,14 @@ await refreshPhase6ConsciousnessContextEnvelope();
 await refreshPhase6TaskOrchestrationRecords();
 await refreshPhase6MemoryWriteRouteReview();
 await refreshPhase6Exit();
+await refreshLongTermMemoryWritePlan();
+await refreshLongTermMemorySchema();
+await refreshLongTermMemoryProposal();
+await refreshLongTermMemoryWriteRouteReview();
+await refreshLongTermMemoryWriteTask();
+await refreshLongTermMemoryApprovedWrite();
+await refreshLongTermMemoryReadback();
+await refreshLongTermMemoryExit();
 await refreshRuntime();
 await refreshTaskList();
 await refreshTaskHistoryDetail();
@@ -8452,6 +8724,14 @@ setInterval(refreshPhase6ConsciousnessContextEnvelope, 5000);
 setInterval(refreshPhase6TaskOrchestrationRecords, 5000);
 setInterval(refreshPhase6MemoryWriteRouteReview, 5000);
 setInterval(refreshPhase6Exit, 5000);
+setInterval(refreshLongTermMemoryWritePlan, 5000);
+setInterval(refreshLongTermMemorySchema, 5000);
+setInterval(refreshLongTermMemoryProposal, 5000);
+setInterval(refreshLongTermMemoryWriteRouteReview, 5000);
+setInterval(refreshLongTermMemoryWriteTask, 5000);
+setInterval(refreshLongTermMemoryApprovedWrite, 5000);
+setInterval(refreshLongTermMemoryReadback, 5000);
+setInterval(refreshLongTermMemoryExit, 5000);
 setInterval(refreshRuntime, 5000);
 setInterval(refreshTaskList, 5000);
 setInterval(refreshTaskHistoryDetail, 5000);
