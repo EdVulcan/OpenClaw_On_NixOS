@@ -19,6 +19,7 @@ export OPENCLAW_SYSTEM_HEAL_STATE_FILE="${OPENCLAW_SYSTEM_HEAL_STATE_FILE:-$REPO
 CORE_URL="http://127.0.0.1:$OPENCLAW_CORE_PORT"
 OBSERVER_URL="http://127.0.0.1:$OBSERVER_UI_PORT"
 LEDGER_DIR="$REPO_ROOT/.artifacts/openclaw-body-evidence-ledger"
+. "$SCRIPT_DIR/dev-body-evidence-prereqs.sh"
 
 "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 rm -f \
@@ -41,6 +42,8 @@ post_json() {
 }
 
 "$SCRIPT_DIR/dev-up.sh"
+
+prepare_body_evidence_timeline_readiness "$CORE_URL" "Approve one next repair execution before observer next repair task shell."
 
 created_directory="$(post_json "$CORE_URL/body/evidence-ledger/directory-tasks" '{"confirm":true}')"
 directory_approval_id="$(node -e 'const data = JSON.parse(process.argv[1]); process.stdout.write(data.approval.id)' "$created_directory")"
