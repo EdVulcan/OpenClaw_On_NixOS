@@ -4110,6 +4110,11 @@ function renderTaskSummary(task, { includeRecovery = true, includeOutcome = true
       lines.push(\`Body Evidence Ledger First Record: \${firstRecord.plannedRecordType ?? "unknown"} appended=\${Boolean(firstRecord.recordAppended)} storageWritten=\${Boolean(firstRecord.durableStorageWritten)}\`);
       lines.push(\`Body Evidence Ledger File: \${firstRecord.ledgerFileDisplayPath ?? "pending"} recordId=\${firstRecord.recordId ?? "pending"} hash=\${firstRecord.contentHash ?? "pending"}\`);
     }
+    if (task.bodyEvidenceLedgerFollowupRecord) {
+      const followupRecord = task.bodyEvidenceLedgerFollowupRecord;
+      lines.push(\`Body Evidence Ledger Follow-up Record: \${followupRecord.plannedRecordType ?? "unknown"} sequence=\${followupRecord.plannedSequence ?? "unknown"} appended=\${Boolean(followupRecord.recordAppended)} storageWritten=\${Boolean(followupRecord.durableStorageWritten)}\`);
+      lines.push(\`Body Evidence Ledger Follow-up File: \${followupRecord.ledgerFileDisplayPath ?? "pending"} recordId=\${followupRecord.recordId ?? "pending"} previous=\${followupRecord.previousRecordId ?? "pending"} hash=\${followupRecord.contentHash ?? "pending"}\`);
+    }
   }
 
   if (includeRecovery) {
@@ -5300,6 +5305,8 @@ async function refreshBodyEvidenceLedgerFollowupRecordAppendRouteReview() {
       \`Decision: \${decision.status ?? "unknown"} track=\${decision.selectedTrack ?? "unknown"} slice=\${decision.selectedSlice ?? "unknown"}\`,
       \`Record: task=\${summary.taskId ?? "none"} approval=\${summary.approvalStatus ?? "unknown"} sequence=\${summary.plannedSequence ?? "unknown"} existingRecords=\${summary.existingRecordCount ?? 0} appended=\${Boolean(summary.recordAppended)}\`,
       \`Governance: readOnly=\${Boolean(governance.readOnly)} createsTask=\${Boolean(governance.createsTask)} createsApproval=\${Boolean(governance.createsApproval)} approvesTask=\${Boolean(governance.approvesTask)} canAppend=\${Boolean(governance.canAppendLedgerRecord)} mutation=\${Boolean(governance.hostMutation)} scheduler=\${Boolean(governance.schedulesFollowUp)} backgroundWriter=\${Boolean(governance.backgroundWriter)}\`,
+      \`Append Registry: openclaw-body-evidence-ledger-followup-record-append-v0\`,
+      \`Append Endpoint: /body/evidence-ledger/followup-record-append\`,
       \`Next: \${data.next?.recommendedSlice ?? "unknown"} boundary=\${data.next?.boundary ?? "unknown"}\`,
     ].join("\\n");
   } catch {

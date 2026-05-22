@@ -10368,6 +10368,86 @@ function buildMvpRouteAlignment() {
   };
 }
 
+async function armBodyEvidenceLedgerFollowupRecordAppend({ confirm = false, taskId = null } = {}) {
+  if (confirm !== true) {
+    throw new Error("Body evidence ledger follow-up append requires confirm=true.");
+  }
+
+  const routeReview = await buildBodyEvidenceLedgerFollowupRecordAppendRouteReview();
+  if (routeReview.status !== "selected"
+    || routeReview.decision?.selectedSlice !== "openclaw-body-evidence-ledger-followup-record-append"
+    || routeReview.summary?.existingRecordCount !== 1
+    || routeReview.summary?.recordAppended !== false) {
+    throw new Error("Body evidence ledger follow-up append requires a selected append route review.");
+  }
+
+  const task = taskId ? getTaskById(taskId) : findLatestBodyEvidenceLedgerFollowupRecordTask();
+  if (!task || !isBodyEvidenceLedgerFollowupRecordTask(task)) {
+    throw new Error("Follow-up ledger record append requires an existing follow-up record task.");
+  }
+  if (task.id !== routeReview.summary?.taskId) {
+    throw new Error("Follow-up ledger record append task must match the selected route-review task.");
+  }
+  if (task.approval?.status !== "pending" && task.approval?.status !== "approved") {
+    throw new Error("Follow-up ledger record append requires a pending or approved task approval.");
+  }
+
+  task.bodyEvidenceLedgerFollowupRecord = {
+    ...(task.bodyEvidenceLedgerFollowupRecord ?? {}),
+    appendExecutionEnabled: true,
+    appendRouteReviewRegistry: routeReview.registry,
+    appendRouteReviewSelectedAt: routeReview.generatedAt,
+    futureAppendRequiresSeparateMilestone: false,
+  };
+  task.plan = {
+    ...(task.plan ?? {}),
+    strategy: "approval-gated-ledger-followup-record-append",
+    summary: "Execute the approved second body evidence ledger JSONL append for the existing follow-up record task.",
+    steps: (task.plan?.steps ?? []).map((step) => {
+      if (step.id === "defer-followup-record-append") {
+        return {
+          ...step,
+          phase: "approved_followup_record_append",
+          title: "Append the second JSONL record after explicit approval",
+          executesNow: true,
+        };
+      }
+      return step;
+    }),
+  };
+  task.updatedAt = new Date().toISOString();
+  persistState();
+  await publishEvent("body_evidence_ledger.followup_record_append_armed", {
+    task: serialiseTask(task),
+    routeReview: {
+      registry: routeReview.registry,
+      selectedSlice: routeReview.decision?.selectedSlice ?? null,
+    },
+  });
+
+  return {
+    registry: "openclaw-body-evidence-ledger-followup-record-append-v0",
+    mode: "approval-gated-followup-record-append-armed",
+    generatedAt: new Date().toISOString(),
+    routeReview,
+    task,
+    approval: task.approval?.requestId ? approvals.get(task.approval.requestId) : null,
+    governance: {
+      createsTask: false,
+      createsApproval: false,
+      requiresExplicitApproval: true,
+      canAppendLedgerRecord: true,
+      appendExecutionEnabled: true,
+      recordAppended: false,
+      durableStorageWritten: false,
+      hostMutation: false,
+      schedulesFollowUp: false,
+      backgroundWriter: false,
+      bulkImport: false,
+    },
+  };
+}
+
 function taskTimeForDemo(task) {
   const value = Date.parse(task?.closedAt ?? task?.updatedAt ?? task?.createdAt ?? "");
   return Number.isFinite(value) ? value : 0;
@@ -13528,6 +13608,155 @@ async function deferBodyEvidenceLedgerFollowupRecordTask(task) {
   };
 }
 
+async function executeBodyEvidenceLedgerFollowupRecordTask(task) {
+  const followupRecord = task.bodyEvidenceLedgerFollowupRecord ?? {};
+  const recordType = typeof followupRecord.plannedRecordType === "string" && followupRecord.plannedRecordType.trim()
+    ? followupRecord.plannedRecordType.trim()
+    : "body_evidence_timeline_followup";
+  const plannedSequence = Number.isInteger(followupRecord.plannedSequence) ? followupRecord.plannedSequence : 2;
+  const ledgerFileDisplayPath = ".artifacts/openclaw-body-evidence-ledger/body-evidence-ledger.jsonl";
+  const ledgerFilePath = path.resolve(process.cwd(), "../..", ledgerFileDisplayPath);
+  const ledger = readBodyEvidenceLedgerLines();
+  if (!ledger.exists || ledger.lineCount !== 1 || ledger.records?.[0]?.ok !== true) {
+    throw new Error("Follow-up ledger append requires exactly one existing valid ledger record.");
+  }
+
+  if (followupRecord.appendRouteReviewRegistry !== "openclaw-body-evidence-ledger-followup-record-append-route-review-v0") {
+    throw new Error("Follow-up ledger append requires a stored append route review.");
+  }
+
+  const timelineReadiness = await fetchJson(`${systemSenseUrl}/system/route/body-evidence-timeline-readiness`);
+  const previousRecord = ledger.records[0];
+  const recordedAt = new Date().toISOString();
+  const recordBase = {
+    id: `body-ledger-${randomUUID()}`,
+    recordedAt,
+    sourceRegistry: followupRecord.sourceRegistry ?? "openclaw-body-evidence-timeline-readiness-v0",
+    sourceEndpoint: followupRecord.sourceEndpoint ?? "/system/route/body-evidence-timeline-readiness",
+    phase: "phase_2_body_evidence_memory",
+    evidenceType: recordType,
+    sequence: plannedSequence,
+    summary: "Follow-up durable OpenClaw body evidence memory from the latest timeline readiness evidence.",
+    previousRecord: {
+      id: previousRecord.id ?? null,
+      evidenceType: previousRecord.evidenceType ?? null,
+      sourceRegistry: previousRecord.sourceRegistry ?? null,
+      contentHash: previousRecord.contentHash ?? null,
+    },
+    evidence: {
+      timelineReadinessRegistry: timelineReadiness.registry ?? null,
+      timelineReady: timelineReadiness.summary?.ready === true || timelineReadiness.ready === true,
+      bodyMemoryPurpose: timelineReadiness.memoryPurpose ?? timelineReadiness.purpose ?? "operator-visible body evidence memory",
+      sourceChecks: timelineReadiness.summary?.checks ?? timelineReadiness.checks ?? null,
+      routeReviewRegistry: followupRecord.appendRouteReviewRegistry,
+    },
+    governance: {
+      taskId: task.id,
+      approvalId: task.approval?.requestId ?? null,
+      approved: isTaskPolicyApproved(task),
+      appendOnly: true,
+      scheduler: false,
+      backgroundWriter: false,
+      bulkImport: false,
+      hostMutation: true,
+      scope: ledgerFileDisplayPath,
+    },
+  };
+  const contentHash = createHash("sha256").update(JSON.stringify(recordBase)).digest("hex");
+  const record = {
+    ...recordBase,
+    contentHash,
+  };
+  const line = `${JSON.stringify(record)}\n`;
+
+  await setTaskPhase(task, "body_evidence_ledger_followup_record_append", {
+    status: "running",
+    details: {
+      executor: "body-evidence-ledger-followup-record-append-v0",
+      ledgerFile: ledgerFileDisplayPath,
+      recordType,
+      plannedSequence,
+      hostMutation: true,
+      durableStorageWritten: false,
+    },
+  });
+
+  const result = await postJson(`${systemSenseUrl}/system/files/append-text`, {
+    path: ledgerFilePath,
+    content: line,
+    encoding: "utf8",
+    createIfMissing: false,
+    intent: "body.evidence.ledger.followup_record.append",
+  });
+  task.bodyEvidenceLedgerFollowupRecord = {
+    ...followupRecord,
+    ledgerFileDisplayPath,
+    ledgerFilePath: result.path ?? ledgerFilePath,
+    allowedRoot: result.root ?? null,
+    recordId: record.id,
+    contentHash,
+    previousRecordId: previousRecord.id ?? null,
+    previousRecordHash: previousRecord.contentHash ?? null,
+    contentBytes: result.contentBytes ?? Buffer.byteLength(line, "utf8"),
+    previousBytes: result.previousBytes ?? null,
+    totalBytes: result.totalBytes ?? null,
+    recordAppended: true,
+    durableStorageWritten: true,
+    appendExecutionEnabled: true,
+    appendResult: {
+      registry: "openclaw-body-evidence-ledger-followup-record-append-v0",
+      mode: result.mode ?? "append_text",
+      created: result.created === true,
+      createIfMissing: result.createIfMissing === true,
+      metadata: result.metadata ?? null,
+    },
+  };
+  const completedTask = completeTask(task, {
+    executor: "body-evidence-ledger-followup-record-append-v0",
+    summary: `Appended follow-up OpenClaw body evidence ledger record ${record.id} to ${ledgerFileDisplayPath}.`,
+    ledgerFile: ledgerFileDisplayPath,
+    result,
+    record,
+    previousRecord: record.previousRecord,
+    hostMutation: true,
+    recordAppended: true,
+    durableStorageWritten: true,
+    scheduler: false,
+    backgroundWriter: false,
+    bulkImport: false,
+  });
+  await publishEvent("body_evidence_ledger.followup_record_appended", {
+    task: serialiseTask(completedTask),
+    ledgerFile: ledgerFileDisplayPath,
+    recordId: record.id,
+    previousRecordId: record.previousRecord.id,
+    contentHash,
+  });
+
+  return {
+    task: completedTask,
+    policy: completedTask.policy?.decision ?? null,
+    approval: completedTask.approval ?? null,
+    actions: [],
+    verification: null,
+    execution: {
+      registry: "openclaw-body-evidence-ledger-followup-record-append-v0",
+      mode: "approved_followup_record_append",
+      ledgerFile: ledgerFileDisplayPath,
+      path: result.path ?? null,
+      recordId: record.id,
+      previousRecordId: record.previousRecord.id,
+      contentHash,
+      hostMutation: true,
+      recordAppended: true,
+      durableStorageWritten: true,
+      scheduler: false,
+      backgroundWriter: false,
+      bulkImport: false,
+    },
+  };
+}
+
 function findSystemdVerificationUnit(inventory, targetUnit) {
   return (inventory?.units ?? []).find((unit) => unit.unit === targetUnit) ?? null;
 }
@@ -15418,7 +15647,9 @@ async function executeTaskWithRecovery(task, options = {}) {
   }
 
   if (isBodyEvidenceLedgerFollowupRecordTask(task)) {
-    const followupRecordExecution = await deferBodyEvidenceLedgerFollowupRecordTask(task);
+    const followupRecordExecution = task.bodyEvidenceLedgerFollowupRecord?.appendExecutionEnabled === true
+      ? await executeBodyEvidenceLedgerFollowupRecordTask(task)
+      : await deferBodyEvidenceLedgerFollowupRecordTask(task);
     return {
       finalExecution: followupRecordExecution,
       attempts: [followupRecordExecution],
@@ -17147,6 +17378,31 @@ const server = http.createServer(async (req, res) => {
         followupRecord: result.followupRecord,
         task: serialiseTask(result.task),
         approval: serialiseApproval(result.approval),
+        governance: result.governance,
+        summary: buildTaskSummary(),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/body/evidence-ledger/followup-record-append") {
+    try {
+      const body = await readJsonBody(req);
+      const result = await armBodyEvidenceLedgerFollowupRecordAppend({
+        confirm: body.confirm === true,
+        taskId: typeof body.taskId === "string" && body.taskId.trim() ? body.taskId.trim() : null,
+      });
+      sendJson(res, 200, {
+        ok: true,
+        registry: result.registry,
+        mode: result.mode,
+        generatedAt: result.generatedAt,
+        routeReview: result.routeReview,
+        task: serialiseTask(result.task),
+        approval: result.approval ? serialiseApproval(result.approval) : null,
         governance: result.governance,
         summary: buildTaskSummary(),
       });
