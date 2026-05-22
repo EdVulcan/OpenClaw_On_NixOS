@@ -16,8 +16,10 @@ export OBSERVER_UI_PORT="${OBSERVER_UI_PORT:-6530}"
 export OPENCLAW_CORE_STATE_FILE="${OPENCLAW_CORE_STATE_FILE:-$REPO_ROOT/.artifacts/openclaw-core-observer-body-evidence-ledger-storage-root-route-review-check.json}"
 export OPENCLAW_SYSTEM_HEAL_STATE_FILE="${OPENCLAW_SYSTEM_HEAL_STATE_FILE:-$REPO_ROOT/.artifacts/openclaw-system-heal-observer-body-evidence-ledger-storage-root-route-review-check.json}"
 
+CORE_URL="http://127.0.0.1:$OPENCLAW_CORE_PORT"
 SYSTEM_URL="http://127.0.0.1:$OPENCLAW_SYSTEM_SENSE_PORT"
 OBSERVER_URL="http://127.0.0.1:$OBSERVER_UI_PORT"
+. "$SCRIPT_DIR/dev-body-evidence-prereqs.sh"
 
 "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 rm -f \
@@ -33,6 +35,8 @@ cleanup() {
 trap cleanup EXIT
 
 "$SCRIPT_DIR/dev-up.sh"
+
+prepare_body_evidence_timeline_readiness "$CORE_URL" "Approve one next repair execution before observer body evidence ledger storage root route review."
 
 curl --silent --fail "$SYSTEM_URL/system/health" >/dev/null
 
