@@ -22,7 +22,9 @@ export OPENCLAW_CORE_STATE_FILE="${OPENCLAW_CORE_STATE_FILE:-$REPO_ROOT/.artifac
 export OPENCLAW_SYSTEM_HEAL_STATE_FILE="${OPENCLAW_SYSTEM_HEAL_STATE_FILE:-$REPO_ROOT/.artifacts/openclaw-system-heal-phase-7-$CHECK_KIND-check.json}"
 
 CORE_URL="http://127.0.0.1:$OPENCLAW_CORE_PORT"
+HEAL_URL="http://127.0.0.1:$OPENCLAW_SYSTEM_HEAL_PORT"
 OBSERVER_URL="http://127.0.0.1:$OBSERVER_UI_PORT"
+. "$SCRIPT_DIR/dev-phase-4-prereqs.sh"
 
 post_json() {
   local url="$1"
@@ -56,6 +58,7 @@ cleanup() {
 }
 trap cleanup EXIT
 "$SCRIPT_DIR/dev-up.sh"
+prepare_phase_4_self_heal_evidence "$HEAL_URL"
 
 case "$CHECK_KIND" in
   write-plan)
