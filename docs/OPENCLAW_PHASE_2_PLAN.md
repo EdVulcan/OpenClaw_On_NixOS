@@ -447,6 +447,17 @@ This checkpoint is allowed because the completed ledger block needs a concise de
 - Creates no task, no approval, no command execution, no host mutation, no scheduler, no recovery action, no background writer, and no additional ledger record.
 - Must return to whitepaper route review before adding more ledger records, durable background persistence, automatic repair, denial recovery, duplicate-click handling, plugin/runtime adapter work, arbitrary host control, or broader mutation.
 
+Body evidence ledger follow-up record plan checkpoint:
+
+After the first durable ledger demo and later body repair/candidate evidence are visible, `openclaw-body-evidence-ledger-followup-record-plan` may plan how the next body evidence timeline readiness snapshot would become a future ledger record.
+
+This checkpoint is allowed because it advances resident body memory by making the next evidence write explainable before any second append exists:
+
+- Reads body evidence timeline readiness, body evidence ledger readiness, and the existing ledger JSONL record count only.
+- Exposes planned follow-up record type, source registry, source endpoint, existing record count, latest record id, pre-append checks, and explicit deferred actions.
+- Creates no task, no approval, no command execution, no host mutation, no scheduler, no recovery action, no background writer, no bulk import, and no additional ledger record.
+- Must return to whitepaper route review before turning this plan into any task, approval, scheduler, durable append, automatic repair, denial recovery, duplicate-click handling, plugin/runtime adapter work, arbitrary host control, or broader mutation.
+
 Systemd next repair scope review checkpoint:
 
 After the next capability route review selects `openclaw-systemd-next-repair-scope-review`, the system may choose the next Track A repair scope from existing body evidence.

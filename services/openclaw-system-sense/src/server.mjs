@@ -47,6 +47,7 @@ const BODY_EVIDENCE_LEDGER_FIRST_RECORD_PLAN_REGISTRY = "openclaw-body-evidence-
 const BODY_EVIDENCE_LEDGER_FIRST_RECORD_ROUTE_REVIEW_REGISTRY = "openclaw-body-evidence-ledger-first-record-route-review-v0";
 const BODY_EVIDENCE_LEDGER_READINESS_REGISTRY = "openclaw-body-evidence-ledger-readiness-v0";
 const BODY_EVIDENCE_LEDGER_DEMO_STATUS_REGISTRY = "openclaw-body-evidence-ledger-demo-status-v0";
+const BODY_EVIDENCE_LEDGER_FOLLOWUP_RECORD_PLAN_REGISTRY = "openclaw-body-evidence-ledger-followup-record-plan-v0";
 const SYSTEMD_NEXT_REPAIR_SCOPE_REVIEW_REGISTRY = "openclaw-systemd-next-repair-scope-review-v0";
 const SYSTEMD_NEXT_REPAIR_PLAN_REGISTRY = "openclaw-systemd-next-repair-plan-v0";
 const SYSTEMD_NEXT_REPAIR_ROUTE_REVIEW_REGISTRY = "openclaw-systemd-next-repair-route-review-v0";
@@ -3582,6 +3583,127 @@ async function buildBodyEvidenceLedgerDemoStatus() {
   };
 }
 
+async function buildBodyEvidenceLedgerFollowupRecordPlan() {
+  const timelineReadiness = await buildBodyEvidenceTimelineReadiness();
+  const ledgerReadiness = await buildBodyEvidenceLedgerReadiness();
+  const ledger = readBodyEvidenceLedgerRecords();
+  const existingRecords = ledger.records.map((record, index) => ({
+    index: index + 1,
+    id: record.id,
+    recordedAt: record.recordedAt,
+    evidenceType: record.evidenceType,
+    sourceRegistry: record.sourceRegistry,
+    hashValid: record.hashValid === true,
+  }));
+  const latestRecord = existingRecords.at(-1) ?? null;
+  const planReady = timelineReadiness.summary?.ready === true
+    && ledgerReadiness.summary?.ready === true
+    && ledger.records.length >= 1
+    && ledger.parseErrors.length === 0;
+  const plannedRecord = {
+    version: "body-evidence-ledger-record-v0",
+    evidenceType: "body_evidence_timeline_followup",
+    phase: "phase_2_body_evidence_memory",
+    sequence: ledger.records.length + 1,
+    sourceRegistry: timelineReadiness.registry,
+    sourceEndpoint: "/system/route/body-evidence-timeline-readiness",
+    summary: "Plan a future follow-up ledger record from the latest body evidence timeline readiness after completed repair and candidate evidence.",
+    contentHashStrategy: "sha256(JSON.stringify(canonicalRecordWithoutHash))",
+    governance: {
+      hostMutation: false,
+      executesCommand: false,
+      createsTask: false,
+      createsApproval: false,
+      triggersRecovery: false,
+      schedulesFollowUp: false,
+      backgroundWriter: false,
+      bulkImport: false,
+    },
+  };
+
+  return {
+    ok: true,
+    registry: BODY_EVIDENCE_LEDGER_FOLLOWUP_RECORD_PLAN_REGISTRY,
+    mode: "plan_only_body_evidence_ledger_followup_record",
+    generatedAt: new Date().toISOString(),
+    source: {
+      service: "openclaw-system-sense",
+      timelineReadinessRegistry: timelineReadiness.registry,
+      ledgerReadinessRegistry: ledgerReadiness.registry,
+      phase2Plan: "docs/OPENCLAW_PHASE_2_PLAN.md",
+      evidence: "body_evidence_ledger_followup_record_plan",
+    },
+    governance: {
+      domain: "body_internal",
+      risk: "low",
+      autonomy: "plan_only",
+      approvalRequired: false,
+      hostMutation: false,
+      canMutate: false,
+      canAppendLedgerRecord: false,
+      canWriteLedger: false,
+      durableStorageWritten: false,
+      createsTask: false,
+      createsApproval: false,
+      executesCommand: false,
+      triggersRecovery: false,
+      schedulesFollowUp: false,
+      backgroundWriter: false,
+      bulkImport: false,
+    },
+    summary: {
+      planReady,
+      timelineReady: timelineReadiness.summary?.ready === true,
+      ledgerReady: ledgerReadiness.summary?.ready === true,
+      existingRecordCount: ledger.records.length,
+      latestRecordId: latestRecord?.id ?? null,
+      latestRecordHashValid: ledger.records.at(-1)?.hashValid === true,
+      plannedRecordType: plannedRecord.evidenceType,
+      plannedSequence: plannedRecord.sequence,
+      durableStorageWritten: false,
+      hiddenMutation: false,
+    },
+    plan: {
+      intent: "body.evidence.ledger.followup_record.plan",
+      ledgerFile: {
+        displayPath: ledger.ledgerFileDisplayPath,
+        resolvedPath: ledger.ledgerFilePath,
+        exists: ledger.fileExists,
+        lineCount: ledger.lineCount,
+      },
+      existingRecords,
+      plannedRecord,
+      prerequisiteEvidence: {
+        timelineReadiness: {
+          registry: timelineReadiness.registry,
+          ready: timelineReadiness.summary?.ready === true,
+          latestEntryId: timelineReadiness.summary?.latestEntryId ?? null,
+        },
+        ledgerReadiness: {
+          registry: ledgerReadiness.registry,
+          ready: ledgerReadiness.summary?.ready === true,
+          recordCount: ledgerReadiness.summary?.recordCount ?? 0,
+        },
+      },
+      preAppendChecks: [
+        "future follow-up append requires its own route review before any JSONL write",
+        "operator-visible plan must cite the latest timeline readiness registry and existing ledger count",
+        "no background writer, scheduler, automatic repair, bulk import, or plugin/runtime adapter work in this checkpoint",
+      ],
+      deferredActions: [
+        "do not create a follow-up append task",
+        "do not request approval",
+        "do not append a second ledger record",
+        "do not schedule recurring ledger writes",
+      ],
+    },
+    next: {
+      recommendedSlice: "openclaw-phase-2-next-capability-route-review",
+      boundary: "return to whitepaper route review before turning this follow-up plan into any task, approval, scheduler, or ledger append",
+    },
+  };
+}
+
 async function buildSystemdNextRepairScopeReview() {
   const inventory = await buildSystemdUnitInventory();
   const dependencyMap = await buildSystemdDependencyMap();
@@ -4392,6 +4514,12 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "GET" && requestUrl.pathname === "/system/route/body-evidence-ledger-demo-status") {
     const status = await buildBodyEvidenceLedgerDemoStatus();
     sendJson(res, 200, status);
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/system/route/body-evidence-ledger-followup-record-plan") {
+    const plan = await buildBodyEvidenceLedgerFollowupRecordPlan();
+    sendJson(res, 200, plan);
     return;
   }
 
