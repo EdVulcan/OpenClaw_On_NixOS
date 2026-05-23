@@ -744,6 +744,69 @@ function observerHtml() {
           <div class="metric"><span>Next</span><span id="cloud-real-provider-exit-next">loading</span></div>
           <pre id="cloud-real-provider-exit-json">Loading real provider call exit gate...</pre>
         </section>
+        <section class="panel" id="cloud-consciousness-live-provider-call-runbook-panel">
+          <h2>Cloud Consciousness Live Provider Call Runbook</h2>
+          <div class="metric"><span>Ready</span><span id="cloud-live-runbook-ready">false</span></div>
+          <div class="metric"><span>Live Enabled</span><span id="cloud-live-runbook-enabled">false</span></div>
+          <div class="metric"><span>Next</span><span id="cloud-live-runbook-next">loading</span></div>
+          <pre id="cloud-live-runbook-json">Loading live provider call runbook...</pre>
+        </section>
+        <section class="panel" id="cloud-consciousness-live-provider-operator-checklist-panel">
+          <h2>Cloud Consciousness Live Provider Operator Checklist</h2>
+          <div class="metric"><span>Ready</span><span id="cloud-live-checklist-ready">false</span></div>
+          <div class="metric"><span>Items</span><span id="cloud-live-checklist-items">0</span></div>
+          <div class="metric"><span>Transmits</span><span id="cloud-live-checklist-transmits">false</span></div>
+          <pre id="cloud-live-checklist-json">Loading live provider operator checklist...</pre>
+        </section>
+        <section class="panel" id="cloud-consciousness-live-provider-egress-transcript-schema-panel">
+          <h2>Cloud Consciousness Live Provider Egress Transcript Schema</h2>
+          <div class="metric"><span>Ready</span><span id="cloud-live-transcript-ready">false</span></div>
+          <div class="metric"><span>Fields</span><span id="cloud-live-transcript-fields">0</span></div>
+          <div class="metric"><span>Status</span><span id="cloud-live-transcript-status">loading</span></div>
+          <pre id="cloud-live-transcript-json">Loading live provider egress transcript schema...</pre>
+        </section>
+        <section class="panel" id="cloud-consciousness-live-provider-final-authorization-review-panel">
+          <h2>Cloud Consciousness Live Provider Final Authorization Review</h2>
+          <div class="metric"><span>Ready</span><span id="cloud-live-auth-ready">false</span></div>
+          <div class="metric"><span>Live Enabled</span><span id="cloud-live-auth-enabled">false</span></div>
+          <div class="metric"><span>Credential Read</span><span id="cloud-live-auth-credential">false</span></div>
+          <pre id="cloud-live-auth-json">Loading live provider final authorization review...</pre>
+        </section>
+        <section class="panel" id="cloud-consciousness-live-provider-runbook-route-review-panel">
+          <h2>Cloud Consciousness Live Provider Runbook Route</h2>
+          <div class="metric"><span>Ready</span><span id="cloud-live-route-ready">false</span></div>
+          <div class="metric"><span>Selected</span><span id="cloud-live-route-selected">loading</span></div>
+          <div class="metric"><span>Cloud Call</span><span id="cloud-live-route-call">false</span></div>
+          <pre id="cloud-live-route-json">Loading live provider runbook route review...</pre>
+        </section>
+        <section class="panel" id="cloud-consciousness-live-provider-runbook-task-panel">
+          <h2>Cloud Consciousness Live Provider Runbook Task</h2>
+          <div class="metric"><span>Route Ready</span><span id="cloud-live-task-ready">false</span></div>
+          <div class="metric"><span>Creates Task</span><span id="cloud-live-task-creates">false</span></div>
+          <div class="metric"><span>Approval</span><span id="cloud-live-task-approval">required</span></div>
+          <pre id="cloud-live-task-json">Loading live provider runbook task boundary...</pre>
+        </section>
+        <section class="panel" id="cloud-consciousness-approved-live-provider-runbook-panel">
+          <h2>Cloud Consciousness Approved Live Provider Runbook</h2>
+          <div class="metric"><span>Records</span><span id="cloud-live-approved-records">0</span></div>
+          <div class="metric"><span>Latest</span><span id="cloud-live-approved-latest">none</span></div>
+          <div class="metric"><span>Live Enabled</span><span id="cloud-live-approved-enabled">false</span></div>
+          <pre id="cloud-live-approved-json">Loading approved live provider runbook evidence...</pre>
+        </section>
+        <section class="panel" id="cloud-consciousness-live-provider-runbook-readback-panel">
+          <h2>Cloud Consciousness Live Provider Runbook Readback</h2>
+          <div class="metric"><span>Ready</span><span id="cloud-live-readback-ready">false</span></div>
+          <div class="metric"><span>Records</span><span id="cloud-live-readback-records">0</span></div>
+          <div class="metric"><span>Hash</span><span id="cloud-live-readback-hash">none</span></div>
+          <pre id="cloud-live-readback-json">Loading live provider runbook readback...</pre>
+        </section>
+        <section class="panel" id="cloud-consciousness-live-provider-call-runbook-exit-panel">
+          <h2>Cloud Consciousness Live Provider Call Runbook Exit</h2>
+          <div class="metric"><span>Complete</span><span id="cloud-live-exit-complete">false</span></div>
+          <div class="metric"><span>Percent</span><span id="cloud-live-exit-percent">0</span></div>
+          <div class="metric"><span>Next</span><span id="cloud-live-exit-next">loading</span></div>
+          <pre id="cloud-live-exit-json">Loading live provider call runbook exit gate...</pre>
+        </section>
         <section class="panel">
           <h2>Controls</h2>
           <div class="control-stack">
@@ -1984,6 +2047,42 @@ const cloudRealProviderExitComplete = document.querySelector("#cloud-real-provid
 const cloudRealProviderExitPercent = document.querySelector("#cloud-real-provider-exit-percent");
 const cloudRealProviderExitNext = document.querySelector("#cloud-real-provider-exit-next");
 const cloudRealProviderExitJson = document.querySelector("#cloud-real-provider-exit-json");
+const cloudLiveRunbookReady = document.querySelector("#cloud-live-runbook-ready");
+const cloudLiveRunbookEnabled = document.querySelector("#cloud-live-runbook-enabled");
+const cloudLiveRunbookNext = document.querySelector("#cloud-live-runbook-next");
+const cloudLiveRunbookJson = document.querySelector("#cloud-live-runbook-json");
+const cloudLiveChecklistReady = document.querySelector("#cloud-live-checklist-ready");
+const cloudLiveChecklistItems = document.querySelector("#cloud-live-checklist-items");
+const cloudLiveChecklistTransmits = document.querySelector("#cloud-live-checklist-transmits");
+const cloudLiveChecklistJson = document.querySelector("#cloud-live-checklist-json");
+const cloudLiveTranscriptReady = document.querySelector("#cloud-live-transcript-ready");
+const cloudLiveTranscriptFields = document.querySelector("#cloud-live-transcript-fields");
+const cloudLiveTranscriptStatus = document.querySelector("#cloud-live-transcript-status");
+const cloudLiveTranscriptJson = document.querySelector("#cloud-live-transcript-json");
+const cloudLiveAuthReady = document.querySelector("#cloud-live-auth-ready");
+const cloudLiveAuthEnabled = document.querySelector("#cloud-live-auth-enabled");
+const cloudLiveAuthCredential = document.querySelector("#cloud-live-auth-credential");
+const cloudLiveAuthJson = document.querySelector("#cloud-live-auth-json");
+const cloudLiveRouteReady = document.querySelector("#cloud-live-route-ready");
+const cloudLiveRouteSelected = document.querySelector("#cloud-live-route-selected");
+const cloudLiveRouteCall = document.querySelector("#cloud-live-route-call");
+const cloudLiveRouteJson = document.querySelector("#cloud-live-route-json");
+const cloudLiveTaskReady = document.querySelector("#cloud-live-task-ready");
+const cloudLiveTaskCreates = document.querySelector("#cloud-live-task-creates");
+const cloudLiveTaskApproval = document.querySelector("#cloud-live-task-approval");
+const cloudLiveTaskJson = document.querySelector("#cloud-live-task-json");
+const cloudLiveApprovedRecords = document.querySelector("#cloud-live-approved-records");
+const cloudLiveApprovedLatest = document.querySelector("#cloud-live-approved-latest");
+const cloudLiveApprovedEnabled = document.querySelector("#cloud-live-approved-enabled");
+const cloudLiveApprovedJson = document.querySelector("#cloud-live-approved-json");
+const cloudLiveReadbackReady = document.querySelector("#cloud-live-readback-ready");
+const cloudLiveReadbackRecords = document.querySelector("#cloud-live-readback-records");
+const cloudLiveReadbackHash = document.querySelector("#cloud-live-readback-hash");
+const cloudLiveReadbackJson = document.querySelector("#cloud-live-readback-json");
+const cloudLiveExitComplete = document.querySelector("#cloud-live-exit-complete");
+const cloudLiveExitPercent = document.querySelector("#cloud-live-exit-percent");
+const cloudLiveExitNext = document.querySelector("#cloud-live-exit-next");
+const cloudLiveExitJson = document.querySelector("#cloud-live-exit-json");
 const screenWindow = document.querySelector("#screen-window");
 const screenSession = document.querySelector("#screen-session");
 const screenReadiness = document.querySelector("#screen-readiness");
@@ -6420,6 +6519,203 @@ async function refreshCloudConsciousnessRealProviderCallExit() {
   }
 }
 
+async function refreshCloudConsciousnessLiveProviderCallRunbook() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/cloud-consciousness/live-provider-call-runbook\`);
+    const summary = data.summary ?? {};
+    cloudLiveRunbookReady.textContent = String(Boolean(summary.ready));
+    cloudLiveRunbookEnabled.textContent = String(Boolean(summary.liveProviderCallEnabled));
+    cloudLiveRunbookNext.textContent = data.next?.recommendedSlice ?? "openclaw-cloud-consciousness-live-provider-operator-checklist";
+    cloudLiveRunbookJson.textContent = [
+      "Registry: " + (data.registry ?? "openclaw-cloud-consciousness-live-provider-call-runbook-v0"),
+      "Mode: " + (data.mode ?? "unknown") + " status=" + (data.status ?? "unknown"),
+      "Theme: " + (data.whitepaperAlignment?.phaseTheme ?? "Prepare the live provider-call runbook without enabling external transmission."),
+      "Live Enabled: " + Boolean(summary.liveProviderCallEnabled),
+      "Next: " + (data.next?.recommendedSlice ?? "unknown"),
+    ].join("\\n");
+  } catch {
+    cloudLiveRunbookReady.textContent = "false";
+    cloudLiveRunbookEnabled.textContent = "false";
+    cloudLiveRunbookNext.textContent = "openclaw-cloud-consciousness-live-provider-operator-checklist";
+    cloudLiveRunbookJson.textContent = "Unable to read live provider call runbook.";
+  }
+}
+
+async function refreshCloudConsciousnessLiveProviderOperatorChecklist() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/cloud-consciousness/live-provider-operator-checklist\`);
+    const summary = data.summary ?? {};
+    cloudLiveChecklistReady.textContent = String(Boolean(summary.ready));
+    cloudLiveChecklistItems.textContent = String(summary.checklistItemCount ?? 0);
+    cloudLiveChecklistTransmits.textContent = String(Boolean(summary.transmitsExternally));
+    cloudLiveChecklistJson.textContent = [
+      "Registry: " + (data.registry ?? "openclaw-cloud-consciousness-live-provider-operator-checklist-v0"),
+      "Mode: " + (data.mode ?? "unknown") + " status=" + (data.status ?? "unknown"),
+      "Items: " + ((data.checklist?.operatorMustConfirm ?? []).join(", ") || "none"),
+      "Transmits: " + Boolean(summary.transmitsExternally),
+    ].join("\\n");
+  } catch {
+    cloudLiveChecklistReady.textContent = "false";
+    cloudLiveChecklistItems.textContent = "0";
+    cloudLiveChecklistTransmits.textContent = "false";
+    cloudLiveChecklistJson.textContent = "Unable to read live provider operator checklist.";
+  }
+}
+
+async function refreshCloudConsciousnessLiveProviderEgressTranscriptSchema() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/cloud-consciousness/live-provider-egress-transcript-schema\`);
+    const summary = data.summary ?? {};
+    cloudLiveTranscriptReady.textContent = String(Boolean(summary.ready));
+    cloudLiveTranscriptFields.textContent = String(summary.requiredFieldCount ?? 0);
+    cloudLiveTranscriptStatus.textContent = data.schema?.phase11AllowedStatus ?? "unknown";
+    cloudLiveTranscriptJson.textContent = [
+      "Registry: " + (data.registry ?? "openclaw-cloud-consciousness-live-provider-egress-transcript-schema-v0"),
+      "Mode: " + (data.mode ?? "unknown") + " status=" + (data.status ?? "unknown"),
+      "Schema: " + (data.schema?.id ?? "unknown"),
+      "Fields: " + ((data.schema?.requiredFields ?? []).join(", ") || "none"),
+      "Allowed Status: " + (data.schema?.phase11AllowedStatus ?? "unknown"),
+    ].join("\\n");
+  } catch {
+    cloudLiveTranscriptReady.textContent = "false";
+    cloudLiveTranscriptFields.textContent = "0";
+    cloudLiveTranscriptStatus.textContent = "unknown";
+    cloudLiveTranscriptJson.textContent = "Unable to read live provider egress transcript schema.";
+  }
+}
+
+async function refreshCloudConsciousnessLiveProviderFinalAuthorizationReview() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/cloud-consciousness/live-provider-final-authorization-review\`);
+    const summary = data.summary ?? {};
+    cloudLiveAuthReady.textContent = String(Boolean(summary.ready));
+    cloudLiveAuthEnabled.textContent = String(Boolean(summary.liveProviderCallEnabled));
+    cloudLiveAuthCredential.textContent = String(Boolean(summary.providerCredentialRead));
+    cloudLiveAuthJson.textContent = [
+      "Registry: " + (data.registry ?? "openclaw-cloud-consciousness-live-provider-final-authorization-review-v0"),
+      "Mode: " + (data.mode ?? "unknown") + " status=" + (data.status ?? "unknown"),
+      "Authorization: " + (data.authorization?.status ?? "unknown"),
+      "Response: " + (data.authorization?.reviewedResponseRecordId ?? "none"),
+      "Live Enabled: " + Boolean(summary.liveProviderCallEnabled),
+    ].join("\\n");
+  } catch {
+    cloudLiveAuthReady.textContent = "false";
+    cloudLiveAuthEnabled.textContent = "false";
+    cloudLiveAuthCredential.textContent = "false";
+    cloudLiveAuthJson.textContent = "Unable to read live provider final authorization review.";
+  }
+}
+
+async function refreshCloudConsciousnessLiveProviderRunbookRouteReview() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/cloud-consciousness/live-provider-runbook-route-review\`);
+    const summary = data.summary ?? {};
+    cloudLiveRouteReady.textContent = String(Boolean(summary.ready));
+    cloudLiveRouteSelected.textContent = summary.selectedSlice ?? "unknown";
+    cloudLiveRouteCall.textContent = String(Boolean(summary.callsCloudModel));
+    cloudLiveRouteJson.textContent = [
+      "Registry: " + (data.registry ?? "openclaw-cloud-consciousness-live-provider-runbook-route-review-v0"),
+      "Mode: " + (data.mode ?? "unknown") + " status=" + (data.status ?? "unknown"),
+      "Selected: " + (summary.selectedSlice ?? "unknown"),
+      "Deferred: " + (summary.deferredSlice ?? "unknown"),
+      "Cloud Call: " + Boolean(summary.callsCloudModel),
+    ].join("\\n");
+  } catch {
+    cloudLiveRouteReady.textContent = "false";
+    cloudLiveRouteSelected.textContent = "unknown";
+    cloudLiveRouteCall.textContent = "false";
+    cloudLiveRouteJson.textContent = "Unable to read live provider runbook route review.";
+  }
+}
+
+async function refreshCloudConsciousnessLiveProviderRunbookTask() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/cloud-consciousness/live-provider-runbook-route-review\`);
+    const summary = data.summary ?? {};
+    cloudLiveTaskReady.textContent = String(Boolean(summary.ready));
+    cloudLiveTaskCreates.textContent = "true";
+    cloudLiveTaskApproval.textContent = data.decision?.canCreateTask === true ? "required" : "blocked";
+    cloudLiveTaskJson.textContent = [
+      "Registry: openclaw-cloud-consciousness-live-provider-call-runbook-task-v0",
+      "Route: " + (data.registry ?? "openclaw-cloud-consciousness-live-provider-runbook-route-review-v0"),
+      "Ready: " + Boolean(summary.ready),
+      "Creates Task: true",
+      "Provider Call: runbook only",
+    ].join("\\n");
+  } catch {
+    cloudLiveTaskReady.textContent = "false";
+    cloudLiveTaskCreates.textContent = "false";
+    cloudLiveTaskApproval.textContent = "unknown";
+    cloudLiveTaskJson.textContent = "Unable to read live provider runbook task boundary.";
+  }
+}
+
+async function refreshCloudConsciousnessApprovedLiveProviderRunbook() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/cloud-consciousness/live-provider-runbook-readback\`);
+    const summary = data.summary ?? {};
+    cloudLiveApprovedRecords.textContent = String(summary.recordCount ?? 0);
+    cloudLiveApprovedLatest.textContent = summary.latestRecordId ?? "none";
+    cloudLiveApprovedEnabled.textContent = String(Boolean(summary.liveProviderCallEnabled));
+    cloudLiveApprovedJson.textContent = [
+      "Registry: openclaw-cloud-consciousness-approved-live-provider-runbook-v0",
+      "Readback: " + (data.registry ?? "openclaw-cloud-consciousness-live-provider-runbook-readback-v0"),
+      "Records: " + (summary.recordCount ?? 0),
+      "Latest: " + (summary.latestRecordId ?? "none"),
+      "Live Enabled: " + Boolean(summary.liveProviderCallEnabled),
+    ].join("\\n");
+  } catch {
+    cloudLiveApprovedRecords.textContent = "0";
+    cloudLiveApprovedLatest.textContent = "none";
+    cloudLiveApprovedEnabled.textContent = "false";
+    cloudLiveApprovedJson.textContent = "No approved live provider runbook evidence yet.";
+  }
+}
+
+async function refreshCloudConsciousnessLiveProviderRunbookReadback() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/cloud-consciousness/live-provider-runbook-readback\`);
+    const summary = data.summary ?? {};
+    cloudLiveReadbackReady.textContent = String(Boolean(summary.ready));
+    cloudLiveReadbackRecords.textContent = String(summary.recordCount ?? 0);
+    cloudLiveReadbackHash.textContent = summary.latestContentHash ?? "none";
+    cloudLiveReadbackJson.textContent = [
+      "Registry: " + (data.registry ?? "openclaw-cloud-consciousness-live-provider-runbook-readback-v0"),
+      "Mode: " + (data.mode ?? "unknown") + " status=" + (data.status ?? "unknown"),
+      "Ready: " + Boolean(summary.ready) + " records=" + (summary.recordCount ?? 0),
+      "Latest: " + (summary.latestRecordId ?? "none"),
+      "Hash: " + (summary.latestContentHash ?? "none"),
+    ].join("\\n");
+  } catch {
+    cloudLiveReadbackReady.textContent = "false";
+    cloudLiveReadbackRecords.textContent = "0";
+    cloudLiveReadbackHash.textContent = "none";
+    cloudLiveReadbackJson.textContent = "Unable to read live provider runbook readback.";
+  }
+}
+
+async function refreshCloudConsciousnessLiveProviderCallRunbookExit() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/cloud-consciousness/live-provider-call-runbook-exit\`);
+    const summary = data.summary ?? {};
+    cloudLiveExitComplete.textContent = String(Boolean(summary.complete));
+    cloudLiveExitPercent.textContent = String(summary.completionPercent ?? 0);
+    cloudLiveExitNext.textContent = data.next?.recommendedSlice ?? "openclaw-cloud-consciousness-live-provider-call-execution-plan";
+    cloudLiveExitJson.textContent = [
+      "Registry: " + (data.registry ?? "openclaw-cloud-consciousness-live-provider-call-runbook-exit-v0"),
+      "Mode: " + (data.mode ?? "unknown") + " status=" + (data.status ?? "unknown"),
+      "Complete: " + Boolean(summary.complete) + " percent=" + (summary.completionPercent ?? 0),
+      "Records: " + (summary.recordCount ?? 0),
+      "Next: " + (data.next?.recommendedSlice ?? "openclaw-cloud-consciousness-live-provider-call-execution-plan"),
+    ].join("\\n");
+  } catch {
+    cloudLiveExitComplete.textContent = "false";
+    cloudLiveExitPercent.textContent = "0";
+    cloudLiveExitNext.textContent = "openclaw-cloud-consciousness-live-provider-call-execution-plan";
+    cloudLiveExitJson.textContent = "Unable to read live provider call runbook exit gate.";
+  }
+}
+
 async function refreshRuntime() {
   try {
     const data = await fetchJson(\`\${observerConfig.coreUrl}/state/runtime\`);
@@ -9479,6 +9775,15 @@ await refreshCloudConsciousnessRealProviderCallTask();
 await refreshCloudConsciousnessApprovedProviderCallRehearsal();
 await refreshCloudConsciousnessProviderResponseReadback();
 await refreshCloudConsciousnessRealProviderCallExit();
+await refreshCloudConsciousnessLiveProviderCallRunbook();
+await refreshCloudConsciousnessLiveProviderOperatorChecklist();
+await refreshCloudConsciousnessLiveProviderEgressTranscriptSchema();
+await refreshCloudConsciousnessLiveProviderFinalAuthorizationReview();
+await refreshCloudConsciousnessLiveProviderRunbookRouteReview();
+await refreshCloudConsciousnessLiveProviderRunbookTask();
+await refreshCloudConsciousnessApprovedLiveProviderRunbook();
+await refreshCloudConsciousnessLiveProviderRunbookReadback();
+await refreshCloudConsciousnessLiveProviderCallRunbookExit();
 await refreshRuntime();
 await refreshTaskList();
 await refreshTaskHistoryDetail();
@@ -9642,6 +9947,15 @@ setInterval(refreshCloudConsciousnessRealProviderCallTask, 5000);
 setInterval(refreshCloudConsciousnessApprovedProviderCallRehearsal, 5000);
 setInterval(refreshCloudConsciousnessProviderResponseReadback, 5000);
 setInterval(refreshCloudConsciousnessRealProviderCallExit, 5000);
+setInterval(refreshCloudConsciousnessLiveProviderCallRunbook, 5000);
+setInterval(refreshCloudConsciousnessLiveProviderOperatorChecklist, 5000);
+setInterval(refreshCloudConsciousnessLiveProviderEgressTranscriptSchema, 5000);
+setInterval(refreshCloudConsciousnessLiveProviderFinalAuthorizationReview, 5000);
+setInterval(refreshCloudConsciousnessLiveProviderRunbookRouteReview, 5000);
+setInterval(refreshCloudConsciousnessLiveProviderRunbookTask, 5000);
+setInterval(refreshCloudConsciousnessApprovedLiveProviderRunbook, 5000);
+setInterval(refreshCloudConsciousnessLiveProviderRunbookReadback, 5000);
+setInterval(refreshCloudConsciousnessLiveProviderCallRunbookExit, 5000);
 setInterval(refreshRuntime, 5000);
 setInterval(refreshTaskList, 5000);
 setInterval(refreshTaskHistoryDetail, 5000);
