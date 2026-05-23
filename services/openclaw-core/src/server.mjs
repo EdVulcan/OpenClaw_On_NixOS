@@ -9551,6 +9551,7 @@ function serialiseTask(task) {
     bodyEvidenceLedgerFollowupRecord: task.bodyEvidenceLedgerFollowupRecord ?? null,
     longTermMemoryWrite: task.longTermMemoryWrite ?? null,
     cloudConsciousnessHandoff: task.cloudConsciousnessHandoff ?? null,
+    cloudConsciousnessProviderDryRun: task.cloudConsciousnessProviderDryRun ?? null,
     recovery: task.recovery ?? null,
     recoveredByTaskId: task.recoveredByTaskId ?? null,
     restorable: isRecoverableTask(task),
