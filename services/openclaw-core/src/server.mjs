@@ -24958,7 +24958,17 @@ const server = http.createServer(async (req, res) => {
       }
 
       if (typeof body.status === "string" && body.status.trim()) {
-        task.status = body.status.trim();
+        // N-1: Validate status against the allowed enum before writing to the task.
+        // Without this check, any string could bypass the state machine.
+        const VALID_TASK_STATUSES = new Set([
+          "queued", "running", "paused", "completed", "failed", "superseded",
+        ]);
+        const requestedStatus = body.status.trim();
+        if (!VALID_TASK_STATUSES.has(requestedStatus)) {
+          sendJson(res, 400, { ok: false, error: `Invalid task status: "${requestedStatus}". Allowed: ${[...VALID_TASK_STATUSES].join(", ")}.` });
+          return;
+        }
+        task.status = requestedStatus;
       }
 
       const updatedTask = appendTaskPhase(task, phase, body.details ?? null);

@@ -1,6 +1,7 @@
 import http from "node:http";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
+import { promises as fsPromises } from "node:fs";
 import path from "node:path";
 
 const host = process.env.OPENCLAW_EVENT_HUB_HOST ?? "127.0.0.1";
@@ -109,10 +110,11 @@ function safeParseAuditLine(line) {
   }
 }
 
-function readAuditEvents({ type = null, source = null, limit = 100 } = {}) {
+// H-3 Fix: Async file read to avoid blocking the event loop on large log files.
+async function readAuditEvents({ type = null, source = null, limit = 100 } = {}) {
   ensureAuditLogReady();
   const safeLimit = Math.max(1, Math.min(limit, maxAuditQueryLimit));
-  const text = fs.readFileSync(auditLogFile, "utf8");
+  const text = await fsPromises.readFile(auditLogFile, "utf8");
   const items = [];
 
   for (const line of text.split(/\r?\n/)) {
@@ -132,9 +134,10 @@ function readAuditEvents({ type = null, source = null, limit = 100 } = {}) {
   return items.slice(-safeLimit);
 }
 
-function buildAuditSummary() {
+// H-3 Fix: Async file read to avoid blocking the event loop on large log files.
+async function buildAuditSummary() {
   ensureAuditLogReady();
-  const text = fs.readFileSync(auditLogFile, "utf8");
+  const text = await fsPromises.readFile(auditLogFile, "utf8");
   const byType = {};
   const bySource = {};
   let total = 0;
@@ -159,7 +162,11 @@ function buildAuditSummary() {
 
     if (typeof event.timestamp === "string" && event.timestamp) {
       earliestTimestamp = earliestTimestamp ?? event.timestamp;
-      latestTimestamp = event.timestamp;
+      // M-2 Fix: Compare timestamps lexicographically instead of always taking
+      // the last one, so that out-of-order entries don't produce a wrong result.
+      latestTimestamp = latestTimestamp === null || event.timestamp > latestTimestamp
+        ? event.timestamp
+        : latestTimestamp;
     }
   }
 
@@ -176,14 +183,16 @@ function buildAuditSummary() {
   };
 }
 
-function appendAuditEvent(event) {
+// H-3 Fix: Async append to avoid blocking the event loop during log writes.
+async function appendAuditEvent(event) {
   ensureAuditLogReady();
-  fs.appendFileSync(auditLogFile, `${JSON.stringify(event)}\n`, "utf8");
+  await fsPromises.appendFile(auditLogFile, `${JSON.stringify(event)}\n`, "utf8");
 }
 
-function hydrateRecentEventsFromAuditLog() {
+// H-3 Fix: Now async since readAuditEvents is async.
+async function hydrateRecentEventsFromAuditLog() {
   try {
-    for (const event of readAuditEvents({ limit: maxRecentEvents })) {
+    for (const event of await readAuditEvents({ limit: maxRecentEvents })) {
       recentEvents.push(event);
     }
   } catch (error) {
@@ -192,12 +201,16 @@ function hydrateRecentEventsFromAuditLog() {
   }
 }
 
-function publishEvent(event) {
-  appendAuditEvent(event);
+// H-3 Fix: publishEvent is now async to await the async appendAuditEvent.
+async function publishEvent(event) {
+  await appendAuditEvent(event);
 
   recentEvents.push(event);
+  // L-1 Fix: Use shift() instead of splice(0, N) since we push exactly one
+  // element at a time, so at most one element needs to be removed. This avoids
+  // a potentially large splice when the array is only one over the limit.
   if (recentEvents.length > maxRecentEvents) {
-    recentEvents.splice(0, recentEvents.length - maxRecentEvents);
+    recentEvents.shift();
   }
 
   const frame = `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`;
@@ -258,7 +271,8 @@ const server = http.createServer(async (req, res) => {
     const limit = Number.parseInt(requestUrl.searchParams.get("limit") ?? "100", 10);
     const type = requestUrl.searchParams.get("type") || null;
     const source = requestUrl.searchParams.get("source") || null;
-    const items = readAuditEvents({
+    // H-3 Fix: readAuditEvents is now async.
+    const items = await readAuditEvents({
       limit: Number.isFinite(limit) ? limit : 100,
       type,
       source,
@@ -273,9 +287,10 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === "GET" && requestUrl.pathname === "/events/audit/summary") {
+    // H-3 Fix: buildAuditSummary is now async.
     sendJson(res, 200, {
       ok: true,
-      audit: buildAuditSummary(),
+      audit: await buildAuditSummary(),
     });
     return;
   }
@@ -289,7 +304,8 @@ const server = http.createServer(async (req, res) => {
     try {
       const body = await readJsonBody(req);
       const event = normaliseEvent(body);
-      publishEvent(event);
+      // H-3 Fix: await publishEvent since it is now async (async audit log append).
+      await publishEvent(event);
       sendJson(res, 201, { ok: true, event });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";

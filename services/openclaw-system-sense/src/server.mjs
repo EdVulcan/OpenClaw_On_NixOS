@@ -444,6 +444,9 @@ function writeTextFile(body = {}) {
 
   const resolved = resolveAllowedPath(targetPath);
   const parentPath = path.dirname(resolved.path);
+  // H-4 note: This call intentionally discards the return value. Its purpose
+  // is boundary validation only — it throws if parentPath falls outside the
+  // allowed roots. On NixOS the path check is correct and complete.
   resolveAllowedPath(parentPath);
   if (!existsSync(parentPath) || !statSync(parentPath).isDirectory()) {
     const error = new Error("Parent directory must exist inside allowed roots.");

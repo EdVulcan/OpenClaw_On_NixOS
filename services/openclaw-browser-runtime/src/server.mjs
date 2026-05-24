@@ -1,4 +1,5 @@
 import http from "node:http";
+import { randomUUID } from "node:crypto";
 
 const host = process.env.OPENCLAW_BROWSER_RUNTIME_HOST ?? "127.0.0.1";
 const port = Number.parseInt(process.env.OPENCLAW_BROWSER_RUNTIME_PORT ?? "4103", 10);
@@ -123,7 +124,22 @@ async function waitForReadySession() {
   return null;
 }
 
+// H-2 Fix: Mutex to prevent concurrent calls from each triggering a separate
+// session/start request. While the first call is in flight, subsequent callers
+// await the same Promise.
+let _ensureSessionPromise = null;
+
 async function ensureSession() {
+  if (_ensureSessionPromise) {
+    return _ensureSessionPromise;
+  }
+  _ensureSessionPromise = _doEnsureSession().finally(() => {
+    _ensureSessionPromise = null;
+  });
+  return _ensureSessionPromise;
+}
+
+async function _doEnsureSession() {
   const current = await readSessionState();
   if (current?.status === "running" && current?.sessionId) {
     return current;
@@ -140,7 +156,9 @@ async function ensureSession() {
 
 function addTab(url) {
   const tab = {
-    id: `tab-${browserState.tabs.length + 1}`,
+    // H-1 Fix: Use randomUUID instead of tabs.length+1 to avoid duplicate IDs
+    // if tabs are ever removed in the future.
+    id: `tab-${randomUUID()}`,
     url,
     title: titleForUrl(url),
     createdAt: new Date().toISOString(),

@@ -136,6 +136,8 @@ function loadPersistentState() {
     return;
   }
 
+  // H-4 note: resolveAllowedPath-style path checks do not apply here because
+  // stateFilePath is set from a trusted environment variable, not user input.
   try {
     const data = JSON.parse(readFileSync(stateFilePath, "utf8"));
     latestDiagnosis = data?.latestDiagnosis && typeof data.latestDiagnosis === "object"
@@ -151,11 +153,15 @@ function loadPersistentState() {
       maintenanceRuns.splice(0, maintenanceRuns.length, ...data.maintenanceRuns.slice(0, MAX_MAINTENANCE_RUNS));
     }
     if (data?.maintenancePolicy && typeof data.maintenancePolicy === "object") {
+      // M-6 Fix: Validate mode against an explicit allowlist so that a corrupted
+      // or manually-edited state file cannot inject an arbitrary mode string.
+      const VALID_HEAL_MODES = ["simulated", "audit_only"];
       Object.assign(maintenancePolicy, {
         enabled: data.maintenancePolicy.enabled === true,
         intervalMs: parsePositiveInteger(data.maintenancePolicy.intervalMs, maintenancePolicy.intervalMs),
         autofix: data.maintenancePolicy.autofix !== false,
-        mode: typeof data.maintenancePolicy.mode === "string" && data.maintenancePolicy.mode.trim()
+        mode: typeof data.maintenancePolicy.mode === "string"
+          && VALID_HEAL_MODES.includes(data.maintenancePolicy.mode.trim())
           ? data.maintenancePolicy.mode.trim()
           : maintenancePolicy.mode,
         lastCheckedAt: typeof data.maintenancePolicy.lastCheckedAt === "string"
@@ -217,7 +223,17 @@ function isMaintenanceDue(now = new Date()) {
     return true;
   }
   const dueAtMs = Date.parse(maintenancePolicy.nextDueAt);
-  return Number.isNaN(dueAtMs) || dueAtMs <= now.getTime();
+  // L-2 Fix: A corrupted nextDueAt (NaN) previously triggered maintenance
+  // silently. Now we log a warning and reset the schedule instead.
+  if (Number.isNaN(dueAtMs)) {
+    console.warn(
+      `[system-heal] Invalid nextDueAt value "${maintenancePolicy.nextDueAt}" detected. ` +
+      "Resetting maintenance schedule to prevent unintended trigger."
+    );
+    maintenancePolicy.nextDueAt = calculateNextDueAt(now);
+    return false;
+  }
+  return dueAtMs <= now.getTime();
 }
 
 async function fetchSystemHealth() {
@@ -320,7 +336,7 @@ async function buildDiagnosisFromRequest(body = {}) {
 }
 
 async function executeHealStep(step) {
-  const now = new Date().toISOString();
+  const startedAt = new Date().toISOString();
   const entry = {
     id: randomUUID(),
     action: step.kind,
@@ -330,13 +346,18 @@ async function executeHealStep(step) {
     reason: step.reason,
     risk: step.risk,
     evidence: step.evidence ?? null,
-    startedAt: now,
-    completedAt: new Date().toISOString(),
+    startedAt,
+    completedAt: startedAt, // will be updated after execution below
   };
 
   await publishEvent("heal.started", { entry, step });
-  addHistory(entry);
+  // M-3 Fix: Record the actual completion time after work is done, then
+  // persist history only after BOTH events have been published. This prevents
+  // a state where history is written but heal.completed was never emitted
+  // (e.g. if the first publishEvent call timed out).
+  entry.completedAt = new Date().toISOString();
   await publishEvent("heal.completed", { entry, step });
+  addHistory(entry);
   return entry;
 }
 

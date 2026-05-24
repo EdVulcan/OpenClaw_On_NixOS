@@ -93,6 +93,16 @@ function updateWorkViewState(patch) {
   });
 }
 
+// L-3 Fix: Both /session/state and /work-view/state return identical payloads.
+// Extract a shared builder to keep them consistent and DRY.
+function buildStateResponse() {
+  return {
+    ok: true,
+    session: serialiseSessionState(),
+    workView: serialiseWorkViewState(),
+  };
+}
+
 function sleep(ms) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
@@ -246,20 +256,14 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === "GET" && requestUrl.pathname === "/session/state") {
-    sendJson(res, 200, {
-      ok: true,
-      session: serialiseSessionState(),
-      workView: serialiseWorkViewState(),
-    });
+    // L-3 Fix: Use shared builder so both routes stay in sync.
+    sendJson(res, 200, buildStateResponse());
     return;
   }
 
   if (req.method === "GET" && requestUrl.pathname === "/work-view/state") {
-    sendJson(res, 200, {
-      ok: true,
-      session: serialiseSessionState(),
-      workView: serialiseWorkViewState(),
-    });
+    // L-3 Fix: Use shared builder so both routes stay in sync.
+    sendJson(res, 200, buildStateResponse());
     return;
   }
 
@@ -337,7 +341,9 @@ const server = http.createServer(async (req, res) => {
       const browser = await prepareWorkView(displayTarget, entryUrl);
       const session = serialiseSessionState();
       const workView = serialiseWorkViewState();
-      await publishEvent("service.started", {
+      // M-1 Fix: Use screen.updated instead of service.started for work-view
+      // state transitions so event subscribers can distinguish them.
+      await publishEvent("screen.updated", {
         service: "openclaw-session-manager",
         action: "work-view-prepared",
         session,
@@ -367,7 +373,8 @@ const server = http.createServer(async (req, res) => {
       const browser = await revealWorkView(entryUrl);
       const session = serialiseSessionState();
       const workView = serialiseWorkViewState();
-      await publishEvent("service.started", {
+      // M-1 Fix: Use screen.updated for visibility change events.
+      await publishEvent("screen.updated", {
         service: "openclaw-session-manager",
         action: "work-view-revealed",
         session,
@@ -387,7 +394,8 @@ const server = http.createServer(async (req, res) => {
       hideWorkView();
       const session = serialiseSessionState();
       const workView = serialiseWorkViewState();
-      await publishEvent("service.started", {
+      // M-1 Fix: Use screen.updated for visibility change events.
+      await publishEvent("screen.updated", {
         service: "openclaw-session-manager",
         action: "work-view-hidden",
         session,

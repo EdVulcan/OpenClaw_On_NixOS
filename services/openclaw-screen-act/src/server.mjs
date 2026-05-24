@@ -196,22 +196,36 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === "POST" && requestUrl.pathname === "/act/mouse/click") {
-    const body = await readJsonBody(req);
-    const action = await executeAction("mouse.click", {
-      x: typeof body.x === "number" ? body.x : null,
-      y: typeof body.y === "number" ? body.y : null,
-      button: typeof body.button === "string" ? body.button : "left",
-    });
-    sendJson(res, 200, { ok: true, action });
+    // M-4 Fix: Added try/catch consistent with all other routes in this service.
+    // Without it, exceptions from readJsonBody or executeAction would leave
+    // the HTTP connection hanging with no response.
+    try {
+      const body = await readJsonBody(req);
+      const action = await executeAction("mouse.click", {
+        x: typeof body.x === "number" ? body.x : null,
+        y: typeof body.y === "number" ? body.y : null,
+        button: typeof body.button === "string" ? body.button : "left",
+      });
+      sendJson(res, 200, { ok: true, action });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
     return;
   }
 
   if (req.method === "POST" && requestUrl.pathname === "/act/keyboard/type") {
-    const body = await readJsonBody(req);
-    const action = await executeAction("keyboard.type", {
-      text: typeof body.text === "string" ? body.text : "",
-    });
-    sendJson(res, 200, { ok: true, action });
+    // M-4 Fix: Added try/catch consistent with all other routes in this service.
+    try {
+      const body = await readJsonBody(req);
+      const action = await executeAction("keyboard.type", {
+        text: typeof body.text === "string" ? body.text : "",
+      });
+      sendJson(res, 200, { ok: true, action });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
     return;
   }
 

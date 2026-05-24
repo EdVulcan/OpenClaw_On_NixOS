@@ -266,7 +266,29 @@ async function collectStableScreenState() {
   try {
     while (Date.now() <= deadline) {
       latest = await readUpstreamState();
-      if (!(latest.browser?.running) || latest.session?.sessionId) {
+
+      // M-5 Fix: The original condition was `!(latest.browser?.running) || latest.session?.sessionId`.
+      // When the browser-runtime fetch fails, latest.browser is null, so
+      // latest.browser?.running is undefined, and !(undefined) is true — this
+      // caused a failed fetch to be treated as "browser not running" and
+      // returned degraded:false incorrectly.
+      //
+      // Now we distinguish three explicit cases:
+      //   1. Browser explicitly reports running=false (not null): stable state,
+      //      no need to wait further.
+      //   2. Session is ready (has a sessionId): stable state.
+      //   3. Everything else (null browser, browser running but no session yet):
+      //      keep polling until the deadline.
+
+      if (latest.browser !== null && !latest.browser.running) {
+        // Browser is explicitly not running — stable, nothing to wait for.
+        const patch = deriveScreenPatch({ ...latest, degraded: false });
+        updateScreenState(patch);
+        return { ...screenState };
+      }
+
+      if (latest.session?.sessionId) {
+        // Session is ready (browser is running and session is established).
         const patch = deriveScreenPatch({ ...latest, degraded: false });
         updateScreenState(patch);
         return { ...screenState };
@@ -275,6 +297,7 @@ async function collectStableScreenState() {
       await sleep(statePollMs);
     }
 
+    // Timed out waiting for a consistent state.
     const degradedPatch = deriveScreenPatch({ ...latest, degraded: true });
     updateScreenState(degradedPatch);
     return { ...screenState };
