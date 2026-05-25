@@ -84,6 +84,9 @@ export function registerRoutes(deps) {
     createCloudConsciousnessLiveProviderExecutionPlanTask,
     buildCloudConsciousnessLiveProviderExecutionPlanReadback,
     buildCloudConsciousnessLiveProviderCallExecutionPlanExit,
+    buildCloudConsciousnessLiveProviderCallRuntimeAdapterPlan,
+    createCloudConsciousnessLiveProviderRuntimeAdapterTask,
+    buildCloudConsciousnessLiveProviderRuntimeAdapterExit,
   } = planBuilder;
   const { executeTask, executeTaskWithRecovery, serialiseExecutionResult, buildOperatorState, buildOperatorOptions, runOperatorStep, runOperatorLoop } = executor;
 
@@ -510,6 +513,16 @@ export function registerRoutes(deps) {
 
   if (req.method === "GET" && requestUrl.pathname === "/cloud-consciousness/live-provider-call-execution-plan-exit") {
     sendJson(res, 200, await buildCloudConsciousnessLiveProviderCallExecutionPlanExit());
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/cloud-consciousness/live-provider-call-runtime-adapter-plan") {
+    sendJson(res, 200, await buildCloudConsciousnessLiveProviderCallRuntimeAdapterPlan());
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/cloud-consciousness/live-provider-runtime-adapter-exit") {
+    sendJson(res, 200, await buildCloudConsciousnessLiveProviderRuntimeAdapterExit());
     return;
   }
 
@@ -2091,6 +2104,31 @@ export function registerRoutes(deps) {
         sourceRegistry: result.sourceRegistry,
         routeReview: result.routeReview,
         transcriptSchema: result.transcriptSchema,
+        task: serialiseTask(result.task),
+        approval: serialiseApproval(result.approval),
+        governance: result.governance,
+        summary: buildTaskSummary(),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/cloud-consciousness/live-provider-runtime-adapter-tasks") {
+    try {
+      const body = await readJsonBody(req);
+      const result = await createCloudConsciousnessLiveProviderRuntimeAdapterTask({
+        confirm: body.confirm === true,
+      });
+      sendJson(res, 201, {
+        ok: true,
+        registry: result.registry,
+        mode: result.mode,
+        generatedAt: result.generatedAt,
+        sourceRegistry: result.sourceRegistry,
+        adapterPlan: result.adapterPlan,
         task: serialiseTask(result.task),
         approval: serialiseApproval(result.approval),
         governance: result.governance,

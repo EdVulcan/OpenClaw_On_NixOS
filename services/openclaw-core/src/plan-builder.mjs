@@ -40,6 +40,7 @@ export function createPlanBuilder(deps) {
     CLOUD_CONSCIOUSNESS_PROVIDER_CALL_REHEARSAL_TASK_REGISTRY,
     CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_RUNBOOK_TASK_REGISTRY,
     CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_EXECUTION_PLAN_TASK_REGISTRY,
+    CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_RUNTIME_ADAPTER_TASK_REGISTRY,
     CLOUD_CONSCIOUSNESS_HANDOFF_FILE_DISPLAY_PATH,
     CLOUD_CONSCIOUSNESS_PROVIDER_DRY_RUN_FILE_DISPLAY_PATH,
     CLOUD_CONSCIOUSNESS_PROVIDER_RESPONSE_FILE_DISPLAY_PATH,
@@ -57,7 +58,7 @@ export function createPlanBuilder(deps) {
     reconcileRuntimeState,
     buildTaskSummary,
   } = taskManager;
-  const { createApprovalRequestForTask, publishTaskApprovalIfPending } = approvalEngine;
+  const { serialiseApproval, createApprovalRequestForTask, publishTaskApprovalIfPending } = approvalEngine;
   const { evaluatePolicyIntent, isPolicyExecutionAllowed } = policyEvaluator;
   const { selectOpenClawToolCatalogWorkspace, buildOpenClawNativePluginRegistryResponse } = pluginReview;
 
@@ -10665,6 +10666,345 @@ async function buildCloudConsciousnessLiveProviderCallExecutionPlanExit() {
   };
 }
 
+function phase13Governance(extra = {}) {
+  return {
+    phase: "phase-13",
+    createsTask: false,
+    createsApproval: false,
+    implementsRuntimeAdapter: false,
+    callsCloudModel: false,
+    transmitsExternally: false,
+    liveProviderCallEnabled: false,
+    providerSdkLoaded: false,
+    providerCredentialRead: false,
+    credentialValueRead: false,
+    endpointContacted: false,
+    networkEgress: false,
+    ...extra,
+  };
+}
+
+async function buildCloudConsciousnessLiveProviderCallRuntimeAdapterPlan() {
+  const phase12Exit = await buildCloudConsciousnessLiveProviderCallExecutionPlanExit();
+  const checks = [
+    {
+      id: "phase-12-complete",
+      label: "Phase 12 execution plan exit is complete",
+      passed: phase12Exit.summary?.complete === true,
+      evidence: phase12Exit.registry,
+    },
+    {
+      id: "adapter-plan-only",
+      label: "Runtime adapter is planned without implementation or live egress",
+      passed: true,
+      evidence: "plan-only",
+    },
+    {
+      id: "operator-task-next",
+      label: "Next slice is an approval-gated runtime adapter task shell",
+      passed: true,
+      evidence: "openclaw-cloud-consciousness-live-provider-runtime-adapter-task",
+    },
+  ];
+  const passed = checks.filter((check) => check.passed).length;
+  const ready = passed === checks.length;
+  return {
+    ok: true,
+    registry: "openclaw-cloud-consciousness-live-provider-call-runtime-adapter-plan-v0",
+    mode: "phase_13_live_provider_runtime_adapter_plan_only",
+    generatedAt: new Date().toISOString(),
+    status: ready ? "runtime_adapter_plan_ready" : "waiting_for_phase_12_execution_plan_exit",
+    governance: phase13Governance(),
+    adapterPlan: {
+      owner: "OpenClawOnNixOS",
+      adapterKind: "live_provider_call_runtime_adapter",
+      implementationStatus: "not_implemented",
+      credentialReadStatus: "not_read",
+      endpointContactStatus: "not_contacted",
+      networkEgressStatus: "disabled",
+      providerSdkStatus: "not_loaded",
+      liveProviderCallStatus: "disabled",
+      requiredBeforeLiveEgress: [
+        "operator-approved runtime adapter task",
+        "credential reference readback without value exposure",
+        "egress transcript writer",
+        "final human-visible live-call authorization",
+      ],
+    },
+    checks,
+    summary: {
+      ready,
+      complete: ready,
+      passed,
+      total: checks.length,
+      completionPercent: ready ? 100 : Math.round((passed / checks.length) * 100),
+      phase: "phase-13",
+      callsCloudModel: false,
+      transmitsExternally: false,
+      providerSdkLoaded: false,
+      providerCredentialRead: false,
+      endpointContacted: false,
+      liveProviderCallEnabled: false,
+      createsTask: false,
+    },
+    evidence: {
+      phase12Exit: phase12EvidenceRef(phase12Exit),
+    },
+    next: {
+      recommendedSlice: "openclaw-cloud-consciousness-live-provider-runtime-adapter-task",
+      boundary: "materialize the runtime adapter as an approval-gated task shell before any implementation or live provider egress",
+    },
+  };
+}
+
+function phase14Governance(extra = {}) {
+  return {
+    phase: "phase-14",
+    createsTask: false,
+    createsApproval: false,
+    implementsRuntimeAdapter: false,
+    callsCloudModel: false,
+    transmitsExternally: false,
+    liveProviderCallEnabled: false,
+    providerSdkLoaded: false,
+    providerCredentialRead: false,
+    credentialValueRead: false,
+    endpointContacted: false,
+    networkEgress: false,
+    ...extra,
+  };
+}
+
+async function createCloudConsciousnessLiveProviderRuntimeAdapterTask({ confirm = false } = {}) {
+  if (confirm !== true) {
+    throw new Error("Cloud consciousness live provider runtime adapter task creation requires confirm=true.");
+  }
+
+  const adapterPlan = await buildCloudConsciousnessLiveProviderCallRuntimeAdapterPlan();
+  if (adapterPlan.summary?.ready !== true) {
+    throw new Error("Cloud consciousness live provider runtime adapter task requires a ready Phase 13 adapter plan.");
+  }
+
+  const policyRequest = {
+    intent: "cloud_consciousness.live_provider_call.runtime_adapter",
+    domain: "body_internal",
+    risk: "high",
+    requiresApproval: true,
+    audit: true,
+    tags: ["cloud_consciousness", "live_provider_call", "runtime_adapter_shell", "operator_reviewed"],
+  };
+  const goal = "Prepare reviewed live provider-call runtime adapter task without enabling egress";
+  const policyDecision = evaluatePolicyIntent({
+    type: "cloud_consciousness_live_provider_runtime_adapter_task",
+    goal,
+    policy: policyRequest,
+  }, {
+    stage: "cloud_consciousness.live_provider_runtime_adapter_task.draft",
+    type: "cloud_consciousness_live_provider_runtime_adapter_task",
+    goal,
+  });
+  const task = createTask({
+    goal,
+    type: "cloud_consciousness_live_provider_runtime_adapter_task",
+    workViewStrategy: "cloud-consciousness-live-provider-runtime-adapter",
+    policy: policyRequest,
+    plan: {
+      planner: "cloud-consciousness-live-provider-runtime-adapter-task-v0",
+      strategy: "approval-gated-cloud-consciousness-live-provider-runtime-adapter-shell",
+      summary: "Prepare an approval-gated runtime adapter shell while keeping provider egress disabled.",
+      governance: phase14Governance({ createsTask: true, createsApproval: true }),
+      steps: [
+        {
+          id: "review-runtime-adapter-plan",
+          phase: "review_live_provider_runtime_adapter_plan",
+          title: "Review Phase 13 runtime adapter plan and Phase 12 execution-plan evidence",
+          status: "pending",
+          requiresApproval: false,
+        },
+        {
+          id: "operator-approval",
+          phase: "waiting_for_approval",
+          title: "Wait for operator approval before runtime adapter shell materialization",
+          status: "pending",
+          capabilityId: "act.system.command.dry_run",
+          requiresApproval: true,
+          risk: "high",
+        },
+        {
+          id: "defer-runtime-adapter-implementation",
+          phase: "cloud_consciousness_live_provider_runtime_adapter_deferred",
+          title: "Record approved runtime adapter shell and defer implementation/live egress",
+          status: "pending",
+          requiresApproval: true,
+          executesNow: false,
+        },
+      ],
+    },
+  }, { skipInitialPolicy: true });
+  task.policy = {
+    request: policyRequest,
+    decision: policyDecision,
+  };
+  task.cloudConsciousnessLiveProviderRuntimeAdapter = {
+    registry: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_RUNTIME_ADAPTER_TASK_REGISTRY,
+    adapterPlanRegistry: adapterPlan.registry,
+    implementationStatus: "deferred",
+    liveProviderCallEnabled: false,
+    providerSdkLoaded: false,
+    providerCredentialRead: false,
+    endpointContacted: false,
+    transmitsExternally: false,
+  };
+  const approval = createApprovalRequestForTask(task, policyDecision);
+  const reclaimedTasks = supersedeOtherActiveTasks(task.id);
+  reconcileRuntimeState();
+  persistState();
+
+  await publishEvent("task.created", { task: serialiseTask(task), planner: "cloud-consciousness-live-provider-runtime-adapter-task-v0" });
+  await publishTaskApprovalIfPending(task);
+  await publishEvent("task.planned", { task: serialiseTask(task), plan: serialisePlanForPublic(task.plan) });
+  await Promise.all(reclaimedTasks.map((reclaimedTask) => publishEvent("task.phase_changed", {
+    task: serialiseTask(reclaimedTask),
+  })));
+
+  return {
+    ok: true,
+    registry: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_RUNTIME_ADAPTER_TASK_REGISTRY,
+    mode: "approval-gated-cloud-consciousness-live-provider-runtime-adapter-task",
+    generatedAt: new Date().toISOString(),
+    sourceRegistry: adapterPlan.registry,
+    adapterPlan,
+    task,
+    approval,
+    governance: phase14Governance({ createsTask: true, createsApproval: true }),
+  };
+}
+
+function isCloudConsciousnessLiveProviderRuntimeAdapterTask(task) {
+  return task?.type === "cloud_consciousness_live_provider_runtime_adapter_task"
+    && task?.cloudConsciousnessLiveProviderRuntimeAdapter?.registry === CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_RUNTIME_ADAPTER_TASK_REGISTRY;
+}
+
+async function executeCloudConsciousnessLiveProviderRuntimeAdapterTask(task) {
+  const adapterPlan = await buildCloudConsciousnessLiveProviderCallRuntimeAdapterPlan();
+  const approval = task.approval?.requestId ? approvals.get(task.approval.requestId) : null;
+  if (approval?.status !== "approved") {
+    return {
+      blocked: true,
+      reason: "approval_required",
+      task,
+      approval: approval ? serialiseApproval(approval) : null,
+      policy: task.policy?.decision ?? null,
+    };
+  }
+
+  task.cloudConsciousnessLiveProviderRuntimeAdapter = {
+    ...(task.cloudConsciousnessLiveProviderRuntimeAdapter ?? {}),
+    implementationStatus: "deferred_after_approval",
+    approvedAt: approval.updatedAt,
+    liveProviderCallEnabled: false,
+    providerSdkLoaded: false,
+    providerCredentialRead: false,
+    endpointContacted: false,
+    transmitsExternally: false,
+  };
+  appendTaskPhase(task, "cloud_consciousness_live_provider_runtime_adapter_deferred", {
+    adapterPlanRegistry: adapterPlan.registry,
+    deferredSlice: "openclaw-cloud-consciousness-live-provider-call-final-authorization",
+    reason: "runtime adapter shell approved; implementation and live egress remain deferred",
+    callsCloudModel: false,
+    transmitsExternally: false,
+    providerSdkLoaded: false,
+    providerCredentialRead: false,
+  });
+  completeTask(task, {
+    summary: "Approved runtime adapter task shell recorded; live provider egress remains deferred.",
+    adapterPlanRegistry: adapterPlan.registry,
+    phase: "cloud_consciousness_live_provider_runtime_adapter_deferred",
+    callsCloudModel: false,
+    transmitsExternally: false,
+    providerSdkLoaded: false,
+    providerCredentialRead: false,
+    liveProviderCallEnabled: false,
+  });
+  await publishEvent("task.completed", { task: serialiseTask(task), adapterPlan: phase12EvidenceRef(adapterPlan) });
+  return {
+    ok: true,
+    executor: "cloud-consciousness-live-provider-runtime-adapter-task-v0",
+    status: "runtime_adapter_deferred_after_approval",
+    task,
+    adapterPlan,
+    governance: phase14Governance({ createsTask: true, createsApproval: true }),
+    summary: {
+      ready: true,
+      implementationStatus: "deferred_after_approval",
+      callsCloudModel: false,
+      transmitsExternally: false,
+      providerSdkLoaded: false,
+      providerCredentialRead: false,
+      endpointContacted: false,
+      liveProviderCallEnabled: false,
+    },
+  };
+}
+
+async function buildCloudConsciousnessLiveProviderRuntimeAdapterExit() {
+  const adapterPlan = await buildCloudConsciousnessLiveProviderCallRuntimeAdapterPlan();
+  const checks = [
+    {
+      id: "phase-13-adapter-plan-ready",
+      label: "Phase 13 runtime adapter plan is ready",
+      passed: adapterPlan.summary?.ready === true,
+      evidence: adapterPlan.registry,
+    },
+    {
+      id: "phase-14-task-shell-registered",
+      label: "Phase 14 runtime adapter task shell is registered",
+      passed: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_RUNTIME_ADAPTER_TASK_REGISTRY === "openclaw-cloud-consciousness-live-provider-runtime-adapter-task-v0",
+      evidence: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_RUNTIME_ADAPTER_TASK_REGISTRY,
+    },
+    {
+      id: "live-egress-still-disabled",
+      label: "Live provider egress remains disabled after Phase 14",
+      passed: true,
+      evidence: "no provider SDK load, credential read, endpoint contact, or external transmission",
+    },
+  ];
+  const passed = checks.filter((check) => check.passed).length;
+  const complete = passed === checks.length;
+  return {
+    ok: true,
+    registry: "openclaw-cloud-consciousness-live-provider-runtime-adapter-exit-v0",
+    mode: "phase_14_live_provider_runtime_adapter_exit_gate",
+    generatedAt: new Date().toISOString(),
+    status: complete ? "phase_14_complete" : "waiting_for_phase_14_runtime_adapter_task",
+    governance: phase14Governance(),
+    checks,
+    summary: {
+      complete,
+      ready: complete,
+      passed,
+      total: checks.length,
+      completionPercent: complete ? 100 : Math.round((passed / checks.length) * 100),
+      phase: "phase-14",
+      createsTask: true,
+      callsCloudModel: false,
+      transmitsExternally: false,
+      providerSdkLoaded: false,
+      providerCredentialRead: false,
+      endpointContacted: false,
+      liveProviderCallEnabled: false,
+    },
+    evidence: {
+      adapterPlan: phase12EvidenceRef(adapterPlan),
+    },
+    next: {
+      recommendedSlice: "openclaw-cloud-consciousness-live-provider-call-final-authorization",
+      boundary: "only a future explicit final authorization phase may consider enabling real live provider egress",
+    },
+  };
+}
+
 function baseCapabilities() {
   return [
     {
@@ -11794,5 +12134,10 @@ async function buildCapabilityRegistry() {
     executeCloudConsciousnessLiveProviderExecutionPlanTask,
     buildCloudConsciousnessLiveProviderExecutionPlanReadback,
     buildCloudConsciousnessLiveProviderCallExecutionPlanExit,
+    buildCloudConsciousnessLiveProviderCallRuntimeAdapterPlan,
+    createCloudConsciousnessLiveProviderRuntimeAdapterTask,
+    isCloudConsciousnessLiveProviderRuntimeAdapterTask,
+    executeCloudConsciousnessLiveProviderRuntimeAdapterTask,
+    buildCloudConsciousnessLiveProviderRuntimeAdapterExit,
   };
 }

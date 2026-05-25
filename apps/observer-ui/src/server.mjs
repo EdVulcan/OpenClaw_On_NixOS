@@ -835,6 +835,20 @@ function observerHtml() {
           <div class="metric"><span>Next</span><span id="cloud-live-exec-exit-next">loading</span></div>
           <pre id="cloud-live-exec-exit-json">Loading live provider execution plan exit gate...</pre>
         </section>
+        <section class="panel" id="cloud-consciousness-live-provider-call-runtime-adapter-plan-panel">
+          <h2>Cloud Consciousness Live Provider Runtime Adapter Plan</h2>
+          <div class="metric"><span>Ready</span><span id="cloud-live-runtime-adapter-plan-ready">false</span></div>
+          <div class="metric"><span>Percent</span><span id="cloud-live-runtime-adapter-plan-percent">0</span></div>
+          <div class="metric"><span>Next</span><span id="cloud-live-runtime-adapter-plan-next">loading</span></div>
+          <pre id="cloud-live-runtime-adapter-plan-json">Loading live provider runtime adapter plan...</pre>
+        </section>
+        <section class="panel" id="cloud-consciousness-live-provider-runtime-adapter-exit-panel">
+          <h2>Cloud Consciousness Live Provider Runtime Adapter Exit</h2>
+          <div class="metric"><span>Complete</span><span id="cloud-live-runtime-adapter-exit-complete">false</span></div>
+          <div class="metric"><span>Percent</span><span id="cloud-live-runtime-adapter-exit-percent">0</span></div>
+          <div class="metric"><span>Next</span><span id="cloud-live-runtime-adapter-exit-next">loading</span></div>
+          <pre id="cloud-live-runtime-adapter-exit-json">Loading live provider runtime adapter exit gate...</pre>
+        </section>
         <section class="panel">
           <h2>Controls</h2>
           <div class="control-stack">
@@ -2127,6 +2141,14 @@ const cloudLiveExecExitComplete = document.querySelector("#cloud-live-exec-exit-
 const cloudLiveExecExitPercent = document.querySelector("#cloud-live-exec-exit-percent");
 const cloudLiveExecExitNext = document.querySelector("#cloud-live-exec-exit-next");
 const cloudLiveExecExitJson = document.querySelector("#cloud-live-exec-exit-json");
+const cloudLiveRuntimeAdapterPlanReady = document.querySelector("#cloud-live-runtime-adapter-plan-ready");
+const cloudLiveRuntimeAdapterPlanPercent = document.querySelector("#cloud-live-runtime-adapter-plan-percent");
+const cloudLiveRuntimeAdapterPlanNext = document.querySelector("#cloud-live-runtime-adapter-plan-next");
+const cloudLiveRuntimeAdapterPlanJson = document.querySelector("#cloud-live-runtime-adapter-plan-json");
+const cloudLiveRuntimeAdapterExitComplete = document.querySelector("#cloud-live-runtime-adapter-exit-complete");
+const cloudLiveRuntimeAdapterExitPercent = document.querySelector("#cloud-live-runtime-adapter-exit-percent");
+const cloudLiveRuntimeAdapterExitNext = document.querySelector("#cloud-live-runtime-adapter-exit-next");
+const cloudLiveRuntimeAdapterExitJson = document.querySelector("#cloud-live-runtime-adapter-exit-json");
 const screenWindow = document.querySelector("#screen-window");
 const screenSession = document.querySelector("#screen-session");
 const screenReadiness = document.querySelector("#screen-readiness");
@@ -6859,6 +6881,54 @@ async function refreshCloudConsciousnessLiveProviderCallExecutionPlanExit() {
   }
 }
 
+async function refreshCloudConsciousnessLiveProviderCallRuntimeAdapterPlan() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/cloud-consciousness/live-provider-call-runtime-adapter-plan\`);
+    const summary = data.summary ?? {};
+    cloudLiveRuntimeAdapterPlanReady.textContent = String(Boolean(summary.ready));
+    cloudLiveRuntimeAdapterPlanPercent.textContent = String(summary.completionPercent ?? 0);
+    cloudLiveRuntimeAdapterPlanNext.textContent = data.next?.recommendedSlice ?? "openclaw-cloud-consciousness-live-provider-runtime-adapter-task";
+    cloudLiveRuntimeAdapterPlanJson.textContent = [
+      "Registry: " + (data.registry ?? "openclaw-cloud-consciousness-live-provider-call-runtime-adapter-plan-v0"),
+      "Task Endpoint: /cloud-consciousness/live-provider-runtime-adapter-tasks",
+      "Task Registry: openclaw-cloud-consciousness-live-provider-runtime-adapter-task-v0",
+      "Ready: " + Boolean(summary.ready) + " percent=" + (summary.completionPercent ?? 0),
+      "SDK loaded: " + Boolean(summary.providerSdkLoaded),
+      "Endpoint contacted: " + Boolean(summary.endpointContacted),
+      "Live enabled: " + Boolean(summary.liveProviderCallEnabled),
+      "Next: " + (data.next?.recommendedSlice ?? "openclaw-cloud-consciousness-live-provider-runtime-adapter-task"),
+    ].join("\\n");
+  } catch {
+    cloudLiveRuntimeAdapterPlanReady.textContent = "false";
+    cloudLiveRuntimeAdapterPlanPercent.textContent = "0";
+    cloudLiveRuntimeAdapterPlanNext.textContent = "openclaw-cloud-consciousness-live-provider-runtime-adapter-task";
+    cloudLiveRuntimeAdapterPlanJson.textContent = "Unable to read live provider runtime adapter plan.";
+  }
+}
+
+async function refreshCloudConsciousnessLiveProviderRuntimeAdapterExit() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/cloud-consciousness/live-provider-runtime-adapter-exit\`);
+    const summary = data.summary ?? {};
+    cloudLiveRuntimeAdapterExitComplete.textContent = String(Boolean(summary.complete));
+    cloudLiveRuntimeAdapterExitPercent.textContent = String(summary.completionPercent ?? 0);
+    cloudLiveRuntimeAdapterExitNext.textContent = data.next?.recommendedSlice ?? "openclaw-cloud-consciousness-live-provider-call-final-authorization";
+    cloudLiveRuntimeAdapterExitJson.textContent = [
+      "Registry: " + (data.registry ?? "openclaw-cloud-consciousness-live-provider-runtime-adapter-exit-v0"),
+      "Complete: " + Boolean(summary.complete) + " percent=" + (summary.completionPercent ?? 0),
+      "Creates task: " + Boolean(summary.createsTask),
+      "Transmits externally: " + Boolean(summary.transmitsExternally),
+      "Live enabled: " + Boolean(summary.liveProviderCallEnabled),
+      "Next: " + (data.next?.recommendedSlice ?? "openclaw-cloud-consciousness-live-provider-call-final-authorization"),
+    ].join("\\n");
+  } catch {
+    cloudLiveRuntimeAdapterExitComplete.textContent = "false";
+    cloudLiveRuntimeAdapterExitPercent.textContent = "0";
+    cloudLiveRuntimeAdapterExitNext.textContent = "openclaw-cloud-consciousness-live-provider-call-final-authorization";
+    cloudLiveRuntimeAdapterExitJson.textContent = "Unable to read live provider runtime adapter exit gate.";
+  }
+}
+
 async function refreshRuntime() {
   try {
     const data = await fetchJson(\`\${observerConfig.coreUrl}/state/runtime\`);
@@ -9931,6 +10001,8 @@ await refreshCloudConsciousnessLiveProviderCallExecutionPlan();
 await refreshCloudConsciousnessLiveProviderExecutionRouteReview();
 await refreshCloudConsciousnessLiveProviderExecutionPlanReadback();
 await refreshCloudConsciousnessLiveProviderCallExecutionPlanExit();
+await refreshCloudConsciousnessLiveProviderCallRuntimeAdapterPlan();
+await refreshCloudConsciousnessLiveProviderRuntimeAdapterExit();
 await refreshRuntime();
 await refreshTaskList();
 await refreshTaskHistoryDetail();
@@ -10107,6 +10179,8 @@ setInterval(refreshCloudConsciousnessLiveProviderCallExecutionPlan, 5000);
 setInterval(refreshCloudConsciousnessLiveProviderExecutionRouteReview, 5000);
 setInterval(refreshCloudConsciousnessLiveProviderExecutionPlanReadback, 5000);
 setInterval(refreshCloudConsciousnessLiveProviderCallExecutionPlanExit, 5000);
+setInterval(refreshCloudConsciousnessLiveProviderCallRuntimeAdapterPlan, 5000);
+setInterval(refreshCloudConsciousnessLiveProviderRuntimeAdapterExit, 5000);
 setInterval(refreshRuntime, 5000);
 setInterval(refreshTaskList, 5000);
 setInterval(refreshTaskHistoryDetail, 5000);

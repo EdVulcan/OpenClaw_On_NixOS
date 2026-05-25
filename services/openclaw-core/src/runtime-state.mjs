@@ -67,6 +67,7 @@ const CLOUD_CONSCIOUSNESS_PROVIDER_DRY_RUN_TASK_REGISTRY = "openclaw-cloud-consc
 const CLOUD_CONSCIOUSNESS_PROVIDER_CALL_REHEARSAL_TASK_REGISTRY = "openclaw-cloud-consciousness-real-provider-call-task-v0";
 const CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_RUNBOOK_TASK_REGISTRY = "openclaw-cloud-consciousness-live-provider-call-runbook-task-v0";
 const CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_EXECUTION_PLAN_TASK_REGISTRY = "openclaw-cloud-consciousness-live-provider-call-execution-plan-task-v0";
+const CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_RUNTIME_ADAPTER_TASK_REGISTRY = "openclaw-cloud-consciousness-live-provider-runtime-adapter-task-v0";
 const CLOUD_CONSCIOUSNESS_HANDOFF_FILE_DISPLAY_PATH = `${CLOUD_CONSCIOUSNESS_DIR_DISPLAY_PATH}/context-handoff.jsonl`;
 const CLOUD_CONSCIOUSNESS_PROVIDER_DRY_RUN_FILE_DISPLAY_PATH = `${CLOUD_CONSCIOUSNESS_DIR_DISPLAY_PATH}/provider-dry-run.jsonl`;
 const CLOUD_CONSCIOUSNESS_PROVIDER_RESPONSE_FILE_DISPLAY_PATH = `${CLOUD_CONSCIOUSNESS_DIR_DISPLAY_PATH}/provider-response-rehearsal.jsonl`;
@@ -203,6 +204,7 @@ function getCurrentTask() {
     CLOUD_CONSCIOUSNESS_HANDOFF_FILE_DISPLAY_PATH, CLOUD_CONSCIOUSNESS_PROVIDER_DRY_RUN_FILE_DISPLAY_PATH,
     CLOUD_CONSCIOUSNESS_PROVIDER_RESPONSE_FILE_DISPLAY_PATH, CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_RUNBOOK_FILE_DISPLAY_PATH,
     CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_EXECUTION_PLAN_FILE_DISPLAY_PATH,
+    CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_RUNTIME_ADAPTER_TASK_REGISTRY,
     normaliseAutonomyMode, parseOptionalPositiveInteger, normaliseOptionalString, uniqueResolvedPaths, parseWorkspaceRoots,
     updateRuntimeState, persistState, loadPersistentState, getCurrentTask
   };

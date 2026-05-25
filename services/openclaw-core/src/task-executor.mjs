@@ -59,6 +59,8 @@ export function createTaskExecutor(deps) {
     executeCloudConsciousnessLiveProviderRunbookTask,
     isCloudConsciousnessLiveProviderExecutionPlanTask,
     executeCloudConsciousnessLiveProviderExecutionPlanTask,
+    isCloudConsciousnessLiveProviderRuntimeAdapterTask,
+    executeCloudConsciousnessLiveProviderRuntimeAdapterTask,
   } = planBuilder;
   const { serialiseApproval, buildApprovalSummary } = approvalEngine;
   const { applyWorkspacePatchEdits, readBoundedWorkspaceTextFile } = workspaceOps;
@@ -2721,6 +2723,18 @@ async function executeTaskWithRecovery(task, options = {}) {
     return {
       finalExecution: cloudConsciousnessLiveProviderExecutionPlanExecution,
       attempts: [cloudConsciousnessLiveProviderExecutionPlanExecution],
+      recovery: {
+        attempted: false,
+        maxAttempts: 0,
+      },
+    };
+  }
+
+  if (isCloudConsciousnessLiveProviderRuntimeAdapterTask(task)) {
+    const cloudConsciousnessLiveProviderRuntimeAdapterExecution = await executeCloudConsciousnessLiveProviderRuntimeAdapterTask(task);
+    return {
+      finalExecution: cloudConsciousnessLiveProviderRuntimeAdapterExecution,
+      attempts: [cloudConsciousnessLiveProviderRuntimeAdapterExecution],
       recovery: {
         attempted: false,
         maxAttempts: 0,
