@@ -66,7 +66,7 @@ is_managed_service_pid() {
   local cmdline=""
   local cwd=""
 
-  if [[ -z "$pid" ]] || ! kill -0 "$pid" >/dev/null 2>&1; then
+  if [[ -z "$pid" ]] || { ! kill -0 "$pid" >/dev/null 2>&1 && ! { command -v sudo >/dev/null 2>&1 && sudo -n kill -0 "$pid" >/dev/null 2>&1; }; }; then
     return 1
   fi
 
