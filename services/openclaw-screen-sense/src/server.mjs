@@ -184,7 +184,7 @@ function deriveScreenPatch({ session, browser, browserCapture, degraded }) {
   }
 
   return {
-    sessionId: session?.sessionId ?? null,
+    sessionId: session?.sessionId ?? browserCapture?.sessionId ?? browser?.sessionId ?? null,
     readiness,
     captureSource,
     captureStrategy,
