@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { createOpenClawNativePluginRegistry } from "../../../packages/shared-types/src/plugin-registry.mjs";
@@ -17,7 +17,7 @@ export function createWorkspaceOps(deps) {
     publishTaskApprovalIfPending,
   } = deps;
   const { postJson } = client;
-  const { tasks, persistState, workspaceRoots } = state;
+  const { tasks, persistState, workspaceRoots, autonomyMode } = state;
 
   // L5977-7324
 function sha256Hex(value) {
