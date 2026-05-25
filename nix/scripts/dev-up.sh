@@ -84,12 +84,21 @@ is_managed_service_pid() {
   [[ "$cmdline" == *"$REPO_ROOT"* ]] && [[ "$cmdline" == *"src/server.mjs"* ]]
 }
 
+terminate_pid() {
+  local pid="$1"
+  kill "$pid" >/dev/null 2>&1 && return 0
+  if command -v sudo >/dev/null 2>&1; then
+    sudo -n kill "$pid" >/dev/null 2>&1 && return 0
+  fi
+  return 1
+}
+
 kill_listener_on_port() {
   local port="$1"
   local pid=""
   pid="$(find_listener_pid "$port")"
   if is_managed_service_pid "$pid"; then
-    kill "$pid" >/dev/null 2>&1 || true
+    terminate_pid "$pid" || true
     sleep 0.5
   fi
 }
@@ -201,7 +210,7 @@ for entry in "${services[@]}"; do
     if [[ "$attempt" -lt 2 ]]; then
       echo "Retrying $name startup..." >&2
       if is_managed_service_pid "$pid"; then
-        kill "$pid" >/dev/null 2>&1 || true
+        terminate_pid "$pid" || true
         sleep 0.5
       fi
     fi

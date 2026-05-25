@@ -65,12 +65,21 @@ is_managed_service_pid() {
   [[ "$cmdline" == *"$REPO_ROOT"* ]] && [[ "$cmdline" == *"src/server.mjs"* ]]
 }
 
+terminate_pid() {
+  local pid="$1"
+  kill "$pid" >/dev/null 2>&1 && return 0
+  if command -v sudo >/dev/null 2>&1; then
+    sudo -n kill "$pid" >/dev/null 2>&1 && return 0
+  fi
+  return 1
+}
+
 if [[ ! -f "$STATE_FILE" ]]; then
   echo "No unix dev state file found at $STATE_FILE"
 else
   while IFS=$'\t' read -r name pid _rest; do
     if is_managed_service_pid "${pid:-}"; then
-      kill "$pid" >/dev/null 2>&1 || true
+      terminate_pid "$pid" || true
       echo "Stopped $name (PID $pid)"
     fi
   done <"$STATE_FILE"
@@ -84,7 +93,7 @@ for port in "${ports[@]}"; do
   fi
   pid="$(find_listener_pid "$port")"
   if is_managed_service_pid "$pid"; then
-    kill "$pid" >/dev/null 2>&1 || true
+    terminate_pid "$pid" || true
     echo "Stopped listener on port $port (PID $pid)"
     wait_port_released "$port" >/dev/null 2>&1 || true
   fi
@@ -92,7 +101,7 @@ done
 
 while read -r pid; do
   if is_managed_service_pid "$pid"; then
-    kill "$pid" >/dev/null 2>&1 || true
+    terminate_pid "$pid" || true
     echo "Stopped stale managed service (PID $pid)"
   fi
 done < <(pgrep -f 'src/server\.mjs' 2>/dev/null || true)
