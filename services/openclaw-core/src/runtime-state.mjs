@@ -116,6 +116,9 @@ function parseWorkspaceRoots(value) {
   ]);
 }
 
+const autonomyMode = normaliseAutonomyMode(process.env.OPENCLAW_AUTONOMY_MODE);
+const workspaceRoots = parseWorkspaceRoots(process.env.OPENCLAW_WORKSPACE_ROOTS);
+
   // L188-192
 function updateRuntimeState(patch) {
   Object.assign(runtimeState, patch, {
@@ -206,6 +209,7 @@ function getCurrentTask() {
     CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_EXECUTION_PLAN_FILE_DISPLAY_PATH,
     CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_RUNTIME_ADAPTER_TASK_REGISTRY,
     normaliseAutonomyMode, parseOptionalPositiveInteger, normaliseOptionalString, uniqueResolvedPaths, parseWorkspaceRoots,
+    autonomyMode, workspaceRoots,
     updateRuntimeState, persistState, loadPersistentState, getCurrentTask
   };
 }
