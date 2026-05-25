@@ -12073,6 +12073,7 @@ async function buildCapabilityRegistry() {
     buildRulePlan,
     shouldBuildPlan,
     updatePlanForPhase,
+    buildCapabilityRegistry,
     listCapabilityInvocations,
     buildCapabilityInvocationSummary,
     invokeCapability,

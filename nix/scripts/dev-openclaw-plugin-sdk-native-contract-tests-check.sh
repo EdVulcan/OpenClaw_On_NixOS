@@ -168,7 +168,7 @@ if (
   report.summary?.requiredTests !== report.summary?.passedRequired
   || report.summary?.failedRequired !== 0
   || report.summary?.nativeContractReadyForImplementation !== true
-  || report.summary?.nativeCapabilities !== 7
+  || report.summary?.nativeCapabilities !== 11
   || report.summary?.canImportModule !== false
   || report.summary?.canExecutePluginCode !== false
   || report.summary?.canActivateRuntime !== false

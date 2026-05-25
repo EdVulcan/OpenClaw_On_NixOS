@@ -107,9 +107,9 @@ if (
   || governance.requiresHumanReviewBeforeActivation !== true
   || contractResponse.validation?.ok !== true
   || summary.validationOk !== true
-  || summary.totalCapabilities !== 7
-  || summary.approvalRequired !== 1
-  || summary.mutationCapable !== 1
+  || summary.totalCapabilities !== 11
+  || summary.approvalRequired !== 3
+  || summary.mutationCapable !== 3
   || summary.executionCapable !== 1
   || summary.governance?.runtimeOwner !== "openclaw_on_nixos"
   || summary.governance?.externalRuntimeDependencyAllowed !== false
@@ -120,7 +120,7 @@ if (
 
 const capabilities = contract.capabilities ?? [];
 if (
-  capabilities.length !== 7
+  capabilities.length !== 11
   || !capabilities.some((capability) => capability.id === "sense.plugin.manifest_profile" && capability.risk === "low" && capability.approval?.required === false)
   || !capabilities.some((capability) => capability.id === "sense.openclaw.tool_catalog" && capability.risk === "low" && capability.approval?.required === false)
   || !capabilities.some((capability) => capability.id === "sense.openclaw.workspace_semantic_index" && capability.risk === "low" && capability.approval?.required === false)
