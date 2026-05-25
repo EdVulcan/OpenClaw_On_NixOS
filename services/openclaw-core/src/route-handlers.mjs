@@ -14,6 +14,7 @@ export function registerRoutes(deps) {
     buildOpenClawNativePluginRegistryResponse,
     buildOpenClawFormalIntegrationReadiness,
     buildOpenClawNativePluginAdapterStatus,
+    buildNativePluginManifestProfile,
     buildOpenClawToolCatalog,
     buildOpenClawPluginCapabilityPlan,
     buildOpenClawPluginCandidateContractTests,

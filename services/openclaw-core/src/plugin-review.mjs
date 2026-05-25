@@ -5691,6 +5691,7 @@ function buildNativeOpenClawWorkspaceEditTargetSelection({
     buildOpenClawNativePluginRegistryResponse,
     buildOpenClawFormalIntegrationReadiness,
     buildOpenClawNativePluginAdapterStatus,
+    buildNativePluginManifestProfile,
     buildOpenClawToolCatalog,
     buildOpenClawPluginCapabilityPlan,
     buildOpenClawPluginCandidateContractTests,

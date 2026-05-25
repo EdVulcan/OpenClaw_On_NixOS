@@ -60,7 +60,7 @@ export function createPlanBuilder(deps) {
   } = taskManager;
   const { serialiseApproval, createApprovalRequestForTask, publishTaskApprovalIfPending } = approvalEngine;
   const { evaluatePolicyIntent, isPolicyExecutionAllowed } = policyEvaluator;
-  const { selectOpenClawToolCatalogWorkspace, buildOpenClawNativePluginRegistryResponse } = pluginReview;
+  const { selectOpenClawToolCatalogWorkspace, buildOpenClawNativePluginRegistryResponse, buildNativePluginManifestProfile } = pluginReview;
 
   // L7325-8456
 function buildNativePluginCapabilityInvokePlan({ packagePath = null, capabilityId = "act.plugin.capability.invoke" } = {}) {
