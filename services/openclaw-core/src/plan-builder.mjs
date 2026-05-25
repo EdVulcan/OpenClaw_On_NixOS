@@ -59,7 +59,7 @@ export function createPlanBuilder(deps) {
     buildTaskSummary,
   } = taskManager;
   const { serialiseApproval, createApprovalRequestForTask, publishTaskApprovalIfPending } = approvalEngine;
-  const { evaluatePolicyIntent, isPolicyExecutionAllowed } = policyEvaluator;
+  const { evaluatePolicyIntent, recordPolicyDecision, isPolicyExecutionAllowed } = policyEvaluator;
   const { selectOpenClawToolCatalogWorkspace, buildOpenClawNativePluginRegistryResponse, buildNativePluginManifestProfile } = pluginReview;
 
   // L7325-8456
