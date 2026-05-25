@@ -41,6 +41,7 @@ export function createTaskExecutor(deps) {
     appendTaskPhase,
     setTaskPhase,
     attachTaskToWorkView,
+    buildWorkViewAttachPayload,
     completeTask,
     failTask,
     reconcileRuntimeState,
