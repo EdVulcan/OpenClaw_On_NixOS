@@ -45,6 +45,20 @@ function Stop-ServiceByName {
   Stop-Process -Id $service.pid -Force
 }
 
+function Wait-HttpDown {
+  param([string]$Uri)
+
+  $deadline = (Get-Date).AddSeconds(5)
+  while ((Get-Date) -lt $deadline) {
+    try {
+      Invoke-RestMethod -Method GET -Uri $Uri | Out-Null
+    } catch {
+      return
+    }
+    Start-Sleep -Milliseconds 200
+  }
+}
+
 try {
   & powershell -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "dev-down.ps1") | Out-Null
 } catch {
@@ -68,7 +82,8 @@ try {
 
   Stop-ServiceByName -Name "openclaw-session-manager"
   Stop-ServiceByName -Name "openclaw-browser-runtime"
-  Start-Sleep -Milliseconds 300
+  Wait-HttpDown -Uri "http://127.0.0.1:4102/health"
+  Wait-HttpDown -Uri "http://127.0.0.1:4103/health"
 
   $degradedScreen = Invoke-Json -Method GET -Uri "http://127.0.0.1:4104/screen/current"
   Assert-Condition ($degradedScreen.screen.readiness -eq "degraded") "Expected screen readiness to become 'degraded' when session-manager is unavailable."

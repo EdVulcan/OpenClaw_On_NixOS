@@ -15,6 +15,18 @@ trap cleanup EXIT
 
 "$SCRIPT_DIR/dev-up.sh"
 
+wait_http_down() {
+  local url="$1"
+  local deadline=$((SECONDS + 5))
+  while (( SECONDS < deadline )); do
+    if ! curl --silent --fail "$url" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 0.2
+  done
+  return 1
+}
+
 warming_screen="$(curl --silent http://127.0.0.1:4104/screen/current)"
 node -e "const data=JSON.parse(process.argv[1]); if(!['warming_up','ready'].includes(data.screen.readiness)){throw new Error(\`Expected warming_up or ready screen readiness, got: \${data.screen.readiness}\`);}" "$warming_screen"
 
@@ -38,7 +50,8 @@ session_pid="$(awk -F $'\t' '$1=="openclaw-session-manager" { print $2 }' "$REPO
 browser_pid="$(awk -F $'\t' '$1=="openclaw-browser-runtime" { print $2 }' "$REPO_ROOT/.artifacts/dev-services-unix.tsv")"
 kill "$session_pid" >/dev/null 2>&1 || true
 kill "$browser_pid" >/dev/null 2>&1 || true
-sleep 0.3
+wait_http_down "http://127.0.0.1:4102/health" || true
+wait_http_down "http://127.0.0.1:4103/health" || true
 
 degraded_screen="$(curl --silent http://127.0.0.1:4104/screen/current)"
 node -e "const data=JSON.parse(process.argv[1]); if(data.screen.readiness!=='degraded'){throw new Error('Expected degraded screen readiness.');}" "$degraded_screen"
