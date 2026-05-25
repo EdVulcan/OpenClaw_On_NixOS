@@ -2973,6 +2973,7 @@ async function runOperatorLoop(body = {}) {
   return {
     executeTask,
     executeTaskWithRecovery,
+    serialiseExecutionResult,
     buildOperatorState,
     buildOperatorOptions,
     runOperatorStep,

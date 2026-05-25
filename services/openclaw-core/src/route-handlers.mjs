@@ -85,7 +85,7 @@ export function registerRoutes(deps) {
     buildCloudConsciousnessLiveProviderExecutionPlanReadback,
     buildCloudConsciousnessLiveProviderCallExecutionPlanExit,
   } = planBuilder;
-  const { executeTask, executeTaskWithRecovery, buildOperatorState, buildOperatorOptions, runOperatorStep, runOperatorLoop } = executor;
+  const { executeTask, executeTaskWithRecovery, serialiseExecutionResult, buildOperatorState, buildOperatorOptions, runOperatorStep, runOperatorLoop } = executor;
 
   return async function handleRequest(req, res, requestUrl) {
     // ---- Generic Proxy Routing for observer-ui ----
