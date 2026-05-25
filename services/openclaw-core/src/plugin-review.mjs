@@ -285,6 +285,11 @@ function workspaceScriptRisk(scriptName) {
   return scriptName === "dev" || scriptName === "start" ? "medium" : "low";
 }
 
+function truncatePatchMetadata(value, maxLength = 240) {
+  const text = typeof value === "string" ? value : "";
+  return text.length > maxLength ? `${text.slice(0, maxLength - 3)}...` : text;
+}
+
 function buildWorkspaceCommandProposals() {
   const registry = buildWorkspaceRegistry();
   const items = registry.items
