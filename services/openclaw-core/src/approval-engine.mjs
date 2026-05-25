@@ -2,8 +2,8 @@ import { randomUUID } from "node:crypto";
 
 export function createApprovalEngine(deps) {
   const { state, taskManager, policyEvaluator, publishEvent } = deps;
-  const { approvals, APPROVAL_TTL_MS, policyAuditLog, MAX_POLICY_AUDIT_ENTRIES, MAX_APPROVAL_ITEMS, persistState } = state;
-  const { serialiseTask, tasks, getTaskById, isActiveTask, failTask } = taskManager;
+  const { tasks, approvals, APPROVAL_TTL_MS, policyAuditLog, MAX_POLICY_AUDIT_ENTRIES, MAX_APPROVAL_ITEMS, persistState } = state;
+  const { serialiseTask, getTaskById, isActiveTask, failTask } = taskManager;
   const { ensureTaskPolicy } = policyEvaluator;
 
   // L10041-10298
