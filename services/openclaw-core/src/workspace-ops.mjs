@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { createOpenClawNativePluginRegistry } from "../../../packages/shared-types/src/plugin-registry.mjs";
 
@@ -30,6 +30,27 @@ export function createWorkspaceOps(deps) {
   // L5977-7324
 function sha256Hex(value) {
   return createHash("sha256").update(value, "utf8").digest("hex");
+}
+
+function safeStat(rootPath) {
+  try {
+    return statSync(rootPath);
+  } catch {
+    return null;
+  }
+}
+
+function redactPublicParams(params) {
+  if (!params || typeof params !== "object" || Array.isArray(params)) {
+    return params ?? {};
+  }
+  const redacted = { ...params };
+  for (const key of ["content", "body", "data"]) {
+    if (typeof redacted[key] === "string") {
+      redacted[key] = `[redacted:${Buffer.byteLength(redacted[key], "utf8")} bytes]`;
+    }
+  }
+  return redacted;
 }
 
 function resolveOpenClawWorkspaceTarget({ workspacePath = null, relativePath = null } = {}) {

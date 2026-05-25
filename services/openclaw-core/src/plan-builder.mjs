@@ -89,6 +89,11 @@ function buildOperatorState() {
   };
 }
 
+function isBodyEvidenceLedgerFollowupRecordTask(task) {
+  return task?.type === "body_evidence_ledger_followup_record_task"
+    && task?.bodyEvidenceLedgerFollowupRecord?.registry === "openclaw-body-evidence-ledger-followup-record-task-v0";
+}
+
   // L7325-8456
 function buildNativePluginCapabilityInvokePlan({ packagePath = null, capabilityId = "act.plugin.capability.invoke" } = {}) {
   const manifestProfile = buildNativePluginManifestProfile({ packagePath });
