@@ -55,7 +55,7 @@ const taskManager = createTaskManager({
   publishEvent,
 });
 
-const approvalEngine = createApprovalEngine({ state, taskManager });
+const approvalEngine = createApprovalEngine({ state, taskManager, policyEvaluator, publishEvent });
 
 const pluginReview = createPluginReview({
   client,

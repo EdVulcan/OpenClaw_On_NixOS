@@ -6798,6 +6798,8 @@ async function refreshCloudConsciousnessLiveProviderExecutionRouteReview() {
     cloudLiveExecRouteJson.textContent = [
       "Registry: " + (data.registry ?? "openclaw-cloud-consciousness-live-provider-execution-route-review-v0"),
       "Schema Registry: " + (schema?.registry ?? "openclaw-cloud-consciousness-live-provider-execution-transcript-schema-v0"),
+      "Task Registry: openclaw-cloud-consciousness-live-provider-call-execution-plan-task-v0",
+      "Task Endpoint: /cloud-consciousness/live-provider-execution-plan-tasks",
       "Mode: " + (data.mode ?? "unknown") + " status=" + (data.status ?? "unknown"),
       "Selected: " + (summary.selectedSlice ?? "none"),
       "Deferred: " + (summary.deferredSlice ?? "none"),
