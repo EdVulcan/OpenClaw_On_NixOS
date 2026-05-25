@@ -6,6 +6,7 @@ import { corsHeaders, sendJson, readJsonBody, createEventPublisher, registerServ
 const host = process.env.OPENCLAW_BROWSER_RUNTIME_HOST ?? "127.0.0.1";
 const port = Number.parseInt(process.env.OPENCLAW_BROWSER_RUNTIME_PORT ?? "4103", 10);
 const eventHubUrl = process.env.OPENCLAW_EVENT_HUB_URL ?? "http://127.0.0.1:4101";
+const sessionManagerUrl = process.env.OPENCLAW_SESSION_MANAGER_URL ?? "http://127.0.0.1:4102";
 
 const publishEvent = createEventPublisher(eventHubUrl, "openclaw-browser-runtime");
 
