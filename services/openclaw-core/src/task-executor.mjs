@@ -55,6 +55,7 @@ export function createTaskExecutor(deps) {
   const {
     serialisePlanForPublic,
     updatePlanForPhase,
+    invokeCapability,
     isLongTermMemoryWriteTask,
     executeLongTermMemoryWriteTask,
     isCloudConsciousnessHandoffTask,
