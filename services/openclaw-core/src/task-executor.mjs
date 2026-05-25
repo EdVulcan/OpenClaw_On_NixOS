@@ -38,6 +38,7 @@ export function createTaskExecutor(deps) {
     serialiseTask,
     getTaskById,
     appendTaskPhase,
+    setTaskPhase,
     completeTask,
     failTask,
     reconcileRuntimeState,
