@@ -36,6 +36,7 @@ export function registerRoutes(deps) {
     buildOpenClawPluginSdkSourceReviewScope,
     buildOpenClawPluginSdkSourceContentReview,
     buildOpenClawPluginSdkNativeContractTests,
+    buildOpenClawNativePluginSdkContractImplementation,
     buildNativeOpenClawToolCatalogProfile,
     buildOpenClawPluginManifestMap,
     buildNativeOpenClawPromptSemanticsProfile,

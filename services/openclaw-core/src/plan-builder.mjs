@@ -24,6 +24,7 @@ export function createPlanBuilder(deps) {
     policyAuditLog,
     capabilityInvocationLog,
     MAX_CAPABILITY_INVOCATION_ENTRIES,
+    CAPABILITY_HEALTH_TIMEOUT_MS,
     autonomyMode,
     CROSS_BOUNDARY_INTENTS,
     SYSTEMD_REPAIR_EXECUTION_TASK_REGISTRY,
@@ -50,6 +51,7 @@ export function createPlanBuilder(deps) {
   const {
     serialiseTask,
     getTaskById,
+    getNextQueuedTask,
     createTask,
     appendTaskPhase,
     completeTask,
@@ -58,9 +60,34 @@ export function createPlanBuilder(deps) {
     reconcileRuntimeState,
     buildTaskSummary,
   } = taskManager;
-  const { serialiseApproval, createApprovalRequestForTask, publishTaskApprovalIfPending } = approvalEngine;
+  const { serialiseApproval, buildApprovalSummary, createApprovalRequestForTask, publishTaskApprovalIfPending } = approvalEngine;
   const { evaluatePolicyIntent, recordPolicyDecision, isPolicyExecutionAllowed } = policyEvaluator;
   const { selectOpenClawToolCatalogWorkspace, buildOpenClawNativePluginRegistryResponse, buildNativePluginManifestProfile } = pluginReview;
+
+function buildOperatorState() {
+  reconcileRuntimeState();
+  const currentTask = runtimeState.currentTaskId ? getTaskById(runtimeState.currentTaskId) : null;
+  const nextTask = getNextQueuedTask();
+  const paused = runtimeState.paused === true;
+  return {
+    status: paused ? "paused" : nextTask ? "ready" : "idle",
+    blocked: paused,
+    reason: paused ? "runtime_paused" : null,
+    currentTask: currentTask ? serialiseTask(currentTask) : null,
+    nextTask: nextTask ? serialiseTask(nextTask) : null,
+    policy: {
+      respectsPause: true,
+      enforcesTaskPolicy: true,
+      defaultMaxSteps: 5,
+      maxStepsLimit: 20,
+      supportsDryRun: true,
+      controls: ["pause", "resume", "stop", "takeover"],
+      decisions: ["allow", "audit_only", "require_approval", "deny"],
+    },
+    approvals: buildApprovalSummary(),
+    summary: buildTaskSummary(),
+  };
+}
 
   // L7325-8456
 function buildNativePluginCapabilityInvokePlan({ packagePath = null, capabilityId = "act.plugin.capability.invoke" } = {}) {
