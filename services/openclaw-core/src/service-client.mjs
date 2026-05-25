@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 export function createServiceClient(urls) {
   const { eventHubUrl, sessionManagerUrl, browserRuntimeUrl,
