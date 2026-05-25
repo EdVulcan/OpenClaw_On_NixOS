@@ -13,6 +13,7 @@ export function createWorkspaceOps(deps) {
     buildRulePlan,
     createTask,
     supersedeOtherActiveTasks,
+    reconcileRuntimeState,
     serialiseTask,
     serialisePlanForPublic,
     createApprovalRequestForTask,

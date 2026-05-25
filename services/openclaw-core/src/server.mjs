@@ -78,6 +78,7 @@ const workspaceOps = createWorkspaceOps({
   buildRulePlan: (args) => planBuilder.buildRulePlan(args),
   createTask: (...args) => taskManager.createTask(...args),
   supersedeOtherActiveTasks: (taskId) => taskManager.supersedeOtherActiveTasks(taskId),
+  reconcileRuntimeState: () => taskManager.reconcileRuntimeState(),
   serialiseTask: (task) => taskManager.serialiseTask(task),
   serialisePlanForPublic: (plan) => planBuilder.serialisePlanForPublic(plan),
   createApprovalRequestForTask: (task, decision) => approvalEngine.createApprovalRequestForTask(task, decision),
