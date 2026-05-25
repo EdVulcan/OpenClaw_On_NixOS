@@ -675,6 +675,7 @@ function buildWorkViewAttachPayload(data, targetUrl) {
     getTaskById,
     appendTaskPhase,
     setTaskPhase,
+    attachTaskToWorkView,
     completeTask,
     failTask,
     recoverTask,

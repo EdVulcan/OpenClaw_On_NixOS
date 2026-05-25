@@ -7,7 +7,7 @@ export function registerRoutes(deps) {
   const { fetchJson, postJson, readJsonFileIfPresent, buildSystemSenseUrl } = client;
   const { ensureTaskPolicy, buildPolicyState, evaluatePolicyIntent, recordPolicyDecision } = policyEvaluator;
   const { serialiseApproval, listApprovals, buildApprovalSummary, createApprovalRequestForTask, markApprovalApproved, markApprovalDenied, markApprovalExpired, reconcileApprovalExpirations, findExistingApprovalForTask, publishTaskApprovalIfPending } = approvalEngine;
-  const { createTask, getTaskById, appendTaskPhase, completeTask, failTask, recoverTask, isRecoverableTask, supersedeOtherActiveTasks, compareTasksForDisplay, listTasks, getActiveTasks, getNextQueuedTask, getLatestFinishedTask, getLatestFailedTask, buildTaskSummary, serialiseTask, reconcileRuntimeState } = taskManager;
+  const { createTask, getTaskById, appendTaskPhase, attachTaskToWorkView, completeTask, failTask, recoverTask, isRecoverableTask, supersedeOtherActiveTasks, compareTasksForDisplay, listTasks, getActiveTasks, getNextQueuedTask, getLatestFinishedTask, getLatestFailedTask, buildTaskSummary, serialiseTask, reconcileRuntimeState } = taskManager;
   const {
     buildOpenClawPluginSdkContractReview,
     buildOpenClawNativePluginContractRegistry,

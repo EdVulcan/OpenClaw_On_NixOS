@@ -40,6 +40,7 @@ export function createTaskExecutor(deps) {
     getTaskById,
     appendTaskPhase,
     setTaskPhase,
+    attachTaskToWorkView,
     completeTask,
     failTask,
     reconcileRuntimeState,
