@@ -97,8 +97,8 @@ const shell = step.task?.cloudConsciousnessLiveProviderRuntimeAdapterImplementat
 if (!step.ok || shell?.registry !== registry || shell?.implementationStatus !== "deferred_after_approval") {
   throw new Error(`Approved runtime adapter implementation should defer after approval: ${JSON.stringify(step)}`);
 }
-if (step.execution?.attempts?.[0]?.phase !== "cloud_consciousness_live_provider_runtime_adapter_implementation_deferred") {
-  throw new Error(`Operator execution should record deferred runtime adapter implementation phase: ${JSON.stringify(step.execution)}`);
+if (!step.task?.phaseHistory?.some((entry) => entry.phase === "cloud_consciousness_live_provider_runtime_adapter_implementation_deferred")) {
+  throw new Error(`Task should retain deferred runtime adapter implementation phase history: ${JSON.stringify(step.task?.phaseHistory)}`);
 }
 if (
   shell.implementsRuntimeAdapter !== false
