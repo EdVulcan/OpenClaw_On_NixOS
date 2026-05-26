@@ -7021,6 +7021,8 @@ async function refreshCloudConsciousnessLiveProviderCallRuntimeImplementationPla
     cloudLiveRuntimeImplPlanNext.textContent = data.next?.recommendedSlice ?? "openclaw-cloud-consciousness-live-provider-call-runtime-implementation-task";
     cloudLiveRuntimeImplPlanJson.textContent = [
       "Registry: " + (data.registry ?? "openclaw-cloud-consciousness-live-provider-call-runtime-implementation-plan-v0"),
+      "Task Endpoint: /cloud-consciousness/live-provider-runtime-implementation-tasks",
+      "Task Registry: openclaw-cloud-consciousness-live-provider-runtime-implementation-task-v0",
       "Ready: " + Boolean(summary.ready) + " percent=" + (summary.completionPercent ?? 0),
       "Runtime implemented: " + Boolean(summary.implementsRuntimeAdapter),
       "SDK loaded: " + Boolean(summary.providerSdkLoaded),

@@ -1,4 +1,5 @@
 import { createOpenClawNativePluginRegistry } from "../../../packages/shared-types/src/plugin-registry.mjs";
+import { createCloudLiveProviderRuntimeImplementation } from "./cloud-live-provider-runtime-implementation.mjs";
 import { createHash, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import path from "node:path";
@@ -80,6 +81,19 @@ function buildOperatorState() {
   const currentTask = runtimeState.currentTaskId ? getTaskById(runtimeState.currentTaskId) : null;
   const nextTask = getNextQueuedTask();
   const paused = runtimeState.paused === true;
+  const cloudLiveProviderRuntimeImplementation = createCloudLiveProviderRuntimeImplementation({
+    buildRuntimeImplementationPlan: buildCloudConsciousnessLiveProviderCallRuntimeImplementationPlan,
+    createTask,
+    createApprovalRequestForTask,
+    evaluatePolicyIntent,
+    publishEvent,
+    publishTaskApprovalIfPending,
+    supersedeOtherActiveTasks,
+    reconcileRuntimeState,
+    persistState,
+    serialiseTask,
+  });
+
   return {
     status: paused ? "paused" : nextTask ? "ready" : "idle",
     blocked: paused,
@@ -12549,5 +12563,6 @@ async function buildCapabilityRegistry() {
     buildCloudConsciousnessLiveProviderCallFinalAuthorization,
     buildCloudConsciousnessLiveProviderCallOperatorLaunchReview,
     buildCloudConsciousnessLiveProviderCallRuntimeImplementationPlan,
+    ...cloudLiveProviderRuntimeImplementation,
   };
 }
