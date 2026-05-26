@@ -58,6 +58,7 @@ function serialiseTask(task) {
     cloudConsciousnessLiveProviderRuntimeImplementation: task.cloudConsciousnessLiveProviderRuntimeImplementation ?? null,
     cloudConsciousnessLiveProviderRuntimeAdapterImplementation: task.cloudConsciousnessLiveProviderRuntimeAdapterImplementation ?? null,
     cloudConsciousnessLiveProviderRuntimeAdapterModule: task.cloudConsciousnessLiveProviderRuntimeAdapterModule ?? null,
+    cloudConsciousnessLiveProviderRequestBuilder: task.cloudConsciousnessLiveProviderRequestBuilder ?? null,
     recovery: task.recovery ?? null,
     recoveredByTaskId: task.recoveredByTaskId ?? null,
     restorable: isRecoverableTask(task),
