@@ -863,6 +863,13 @@ function observerHtml() {
           <div class="metric"><span>Next</span><span id="cloud-live-launch-review-next">loading</span></div>
           <pre id="cloud-live-launch-review-json">Loading live provider operator launch review...</pre>
         </section>
+        <section class="panel" id="cloud-consciousness-live-provider-call-runtime-implementation-plan-panel">
+          <h2>Cloud Consciousness Live Provider Runtime Implementation Plan</h2>
+          <div class="metric"><span>Ready</span><span id="cloud-live-runtime-impl-plan-ready">false</span></div>
+          <div class="metric"><span>Implemented</span><span id="cloud-live-runtime-impl-plan-implemented">false</span></div>
+          <div class="metric"><span>Next</span><span id="cloud-live-runtime-impl-plan-next">loading</span></div>
+          <pre id="cloud-live-runtime-impl-plan-json">Loading live provider runtime implementation plan...</pre>
+        </section>
         <section class="panel">
           <h2>Controls</h2>
           <div class="control-stack">
@@ -2171,6 +2178,10 @@ const cloudLiveLaunchReviewReady = document.querySelector("#cloud-live-launch-re
 const cloudLiveLaunchReviewAuthorized = document.querySelector("#cloud-live-launch-review-authorized");
 const cloudLiveLaunchReviewNext = document.querySelector("#cloud-live-launch-review-next");
 const cloudLiveLaunchReviewJson = document.querySelector("#cloud-live-launch-review-json");
+const cloudLiveRuntimeImplPlanReady = document.querySelector("#cloud-live-runtime-impl-plan-ready");
+const cloudLiveRuntimeImplPlanImplemented = document.querySelector("#cloud-live-runtime-impl-plan-implemented");
+const cloudLiveRuntimeImplPlanNext = document.querySelector("#cloud-live-runtime-impl-plan-next");
+const cloudLiveRuntimeImplPlanJson = document.querySelector("#cloud-live-runtime-impl-plan-json");
 const screenWindow = document.querySelector("#screen-window");
 const screenSession = document.querySelector("#screen-session");
 const screenReadiness = document.querySelector("#screen-readiness");
@@ -7001,6 +7012,31 @@ async function refreshCloudConsciousnessLiveProviderCallOperatorLaunchReview() {
   }
 }
 
+async function refreshCloudConsciousnessLiveProviderCallRuntimeImplementationPlan() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/cloud-consciousness/live-provider-call-runtime-implementation-plan\`);
+    const summary = data.summary ?? {};
+    cloudLiveRuntimeImplPlanReady.textContent = String(Boolean(summary.ready));
+    cloudLiveRuntimeImplPlanImplemented.textContent = String(Boolean(summary.implementsRuntimeAdapter));
+    cloudLiveRuntimeImplPlanNext.textContent = data.next?.recommendedSlice ?? "openclaw-cloud-consciousness-live-provider-call-runtime-implementation-task";
+    cloudLiveRuntimeImplPlanJson.textContent = [
+      "Registry: " + (data.registry ?? "openclaw-cloud-consciousness-live-provider-call-runtime-implementation-plan-v0"),
+      "Ready: " + Boolean(summary.ready) + " percent=" + (summary.completionPercent ?? 0),
+      "Runtime implemented: " + Boolean(summary.implementsRuntimeAdapter),
+      "SDK loaded: " + Boolean(summary.providerSdkLoaded),
+      "Credential value read: " + Boolean(summary.credentialValueRead),
+      "Endpoint contacted: " + Boolean(summary.endpointContacted),
+      "Network egress: " + Boolean(summary.networkEgress),
+      "Next: " + (data.next?.recommendedSlice ?? "openclaw-cloud-consciousness-live-provider-call-runtime-implementation-task"),
+    ].join("\\n");
+  } catch {
+    cloudLiveRuntimeImplPlanReady.textContent = "false";
+    cloudLiveRuntimeImplPlanImplemented.textContent = "false";
+    cloudLiveRuntimeImplPlanNext.textContent = "openclaw-cloud-consciousness-live-provider-call-runtime-implementation-task";
+    cloudLiveRuntimeImplPlanJson.textContent = "Unable to read live provider runtime implementation plan.";
+  }
+}
+
 async function refreshRuntime() {
   try {
     const data = await fetchJson(\`\${observerConfig.coreUrl}/state/runtime\`);
@@ -10077,6 +10113,7 @@ await refreshCloudConsciousnessLiveProviderCallRuntimeAdapterPlan();
 await refreshCloudConsciousnessLiveProviderRuntimeAdapterExit();
 await refreshCloudConsciousnessLiveProviderCallFinalAuthorization();
 await refreshCloudConsciousnessLiveProviderCallOperatorLaunchReview();
+await refreshCloudConsciousnessLiveProviderCallRuntimeImplementationPlan();
 await refreshRuntime();
 await refreshTaskList();
 await refreshTaskHistoryDetail();
@@ -10257,6 +10294,7 @@ setInterval(refreshCloudConsciousnessLiveProviderCallRuntimeAdapterPlan, 5000);
 setInterval(refreshCloudConsciousnessLiveProviderRuntimeAdapterExit, 5000);
 setInterval(refreshCloudConsciousnessLiveProviderCallFinalAuthorization, 5000);
 setInterval(refreshCloudConsciousnessLiveProviderCallOperatorLaunchReview, 5000);
+setInterval(refreshCloudConsciousnessLiveProviderCallRuntimeImplementationPlan, 5000);
 setInterval(refreshRuntime, 5000);
 setInterval(refreshTaskList, 5000);
 setInterval(refreshTaskHistoryDetail, 5000);

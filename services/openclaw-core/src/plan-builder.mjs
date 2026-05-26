@@ -11263,6 +11263,116 @@ async function buildCloudConsciousnessLiveProviderCallOperatorLaunchReview() {
   };
 }
 
+function phase17Governance(extra = {}) {
+  return {
+    phase: "phase-17",
+    createsTask: false,
+    createsApproval: false,
+    implementsRuntimeAdapter: false,
+    callsCloudModel: false,
+    transmitsExternally: false,
+    liveProviderCallEnabled: false,
+    providerSdkLoaded: false,
+    providerCredentialRead: false,
+    credentialValueRead: false,
+    endpointContacted: false,
+    networkEgress: false,
+    ...extra,
+  };
+}
+
+async function buildCloudConsciousnessLiveProviderCallRuntimeImplementationPlan() {
+  const launchReview = await buildCloudConsciousnessLiveProviderCallOperatorLaunchReview();
+  const executionTranscriptSchema = await buildCloudConsciousnessLiveProviderExecutionTranscriptSchema();
+  const binding = await buildCloudConsciousnessLiveProviderEndpointCredentialBinding();
+  const implementationPlan = {
+    implementationStatus: "planned_not_implemented",
+    adapterModuleStatus: "not_created",
+    providerSdkStatus: "not_loaded",
+    credentialAccessStatus: "reference_only_value_not_read",
+    endpointContactStatus: "not_contacted",
+    networkEgressStatus: "disabled",
+    transcriptWriterStatus: "schema_ready_no_live_records",
+    rollbackStatus: "plan_required_before_execution",
+    requiredModules: [
+      "provider request serializer",
+      "credential value access gate",
+      "network egress adapter",
+      "egress transcript writer",
+      "post-call readback verifier",
+      "operator rollback note",
+    ],
+  };
+  const checks = [
+    {
+      id: "phase-16-launch-review-ready",
+      label: "Phase 16 operator launch review is ready",
+      passed: launchReview.summary?.ready === true,
+      evidence: launchReview.registry,
+    },
+    {
+      id: "transcript-schema-ready",
+      label: "Execution transcript schema is available for future live-call records",
+      passed: executionTranscriptSchema.summary?.ready === true,
+      evidence: executionTranscriptSchema.registry,
+    },
+    {
+      id: "credential-binding-reference-only",
+      label: "Credential binding remains reference-only without value reads",
+      passed: binding.summary?.ready === true
+        && binding.summary?.credentialValueRead === false,
+      evidence: binding.registry,
+    },
+    {
+      id: "runtime-not-implemented",
+      label: "Runtime implementation plan does not create SDK, credential, endpoint, or network activity",
+      passed: implementationPlan.implementationStatus === "planned_not_implemented"
+        && implementationPlan.providerSdkStatus === "not_loaded"
+        && implementationPlan.networkEgressStatus === "disabled",
+      evidence: implementationPlan.implementationStatus,
+    },
+  ];
+  const passed = checks.filter((check) => check.passed).length;
+  const ready = passed === checks.length;
+  return {
+    ok: true,
+    registry: "openclaw-cloud-consciousness-live-provider-call-runtime-implementation-plan-v0",
+    mode: "phase_17_live_provider_runtime_implementation_plan_only",
+    generatedAt: new Date().toISOString(),
+    status: ready ? "runtime_implementation_plan_ready_no_live_egress" : "waiting_for_runtime_implementation_plan_prerequisites",
+    governance: phase17Governance(),
+    implementationPlan,
+    checks,
+    summary: {
+      ready,
+      complete: ready,
+      passed,
+      total: checks.length,
+      completionPercent: ready ? 100 : Math.round((passed / checks.length) * 100),
+      phase: "phase-17",
+      implementsRuntimeAdapter: false,
+      callsCloudModel: false,
+      transmitsExternally: false,
+      providerSdkLoaded: false,
+      providerCredentialRead: false,
+      credentialValueRead: false,
+      endpointContacted: false,
+      liveProviderCallEnabled: false,
+      networkEgress: false,
+      createsTask: false,
+    },
+    evidence: {
+      launchReview: phase12EvidenceRef(launchReview),
+      executionTranscriptSchema: phase12EvidenceRef(executionTranscriptSchema),
+      binding: phase12EvidenceRef(binding),
+    },
+    next: {
+      recommendedSlice: "openclaw-cloud-consciousness-live-provider-call-runtime-implementation-task",
+      boundary: "a separate approval-gated task is required before any runtime code, provider SDK load, credential value read, endpoint contact, or external transmission",
+    },
+  };
+}
+
 function baseCapabilities() {
   return [
     {
@@ -12438,5 +12548,6 @@ async function buildCapabilityRegistry() {
     buildCloudConsciousnessLiveProviderRuntimeAdapterExit,
     buildCloudConsciousnessLiveProviderCallFinalAuthorization,
     buildCloudConsciousnessLiveProviderCallOperatorLaunchReview,
+    buildCloudConsciousnessLiveProviderCallRuntimeImplementationPlan,
   };
 }
