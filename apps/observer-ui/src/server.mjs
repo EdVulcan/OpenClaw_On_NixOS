@@ -7066,6 +7066,8 @@ async function refreshCloudConsciousnessLiveProviderCallRuntimeAdapterImplementa
       "Credential value read: " + Boolean(summary.credentialValueRead),
       "Endpoint contacted: " + Boolean(summary.endpointContacted),
       "Network egress: " + Boolean(summary.networkEgress),
+      "Task Endpoint: /cloud-consciousness/live-provider-runtime-adapter-implementation-tasks",
+      "Task Registry: openclaw-cloud-consciousness-live-provider-runtime-adapter-implementation-task-v0",
       "Next: " + (data.next?.recommendedSlice ?? "openclaw-cloud-consciousness-live-provider-call-runtime-adapter-implementation-task"),
     ].join("\\n");
   } catch {
