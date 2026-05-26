@@ -1,3 +1,5 @@
+import { buildCloudLiveProviderRuntimeAdapterModuleContract } from "./cloud-live-provider-runtime-adapter.mjs";
+
 const CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_RUNTIME_IMPLEMENTATION_TASK_REGISTRY =
   "openclaw-cloud-consciousness-live-provider-runtime-implementation-task-v0";
 const CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_RUNTIME_ADAPTER_IMPLEMENTATION_TASK_REGISTRY =
@@ -46,6 +48,23 @@ function phase21Governance(extra = {}) {
     createsTask: false,
     createsApproval: false,
     definesRuntimeAdapterInterface: true,
+    implementsRuntimeAdapter: false,
+    callsCloudModel: false,
+    transmitsExternally: false,
+    liveProviderCallEnabled: false,
+    providerSdkLoaded: false,
+    providerCredentialRead: false,
+    credentialValueRead: false,
+    endpointContacted: false,
+    networkEgress: false,
+    ...extra,
+  };
+}
+
+function phase24Governance(extra = {}) {
+  return {
+    phase: "phase-24",
+    moduleBoundaryDefined: true,
     implementsRuntimeAdapter: false,
     callsCloudModel: false,
     transmitsExternally: false,
@@ -509,6 +528,76 @@ export function createCloudLiveProviderRuntimeImplementation(deps) {
     };
   }
 
+  async function buildCloudConsciousnessLiveProviderRuntimeAdapterModuleContract() {
+    const adapterImplementation = await buildCloudConsciousnessLiveProviderCallRuntimeAdapterImplementation();
+    const moduleContract = buildCloudLiveProviderRuntimeAdapterModuleContract();
+    const checks = [
+      {
+        id: "phase-20-interface-scaffold-ready",
+        label: "Phase 20 runtime adapter implementation interface scaffold is ready",
+        passed: adapterImplementation.summary?.ready === true,
+        evidence: adapterImplementation.registry,
+      },
+      {
+        id: "module-boundary-defined",
+        label: "Runtime adapter code boundary is defined in a dedicated module",
+        passed: moduleContract.summary?.moduleBoundaryDefined === true
+          && moduleContract.module === "services/openclaw-core/src/cloud-live-provider-runtime-adapter.mjs",
+        evidence: moduleContract.module,
+      },
+      {
+        id: "contract-only-no-live-activity",
+        label: "Runtime adapter module remains contract-only with no live provider activity",
+        passed: moduleContract.summary?.implementsRuntimeAdapter === false
+          && moduleContract.summary?.providerSdkLoaded === false
+          && moduleContract.summary?.credentialValueRead === false
+          && moduleContract.summary?.endpointContacted === false
+          && moduleContract.summary?.networkEgress === false
+          && moduleContract.summary?.liveProviderCallEnabled === false,
+        evidence: moduleContract.implementationStatus,
+      },
+    ];
+    const passed = checks.filter((check) => check.passed).length;
+    const ready = passed === checks.length;
+    return {
+      ok: true,
+      registry: moduleContract.registry,
+      mode: "phase_24_live_provider_runtime_adapter_module_contract",
+      generatedAt: new Date().toISOString(),
+      status: ready ? "runtime_adapter_module_contract_ready_no_live_egress" : "waiting_for_runtime_adapter_module_contract_prerequisites",
+      governance: phase24Governance(),
+      moduleContract,
+      checks,
+      summary: {
+        ready,
+        complete: ready,
+        passed,
+        total: checks.length,
+        completionPercent: ready ? 100 : Math.round((passed / checks.length) * 100),
+        phase: "phase-24",
+        moduleBoundaryDefined: moduleContract.summary?.moduleBoundaryDefined === true,
+        implementsRuntimeAdapter: false,
+        providerSdkLoaded: false,
+        providerCredentialRead: false,
+        credentialValueRead: false,
+        endpointContacted: false,
+        networkEgress: false,
+        liveProviderCallEnabled: false,
+      },
+      evidence: {
+        adapterImplementation: {
+          registry: adapterImplementation.registry,
+          ready: adapterImplementation.summary?.ready ?? null,
+          completionPercent: adapterImplementation.summary?.completionPercent ?? null,
+        },
+      },
+      next: {
+        recommendedSlice: "openclaw-cloud-consciousness-live-provider-runtime-adapter-module-task",
+        boundary: "a separate approval-gated task is required before adding executable adapter code or provider egress",
+      },
+    };
+  }
+
   function isCloudConsciousnessLiveProviderRuntimeAdapterImplementationTask(task) {
     return task?.type === "cloud_consciousness_live_provider_runtime_adapter_implementation_task"
       && task?.cloudConsciousnessLiveProviderRuntimeAdapterImplementation?.registry
@@ -603,6 +692,7 @@ export function createCloudLiveProviderRuntimeImplementation(deps) {
     isCloudConsciousnessLiveProviderRuntimeImplementationTask,
     executeCloudConsciousnessLiveProviderRuntimeImplementationTask,
     buildCloudConsciousnessLiveProviderCallRuntimeAdapterImplementation,
+    buildCloudConsciousnessLiveProviderRuntimeAdapterModuleContract,
     createCloudConsciousnessLiveProviderRuntimeAdapterImplementationTask,
     isCloudConsciousnessLiveProviderRuntimeAdapterImplementationTask,
     executeCloudConsciousnessLiveProviderRuntimeAdapterImplementationTask,
