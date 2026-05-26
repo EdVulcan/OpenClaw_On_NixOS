@@ -98,6 +98,7 @@ export function registerRoutes(deps) {
     buildCloudConsciousnessLiveProviderRuntimeAdapterModuleContract,
     buildCloudConsciousnessLiveProviderRequestBuilder,
     buildCloudConsciousnessLiveProviderCredentialReferenceResolver,
+    createCloudConsciousnessLiveProviderCredentialReferenceResolverTask,
     createCloudConsciousnessLiveProviderRequestBuilderTask,
     createCloudConsciousnessLiveProviderRuntimeAdapterModuleTask,
     createCloudConsciousnessLiveProviderRuntimeAdapterImplementationTask,
@@ -2278,6 +2279,31 @@ export function registerRoutes(deps) {
         generatedAt: result.generatedAt,
         sourceRegistry: result.sourceRegistry,
         requestBuilder: result.requestBuilder,
+        task: serialiseTask(result.task),
+        approval: serialiseApproval(result.approval),
+        governance: result.governance,
+        summary: buildTaskSummary(),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/cloud-consciousness/live-provider-credential-reference-resolver-tasks") {
+    try {
+      const body = await readJsonBody(req);
+      const result = await createCloudConsciousnessLiveProviderCredentialReferenceResolverTask({
+        confirm: body.confirm === true,
+      });
+      sendJson(res, 201, {
+        ok: true,
+        registry: result.registry,
+        mode: result.mode,
+        generatedAt: result.generatedAt,
+        sourceRegistry: result.sourceRegistry,
+        credentialResolver: result.credentialResolver,
         task: serialiseTask(result.task),
         approval: serialiseApproval(result.approval),
         governance: result.governance,

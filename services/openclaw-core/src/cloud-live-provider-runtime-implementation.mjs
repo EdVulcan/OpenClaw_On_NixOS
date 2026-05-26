@@ -12,6 +12,8 @@ const CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_RUNTIME_ADAPTER_MODULE_TASK_REGISTRY =
   "openclaw-cloud-consciousness-live-provider-runtime-adapter-module-task-v0";
 const CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_REQUEST_BUILDER_TASK_REGISTRY =
   "openclaw-cloud-consciousness-live-provider-request-builder-task-v0";
+const CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CREDENTIAL_REFERENCE_RESOLVER_TASK_REGISTRY =
+  "openclaw-cloud-consciousness-live-provider-credential-reference-resolver-task-v0";
 
 function phase18Governance(extra = {}) {
   return {
@@ -148,6 +150,27 @@ function phase32Governance(extra = {}) {
   return {
     phase: "phase-32",
     pureProviderRequestBuilderReady: true,
+    pureCredentialReferenceResolverReady: true,
+    referenceOnly: true,
+    implementsRuntimeAdapter: false,
+    callsCloudModel: false,
+    transmitsExternally: false,
+    liveProviderCallEnabled: false,
+    providerSdkLoaded: false,
+    providerCredentialRead: false,
+    credentialValueRead: false,
+    credentialValueExposed: false,
+    endpointContacted: false,
+    networkEgress: false,
+    ...extra,
+  };
+}
+
+function phase33Governance(extra = {}) {
+  return {
+    phase: "phase-33",
+    createsTask: false,
+    createsApproval: false,
     pureCredentialReferenceResolverReady: true,
     referenceOnly: true,
     implementsRuntimeAdapter: false,
@@ -1101,6 +1124,129 @@ export function createCloudLiveProviderRuntimeImplementation(deps) {
     };
   }
 
+  async function createCloudConsciousnessLiveProviderCredentialReferenceResolverTask({ confirm = false } = {}) {
+    if (confirm !== true) {
+      throw new Error("Cloud consciousness live provider credential reference resolver task creation requires confirm=true.");
+    }
+
+    const credentialResolver = await buildCloudConsciousnessLiveProviderCredentialReferenceResolver();
+    if (credentialResolver.summary?.ready !== true) {
+      throw new Error("Cloud consciousness live provider credential reference resolver task requires a ready Phase 32 resolver.");
+    }
+
+    const policyRequest = {
+      intent: "cloud_consciousness.live_provider_call.credential_reference_resolver",
+      domain: "cross_boundary",
+      risk: "high",
+      requiresApproval: true,
+      audit: true,
+      tags: ["cloud_consciousness", "live_provider_call", "credential_reference_resolver_task", "operator_reviewed"],
+    };
+    const goal = "Prepare reviewed credential reference resolver task without reading credential values or enabling egress";
+    const policyDecision = evaluatePolicyIntent({
+      type: "cloud_consciousness_live_provider_credential_reference_resolver_task",
+      goal,
+      policy: policyRequest,
+    }, {
+      stage: "cloud_consciousness.live_provider_credential_reference_resolver_task.draft",
+      type: "cloud_consciousness_live_provider_credential_reference_resolver_task",
+      goal,
+    });
+
+    const task = createTask({
+      goal,
+      type: "cloud_consciousness_live_provider_credential_reference_resolver_task",
+      workViewStrategy: "cloud-consciousness-live-provider-credential-reference-resolver",
+      policy: policyRequest,
+      plan: {
+        planner: "cloud-consciousness-live-provider-credential-reference-resolver-task-v0",
+        strategy: "approval-gated-cloud-consciousness-live-provider-credential-reference-resolver-shell",
+        summary: "Create an approval-gated task shell around the credential reference resolver while keeping credential values, endpoints, network egress, and live provider calls disabled.",
+        governance: phase33Governance({ createsTask: true, createsApproval: true }),
+        steps: [
+          {
+            id: "review-credential-reference-resolver",
+            phase: "review_live_provider_credential_reference_resolver",
+            title: "Review Phase 32 credential reference resolver output",
+            status: "pending",
+            requiresApproval: false,
+          },
+          {
+            id: "operator-approval",
+            phase: "waiting_for_approval",
+            title: "Wait for operator approval before credential reference resolution can access any credential store",
+            status: "pending",
+            capabilityId: "act.system.command.dry_run",
+            requiresApproval: true,
+            risk: "high",
+          },
+          {
+            id: "defer-credential-reference-resolution",
+            phase: "cloud_consciousness_live_provider_credential_reference_resolver_deferred",
+            title: "Record approved credential resolver shell and defer credential-store access, endpoint, network, and live-call work",
+            status: "pending",
+            requiresApproval: true,
+            executesNow: false,
+          },
+        ],
+      },
+    }, { skipInitialPolicy: true });
+
+    task.policy = {
+      request: policyRequest,
+      decision: policyDecision,
+    };
+    task.cloudConsciousnessLiveProviderCredentialReferenceResolver = {
+      registry: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CREDENTIAL_REFERENCE_RESOLVER_TASK_REGISTRY,
+      credentialResolverRegistry: credentialResolver.registry,
+      credentialReferencePresent: credentialResolver.summary?.credentialReferencePresent ?? false,
+      validReference: credentialResolver.summary?.validReference ?? false,
+      implementationStatus: "task_shell_only",
+      pureCredentialReferenceResolverReady: true,
+      referenceOnly: true,
+      credentialValueIncluded: false,
+      credentialValueRead: false,
+      credentialValueExposed: false,
+      implementsRuntimeAdapter: false,
+      providerSdkLoaded: false,
+      providerCredentialRead: false,
+      endpointContacted: false,
+      networkEgress: false,
+      transmitsExternally: false,
+      liveProviderCallEnabled: false,
+    };
+
+    const approval = createApprovalRequestForTask(task, policyDecision);
+    const reclaimedTasks = supersedeOtherActiveTasks(task.id);
+    reconcileRuntimeState();
+    persistState();
+
+    await publishEvent("task.created", {
+      task: serialiseTask(task),
+      planner: "cloud-consciousness-live-provider-credential-reference-resolver-task-v0",
+    });
+    await publishTaskApprovalIfPending(task);
+    await publishEvent("task.planned", {
+      task: serialiseTask(task),
+      plan: task.plan,
+    });
+    await Promise.all(reclaimedTasks.map((reclaimedTask) => publishEvent("task.phase_changed", {
+      task: serialiseTask(reclaimedTask),
+    })));
+
+    return {
+      ok: true,
+      registry: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CREDENTIAL_REFERENCE_RESOLVER_TASK_REGISTRY,
+      mode: "approval-gated-cloud-consciousness-live-provider-credential-reference-resolver-task",
+      generatedAt: new Date().toISOString(),
+      sourceRegistry: credentialResolver.registry,
+      credentialResolver,
+      task,
+      approval,
+      governance: phase33Governance({ createsTask: true, createsApproval: true }),
+    };
+  }
+
   function isCloudConsciousnessLiveProviderRequestBuilderTask(task) {
     return task?.type === "cloud_consciousness_live_provider_request_builder_task"
       && task?.cloudConsciousnessLiveProviderRequestBuilder?.registry
@@ -1390,6 +1536,7 @@ export function createCloudLiveProviderRuntimeImplementation(deps) {
     buildCloudConsciousnessLiveProviderRuntimeAdapterModuleContract,
     buildCloudConsciousnessLiveProviderRequestBuilder,
     buildCloudConsciousnessLiveProviderCredentialReferenceResolver,
+    createCloudConsciousnessLiveProviderCredentialReferenceResolverTask,
     createCloudConsciousnessLiveProviderRequestBuilderTask,
     isCloudConsciousnessLiveProviderRequestBuilderTask,
     executeCloudConsciousnessLiveProviderRequestBuilderTask,
