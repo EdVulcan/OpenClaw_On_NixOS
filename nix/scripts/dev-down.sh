@@ -17,17 +17,34 @@ ports=(
   "${OPENCLAW_SYSTEM_HEAL_PORT:-}"
   "${OBSERVER_UI_PORT:-}"
 )
+if [[ "${OPENCLAW_DEV_INCLUDE_HIGH_PORT_PHASES:-true}" == "true" ]]; then
+  for port in $(seq 19160 19238); do
+    ports+=("$port")
+  done
+fi
 
 find_listener_pid() {
   local port="$1"
-  {
-    ss -ltnpH "( sport = :$port )" 2>/dev/null
-    if command -v sudo >/dev/null 2>&1; then
-      sudo -n ss -ltnpH "( sport = :$port )" 2>/dev/null || true
-    fi
-  } \
-    | sed -n 's/.*pid=\([0-9]\+\).*/\1/p' \
-    | head -n 1
+  local pid=""
+  if command -v ss >/dev/null 2>&1; then
+    pid="$(
+      {
+        ss -ltnpH "( sport = :$port )" 2>/dev/null
+        if command -v sudo >/dev/null 2>&1; then
+          sudo -n ss -ltnpH "( sport = :$port )" 2>/dev/null || true
+        fi
+      } \
+        | sed -n 's/.*pid=\([0-9]\+\).*/\1/p' \
+        | head -n 1
+    )"
+  fi
+  if [[ -z "$pid" ]] && command -v netstat >/dev/null 2>&1; then
+    pid="$(netstat -ltnp 2>/dev/null | awk -v port=":$port" '$4 ~ port { split($7, parts, "/"); if (parts[1] ~ /^[0-9]+$/) { print parts[1]; exit } }' || true)"
+  fi
+  if [[ -z "$pid" ]] && command -v netstat >/dev/null 2>&1; then
+    pid="$(netstat -ano 2>/dev/null | awk -v port=":$port" '$0 ~ port && ($0 ~ /LISTEN/ || $0 ~ /BOUND/) { print $NF; exit }' || true)"
+  fi
+  echo "$pid"
 }
 
 wait_port_released() {
@@ -52,6 +69,9 @@ is_managed_service_pid() {
   fi
 
   cmdline="$(ps -p "$pid" -o args= 2>/dev/null || true)"
+  if [[ -z "$cmdline" ]] && ps -W -f >/dev/null 2>&1; then
+    cmdline="$(ps -W -f 2>/dev/null | awk -v pid="$pid" '$2 == pid { $1=$2=$3=$4=$5=""; sub(/^[[:space:]]+/, ""); print; exit }' || true)"
+  fi
   cwd="$(readlink -f "/proc/$pid/cwd" 2>/dev/null || true)"
   if [[ -z "$cwd" ]] && command -v sudo >/dev/null 2>&1; then
     cwd="$(sudo -n readlink -f "/proc/$pid/cwd" 2>/dev/null || true)"
@@ -62,12 +82,21 @@ is_managed_service_pid() {
     return $?
   fi
 
+  # Git Bash on Windows may not expose /proc/$pid/cwd, and node is started
+  # from each service directory as `node src/server.mjs`.
+  if [[ -z "$cwd" ]] && [[ "$cmdline" == *"src/server.mjs"* ]] && { [[ "$cmdline" == *"node"* ]] || [[ "$cmdline" == *"nohup"* ]]; }; then
+    return 0
+  fi
+
   [[ "$cmdline" == *"$REPO_ROOT"* ]] && [[ "$cmdline" == *"src/server.mjs"* ]]
 }
 
 terminate_pid() {
   local pid="$1"
   kill "$pid" >/dev/null 2>&1 && return 0
+  if command -v taskkill.exe >/dev/null 2>&1; then
+    taskkill.exe //PID "$pid" //T //F >/dev/null 2>&1 && return 0
+  fi
   if command -v sudo >/dev/null 2>&1; then
     sudo -n kill "$pid" >/dev/null 2>&1 && return 0
   fi
@@ -104,7 +133,13 @@ while read -r pid; do
     terminate_pid "$pid" || true
     echo "Stopped stale managed service (PID $pid)"
   fi
-done < <(pgrep -f 'src/server\.mjs' 2>/dev/null || true)
+done < <(
+  if command -v pgrep >/dev/null 2>&1; then
+    pgrep -f 'src/server\.mjs' 2>/dev/null || true
+  elif ps -W -f >/dev/null 2>&1; then
+    ps -W -f 2>/dev/null | awk '/src\/server\.mjs/ && !/awk/ { print $2 }' || true
+  fi
+)
 
 for port in "${ports[@]}"; do
   if [[ -n "$port" ]]; then

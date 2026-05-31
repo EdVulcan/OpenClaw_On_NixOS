@@ -101,9 +101,11 @@ export function registerRoutes(deps) {
     buildCloudConsciousnessLiveProviderNoNetworkSender,
     buildCloudConsciousnessLiveProviderEgressTranscriptRecorder,
     buildCloudConsciousnessLiveProviderResponseVerifier,
+    buildCloudConsciousnessLiveProviderRollbackNote,
     createCloudConsciousnessLiveProviderNoNetworkSenderTask,
     createCloudConsciousnessLiveProviderEgressTranscriptRecorderTask,
     createCloudConsciousnessLiveProviderResponseVerifierTask,
+    createCloudConsciousnessLiveProviderRollbackNoteTask,
     createCloudConsciousnessLiveProviderCredentialReferenceResolverTask,
     createCloudConsciousnessLiveProviderRequestBuilderTask,
     createCloudConsciousnessLiveProviderRuntimeAdapterModuleTask,
@@ -594,6 +596,11 @@ export function registerRoutes(deps) {
 
   if (req.method === "GET" && requestUrl.pathname === "/cloud-consciousness/live-provider-response-verifier") {
     sendJson(res, 200, await buildCloudConsciousnessLiveProviderResponseVerifier());
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/cloud-consciousness/live-provider-rollback-note") {
+    sendJson(res, 200, await buildCloudConsciousnessLiveProviderRollbackNote());
     return;
   }
 
@@ -2400,6 +2407,31 @@ export function registerRoutes(deps) {
         generatedAt: result.generatedAt,
         sourceRegistry: result.sourceRegistry,
         responseVerifier: result.responseVerifier,
+        task: serialiseTask(result.task),
+        approval: serialiseApproval(result.approval),
+        governance: result.governance,
+        summary: buildTaskSummary(),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/cloud-consciousness/live-provider-rollback-note-tasks") {
+    try {
+      const body = await readJsonBody(req);
+      const result = await createCloudConsciousnessLiveProviderRollbackNoteTask({
+        confirm: body.confirm === true,
+      });
+      sendJson(res, 201, {
+        ok: true,
+        registry: result.registry,
+        mode: result.mode,
+        generatedAt: result.generatedAt,
+        sourceRegistry: result.sourceRegistry,
+        rollbackNote: result.rollbackNote,
         task: serialiseTask(result.task),
         approval: serialiseApproval(result.approval),
         governance: result.governance,

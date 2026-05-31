@@ -87,6 +87,8 @@ export function createTaskExecutor(deps) {
     executeCloudConsciousnessLiveProviderEgressTranscriptRecorderTask,
     isCloudConsciousnessLiveProviderResponseVerifierTask,
     executeCloudConsciousnessLiveProviderResponseVerifierTask,
+    isCloudConsciousnessLiveProviderRollbackNoteTask,
+    executeCloudConsciousnessLiveProviderRollbackNoteTask,
     capabilityById,
     normaliseCapabilityInvokeRequest,
     buildCapabilityPolicyInput,
@@ -2901,6 +2903,18 @@ async function executeTaskWithRecovery(task, options = {}) {
     return {
       finalExecution: cloudConsciousnessLiveProviderResponseVerifierExecution,
       attempts: [cloudConsciousnessLiveProviderResponseVerifierExecution],
+      recovery: {
+        attempted: false,
+        maxAttempts: 0,
+      },
+    };
+  }
+
+  if (isCloudConsciousnessLiveProviderRollbackNoteTask(task)) {
+    const cloudConsciousnessLiveProviderRollbackNoteExecution = await executeCloudConsciousnessLiveProviderRollbackNoteTask(task);
+    return {
+      finalExecution: cloudConsciousnessLiveProviderRollbackNoteExecution,
+      attempts: [cloudConsciousnessLiveProviderRollbackNoteExecution],
       recovery: {
         attempted: false,
         maxAttempts: 0,

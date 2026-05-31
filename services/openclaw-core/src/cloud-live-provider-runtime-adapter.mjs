@@ -12,6 +12,8 @@ const EGRESS_TRANSCRIPT_RECORDER_REGISTRY =
   "openclaw-cloud-consciousness-live-provider-egress-transcript-recorder-v0";
 const PROVIDER_RESPONSE_VERIFIER_REGISTRY =
   "openclaw-cloud-consciousness-live-provider-response-verifier-v0";
+const ROLLBACK_NOTE_BUILDER_REGISTRY =
+  "openclaw-cloud-consciousness-live-provider-rollback-note-v0";
 
 const ADAPTER_METHODS = [
   {
@@ -41,8 +43,8 @@ const ADAPTER_METHODS = [
   },
   {
     name: "buildRollbackNote",
-    implemented: false,
-    boundary: "future operator-visible rollback note; current module is contract-only",
+    implemented: true,
+    boundary: "operator-visible local rollback note only; no rollback command or host mutation",
   },
 ];
 
@@ -430,6 +432,87 @@ export function verifyProviderResponse({
   };
 }
 
+export function buildRollbackNote({
+  responseVerification = {},
+  egressTranscriptRecord = {},
+  operatorAuthorization = {},
+} = {}) {
+  const verification = responseVerification.verification ?? responseVerification ?? {};
+  const transcript = egressTranscriptRecord.transcript ?? egressTranscriptRecord ?? {};
+  const noExternalSend = verification.transcriptDeferred === true
+    && verification.providerResponseCreated === false
+    && responseVerification.summary?.networkEgress !== true;
+  const noteSeed = {
+    responseRecordId: verification.responseRecordId ?? null,
+    transcriptId: transcript.id ?? verification.transcriptId ?? null,
+    noExternalSend,
+  };
+  const note = {
+    id: `openclaw-live-provider-rollback-note-${stableHash(noteSeed).slice(0, 16)}`,
+    createdAt: new Date().toISOString(),
+    schema: "openclaw.cloud_consciousness.live_provider_rollback_note.v0",
+    responseRecordId: verification.responseRecordId ?? null,
+    responseContentHash: verification.responseContentHash ?? null,
+    transcriptId: transcript.id ?? verification.transcriptId ?? null,
+    transcriptContentHash: transcript.contentHash ?? verification.transcriptContentHash ?? null,
+    operatorAuthorizationState: operatorAuthorization.state ?? "not_authorized",
+    rollbackRequired: false,
+    rollbackExecuted: false,
+    rollbackCommand: null,
+    rollbackReason: noExternalSend
+      ? "No external provider send or provider response creation occurred; rollback is note-only and operator-visible."
+      : "Rollback remains operator-reviewed because the adapter did not prove a safe deferred state.",
+    operatorGuidance: [
+      "Keep live provider egress disabled.",
+      "Do not retry with real network egress until a separate operator-reviewed launch path is approved.",
+      "Use transcript and response verifier evidence for audit before any future live call.",
+    ],
+    nextSafeAction: "review_before_any_live_provider_launch",
+  };
+  note.contentHash = stableHash(note);
+  const ready = noExternalSend && typeof verification.responseRecordId === "string";
+  return {
+    ok: true,
+    registry: ROLLBACK_NOTE_BUILDER_REGISTRY,
+    mode: "phase_48_local_provider_rollback_note",
+    note,
+    governance: {
+      pureFunction: true,
+      rollbackNoteReady: true,
+      localOnly: true,
+      rollbackExecuted: false,
+      rollbackCommandCreated: false,
+      hostMutation: false,
+      dispatchDeferred: verification.transcriptDeferred === true,
+      credentialValueRead: false,
+      credentialValueExposed: false,
+      providerCredentialRead: false,
+      endpointContacted: false,
+      networkEgress: false,
+      providerResponseCreated: false,
+      liveProviderCallEnabled: false,
+    },
+    summary: {
+      ready,
+      rollbackNoteReady: true,
+      localOnly: true,
+      rollbackRequired: false,
+      rollbackExecuted: false,
+      rollbackCommandCreated: false,
+      hostMutation: false,
+      dispatchDeferred: verification.transcriptDeferred === true,
+      credentialValueIncluded: false,
+      credentialValueRead: false,
+      credentialValueExposed: false,
+      providerCredentialRead: false,
+      endpointContacted: false,
+      networkEgress: false,
+      providerResponseCreated: false,
+      liveProviderCallEnabled: false,
+    },
+  };
+}
+
 export function buildCloudLiveProviderRuntimeAdapterModuleContract() {
   const implementedMethodCount = ADAPTER_METHODS.filter((method) => method.implemented).length;
   return {
@@ -473,6 +556,7 @@ export function buildCloudLiveProviderRuntimeAdapterModuleContract() {
       noNetworkProviderRequestSenderReady: true,
       localEgressTranscriptRecorderReady: true,
       localProviderResponseVerifierReady: true,
+      localRollbackNoteBuilderReady: true,
       implementsRuntimeAdapter: false,
       providerSdkLoaded: false,
       providerCredentialRead: false,

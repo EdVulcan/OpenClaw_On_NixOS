@@ -919,6 +919,13 @@ function observerHtml() {
           <div class="metric"><span>Next</span><span id="cloud-live-provider-response-verifier-next">loading</span></div>
           <pre id="cloud-live-provider-response-verifier-json">Loading response verifier...</pre>
         </section>
+        <section class="panel" id="cloud-consciousness-live-provider-rollback-note-panel">
+          <h2>Cloud Consciousness Live Provider Rollback Note</h2>
+          <div class="metric"><span>Ready</span><span id="cloud-live-provider-rollback-note-ready">false</span></div>
+          <div class="metric"><span>Executed</span><span id="cloud-live-provider-rollback-note-executed">false</span></div>
+          <div class="metric"><span>Next</span><span id="cloud-live-provider-rollback-note-next">loading</span></div>
+          <pre id="cloud-live-provider-rollback-note-json">Loading rollback note...</pre>
+        </section>
         <section class="panel">
           <h2>Controls</h2>
           <div class="control-stack">
@@ -2259,6 +2266,10 @@ const cloudLiveProviderResponseVerifierReady = document.querySelector("#cloud-li
 const cloudLiveProviderResponseVerifierVerified = document.querySelector("#cloud-live-provider-response-verifier-verified");
 const cloudLiveProviderResponseVerifierNext = document.querySelector("#cloud-live-provider-response-verifier-next");
 const cloudLiveProviderResponseVerifierJson = document.querySelector("#cloud-live-provider-response-verifier-json");
+const cloudLiveProviderRollbackNoteReady = document.querySelector("#cloud-live-provider-rollback-note-ready");
+const cloudLiveProviderRollbackNoteExecuted = document.querySelector("#cloud-live-provider-rollback-note-executed");
+const cloudLiveProviderRollbackNoteNext = document.querySelector("#cloud-live-provider-rollback-note-next");
+const cloudLiveProviderRollbackNoteJson = document.querySelector("#cloud-live-provider-rollback-note-json");
 const screenWindow = document.querySelector("#screen-window");
 const screenSession = document.querySelector("#screen-session");
 const screenReadiness = document.querySelector("#screen-readiness");
@@ -7324,6 +7335,38 @@ async function refreshCloudConsciousnessLiveProviderResponseVerifier() {
   }
 }
 
+async function refreshCloudConsciousnessLiveProviderRollbackNote() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/cloud-consciousness/live-provider-rollback-note\`);
+    const summary = data.summary ?? {};
+    cloudLiveProviderRollbackNoteReady.textContent = String(Boolean(summary.ready));
+    cloudLiveProviderRollbackNoteExecuted.textContent = String(Boolean(summary.rollbackExecuted));
+    cloudLiveProviderRollbackNoteNext.textContent = data.next?.recommendedSlice ?? "openclaw-cloud-consciousness-live-provider-rollback-note-task";
+    cloudLiveProviderRollbackNoteJson.textContent = [
+      "Registry: " + (data.registry ?? "openclaw-cloud-consciousness-live-provider-rollback-note-v0"),
+      "Ready: " + Boolean(summary.ready) + " percent=" + (summary.completionPercent ?? 0),
+      "Rollback note ready: " + Boolean(summary.rollbackNoteReady),
+      "Local only: " + Boolean(summary.localOnly),
+      "Rollback required: " + Boolean(summary.rollbackRequired),
+      "Rollback executed: " + Boolean(summary.rollbackExecuted),
+      "Rollback command created: " + Boolean(summary.rollbackCommandCreated),
+      "Host mutation: " + Boolean(summary.hostMutation),
+      "Endpoint contacted: " + Boolean(summary.endpointContacted),
+      "Network egress: " + Boolean(summary.networkEgress),
+      "Provider response created: " + Boolean(summary.providerResponseCreated),
+      "Live provider call: " + Boolean(summary.liveProviderCallEnabled),
+      "Task Endpoint: /cloud-consciousness/live-provider-rollback-note-tasks",
+      "Task Registry: openclaw-cloud-consciousness-live-provider-rollback-note-task-v0",
+      "Next: " + (data.next?.recommendedSlice ?? "openclaw-cloud-consciousness-live-provider-rollback-note-task"),
+    ].join("\\n");
+  } catch {
+    cloudLiveProviderRollbackNoteReady.textContent = "false";
+    cloudLiveProviderRollbackNoteExecuted.textContent = "false";
+    cloudLiveProviderRollbackNoteNext.textContent = "openclaw-cloud-consciousness-live-provider-rollback-note-task";
+    cloudLiveProviderRollbackNoteJson.textContent = "Unable to read live provider rollback note.";
+  }
+}
+
 async function refreshRuntime() {
   try {
     const data = await fetchJson(\`\${observerConfig.coreUrl}/state/runtime\`);
@@ -10408,6 +10451,7 @@ await refreshCloudConsciousnessLiveProviderCredentialReferenceResolver();
 await refreshCloudConsciousnessLiveProviderNoNetworkSender();
 await refreshCloudConsciousnessLiveProviderEgressTranscriptRecorder();
 await refreshCloudConsciousnessLiveProviderResponseVerifier();
+await refreshCloudConsciousnessLiveProviderRollbackNote();
 await refreshRuntime();
 await refreshTaskList();
 await refreshTaskHistoryDetail();
@@ -10596,6 +10640,7 @@ setInterval(refreshCloudConsciousnessLiveProviderCredentialReferenceResolver, 50
 setInterval(refreshCloudConsciousnessLiveProviderNoNetworkSender, 5000);
 setInterval(refreshCloudConsciousnessLiveProviderEgressTranscriptRecorder, 5000);
 setInterval(refreshCloudConsciousnessLiveProviderResponseVerifier, 5000);
+setInterval(refreshCloudConsciousnessLiveProviderRollbackNote, 5000);
 setInterval(refreshRuntime, 5000);
 setInterval(refreshTaskList, 5000);
 setInterval(refreshTaskHistoryDetail, 5000);

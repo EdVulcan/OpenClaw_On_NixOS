@@ -1,4 +1,5 @@
 import {
+  buildRollbackNote,
   buildCloudLiveProviderRuntimeAdapterModuleContract,
   buildProviderRequest,
   recordEgressTranscript,
@@ -23,6 +24,8 @@ const CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_EGRESS_TRANSCRIPT_RECORDER_TASK_REGISTRY
   "openclaw-cloud-consciousness-live-provider-egress-transcript-recorder-task-v0";
 const CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_RESPONSE_VERIFIER_TASK_REGISTRY =
   "openclaw-cloud-consciousness-live-provider-response-verifier-task-v0";
+const CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_ROLLBACK_NOTE_TASK_REGISTRY =
+  "openclaw-cloud-consciousness-live-provider-rollback-note-task-v0";
 
 function phase18Governance(extra = {}) {
   return {
@@ -269,6 +272,31 @@ function phase44Governance(extra = {}) {
     localOnly: true,
     dispatchDeferred: true,
     responseSource: "local_rehearsal_readback",
+    implementsRuntimeAdapter: false,
+    callsCloudModel: false,
+    transmitsExternally: false,
+    liveProviderCallEnabled: false,
+    providerSdkLoaded: false,
+    providerCredentialRead: false,
+    credentialValueRead: false,
+    credentialValueExposed: false,
+    endpointContacted: false,
+    networkEgress: false,
+    providerResponseCreated: false,
+    ...extra,
+  };
+}
+
+function phase48Governance(extra = {}) {
+  return {
+    phase: "phase-48",
+    localRollbackNoteBuilderReady: true,
+    rollbackNoteReady: true,
+    localOnly: true,
+    rollbackExecuted: false,
+    rollbackCommandCreated: false,
+    hostMutation: false,
+    dispatchDeferred: true,
     implementsRuntimeAdapter: false,
     callsCloudModel: false,
     transmitsExternally: false,
@@ -2180,6 +2208,326 @@ export function createCloudLiveProviderRuntimeImplementation(deps) {
     };
   }
 
+  async function buildCloudConsciousnessLiveProviderRollbackNote() {
+    const responseVerifier = await buildCloudConsciousnessLiveProviderResponseVerifier();
+    const rollbackNote = buildRollbackNote({
+      responseVerification: responseVerifier.responseVerifier,
+      egressTranscriptRecord: responseVerifier.transcriptRecorder?.transcriptRecorder?.transcript,
+      operatorAuthorization: {
+        state: "not_authorized",
+      },
+    });
+    const checks = [
+      {
+        id: "phase-44-response-verifier-ready",
+        label: "Phase 44 response verifier is ready",
+        passed: responseVerifier.summary?.ready === true
+          && responseVerifier.summary?.responseVerified === true
+          && responseVerifier.summary?.networkEgress === false,
+        evidence: responseVerifier.registry,
+      },
+      {
+        id: "rollback-note-ready",
+        label: "buildRollbackNote creates an operator-visible note without a rollback command",
+        passed: rollbackNote.summary?.ready === true
+          && rollbackNote.summary?.rollbackNoteReady === true
+          && rollbackNote.summary?.rollbackExecuted === false
+          && rollbackNote.note?.rollbackCommand === null,
+        evidence: rollbackNote.registry,
+      },
+      {
+        id: "no-live-provider-activity",
+        label: "Rollback note builder does not mutate host state, contact endpoints, transmit externally, or call providers",
+        passed: rollbackNote.summary?.hostMutation === false
+          && rollbackNote.summary?.endpointContacted === false
+          && rollbackNote.summary?.networkEgress === false
+          && rollbackNote.summary?.liveProviderCallEnabled === false,
+        evidence: "local-rollback-note-only",
+      },
+    ];
+    const passed = checks.filter((check) => check.passed).length;
+    const ready = passed === checks.length;
+    return {
+      ok: true,
+      registry: rollbackNote.registry,
+      mode: "phase_48_local_provider_rollback_note",
+      generatedAt: new Date().toISOString(),
+      status: ready ? "provider_rollback_note_ready_local_only" : "waiting_for_provider_rollback_note_prerequisites",
+      governance: phase48Governance(),
+      rollbackNote,
+      responseVerifier,
+      checks,
+      summary: {
+        ready,
+        complete: ready,
+        passed,
+        total: checks.length,
+        completionPercent: ready ? 100 : Math.round((passed / checks.length) * 100),
+        phase: "phase-48",
+        localRollbackNoteBuilderReady: true,
+        rollbackNoteReady: true,
+        localOnly: true,
+        rollbackRequired: false,
+        rollbackExecuted: false,
+        rollbackCommandCreated: false,
+        hostMutation: false,
+        dispatchDeferred: true,
+        credentialValueIncluded: false,
+        credentialValueRead: false,
+        credentialValueExposed: false,
+        providerCredentialRead: false,
+        endpointContacted: false,
+        networkEgress: false,
+        providerResponseCreated: false,
+        liveProviderCallEnabled: false,
+      },
+      next: {
+        recommendedSlice: "openclaw-cloud-consciousness-live-provider-rollback-note-task",
+        boundary: "separate approval is required before rollback notes can be attached to any runtime egress path",
+      },
+    };
+  }
+
+  async function createCloudConsciousnessLiveProviderRollbackNoteTask({ confirm = false } = {}) {
+    if (confirm !== true) {
+      throw new Error("Cloud consciousness live provider rollback note task creation requires confirm=true.");
+    }
+
+    const rollbackNote = await buildCloudConsciousnessLiveProviderRollbackNote();
+    if (rollbackNote.summary?.ready !== true) {
+      throw new Error("Cloud consciousness live provider rollback note task requires a ready Phase 48 rollback note.");
+    }
+
+    const policyRequest = {
+      intent: "cloud_consciousness.live_provider_call.rollback_note",
+      domain: "cross_boundary",
+      risk: "high",
+      requiresApproval: true,
+      audit: true,
+      tags: ["cloud_consciousness", "live_provider_call", "rollback_note_task", "operator_reviewed"],
+    };
+    const goal = "Prepare reviewed live provider rollback note task without rollback execution or network egress";
+    const policyDecision = evaluatePolicyIntent({
+      type: "cloud_consciousness_live_provider_rollback_note_task",
+      goal,
+      policy: policyRequest,
+    }, {
+      stage: "cloud_consciousness.live_provider_rollback_note_task.draft",
+      type: "cloud_consciousness_live_provider_rollback_note_task",
+      goal,
+    });
+
+    const task = createTask({
+      goal,
+      type: "cloud_consciousness_live_provider_rollback_note_task",
+      workViewStrategy: "cloud-consciousness-live-provider-rollback-note",
+      policy: policyRequest,
+      plan: {
+        planner: "cloud-consciousness-live-provider-rollback-note-task-v0",
+        strategy: "approval-gated-cloud-consciousness-live-provider-rollback-note-shell",
+        summary: "Create an approval-gated task shell around the local rollback note while keeping rollback execution, host mutation, endpoint contact, network egress, and live provider calls disabled.",
+        governance: phase48Governance({ createsTask: true, createsApproval: true }),
+        steps: [
+          {
+            id: "review-rollback-note",
+            phase: "review_live_provider_rollback_note",
+            title: "Review Phase 48 local provider rollback note",
+            status: "pending",
+            requiresApproval: false,
+          },
+          {
+            id: "operator-approval",
+            phase: "waiting_for_approval",
+            title: "Wait for operator approval before rollback notes can be attached to any egress path",
+            status: "pending",
+            capabilityId: "act.system.command.dry_run",
+            requiresApproval: true,
+            risk: "high",
+          },
+          {
+            id: "defer-rollback-note-use",
+            phase: "cloud_consciousness_live_provider_rollback_note_deferred",
+            title: "Record approved rollback-note shell and defer rollback execution, host mutation, network, and live-call work",
+            status: "pending",
+            requiresApproval: true,
+            executesNow: false,
+          },
+        ],
+      },
+    }, { skipInitialPolicy: true });
+
+    task.policy = {
+      request: policyRequest,
+      decision: policyDecision,
+    };
+    task.cloudConsciousnessLiveProviderRollbackNote = {
+      registry: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_ROLLBACK_NOTE_TASK_REGISTRY,
+      rollbackNoteRegistry: rollbackNote.registry,
+      rollbackNoteReady: true,
+      localRollbackNoteBuilderReady: true,
+      implementationStatus: "task_shell_only",
+      localOnly: true,
+      rollbackRequired: false,
+      rollbackExecuted: false,
+      rollbackCommandCreated: false,
+      hostMutation: false,
+      dispatchDeferred: true,
+      credentialValueIncluded: false,
+      credentialValueRead: false,
+      credentialValueExposed: false,
+      implementsRuntimeAdapter: false,
+      providerSdkLoaded: false,
+      providerCredentialRead: false,
+      endpointContacted: false,
+      networkEgress: false,
+      providerResponseCreated: false,
+      transmitsExternally: false,
+      liveProviderCallEnabled: false,
+    };
+
+    const approval = createApprovalRequestForTask(task, policyDecision);
+    const reclaimedTasks = supersedeOtherActiveTasks(task.id);
+    reconcileRuntimeState();
+    persistState();
+
+    await publishEvent("task.created", {
+      task: serialiseTask(task),
+      planner: "cloud-consciousness-live-provider-rollback-note-task-v0",
+    });
+    await publishTaskApprovalIfPending(task);
+    await publishEvent("task.planned", {
+      task: serialiseTask(task),
+      plan: task.plan,
+    });
+    await Promise.all(reclaimedTasks.map((reclaimedTask) => publishEvent("task.phase_changed", {
+      task: serialiseTask(reclaimedTask),
+    })));
+
+    return {
+      ok: true,
+      registry: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_ROLLBACK_NOTE_TASK_REGISTRY,
+      mode: "approval-gated-cloud-consciousness-live-provider-rollback-note-task",
+      generatedAt: new Date().toISOString(),
+      sourceRegistry: rollbackNote.registry,
+      rollbackNote,
+      task,
+      approval,
+      governance: phase48Governance({ createsTask: true, createsApproval: true }),
+    };
+  }
+
+  function isCloudConsciousnessLiveProviderRollbackNoteTask(task) {
+    return task?.type === "cloud_consciousness_live_provider_rollback_note_task"
+      && task?.cloudConsciousnessLiveProviderRollbackNote?.registry
+        === CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_ROLLBACK_NOTE_TASK_REGISTRY;
+  }
+
+  async function executeCloudConsciousnessLiveProviderRollbackNoteTask(task) {
+    const rollbackNote = await buildCloudConsciousnessLiveProviderRollbackNote();
+    const approval = task.approval?.requestId ? approvals.get(task.approval.requestId) : null;
+    if (approval?.status !== "approved") {
+      return {
+        blocked: true,
+        reason: "approval_required",
+        task,
+        approval: approval ? { ...approval } : null,
+      };
+    }
+
+    task.cloudConsciousnessLiveProviderRollbackNote = {
+      ...(task.cloudConsciousnessLiveProviderRollbackNote ?? {}),
+      implementationStatus: "deferred_after_approval",
+      approvedAt: approval.updatedAt,
+      rollbackNoteRegistry: rollbackNote.registry,
+      rollbackNoteReady: true,
+      localRollbackNoteBuilderReady: true,
+      localOnly: true,
+      rollbackRequired: false,
+      rollbackExecuted: false,
+      rollbackCommandCreated: false,
+      hostMutation: false,
+      dispatchDeferred: true,
+      credentialValueIncluded: false,
+      credentialValueRead: false,
+      credentialValueExposed: false,
+      implementsRuntimeAdapter: false,
+      providerSdkLoaded: false,
+      providerCredentialRead: false,
+      endpointContacted: false,
+      networkEgress: false,
+      providerResponseCreated: false,
+      transmitsExternally: false,
+      liveProviderCallEnabled: false,
+    };
+    appendTaskPhase(task, "cloud_consciousness_live_provider_rollback_note_deferred", {
+      rollbackNoteRegistry: rollbackNote.registry,
+      deferredSlice: "openclaw-cloud-consciousness-approved-live-provider-rollback-note-deferred",
+      reason: "rollback note task approved; rollback execution, host mutation, endpoint contact, network egress, and live provider call remain deferred",
+      rollbackNoteReady: true,
+      localOnly: true,
+      rollbackRequired: false,
+      rollbackExecuted: false,
+      rollbackCommandCreated: false,
+      hostMutation: false,
+      dispatchDeferred: true,
+      credentialValueIncluded: false,
+      credentialValueRead: false,
+      credentialValueExposed: false,
+      endpointContacted: false,
+      networkEgress: false,
+      providerResponseCreated: false,
+      liveProviderCallEnabled: false,
+    });
+    completeTask(task, {
+      summary: "Approved rollback note task shell recorded; rollback execution and provider egress remain deferred.",
+      rollbackNoteRegistry: rollbackNote.registry,
+      phase: "cloud_consciousness_live_provider_rollback_note_deferred",
+      rollbackNoteReady: true,
+      localOnly: true,
+      rollbackRequired: false,
+      rollbackExecuted: false,
+      rollbackCommandCreated: false,
+      hostMutation: false,
+      dispatchDeferred: true,
+      credentialValueIncluded: false,
+      credentialValueRead: false,
+      credentialValueExposed: false,
+      endpointContacted: false,
+      networkEgress: false,
+      providerResponseCreated: false,
+      liveProviderCallEnabled: false,
+    });
+    reconcileRuntimeState();
+    persistState();
+    await publishEvent("task.phase_changed", { task: serialiseTask(task) });
+    return {
+      ok: true,
+      executor: "cloud-consciousness-live-provider-rollback-note-task-v0",
+      status: "rollback_note_deferred_after_approval",
+      task,
+      rollbackNote,
+      governance: phase48Governance({ createsTask: true, createsApproval: true }),
+      summary: {
+        ready: true,
+        implementationStatus: "deferred_after_approval",
+        rollbackNoteReady: true,
+        localOnly: true,
+        rollbackRequired: false,
+        rollbackExecuted: false,
+        rollbackCommandCreated: false,
+        hostMutation: false,
+        dispatchDeferred: true,
+        credentialValueIncluded: false,
+        credentialValueRead: false,
+        credentialValueExposed: false,
+        endpointContacted: false,
+        networkEgress: false,
+        providerResponseCreated: false,
+        liveProviderCallEnabled: false,
+      },
+    };
+  }
+
   function isCloudConsciousnessLiveProviderNoNetworkSenderTask(task) {
     return task?.type === "cloud_consciousness_live_provider_no_network_sender_task"
       && task?.cloudConsciousnessLiveProviderNoNetworkSender?.registry
@@ -2655,6 +3003,10 @@ export function createCloudLiveProviderRuntimeImplementation(deps) {
     createCloudConsciousnessLiveProviderResponseVerifierTask,
     isCloudConsciousnessLiveProviderResponseVerifierTask,
     executeCloudConsciousnessLiveProviderResponseVerifierTask,
+    buildCloudConsciousnessLiveProviderRollbackNote,
+    createCloudConsciousnessLiveProviderRollbackNoteTask,
+    isCloudConsciousnessLiveProviderRollbackNoteTask,
+    executeCloudConsciousnessLiveProviderRollbackNoteTask,
     createCloudConsciousnessLiveProviderNoNetworkSenderTask,
     isCloudConsciousnessLiveProviderNoNetworkSenderTask,
     executeCloudConsciousnessLiveProviderNoNetworkSenderTask,
