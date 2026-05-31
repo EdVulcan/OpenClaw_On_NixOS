@@ -1486,6 +1486,94 @@ export function createCloudLiveProviderRuntimeImplementation(deps) {
     };
   }
 
+  function isCloudConsciousnessLiveProviderNoNetworkSenderTask(task) {
+    return task?.type === "cloud_consciousness_live_provider_no_network_sender_task"
+      && task?.cloudConsciousnessLiveProviderNoNetworkSender?.registry
+        === CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_NO_NETWORK_SENDER_TASK_REGISTRY;
+  }
+
+  async function executeCloudConsciousnessLiveProviderNoNetworkSenderTask(task) {
+    const noNetworkSender = await buildCloudConsciousnessLiveProviderNoNetworkSender();
+    const approval = task.approval?.requestId ? approvals.get(task.approval.requestId) : null;
+    if (approval?.status !== "approved") {
+      return {
+        blocked: true,
+        reason: "approval_required",
+        task,
+        approval: approval ? { ...approval } : null,
+      };
+    }
+
+    task.cloudConsciousnessLiveProviderNoNetworkSender = {
+      ...(task.cloudConsciousnessLiveProviderNoNetworkSender ?? {}),
+      implementationStatus: "deferred_after_approval",
+      approvedAt: approval.updatedAt,
+      noNetworkSenderRegistry: noNetworkSender.registry,
+      noNetworkProviderRequestSenderReady: true,
+      dispatchDeferred: true,
+      referenceOnly: true,
+      credentialValueIncluded: false,
+      credentialValueRead: false,
+      credentialValueExposed: false,
+      implementsRuntimeAdapter: false,
+      providerSdkLoaded: false,
+      providerCredentialRead: false,
+      endpointContacted: false,
+      networkEgress: false,
+      transmitsExternally: false,
+      liveProviderCallEnabled: false,
+    };
+    appendTaskPhase(task, "cloud_consciousness_live_provider_no_network_sender_deferred", {
+      noNetworkSenderRegistry: noNetworkSender.registry,
+      deferredSlice: "openclaw-cloud-consciousness-approved-live-provider-no-network-sender-deferred",
+      reason: "no-network sender task approved; endpoint contact, network egress, and live provider call remain deferred",
+      dispatchDeferred: true,
+      referenceOnly: true,
+      credentialValueIncluded: false,
+      credentialValueRead: false,
+      credentialValueExposed: false,
+      endpointContacted: false,
+      networkEgress: false,
+      liveProviderCallEnabled: false,
+    });
+    completeTask(task, {
+      summary: "Approved no-network sender task shell recorded; executable provider egress remains deferred.",
+      noNetworkSenderRegistry: noNetworkSender.registry,
+      phase: "cloud_consciousness_live_provider_no_network_sender_deferred",
+      dispatchDeferred: true,
+      referenceOnly: true,
+      credentialValueIncluded: false,
+      credentialValueRead: false,
+      credentialValueExposed: false,
+      endpointContacted: false,
+      networkEgress: false,
+      liveProviderCallEnabled: false,
+    });
+    reconcileRuntimeState();
+    persistState();
+    await publishEvent("task.phase_changed", { task: serialiseTask(task) });
+    return {
+      ok: true,
+      executor: "cloud-consciousness-live-provider-no-network-sender-task-v0",
+      status: "no_network_sender_deferred_after_approval",
+      task,
+      noNetworkSender,
+      governance: phase37Governance({ createsTask: true, createsApproval: true }),
+      summary: {
+        ready: true,
+        implementationStatus: "deferred_after_approval",
+        dispatchDeferred: true,
+        referenceOnly: true,
+        credentialValueIncluded: false,
+        credentialValueRead: false,
+        credentialValueExposed: false,
+        endpointContacted: false,
+        networkEgress: false,
+        liveProviderCallEnabled: false,
+      },
+    };
+  }
+
   function isCloudConsciousnessLiveProviderCredentialReferenceResolverTask(task) {
     return task?.type === "cloud_consciousness_live_provider_credential_reference_resolver_task"
       && task?.cloudConsciousnessLiveProviderCredentialReferenceResolver?.registry
@@ -1866,6 +1954,8 @@ export function createCloudLiveProviderRuntimeImplementation(deps) {
     buildCloudConsciousnessLiveProviderCredentialReferenceResolver,
     buildCloudConsciousnessLiveProviderNoNetworkSender,
     createCloudConsciousnessLiveProviderNoNetworkSenderTask,
+    isCloudConsciousnessLiveProviderNoNetworkSenderTask,
+    executeCloudConsciousnessLiveProviderNoNetworkSenderTask,
     createCloudConsciousnessLiveProviderCredentialReferenceResolverTask,
     isCloudConsciousnessLiveProviderCredentialReferenceResolverTask,
     executeCloudConsciousnessLiveProviderCredentialReferenceResolverTask,
