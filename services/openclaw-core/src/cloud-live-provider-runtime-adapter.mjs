@@ -4,6 +4,8 @@ const PROVIDER_REQUEST_BUILDER_REGISTRY =
   "openclaw-cloud-consciousness-live-provider-request-builder-v0";
 const CREDENTIAL_REFERENCE_RESOLVER_REGISTRY =
   "openclaw-cloud-consciousness-live-provider-credential-reference-resolver-v0";
+const PROVIDER_REQUEST_SENDER_REGISTRY =
+  "openclaw-cloud-consciousness-live-provider-send-provider-request-v0";
 
 const ADAPTER_METHODS = [
   {
@@ -18,8 +20,8 @@ const ADAPTER_METHODS = [
   },
   {
     name: "sendProviderRequest",
-    implemented: false,
-    boundary: "future bounded egress adapter; current module must not contact endpoints",
+    implemented: true,
+    boundary: "no-network sender envelope only; endpoint contact and network egress remain deferred",
   },
   {
     name: "recordEgressTranscript",
@@ -171,6 +173,72 @@ export function resolveCredentialReference({
   };
 }
 
+export function sendProviderRequest({
+  providerRequest = {},
+  credentialResolution = {},
+  operatorAuthorization = {},
+} = {}) {
+  const request = providerRequest.request ?? {};
+  const credential = credentialResolution.credential ?? {};
+  const credentialReference = request.credentialReference ?? credential.reference ?? null;
+  const bodyText = typeof request.bodyText === "string" ? request.bodyText : stableJson(request.body ?? null);
+  const ready = typeof bodyText === "string"
+    && bodyText.length > 0
+    && typeof credentialReference === "string"
+    && credential.value === null
+    && credential.resolvedValue === null;
+  return {
+    ok: true,
+    registry: PROVIDER_REQUEST_SENDER_REGISTRY,
+    mode: "phase_36_no_network_provider_request_sender",
+    egressEnvelope: {
+      dispatch: "deferred",
+      method: request.method ?? "POST",
+      path: request.path ?? "/v1/chat/completions",
+      headers: {
+        ...(request.headers ?? {}),
+        "x-openclaw-egress-mode": "disabled",
+      },
+      bodyText,
+      credentialReference,
+      credentialValue: null,
+      endpoint: {
+        ...(request.endpoint ?? {}),
+        contacted: false,
+      },
+      operatorAuthorizationState: operatorAuthorization.state ?? "not_authorized",
+      response: null,
+    },
+    governance: {
+      pureFunction: true,
+      noNetworkSenderEnvelope: true,
+      referenceOnly: true,
+      dispatchDeferred: true,
+      credentialValueRead: false,
+      credentialValueExposed: false,
+      providerCredentialRead: false,
+      endpointContacted: false,
+      networkEgress: false,
+      liveProviderCallEnabled: false,
+    },
+    summary: {
+      ready,
+      noNetworkSenderReady: ready,
+      requestPrepared: typeof bodyText === "string" && bodyText.length > 0,
+      credentialReferencePresent: typeof credentialReference === "string",
+      referenceOnly: true,
+      dispatchDeferred: true,
+      credentialValueIncluded: false,
+      credentialValueRead: false,
+      credentialValueExposed: false,
+      providerCredentialRead: false,
+      endpointContacted: false,
+      networkEgress: false,
+      liveProviderCallEnabled: false,
+    },
+  };
+}
+
 export function buildCloudLiveProviderRuntimeAdapterModuleContract() {
   const implementedMethodCount = ADAPTER_METHODS.filter((method) => method.implemented).length;
   return {
@@ -211,6 +279,7 @@ export function buildCloudLiveProviderRuntimeAdapterModuleContract() {
       implementedMethodCount,
       pureProviderRequestBuilderReady: true,
       pureCredentialReferenceResolverReady: true,
+      noNetworkProviderRequestSenderReady: true,
       implementsRuntimeAdapter: false,
       providerSdkLoaded: false,
       providerCredentialRead: false,

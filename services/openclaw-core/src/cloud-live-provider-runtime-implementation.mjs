@@ -2,6 +2,7 @@ import {
   buildCloudLiveProviderRuntimeAdapterModuleContract,
   buildProviderRequest,
   resolveCredentialReference,
+  sendProviderRequest,
 } from "./cloud-live-provider-runtime-adapter.mjs";
 
 const CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_RUNTIME_IMPLEMENTATION_TASK_REGISTRY =
@@ -172,6 +173,26 @@ function phase33Governance(extra = {}) {
     createsTask: false,
     createsApproval: false,
     pureCredentialReferenceResolverReady: true,
+    referenceOnly: true,
+    implementsRuntimeAdapter: false,
+    callsCloudModel: false,
+    transmitsExternally: false,
+    liveProviderCallEnabled: false,
+    providerSdkLoaded: false,
+    providerCredentialRead: false,
+    credentialValueRead: false,
+    credentialValueExposed: false,
+    endpointContacted: false,
+    networkEgress: false,
+    ...extra,
+  };
+}
+
+function phase36Governance(extra = {}) {
+  return {
+    phase: "phase-36",
+    noNetworkProviderRequestSenderReady: true,
+    dispatchDeferred: true,
     referenceOnly: true,
     implementsRuntimeAdapter: false,
     callsCloudModel: false,
@@ -1247,6 +1268,78 @@ export function createCloudLiveProviderRuntimeImplementation(deps) {
     };
   }
 
+  async function buildCloudConsciousnessLiveProviderNoNetworkSender() {
+    const credentialResolver = await buildCloudConsciousnessLiveProviderCredentialReferenceResolver();
+    const egressEnvelope = sendProviderRequest({
+      providerRequest: credentialResolver.requestBuilder?.providerRequest,
+      credentialResolution: credentialResolver.credentialResolution,
+      operatorAuthorization: {
+        state: "not_authorized",
+      },
+    });
+    const checks = [
+      {
+        id: "phase-28-request-builder-ready",
+        label: "Phase 28 request builder provides a serialized provider request",
+        passed: credentialResolver.requestBuilder?.summary?.ready === true
+          && typeof credentialResolver.requestBuilder?.providerRequest?.request?.bodyText === "string",
+        evidence: credentialResolver.requestBuilder?.registry ?? null,
+      },
+      {
+        id: "phase-32-credential-reference-ready",
+        label: "Phase 32 credential resolver validates reference-only metadata",
+        passed: credentialResolver.summary?.ready === true
+          && credentialResolver.summary?.referenceOnly === true
+          && credentialResolver.summary?.credentialValueRead === false,
+        evidence: credentialResolver.registry,
+      },
+      {
+        id: "no-network-sender-envelope-ready",
+        label: "sendProviderRequest returns a deferred local egress envelope",
+        passed: egressEnvelope.summary?.ready === true
+          && egressEnvelope.summary?.dispatchDeferred === true
+          && egressEnvelope.summary?.networkEgress === false
+          && egressEnvelope.egressEnvelope?.dispatch === "deferred",
+        evidence: egressEnvelope.registry,
+      },
+    ];
+    const passed = checks.filter((check) => check.passed).length;
+    const ready = passed === checks.length;
+    return {
+      ok: true,
+      registry: egressEnvelope.registry,
+      mode: "phase_36_no_network_provider_request_sender",
+      generatedAt: new Date().toISOString(),
+      status: ready ? "no_network_sender_ready_deferred_egress" : "waiting_for_no_network_sender_prerequisites",
+      governance: phase36Governance(),
+      egressEnvelope,
+      credentialResolver,
+      checks,
+      summary: {
+        ready,
+        complete: ready,
+        passed,
+        total: checks.length,
+        completionPercent: ready ? 100 : Math.round((passed / checks.length) * 100),
+        phase: "phase-36",
+        noNetworkProviderRequestSenderReady: true,
+        dispatchDeferred: true,
+        referenceOnly: true,
+        credentialValueIncluded: false,
+        credentialValueRead: false,
+        credentialValueExposed: false,
+        providerCredentialRead: false,
+        endpointContacted: false,
+        networkEgress: false,
+        liveProviderCallEnabled: false,
+      },
+      next: {
+        recommendedSlice: "openclaw-cloud-consciousness-live-provider-send-provider-request-task",
+        boundary: "separate approval is required before this sender envelope can be connected to any runtime egress path",
+      },
+    };
+  }
+
   function isCloudConsciousnessLiveProviderCredentialReferenceResolverTask(task) {
     return task?.type === "cloud_consciousness_live_provider_credential_reference_resolver_task"
       && task?.cloudConsciousnessLiveProviderCredentialReferenceResolver?.registry
@@ -1625,6 +1718,7 @@ export function createCloudLiveProviderRuntimeImplementation(deps) {
     buildCloudConsciousnessLiveProviderRuntimeAdapterModuleContract,
     buildCloudConsciousnessLiveProviderRequestBuilder,
     buildCloudConsciousnessLiveProviderCredentialReferenceResolver,
+    buildCloudConsciousnessLiveProviderNoNetworkSender,
     createCloudConsciousnessLiveProviderCredentialReferenceResolverTask,
     isCloudConsciousnessLiveProviderCredentialReferenceResolverTask,
     executeCloudConsciousnessLiveProviderCredentialReferenceResolverTask,
