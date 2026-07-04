@@ -119,6 +119,8 @@ export function registerRoutes(deps) {
     buildCloudConsciousnessLiveProviderCredentialValueAuthorizationRoute,
     createCloudConsciousnessLiveProviderCredentialValueAuthorizationTask,
     buildCloudConsciousnessLiveProviderCredentialValueAuthorizationApprovedDeferred,
+    buildCloudConsciousnessLiveProviderCredentialValueReadinessPreflight,
+    recordCloudConsciousnessLiveProviderCredentialValueReadinessPreflight,
     createCloudConsciousnessLiveProviderNoNetworkSenderTask,
     createCloudConsciousnessLiveProviderEgressTranscriptRecorderTask,
     createCloudConsciousnessLiveProviderResponseVerifierTask,
@@ -669,6 +671,11 @@ export function registerRoutes(deps) {
 
   if (req.method === "GET" && requestUrl.pathname === "/cloud-consciousness/live-provider-credential-value-authorization-approved-deferred") {
     sendJson(res, 200, await buildCloudConsciousnessLiveProviderCredentialValueAuthorizationApprovedDeferred());
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/cloud-consciousness/live-provider-credential-value-readiness-preflight") {
+    sendJson(res, 200, await buildCloudConsciousnessLiveProviderCredentialValueReadinessPreflight());
     return;
   }
 
@@ -2674,6 +2681,30 @@ export function registerRoutes(deps) {
         preflight: result.preflight,
         task: serialiseTask(result.task),
         approval: serialiseApproval(result.approval),
+        governance: result.governance,
+        summary: buildTaskSummary(),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/cloud-consciousness/live-provider-credential-value-readiness-preflight") {
+    try {
+      const body = await readJsonBody(req);
+      const result = await recordCloudConsciousnessLiveProviderCredentialValueReadinessPreflight({
+        confirm: body.confirm === true,
+      });
+      sendJson(res, 201, {
+        ok: true,
+        registry: result.registry,
+        mode: result.mode,
+        generatedAt: result.generatedAt,
+        status: result.status,
+        preflight: result.preflight,
+        task: serialiseTask(result.task),
         governance: result.governance,
         summary: buildTaskSummary(),
       });
