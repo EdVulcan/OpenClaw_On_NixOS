@@ -985,6 +985,14 @@ function observerHtml() {
           <div class="metric"><span>Next</span><span id="cloud-live-provider-egress-execution-task-shell-next">loading</span></div>
           <pre id="cloud-live-provider-egress-execution-task-shell-json">Loading egress execution task shell...</pre>
         </section>
+        <section class="panel" id="cloud-consciousness-live-provider-egress-execution-approved-deferred-panel">
+          <h2>Cloud Consciousness Live Provider Egress Execution Approved Deferred</h2>
+          <div class="metric"><span>Ready</span><span id="cloud-live-provider-egress-execution-approved-deferred-ready">false</span></div>
+          <div class="metric"><span>Source</span><span id="cloud-live-provider-egress-execution-approved-deferred-source">none</span></div>
+          <div class="metric"><span>Network</span><span id="cloud-live-provider-egress-execution-approved-deferred-network">no egress</span></div>
+          <div class="metric"><span>Next</span><span id="cloud-live-provider-egress-execution-approved-deferred-next">loading</span></div>
+          <pre id="cloud-live-provider-egress-execution-approved-deferred-json">Loading egress execution approved deferred evidence...</pre>
+        </section>
         <section class="panel">
           <h2>Controls</h2>
           <div class="control-stack">
@@ -2364,6 +2372,11 @@ const cloudLiveProviderEgressExecutionTaskShellApproval = document.querySelector
 const cloudLiveProviderEgressExecutionTaskShellNetwork = document.querySelector("#cloud-live-provider-egress-execution-task-shell-network");
 const cloudLiveProviderEgressExecutionTaskShellNext = document.querySelector("#cloud-live-provider-egress-execution-task-shell-next");
 const cloudLiveProviderEgressExecutionTaskShellJson = document.querySelector("#cloud-live-provider-egress-execution-task-shell-json");
+const cloudLiveProviderEgressExecutionApprovedDeferredReady = document.querySelector("#cloud-live-provider-egress-execution-approved-deferred-ready");
+const cloudLiveProviderEgressExecutionApprovedDeferredSource = document.querySelector("#cloud-live-provider-egress-execution-approved-deferred-source");
+const cloudLiveProviderEgressExecutionApprovedDeferredNetwork = document.querySelector("#cloud-live-provider-egress-execution-approved-deferred-network");
+const cloudLiveProviderEgressExecutionApprovedDeferredNext = document.querySelector("#cloud-live-provider-egress-execution-approved-deferred-next");
+const cloudLiveProviderEgressExecutionApprovedDeferredJson = document.querySelector("#cloud-live-provider-egress-execution-approved-deferred-json");
 const screenWindow = document.querySelector("#screen-window");
 const screenSession = document.querySelector("#screen-session");
 const screenReadiness = document.querySelector("#screen-readiness");
@@ -7729,6 +7742,43 @@ async function refreshCloudConsciousnessLiveProviderEgressExecutionTaskShell() {
   }
 }
 
+async function refreshCloudConsciousnessLiveProviderEgressExecutionApprovedDeferred() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/cloud-consciousness/live-provider-egress-execution-approved-deferred\`);
+    const summary = data.summary ?? {};
+    cloudLiveProviderEgressExecutionApprovedDeferredReady.textContent = String(Boolean(summary.ready));
+    cloudLiveProviderEgressExecutionApprovedDeferredSource.textContent = summary.sourceTaskId ?? "none";
+    cloudLiveProviderEgressExecutionApprovedDeferredNetwork.textContent = summary.networkEgress === true ? "egress" : "no egress";
+    cloudLiveProviderEgressExecutionApprovedDeferredNext.textContent = data.next?.recommendedSlice ?? "openclaw-cloud-consciousness-live-provider-credential-value-authorization-route";
+    cloudLiveProviderEgressExecutionApprovedDeferredJson.textContent = [
+      "Registry: " + (data.registry ?? "openclaw-cloud-consciousness-live-provider-egress-execution-approved-deferred-v0"),
+      "Ready: " + Boolean(summary.ready) + " percent=" + (summary.completionPercent ?? 0),
+      "Source Task: " + (summary.sourceTaskId ?? "none"),
+      "Approved deferred evidence found: " + Boolean(summary.approvedDeferredEvidenceFound),
+      "Egress execution task created: " + Boolean(summary.egressExecutionTaskCreated),
+      "Egress execution task approved: " + Boolean(summary.egressExecutionTaskApproved),
+      "Egress execution deferred: " + Boolean(summary.egressExecutionDeferred),
+      "Credential access authorized: " + Boolean(summary.credentialValueAccessAuthorized),
+      "Endpoint egress authorized: " + Boolean(summary.endpointNetworkEgressAuthorized),
+      "Credential value read: " + Boolean(summary.credentialValueRead),
+      "Endpoint contacted: " + Boolean(summary.endpointContacted),
+      "Network egress: " + Boolean(summary.networkEgress),
+      "Provider response created: " + Boolean(summary.providerResponseCreated),
+      "Rollback executed: " + Boolean(summary.rollbackExecuted),
+      "Host mutation: " + Boolean(summary.hostMutation),
+      "Live provider call: " + Boolean(summary.liveProviderCallEnabled),
+      "Endpoint: /cloud-consciousness/live-provider-egress-execution-approved-deferred",
+      "Next: " + (data.next?.recommendedSlice ?? "openclaw-cloud-consciousness-live-provider-credential-value-authorization-route"),
+    ].join("\\n");
+  } catch {
+    cloudLiveProviderEgressExecutionApprovedDeferredReady.textContent = "false";
+    cloudLiveProviderEgressExecutionApprovedDeferredSource.textContent = "none";
+    cloudLiveProviderEgressExecutionApprovedDeferredNetwork.textContent = "no egress";
+    cloudLiveProviderEgressExecutionApprovedDeferredNext.textContent = "openclaw-cloud-consciousness-live-provider-credential-value-authorization-route";
+    cloudLiveProviderEgressExecutionApprovedDeferredJson.textContent = "Unable to read live provider egress execution approved deferred evidence.";
+  }
+}
+
 async function refreshRuntime() {
   try {
     const data = await fetchJson(\`\${observerConfig.coreUrl}/state/runtime\`);
@@ -10822,6 +10872,7 @@ await refreshCloudConsciousnessLiveProviderCredentialValueAccessGate();
 await refreshCloudConsciousnessLiveProviderEndpointNetworkEgressGate();
 await refreshCloudConsciousnessLiveProviderEgressExecutionRouteTaskPreflight();
 await refreshCloudConsciousnessLiveProviderEgressExecutionTaskShell();
+await refreshCloudConsciousnessLiveProviderEgressExecutionApprovedDeferred();
 await refreshRuntime();
 await refreshTaskList();
 await refreshTaskHistoryDetail();
@@ -11019,6 +11070,7 @@ setInterval(refreshCloudConsciousnessLiveProviderCredentialValueAccessGate, 5000
 setInterval(refreshCloudConsciousnessLiveProviderEndpointNetworkEgressGate, 5000);
 setInterval(refreshCloudConsciousnessLiveProviderEgressExecutionRouteTaskPreflight, 5000);
 setInterval(refreshCloudConsciousnessLiveProviderEgressExecutionTaskShell, 5000);
+setInterval(refreshCloudConsciousnessLiveProviderEgressExecutionApprovedDeferred, 5000);
 setInterval(refreshRuntime, 5000);
 setInterval(refreshTaskList, 5000);
 setInterval(refreshTaskHistoryDetail, 5000);
