@@ -91,6 +91,8 @@ export function createTaskExecutor(deps) {
     executeCloudConsciousnessLiveProviderRollbackNoteTask,
     isCloudConsciousnessLiveProviderRuntimeAdapterClosureTask,
     executeCloudConsciousnessLiveProviderRuntimeAdapterClosureTask,
+    isCloudConsciousnessLiveProviderRealLaunchTask,
+    executeCloudConsciousnessLiveProviderRealLaunchTask,
     capabilityById,
     normaliseCapabilityInvokeRequest,
     buildCapabilityPolicyInput,
@@ -2929,6 +2931,18 @@ async function executeTaskWithRecovery(task, options = {}) {
     return {
       finalExecution: cloudConsciousnessLiveProviderRuntimeAdapterClosureExecution,
       attempts: [cloudConsciousnessLiveProviderRuntimeAdapterClosureExecution],
+      recovery: {
+        attempted: false,
+        maxAttempts: 0,
+      },
+    };
+  }
+
+  if (isCloudConsciousnessLiveProviderRealLaunchTask(task)) {
+    const cloudConsciousnessLiveProviderRealLaunchExecution = await executeCloudConsciousnessLiveProviderRealLaunchTask(task);
+    return {
+      finalExecution: cloudConsciousnessLiveProviderRealLaunchExecution,
+      attempts: [cloudConsciousnessLiveProviderRealLaunchExecution],
       recovery: {
         attempted: false,
         maxAttempts: 0,

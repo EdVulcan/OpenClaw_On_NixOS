@@ -7479,6 +7479,8 @@ async function refreshCloudConsciousnessLiveProviderRealLaunchRouteReview() {
       "Live provider call: " + Boolean(summary.liveProviderCallEnabled),
       "Task Endpoint: /cloud-consciousness/live-provider-real-launch-tasks",
       "Task Registry: openclaw-cloud-consciousness-live-provider-real-launch-task-v0",
+      "Deferred Status: real_launch_deferred_after_approval",
+      "Execution Preflight: openclaw-cloud-consciousness-live-provider-real-launch-execution-preflight",
       "Next: " + (data.next?.recommendedSlice ?? "openclaw-cloud-consciousness-live-provider-real-launch-task"),
     ].join("\\n");
   } catch {

@@ -3432,6 +3432,116 @@ export function createCloudLiveProviderRuntimeImplementation(deps) {
     };
   }
 
+  function isCloudConsciousnessLiveProviderRealLaunchTask(task) {
+    return task?.type === "cloud_consciousness_live_provider_real_launch_task"
+      && task?.cloudConsciousnessLiveProviderRealLaunch?.registry
+        === CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_REAL_LAUNCH_TASK_REGISTRY;
+  }
+
+  async function executeCloudConsciousnessLiveProviderRealLaunchTask(task) {
+    const routeReview = await buildCloudConsciousnessLiveProviderRealLaunchRouteReview();
+    const approval = task.approval?.requestId ? approvals.get(task.approval.requestId) : null;
+    if (approval?.status !== "approved") {
+      return {
+        blocked: true,
+        reason: "approval_required",
+        task,
+        approval: approval ? { ...approval } : null,
+      };
+    }
+
+    task.cloudConsciousnessLiveProviderRealLaunch = {
+      ...(task.cloudConsciousnessLiveProviderRealLaunch ?? {}),
+      implementationStatus: "deferred_after_approval",
+      approvedAt: approval.updatedAt,
+      routeReviewRegistry: routeReview.registry,
+      operatorApprovalCaptured: true,
+      launchExecutionDeferred: true,
+      localRuntimeAdapterComplete: true,
+      adapterMethodTableClosed: true,
+      methodCount: routeReview.summary?.methodCount ?? 6,
+      implementedMethodCount: routeReview.summary?.implementedMethodCount ?? 6,
+      launchAuthorized: false,
+      launchExecuted: false,
+      credentialValueIncluded: false,
+      credentialValueRead: false,
+      credentialValueExposed: false,
+      providerSdkLoaded: false,
+      providerCredentialRead: false,
+      endpointContacted: false,
+      networkEgress: false,
+      providerResponseCreated: false,
+      rollbackExecuted: false,
+      rollbackCommandCreated: false,
+      hostMutation: false,
+      transmitsExternally: false,
+      liveProviderCallEnabled: false,
+    };
+    appendTaskPhase(task, "cloud_consciousness_live_provider_real_launch_deferred", {
+      routeReviewRegistry: routeReview.registry,
+      deferredSlice: "openclaw-cloud-consciousness-live-provider-real-launch-execution-preflight",
+      reason: "real launch task approved; credential access, endpoint contact, network egress, provider response creation, rollback execution, and live provider call remain deferred",
+      operatorApprovalCaptured: true,
+      launchExecutionDeferred: true,
+      launchAuthorized: false,
+      launchExecuted: false,
+      credentialValueRead: false,
+      endpointContacted: false,
+      networkEgress: false,
+      providerResponseCreated: false,
+      rollbackExecuted: false,
+      hostMutation: false,
+      liveProviderCallEnabled: false,
+    });
+    completeTask(task, {
+      summary: "Approved real launch task shell recorded; real provider launch execution remains deferred.",
+      routeReviewRegistry: routeReview.registry,
+      phase: "cloud_consciousness_live_provider_real_launch_deferred",
+      operatorApprovalCaptured: true,
+      launchExecutionDeferred: true,
+      launchAuthorized: false,
+      launchExecuted: false,
+      credentialValueRead: false,
+      endpointContacted: false,
+      networkEgress: false,
+      providerResponseCreated: false,
+      rollbackExecuted: false,
+      hostMutation: false,
+      liveProviderCallEnabled: false,
+    });
+    reconcileRuntimeState();
+    persistState();
+    await publishEvent("task.phase_changed", { task: serialiseTask(task) });
+    return {
+      ok: true,
+      executor: "cloud-consciousness-live-provider-real-launch-task-v0",
+      status: "real_launch_deferred_after_approval",
+      task,
+      routeReview,
+      governance: phase57Governance({ createsTask: true, createsApproval: true }),
+      summary: {
+        ready: true,
+        implementationStatus: "deferred_after_approval",
+        operatorApprovalCaptured: true,
+        launchExecutionDeferred: true,
+        localRuntimeAdapterComplete: true,
+        adapterMethodTableClosed: true,
+        launchAuthorized: false,
+        launchExecuted: false,
+        credentialValueIncluded: false,
+        credentialValueRead: false,
+        credentialValueExposed: false,
+        endpointContacted: false,
+        networkEgress: false,
+        providerResponseCreated: false,
+        rollbackExecuted: false,
+        rollbackCommandCreated: false,
+        hostMutation: false,
+        liveProviderCallEnabled: false,
+      },
+    };
+  }
+
   function isCloudConsciousnessLiveProviderNoNetworkSenderTask(task) {
     return task?.type === "cloud_consciousness_live_provider_no_network_sender_task"
       && task?.cloudConsciousnessLiveProviderNoNetworkSender?.registry
@@ -3918,6 +4028,8 @@ export function createCloudLiveProviderRuntimeImplementation(deps) {
     buildCloudConsciousnessLiveProviderRuntimeAdapterClosureExit,
     buildCloudConsciousnessLiveProviderRealLaunchRouteReview,
     createCloudConsciousnessLiveProviderRealLaunchTask,
+    isCloudConsciousnessLiveProviderRealLaunchTask,
+    executeCloudConsciousnessLiveProviderRealLaunchTask,
     createCloudConsciousnessLiveProviderNoNetworkSenderTask,
     isCloudConsciousnessLiveProviderNoNetworkSenderTask,
     executeCloudConsciousnessLiveProviderNoNetworkSenderTask,
