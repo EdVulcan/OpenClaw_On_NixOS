@@ -947,6 +947,13 @@ function observerHtml() {
           <div class="metric"><span>Launch</span><span id="cloud-live-provider-real-launch-route-review-launch">not authorized</span></div>
           <pre id="cloud-live-provider-real-launch-route-review-json">Loading real launch route review...</pre>
         </section>
+        <section class="panel" id="cloud-consciousness-live-provider-real-launch-execution-preflight-panel">
+          <h2>Cloud Consciousness Live Provider Real Launch Execution Preflight</h2>
+          <div class="metric"><span>Ready</span><span id="cloud-live-provider-real-launch-execution-preflight-ready">false</span></div>
+          <div class="metric"><span>Source</span><span id="cloud-live-provider-real-launch-execution-preflight-source">none</span></div>
+          <div class="metric"><span>Launch</span><span id="cloud-live-provider-real-launch-execution-preflight-launch">not authorized</span></div>
+          <pre id="cloud-live-provider-real-launch-execution-preflight-json">Loading real launch execution preflight...</pre>
+        </section>
         <section class="panel">
           <h2>Controls</h2>
           <div class="control-stack">
@@ -2303,6 +2310,10 @@ const cloudLiveProviderRealLaunchRouteReviewReady = document.querySelector("#clo
 const cloudLiveProviderRealLaunchRouteReviewSelected = document.querySelector("#cloud-live-provider-real-launch-route-review-selected");
 const cloudLiveProviderRealLaunchRouteReviewLaunch = document.querySelector("#cloud-live-provider-real-launch-route-review-launch");
 const cloudLiveProviderRealLaunchRouteReviewJson = document.querySelector("#cloud-live-provider-real-launch-route-review-json");
+const cloudLiveProviderRealLaunchExecutionPreflightReady = document.querySelector("#cloud-live-provider-real-launch-execution-preflight-ready");
+const cloudLiveProviderRealLaunchExecutionPreflightSource = document.querySelector("#cloud-live-provider-real-launch-execution-preflight-source");
+const cloudLiveProviderRealLaunchExecutionPreflightLaunch = document.querySelector("#cloud-live-provider-real-launch-execution-preflight-launch");
+const cloudLiveProviderRealLaunchExecutionPreflightJson = document.querySelector("#cloud-live-provider-real-launch-execution-preflight-json");
 const screenWindow = document.querySelector("#screen-window");
 const screenSession = document.querySelector("#screen-session");
 const screenReadiness = document.querySelector("#screen-readiness");
@@ -7491,6 +7502,39 @@ async function refreshCloudConsciousnessLiveProviderRealLaunchRouteReview() {
   }
 }
 
+async function refreshCloudConsciousnessLiveProviderRealLaunchExecutionPreflight() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/cloud-consciousness/live-provider-real-launch-execution-preflight\`);
+    const summary = data.summary ?? {};
+    cloudLiveProviderRealLaunchExecutionPreflightReady.textContent = String(Boolean(summary.ready));
+    cloudLiveProviderRealLaunchExecutionPreflightSource.textContent = summary.sourceTaskId ?? "none";
+    cloudLiveProviderRealLaunchExecutionPreflightLaunch.textContent = summary.launchAuthorized === true ? "authorized" : "not authorized";
+    cloudLiveProviderRealLaunchExecutionPreflightJson.textContent = [
+      "Registry: " + (data.registry ?? "openclaw-cloud-consciousness-live-provider-real-launch-execution-preflight-v0"),
+      "Ready: " + Boolean(summary.ready) + " percent=" + (summary.completionPercent ?? 0),
+      "Recorded: " + Boolean(summary.executionPreflightRecorded),
+      "Source Task: " + (summary.sourceTaskId ?? "none"),
+      "Approved deferred evidence: " + Boolean(summary.approvedDeferredEvidenceFound),
+      "Launch authorized: " + Boolean(summary.launchAuthorized),
+      "Launch executed: " + Boolean(summary.launchExecuted),
+      "Credential value read: " + Boolean(summary.credentialValueRead),
+      "Endpoint contacted: " + Boolean(summary.endpointContacted),
+      "Network egress: " + Boolean(summary.networkEgress),
+      "Provider response created: " + Boolean(summary.providerResponseCreated),
+      "Rollback executed: " + Boolean(summary.rollbackExecuted),
+      "Host mutation: " + Boolean(summary.hostMutation),
+      "Live provider call: " + Boolean(summary.liveProviderCallEnabled),
+      "Record Endpoint: /cloud-consciousness/live-provider-real-launch-execution-preflight",
+      "Next: " + (data.next?.recommendedSlice ?? "openclaw-cloud-consciousness-live-provider-credential-value-access-gate"),
+    ].join("\\n");
+  } catch {
+    cloudLiveProviderRealLaunchExecutionPreflightReady.textContent = "false";
+    cloudLiveProviderRealLaunchExecutionPreflightSource.textContent = "none";
+    cloudLiveProviderRealLaunchExecutionPreflightLaunch.textContent = "not authorized";
+    cloudLiveProviderRealLaunchExecutionPreflightJson.textContent = "Unable to read live provider real launch execution preflight.";
+  }
+}
+
 async function refreshRuntime() {
   try {
     const data = await fetchJson(\`\${observerConfig.coreUrl}/state/runtime\`);
@@ -10579,6 +10623,7 @@ await refreshCloudConsciousnessLiveProviderRollbackNote();
 await refreshCloudConsciousnessLiveProviderRuntimeAdapterCompletion();
 await refreshCloudConsciousnessLiveProviderRuntimeAdapterClosure();
 await refreshCloudConsciousnessLiveProviderRealLaunchRouteReview();
+await refreshCloudConsciousnessLiveProviderRealLaunchExecutionPreflight();
 await refreshRuntime();
 await refreshTaskList();
 await refreshTaskHistoryDetail();
@@ -10771,6 +10816,7 @@ setInterval(refreshCloudConsciousnessLiveProviderRollbackNote, 5000);
 setInterval(refreshCloudConsciousnessLiveProviderRuntimeAdapterCompletion, 5000);
 setInterval(refreshCloudConsciousnessLiveProviderRuntimeAdapterClosure, 5000);
 setInterval(refreshCloudConsciousnessLiveProviderRealLaunchRouteReview, 5000);
+setInterval(refreshCloudConsciousnessLiveProviderRealLaunchExecutionPreflight, 5000);
 setInterval(refreshRuntime, 5000);
 setInterval(refreshTaskList, 5000);
 setInterval(refreshTaskHistoryDetail, 5000);

@@ -53,6 +53,7 @@ export function createPlanBuilder(deps) {
     serialiseTask,
     getTaskById,
     getNextQueuedTask,
+    listTasks,
     createTask,
     appendTaskPhase,
     completeTask,
@@ -90,6 +91,7 @@ export function createPlanBuilder(deps) {
     appendTaskPhase,
     completeTask,
     approvals,
+    listTasks,
   });
 
 function buildOperatorState() {
