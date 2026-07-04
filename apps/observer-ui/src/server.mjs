@@ -926,6 +926,20 @@ function observerHtml() {
           <div class="metric"><span>Next</span><span id="cloud-live-provider-rollback-note-next">loading</span></div>
           <pre id="cloud-live-provider-rollback-note-json">Loading rollback note...</pre>
         </section>
+        <section class="panel" id="cloud-consciousness-live-provider-runtime-adapter-completion-panel">
+          <h2>Cloud Consciousness Live Provider Runtime Adapter Completion</h2>
+          <div class="metric"><span>Ready</span><span id="cloud-live-provider-runtime-adapter-completion-ready">false</span></div>
+          <div class="metric"><span>Methods</span><span id="cloud-live-provider-runtime-adapter-completion-methods">0/0</span></div>
+          <div class="metric"><span>Next</span><span id="cloud-live-provider-runtime-adapter-completion-next">loading</span></div>
+          <pre id="cloud-live-provider-runtime-adapter-completion-json">Loading runtime adapter completion...</pre>
+        </section>
+        <section class="panel" id="cloud-consciousness-live-provider-runtime-adapter-closure-panel">
+          <h2>Cloud Consciousness Live Provider Runtime Adapter Closure</h2>
+          <div class="metric"><span>Complete</span><span id="cloud-live-provider-runtime-adapter-closure-complete">false</span></div>
+          <div class="metric"><span>Percent</span><span id="cloud-live-provider-runtime-adapter-closure-percent">0</span></div>
+          <div class="metric"><span>Next</span><span id="cloud-live-provider-runtime-adapter-closure-next">loading</span></div>
+          <pre id="cloud-live-provider-runtime-adapter-closure-json">Loading runtime adapter closure...</pre>
+        </section>
         <section class="panel">
           <h2>Controls</h2>
           <div class="control-stack">
@@ -2270,6 +2284,14 @@ const cloudLiveProviderRollbackNoteReady = document.querySelector("#cloud-live-p
 const cloudLiveProviderRollbackNoteExecuted = document.querySelector("#cloud-live-provider-rollback-note-executed");
 const cloudLiveProviderRollbackNoteNext = document.querySelector("#cloud-live-provider-rollback-note-next");
 const cloudLiveProviderRollbackNoteJson = document.querySelector("#cloud-live-provider-rollback-note-json");
+const cloudLiveProviderRuntimeAdapterCompletionReady = document.querySelector("#cloud-live-provider-runtime-adapter-completion-ready");
+const cloudLiveProviderRuntimeAdapterCompletionMethods = document.querySelector("#cloud-live-provider-runtime-adapter-completion-methods");
+const cloudLiveProviderRuntimeAdapterCompletionNext = document.querySelector("#cloud-live-provider-runtime-adapter-completion-next");
+const cloudLiveProviderRuntimeAdapterCompletionJson = document.querySelector("#cloud-live-provider-runtime-adapter-completion-json");
+const cloudLiveProviderRuntimeAdapterClosureComplete = document.querySelector("#cloud-live-provider-runtime-adapter-closure-complete");
+const cloudLiveProviderRuntimeAdapterClosurePercent = document.querySelector("#cloud-live-provider-runtime-adapter-closure-percent");
+const cloudLiveProviderRuntimeAdapterClosureNext = document.querySelector("#cloud-live-provider-runtime-adapter-closure-next");
+const cloudLiveProviderRuntimeAdapterClosureJson = document.querySelector("#cloud-live-provider-runtime-adapter-closure-json");
 const screenWindow = document.querySelector("#screen-window");
 const screenSession = document.querySelector("#screen-session");
 const screenReadiness = document.querySelector("#screen-readiness");
@@ -7367,6 +7389,64 @@ async function refreshCloudConsciousnessLiveProviderRollbackNote() {
   }
 }
 
+async function refreshCloudConsciousnessLiveProviderRuntimeAdapterCompletion() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/cloud-consciousness/live-provider-runtime-adapter-completion\`);
+    const summary = data.summary ?? {};
+    cloudLiveProviderRuntimeAdapterCompletionReady.textContent = String(Boolean(summary.ready));
+    cloudLiveProviderRuntimeAdapterCompletionMethods.textContent = \`\${summary.readyMethodCount ?? 0}/\${summary.methodCount ?? 0}\`;
+    cloudLiveProviderRuntimeAdapterCompletionNext.textContent = data.next?.recommendedSlice ?? "openclaw-cloud-consciousness-live-provider-runtime-adapter-closure-task";
+    cloudLiveProviderRuntimeAdapterCompletionJson.textContent = [
+      "Registry: " + (data.registry ?? "openclaw-cloud-consciousness-live-provider-runtime-adapter-completion-v0"),
+      "Ready: " + Boolean(summary.ready) + " percent=" + (summary.completionPercent ?? 0),
+      "Methods: " + (summary.readyMethodCount ?? 0) + "/" + (summary.methodCount ?? 0),
+      "Adapter complete: " + Boolean(summary.localRuntimeAdapterComplete),
+      "Method table closed: " + Boolean(summary.adapterMethodTableClosed),
+      "Endpoint contacted: " + Boolean(summary.endpointContacted),
+      "Network egress: " + Boolean(summary.networkEgress),
+      "Provider response created: " + Boolean(summary.providerResponseCreated),
+      "Rollback executed: " + Boolean(summary.rollbackExecuted),
+      "Live provider call: " + Boolean(summary.liveProviderCallEnabled),
+      "Task Endpoint: /cloud-consciousness/live-provider-runtime-adapter-closure-tasks",
+      "Task Registry: openclaw-cloud-consciousness-live-provider-runtime-adapter-closure-task-v0",
+      "Next: " + (data.next?.recommendedSlice ?? "openclaw-cloud-consciousness-live-provider-runtime-adapter-closure-task"),
+    ].join("\\n");
+  } catch {
+    cloudLiveProviderRuntimeAdapterCompletionReady.textContent = "false";
+    cloudLiveProviderRuntimeAdapterCompletionMethods.textContent = "0/0";
+    cloudLiveProviderRuntimeAdapterCompletionNext.textContent = "openclaw-cloud-consciousness-live-provider-runtime-adapter-closure-task";
+    cloudLiveProviderRuntimeAdapterCompletionJson.textContent = "Unable to read live provider runtime adapter completion.";
+  }
+}
+
+async function refreshCloudConsciousnessLiveProviderRuntimeAdapterClosure() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/cloud-consciousness/live-provider-runtime-adapter-closure-exit\`);
+    const summary = data.summary ?? {};
+    cloudLiveProviderRuntimeAdapterClosureComplete.textContent = String(Boolean(summary.complete));
+    cloudLiveProviderRuntimeAdapterClosurePercent.textContent = String(summary.completionPercent ?? 0);
+    cloudLiveProviderRuntimeAdapterClosureNext.textContent = data.next?.recommendedSlice ?? "openclaw-cloud-consciousness-live-provider-real-launch-route-review";
+    cloudLiveProviderRuntimeAdapterClosureJson.textContent = [
+      "Registry: " + (data.registry ?? "openclaw-cloud-consciousness-live-provider-runtime-adapter-closure-exit-v0"),
+      "Complete: " + Boolean(summary.complete) + " percent=" + (summary.completionPercent ?? 0),
+      "Methods: " + (summary.implementedMethodCount ?? 0) + "/" + (summary.methodCount ?? 0),
+      "Adapter complete: " + Boolean(summary.localRuntimeAdapterComplete),
+      "Method table closed: " + Boolean(summary.adapterMethodTableClosed),
+      "Creates approval: " + Boolean(summary.createsApproval),
+      "Endpoint contacted: " + Boolean(summary.endpointContacted),
+      "Network egress: " + Boolean(summary.networkEgress),
+      "Rollback executed: " + Boolean(summary.rollbackExecuted),
+      "Live provider call: " + Boolean(summary.liveProviderCallEnabled),
+      "Next: " + (data.next?.recommendedSlice ?? "openclaw-cloud-consciousness-live-provider-real-launch-route-review"),
+    ].join("\\n");
+  } catch {
+    cloudLiveProviderRuntimeAdapterClosureComplete.textContent = "false";
+    cloudLiveProviderRuntimeAdapterClosurePercent.textContent = "0";
+    cloudLiveProviderRuntimeAdapterClosureNext.textContent = "openclaw-cloud-consciousness-live-provider-real-launch-route-review";
+    cloudLiveProviderRuntimeAdapterClosureJson.textContent = "Unable to read live provider runtime adapter closure.";
+  }
+}
+
 async function refreshRuntime() {
   try {
     const data = await fetchJson(\`\${observerConfig.coreUrl}/state/runtime\`);
@@ -10452,6 +10532,8 @@ await refreshCloudConsciousnessLiveProviderNoNetworkSender();
 await refreshCloudConsciousnessLiveProviderEgressTranscriptRecorder();
 await refreshCloudConsciousnessLiveProviderResponseVerifier();
 await refreshCloudConsciousnessLiveProviderRollbackNote();
+await refreshCloudConsciousnessLiveProviderRuntimeAdapterCompletion();
+await refreshCloudConsciousnessLiveProviderRuntimeAdapterClosure();
 await refreshRuntime();
 await refreshTaskList();
 await refreshTaskHistoryDetail();
@@ -10641,6 +10723,8 @@ setInterval(refreshCloudConsciousnessLiveProviderNoNetworkSender, 5000);
 setInterval(refreshCloudConsciousnessLiveProviderEgressTranscriptRecorder, 5000);
 setInterval(refreshCloudConsciousnessLiveProviderResponseVerifier, 5000);
 setInterval(refreshCloudConsciousnessLiveProviderRollbackNote, 5000);
+setInterval(refreshCloudConsciousnessLiveProviderRuntimeAdapterCompletion, 5000);
+setInterval(refreshCloudConsciousnessLiveProviderRuntimeAdapterClosure, 5000);
 setInterval(refreshRuntime, 5000);
 setInterval(refreshTaskList, 5000);
 setInterval(refreshTaskHistoryDetail, 5000);

@@ -89,6 +89,8 @@ export function createTaskExecutor(deps) {
     executeCloudConsciousnessLiveProviderResponseVerifierTask,
     isCloudConsciousnessLiveProviderRollbackNoteTask,
     executeCloudConsciousnessLiveProviderRollbackNoteTask,
+    isCloudConsciousnessLiveProviderRuntimeAdapterClosureTask,
+    executeCloudConsciousnessLiveProviderRuntimeAdapterClosureTask,
     capabilityById,
     normaliseCapabilityInvokeRequest,
     buildCapabilityPolicyInput,
@@ -2915,6 +2917,18 @@ async function executeTaskWithRecovery(task, options = {}) {
     return {
       finalExecution: cloudConsciousnessLiveProviderRollbackNoteExecution,
       attempts: [cloudConsciousnessLiveProviderRollbackNoteExecution],
+      recovery: {
+        attempted: false,
+        maxAttempts: 0,
+      },
+    };
+  }
+
+  if (isCloudConsciousnessLiveProviderRuntimeAdapterClosureTask(task)) {
+    const cloudConsciousnessLiveProviderRuntimeAdapterClosureExecution = await executeCloudConsciousnessLiveProviderRuntimeAdapterClosureTask(task);
+    return {
+      finalExecution: cloudConsciousnessLiveProviderRuntimeAdapterClosureExecution,
+      attempts: [cloudConsciousnessLiveProviderRuntimeAdapterClosureExecution],
       recovery: {
         attempted: false,
         maxAttempts: 0,

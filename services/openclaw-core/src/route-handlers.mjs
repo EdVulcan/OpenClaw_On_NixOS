@@ -102,10 +102,13 @@ export function registerRoutes(deps) {
     buildCloudConsciousnessLiveProviderEgressTranscriptRecorder,
     buildCloudConsciousnessLiveProviderResponseVerifier,
     buildCloudConsciousnessLiveProviderRollbackNote,
+    buildCloudConsciousnessLiveProviderRuntimeAdapterCompletion,
+    buildCloudConsciousnessLiveProviderRuntimeAdapterClosureExit,
     createCloudConsciousnessLiveProviderNoNetworkSenderTask,
     createCloudConsciousnessLiveProviderEgressTranscriptRecorderTask,
     createCloudConsciousnessLiveProviderResponseVerifierTask,
     createCloudConsciousnessLiveProviderRollbackNoteTask,
+    createCloudConsciousnessLiveProviderRuntimeAdapterClosureTask,
     createCloudConsciousnessLiveProviderCredentialReferenceResolverTask,
     createCloudConsciousnessLiveProviderRequestBuilderTask,
     createCloudConsciousnessLiveProviderRuntimeAdapterModuleTask,
@@ -601,6 +604,16 @@ export function registerRoutes(deps) {
 
   if (req.method === "GET" && requestUrl.pathname === "/cloud-consciousness/live-provider-rollback-note") {
     sendJson(res, 200, await buildCloudConsciousnessLiveProviderRollbackNote());
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/cloud-consciousness/live-provider-runtime-adapter-completion") {
+    sendJson(res, 200, await buildCloudConsciousnessLiveProviderRuntimeAdapterCompletion());
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/cloud-consciousness/live-provider-runtime-adapter-closure-exit") {
+    sendJson(res, 200, await buildCloudConsciousnessLiveProviderRuntimeAdapterClosureExit());
     return;
   }
 
@@ -2432,6 +2445,31 @@ export function registerRoutes(deps) {
         generatedAt: result.generatedAt,
         sourceRegistry: result.sourceRegistry,
         rollbackNote: result.rollbackNote,
+        task: serialiseTask(result.task),
+        approval: serialiseApproval(result.approval),
+        governance: result.governance,
+        summary: buildTaskSummary(),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/cloud-consciousness/live-provider-runtime-adapter-closure-tasks") {
+    try {
+      const body = await readJsonBody(req);
+      const result = await createCloudConsciousnessLiveProviderRuntimeAdapterClosureTask({
+        confirm: body.confirm === true,
+      });
+      sendJson(res, 201, {
+        ok: true,
+        registry: result.registry,
+        mode: result.mode,
+        generatedAt: result.generatedAt,
+        sourceRegistry: result.sourceRegistry,
+        completion: result.completion,
         task: serialiseTask(result.task),
         approval: serialiseApproval(result.approval),
         governance: result.governance,
