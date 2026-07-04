@@ -1001,6 +1001,14 @@ function observerHtml() {
           <div class="metric"><span>Next</span><span id="cloud-live-provider-credential-value-authorization-route-next">loading</span></div>
           <pre id="cloud-live-provider-credential-value-authorization-route-json">Loading credential value authorization route...</pre>
         </section>
+        <section class="panel" id="cloud-consciousness-live-provider-credential-value-authorization-task-shell-panel">
+          <h2>Cloud Consciousness Live Provider Credential Value Authorization Task Shell</h2>
+          <div class="metric"><span>Ready</span><span id="cloud-live-provider-credential-value-authorization-task-shell-ready">false</span></div>
+          <div class="metric"><span>Approval</span><span id="cloud-live-provider-credential-value-authorization-task-shell-approval">required</span></div>
+          <div class="metric"><span>Credential</span><span id="cloud-live-provider-credential-value-authorization-task-shell-credential">not read</span></div>
+          <div class="metric"><span>Next</span><span id="cloud-live-provider-credential-value-authorization-task-shell-next">loading</span></div>
+          <pre id="cloud-live-provider-credential-value-authorization-task-shell-json">Loading credential value authorization task shell...</pre>
+        </section>
         <section class="panel">
           <h2>Controls</h2>
           <div class="control-stack">
@@ -2390,6 +2398,11 @@ const cloudLiveProviderCredentialValueAuthorizationRouteCredential = document.qu
 const cloudLiveProviderCredentialValueAuthorizationRouteNetwork = document.querySelector("#cloud-live-provider-credential-value-authorization-route-network");
 const cloudLiveProviderCredentialValueAuthorizationRouteNext = document.querySelector("#cloud-live-provider-credential-value-authorization-route-next");
 const cloudLiveProviderCredentialValueAuthorizationRouteJson = document.querySelector("#cloud-live-provider-credential-value-authorization-route-json");
+const cloudLiveProviderCredentialValueAuthorizationTaskShellReady = document.querySelector("#cloud-live-provider-credential-value-authorization-task-shell-ready");
+const cloudLiveProviderCredentialValueAuthorizationTaskShellApproval = document.querySelector("#cloud-live-provider-credential-value-authorization-task-shell-approval");
+const cloudLiveProviderCredentialValueAuthorizationTaskShellCredential = document.querySelector("#cloud-live-provider-credential-value-authorization-task-shell-credential");
+const cloudLiveProviderCredentialValueAuthorizationTaskShellNext = document.querySelector("#cloud-live-provider-credential-value-authorization-task-shell-next");
+const cloudLiveProviderCredentialValueAuthorizationTaskShellJson = document.querySelector("#cloud-live-provider-credential-value-authorization-task-shell-json");
 const screenWindow = document.querySelector("#screen-window");
 const screenSession = document.querySelector("#screen-session");
 const screenReadiness = document.querySelector("#screen-readiness");
@@ -7825,6 +7838,38 @@ async function refreshCloudConsciousnessLiveProviderCredentialValueAuthorization
   }
 }
 
+async function refreshCloudConsciousnessLiveProviderCredentialValueAuthorizationTaskShell() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/cloud-consciousness/live-provider-credential-value-authorization-route\`);
+    const summary = data.summary ?? {};
+    cloudLiveProviderCredentialValueAuthorizationTaskShellReady.textContent = String(Boolean(summary.ready));
+    cloudLiveProviderCredentialValueAuthorizationTaskShellApproval.textContent = "required";
+    cloudLiveProviderCredentialValueAuthorizationTaskShellCredential.textContent = summary.credentialValueRead === true ? "read" : "not read";
+    cloudLiveProviderCredentialValueAuthorizationTaskShellNext.textContent = "openclaw-cloud-consciousness-live-provider-credential-value-authorization-approved-deferred";
+    cloudLiveProviderCredentialValueAuthorizationTaskShellJson.textContent = [
+      "Task Registry: openclaw-cloud-consciousness-live-provider-credential-value-authorization-task-v0",
+      "Ready: " + Boolean(summary.ready) + " percent=" + (summary.completionPercent ?? 0),
+      "Source Task: " + (summary.sourceTaskId ?? "none"),
+      "Source Registry: " + (summary.sourceRegistry ?? "openclaw-cloud-consciousness-live-provider-credential-value-authorization-route-v0"),
+      "Approval: required before authorization shell can be completed",
+      "Task Endpoint: /cloud-consciousness/live-provider-credential-value-authorization-tasks",
+      "Credential authorization task created: " + Boolean(summary.credentialValueAuthorizationTaskCreated),
+      "Credential access authorized: " + Boolean(summary.credentialValueAccessAuthorized),
+      "Credential value read: " + Boolean(summary.credentialValueRead),
+      "Endpoint contacted: " + Boolean(summary.endpointContacted),
+      "Network egress: " + Boolean(summary.networkEgress),
+      "Live provider call: " + Boolean(summary.liveProviderCallEnabled),
+      "Next: openclaw-cloud-consciousness-live-provider-credential-value-authorization-approved-deferred",
+    ].join("\\n");
+  } catch {
+    cloudLiveProviderCredentialValueAuthorizationTaskShellReady.textContent = "false";
+    cloudLiveProviderCredentialValueAuthorizationTaskShellApproval.textContent = "required";
+    cloudLiveProviderCredentialValueAuthorizationTaskShellCredential.textContent = "not read";
+    cloudLiveProviderCredentialValueAuthorizationTaskShellNext.textContent = "openclaw-cloud-consciousness-live-provider-credential-value-authorization-task-shell";
+    cloudLiveProviderCredentialValueAuthorizationTaskShellJson.textContent = "Unable to read live provider credential value authorization task shell readiness.";
+  }
+}
+
 async function refreshRuntime() {
   try {
     const data = await fetchJson(\`\${observerConfig.coreUrl}/state/runtime\`);
@@ -10920,6 +10965,7 @@ await refreshCloudConsciousnessLiveProviderEgressExecutionRouteTaskPreflight();
 await refreshCloudConsciousnessLiveProviderEgressExecutionTaskShell();
 await refreshCloudConsciousnessLiveProviderEgressExecutionApprovedDeferred();
 await refreshCloudConsciousnessLiveProviderCredentialValueAuthorizationRoute();
+await refreshCloudConsciousnessLiveProviderCredentialValueAuthorizationTaskShell();
 await refreshRuntime();
 await refreshTaskList();
 await refreshTaskHistoryDetail();
@@ -11119,6 +11165,7 @@ setInterval(refreshCloudConsciousnessLiveProviderEgressExecutionRouteTaskPreflig
 setInterval(refreshCloudConsciousnessLiveProviderEgressExecutionTaskShell, 5000);
 setInterval(refreshCloudConsciousnessLiveProviderEgressExecutionApprovedDeferred, 5000);
 setInterval(refreshCloudConsciousnessLiveProviderCredentialValueAuthorizationRoute, 5000);
+setInterval(refreshCloudConsciousnessLiveProviderCredentialValueAuthorizationTaskShell, 5000);
 setInterval(refreshRuntime, 5000);
 setInterval(refreshTaskList, 5000);
 setInterval(refreshTaskHistoryDetail, 5000);
