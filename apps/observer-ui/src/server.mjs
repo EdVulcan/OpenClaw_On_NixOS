@@ -1073,6 +1073,14 @@ function observerHtml() {
           <div class="metric"><span>Next</span><span id="cloud-live-provider-credential-value-final-readiness-preflight-next">loading</span></div>
           <pre id="cloud-live-provider-credential-value-final-readiness-preflight-json">Loading credential value final readiness preflight...</pre>
         </section>
+        <section class="panel" id="cloud-consciousness-live-provider-credential-value-access-authorization-decision-route-panel">
+          <h2>Cloud Consciousness Live Provider Credential Value Access Authorization Decision Route</h2>
+          <div class="metric"><span>Ready</span><span id="cloud-live-provider-credential-value-access-authorization-decision-route-ready">false</span></div>
+          <div class="metric"><span>Credential</span><span id="cloud-live-provider-credential-value-access-authorization-decision-route-credential">not read</span></div>
+          <div class="metric"><span>Network</span><span id="cloud-live-provider-credential-value-access-authorization-decision-route-network">no egress</span></div>
+          <div class="metric"><span>Next</span><span id="cloud-live-provider-credential-value-access-authorization-decision-route-next">loading</span></div>
+          <pre id="cloud-live-provider-credential-value-access-authorization-decision-route-json">Loading credential value access authorization decision route...</pre>
+        </section>
         <section class="panel">
           <h2>Controls</h2>
           <div class="control-stack">
@@ -2507,6 +2515,11 @@ const cloudLiveProviderCredentialValueFinalReadinessPreflightSource = document.q
 const cloudLiveProviderCredentialValueFinalReadinessPreflightCredential = document.querySelector("#cloud-live-provider-credential-value-final-readiness-preflight-credential");
 const cloudLiveProviderCredentialValueFinalReadinessPreflightNext = document.querySelector("#cloud-live-provider-credential-value-final-readiness-preflight-next");
 const cloudLiveProviderCredentialValueFinalReadinessPreflightJson = document.querySelector("#cloud-live-provider-credential-value-final-readiness-preflight-json");
+const cloudLiveProviderCredentialValueAccessAuthorizationDecisionRouteReady = document.querySelector("#cloud-live-provider-credential-value-access-authorization-decision-route-ready");
+const cloudLiveProviderCredentialValueAccessAuthorizationDecisionRouteCredential = document.querySelector("#cloud-live-provider-credential-value-access-authorization-decision-route-credential");
+const cloudLiveProviderCredentialValueAccessAuthorizationDecisionRouteNetwork = document.querySelector("#cloud-live-provider-credential-value-access-authorization-decision-route-network");
+const cloudLiveProviderCredentialValueAccessAuthorizationDecisionRouteNext = document.querySelector("#cloud-live-provider-credential-value-access-authorization-decision-route-next");
+const cloudLiveProviderCredentialValueAccessAuthorizationDecisionRouteJson = document.querySelector("#cloud-live-provider-credential-value-access-authorization-decision-route-json");
 const screenWindow = document.querySelector("#screen-window");
 const screenSession = document.querySelector("#screen-session");
 const screenReadiness = document.querySelector("#screen-readiness");
@@ -8241,6 +8254,39 @@ async function refreshCloudConsciousnessLiveProviderCredentialValueFinalReadines
   }
 }
 
+async function refreshCloudConsciousnessLiveProviderCredentialValueAccessAuthorizationDecisionRoute() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/cloud-consciousness/live-provider-credential-value-access-authorization-decision-route\`);
+    const summary = data.summary ?? {};
+    cloudLiveProviderCredentialValueAccessAuthorizationDecisionRouteReady.textContent = String(Boolean(summary.ready));
+    cloudLiveProviderCredentialValueAccessAuthorizationDecisionRouteCredential.textContent = summary.credentialValueRead === true ? "read" : "not read";
+    cloudLiveProviderCredentialValueAccessAuthorizationDecisionRouteNetwork.textContent = summary.networkEgress === true ? "egress" : "no egress";
+    cloudLiveProviderCredentialValueAccessAuthorizationDecisionRouteNext.textContent = data.next?.recommendedSlice ?? "openclaw-cloud-consciousness-live-provider-credential-value-access-authorization-decision-task-shell";
+    cloudLiveProviderCredentialValueAccessAuthorizationDecisionRouteJson.textContent = [
+      "Registry: " + (data.registry ?? "openclaw-cloud-consciousness-live-provider-credential-value-access-authorization-decision-route-v0"),
+      "Ready: " + Boolean(summary.ready) + " percent=" + (summary.completionPercent ?? 0),
+      "Source Task: " + (summary.sourceTaskId ?? "none"),
+      "Source Registry: " + (summary.sourceRegistry ?? "openclaw-cloud-consciousness-live-provider-credential-value-final-readiness-preflight-v0"),
+      "Selected: " + (summary.selectedSlice ?? "openclaw-cloud-consciousness-live-provider-credential-value-access-authorization-decision-task-shell"),
+      "Decision task created: " + Boolean(summary.credentialValueAccessAuthorizationDecisionTaskCreated),
+      "Credential access authorized: " + Boolean(summary.credentialValueAccessAuthorized),
+      "Credential value read: " + Boolean(summary.credentialValueRead),
+      "Provider credential read: " + Boolean(summary.providerCredentialRead),
+      "Endpoint contacted: " + Boolean(summary.endpointContacted),
+      "Network egress: " + Boolean(summary.networkEgress),
+      "Live provider call: " + Boolean(summary.liveProviderCallEnabled),
+      "Endpoint: /cloud-consciousness/live-provider-credential-value-access-authorization-decision-route",
+      "Next: " + (data.next?.recommendedSlice ?? "openclaw-cloud-consciousness-live-provider-credential-value-access-authorization-decision-task-shell"),
+    ].join("\\n");
+  } catch {
+    cloudLiveProviderCredentialValueAccessAuthorizationDecisionRouteReady.textContent = "false";
+    cloudLiveProviderCredentialValueAccessAuthorizationDecisionRouteCredential.textContent = "not read";
+    cloudLiveProviderCredentialValueAccessAuthorizationDecisionRouteNetwork.textContent = "no egress";
+    cloudLiveProviderCredentialValueAccessAuthorizationDecisionRouteNext.textContent = "openclaw-cloud-consciousness-live-provider-credential-value-access-authorization-decision-task-shell";
+    cloudLiveProviderCredentialValueAccessAuthorizationDecisionRouteJson.textContent = "Unable to read live provider credential value access authorization decision route.";
+  }
+}
+
 async function refreshRuntime() {
   try {
     const data = await fetchJson(\`\${observerConfig.coreUrl}/state/runtime\`);
@@ -11345,6 +11391,7 @@ await refreshCloudConsciousnessLiveProviderCredentialValueAccessAuthorizationRou
 await refreshCloudConsciousnessLiveProviderCredentialValueAccessAuthorizationTaskShell();
 await refreshCloudConsciousnessLiveProviderCredentialValueAccessAuthorizationApprovedDeferred();
 await refreshCloudConsciousnessLiveProviderCredentialValueFinalReadinessPreflight();
+await refreshCloudConsciousnessLiveProviderCredentialValueAccessAuthorizationDecisionRoute();
 await refreshRuntime();
 await refreshTaskList();
 await refreshTaskHistoryDetail();
@@ -11553,6 +11600,7 @@ setInterval(refreshCloudConsciousnessLiveProviderCredentialValueAccessAuthorizat
 setInterval(refreshCloudConsciousnessLiveProviderCredentialValueAccessAuthorizationTaskShell, 5000);
 setInterval(refreshCloudConsciousnessLiveProviderCredentialValueAccessAuthorizationApprovedDeferred, 5000);
 setInterval(refreshCloudConsciousnessLiveProviderCredentialValueFinalReadinessPreflight, 5000);
+setInterval(refreshCloudConsciousnessLiveProviderCredentialValueAccessAuthorizationDecisionRoute, 5000);
 setInterval(refreshRuntime, 5000);
 setInterval(refreshTaskList, 5000);
 setInterval(refreshTaskHistoryDetail, 5000);
