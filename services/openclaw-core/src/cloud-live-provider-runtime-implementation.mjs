@@ -32,6 +32,8 @@ const CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_RUNTIME_ADAPTER_CLOSURE_TASK_REGISTRY =
   "openclaw-cloud-consciousness-live-provider-runtime-adapter-closure-task-v0";
 const CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_RUNTIME_ADAPTER_CLOSURE_EXIT_REGISTRY =
   "openclaw-cloud-consciousness-live-provider-runtime-adapter-closure-exit-v0";
+const CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_REAL_LAUNCH_ROUTE_REVIEW_REGISTRY =
+  "openclaw-cloud-consciousness-live-provider-real-launch-route-review-v0";
 
 function phase18Governance(extra = {}) {
   return {
@@ -341,6 +343,35 @@ function phase52Governance(extra = {}) {
     hostMutation: false,
     createsTask: false,
     createsApproval: false,
+    ...extra,
+  };
+}
+
+function phase56Governance(extra = {}) {
+  return {
+    phase: "phase-56",
+    routeReviewOnly: true,
+    liveLaunchRouteReviewed: true,
+    selectedSlice: "openclaw-cloud-consciousness-live-provider-real-launch-task",
+    createsTask: false,
+    createsApproval: false,
+    localRuntimeAdapterComplete: true,
+    adapterMethodTableClosed: true,
+    implementsRuntimeAdapter: true,
+    callsCloudModel: false,
+    transmitsExternally: false,
+    liveProviderCallEnabled: false,
+    launchAuthorized: false,
+    providerSdkLoaded: false,
+    providerCredentialRead: false,
+    credentialValueRead: false,
+    credentialValueExposed: false,
+    endpointContacted: false,
+    networkEgress: false,
+    providerResponseCreated: false,
+    rollbackExecuted: false,
+    rollbackCommandCreated: false,
+    hostMutation: false,
     ...extra,
   };
 }
@@ -3137,6 +3168,110 @@ export function createCloudLiveProviderRuntimeImplementation(deps) {
     };
   }
 
+  async function buildCloudConsciousnessLiveProviderRealLaunchRouteReview() {
+    const closureExit = await buildCloudConsciousnessLiveProviderRuntimeAdapterClosureExit();
+    const runtimeImplementationPlan = await buildRuntimeImplementationPlan();
+    const decision = {
+      decision: "route_to_approval_gated_live_launch_task",
+      selectedSlice: "openclaw-cloud-consciousness-live-provider-real-launch-task",
+      reason: "Phase 55 closed the local runtime adapter method table; the next whitepaper-aligned step is an explicit operator-reviewed launch task shell before any live egress.",
+      requiredBeforeExecution: [
+        "operator approval on the launch task",
+        "credential value access gate",
+        "provider endpoint egress gate",
+        "egress transcript write",
+        "post-call readback verification",
+        "rollback note availability",
+      ],
+      launchAuthorized: false,
+      liveProviderCallEnabled: false,
+    };
+    const checks = [
+      {
+        id: "phase-55-closure-complete",
+        label: "Phase 55 runtime adapter closure exit is complete",
+        passed: closureExit.summary?.complete === true
+          && closureExit.next?.recommendedSlice
+            === "openclaw-cloud-consciousness-live-provider-real-launch-route-review",
+        evidence: closureExit.registry,
+      },
+      {
+        id: "runtime-implementation-plan-linked",
+        label: "Earlier runtime implementation plan remains reviewable",
+        passed: runtimeImplementationPlan.summary?.ready === true,
+        evidence: runtimeImplementationPlan.registry,
+      },
+      {
+        id: "launch-task-route-selected",
+        label: "Route review selects an approval-gated real launch task as the next slice",
+        passed: decision.selectedSlice
+          === "openclaw-cloud-consciousness-live-provider-real-launch-task",
+        evidence: decision.selectedSlice,
+      },
+      {
+        id: "route-review-does-not-launch",
+        label: "Route review does not authorize launch, read credential values, contact endpoints, transmit externally, or call providers",
+        passed: decision.launchAuthorized === false
+          && closureExit.summary?.credentialValueRead === false
+          && closureExit.summary?.endpointContacted === false
+          && closureExit.summary?.networkEgress === false
+          && closureExit.summary?.liveProviderCallEnabled === false,
+        evidence: "route_review_only",
+      },
+    ];
+    const passed = checks.filter((check) => check.passed).length;
+    const ready = passed === checks.length;
+    return {
+      ok: true,
+      registry: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_REAL_LAUNCH_ROUTE_REVIEW_REGISTRY,
+      mode: "phase_56_live_provider_real_launch_route_review",
+      generatedAt: new Date().toISOString(),
+      status: ready ? "real_launch_route_review_ready_launch_task_selected" : "waiting_for_real_launch_route_review_prerequisites",
+      governance: phase56Governance(),
+      decision,
+      checks,
+      summary: {
+        ready,
+        complete: ready,
+        passed,
+        total: checks.length,
+        completionPercent: ready ? 100 : Math.round((passed / checks.length) * 100),
+        phase: "phase-56",
+        routeReviewOnly: true,
+        liveLaunchRouteReviewed: ready,
+        selectedSlice: decision.selectedSlice,
+        localRuntimeAdapterComplete: closureExit.summary?.localRuntimeAdapterComplete === true,
+        adapterMethodTableClosed: closureExit.summary?.adapterMethodTableClosed === true,
+        methodCount: closureExit.summary?.methodCount ?? 0,
+        implementedMethodCount: closureExit.summary?.implementedMethodCount ?? 0,
+        createsTask: false,
+        createsApproval: false,
+        localOnly: true,
+        dispatchDeferred: true,
+        launchAuthorized: false,
+        credentialValueIncluded: false,
+        credentialValueRead: false,
+        credentialValueExposed: false,
+        providerCredentialRead: false,
+        endpointContacted: false,
+        networkEgress: false,
+        providerResponseCreated: false,
+        rollbackExecuted: false,
+        rollbackCommandCreated: false,
+        hostMutation: false,
+        liveProviderCallEnabled: false,
+      },
+      evidence: {
+        closureExit: runtimeAdapterEvidenceRef(closureExit),
+        runtimeImplementationPlan: runtimeAdapterEvidenceRef(runtimeImplementationPlan),
+      },
+      next: {
+        recommendedSlice: decision.selectedSlice,
+        boundary: "create a separate approval-gated launch task before any credential value read, endpoint contact, network egress, provider response creation, or rollback execution",
+      },
+    };
+  }
+
   function isCloudConsciousnessLiveProviderNoNetworkSenderTask(task) {
     return task?.type === "cloud_consciousness_live_provider_no_network_sender_task"
       && task?.cloudConsciousnessLiveProviderNoNetworkSender?.registry
@@ -3621,6 +3756,7 @@ export function createCloudLiveProviderRuntimeImplementation(deps) {
     isCloudConsciousnessLiveProviderRuntimeAdapterClosureTask,
     executeCloudConsciousnessLiveProviderRuntimeAdapterClosureTask,
     buildCloudConsciousnessLiveProviderRuntimeAdapterClosureExit,
+    buildCloudConsciousnessLiveProviderRealLaunchRouteReview,
     createCloudConsciousnessLiveProviderNoNetworkSenderTask,
     isCloudConsciousnessLiveProviderNoNetworkSenderTask,
     executeCloudConsciousnessLiveProviderNoNetworkSenderTask,

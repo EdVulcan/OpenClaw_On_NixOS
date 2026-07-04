@@ -104,6 +104,7 @@ export function registerRoutes(deps) {
     buildCloudConsciousnessLiveProviderRollbackNote,
     buildCloudConsciousnessLiveProviderRuntimeAdapterCompletion,
     buildCloudConsciousnessLiveProviderRuntimeAdapterClosureExit,
+    buildCloudConsciousnessLiveProviderRealLaunchRouteReview,
     createCloudConsciousnessLiveProviderNoNetworkSenderTask,
     createCloudConsciousnessLiveProviderEgressTranscriptRecorderTask,
     createCloudConsciousnessLiveProviderResponseVerifierTask,
@@ -614,6 +615,11 @@ export function registerRoutes(deps) {
 
   if (req.method === "GET" && requestUrl.pathname === "/cloud-consciousness/live-provider-runtime-adapter-closure-exit") {
     sendJson(res, 200, await buildCloudConsciousnessLiveProviderRuntimeAdapterClosureExit());
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/cloud-consciousness/live-provider-real-launch-route-review") {
+    sendJson(res, 200, await buildCloudConsciousnessLiveProviderRealLaunchRouteReview());
     return;
   }
 
