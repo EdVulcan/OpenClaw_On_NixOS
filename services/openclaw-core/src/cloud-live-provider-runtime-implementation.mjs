@@ -56,6 +56,8 @@ const CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CREDENTIAL_VALUE_AUTHORIZATION_APPROVED_
   "openclaw-cloud-consciousness-live-provider-credential-value-authorization-approved-deferred-v0";
 const CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CREDENTIAL_VALUE_READINESS_PREFLIGHT_REGISTRY =
   "openclaw-cloud-consciousness-live-provider-credential-value-readiness-preflight-v0";
+const CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CREDENTIAL_VALUE_READ_TASK_REGISTRY =
+  "openclaw-cloud-consciousness-live-provider-credential-value-read-task-v0";
 
 function phase18Governance(extra = {}) {
   return {
@@ -726,6 +728,38 @@ function phase68Governance(extra = {}) {
     credentialValueAuthorizationTaskCreated: true,
     credentialValueAuthorizationTaskApproved: true,
     credentialValueAuthorizationDeferred: true,
+    credentialValueAccessAuthorized: false,
+    credentialValueAccessDenied: true,
+    credentialValueIncluded: false,
+    credentialValueRead: false,
+    credentialValueExposed: false,
+    providerCredentialRead: false,
+    endpointNetworkEgressAuthorized: false,
+    endpointNetworkEgressDenied: true,
+    endpointContacted: false,
+    networkEgress: false,
+    transmitsExternally: false,
+    liveProviderCallEnabled: false,
+    providerResponseCreated: false,
+    rollbackExecuted: false,
+    rollbackCommandCreated: false,
+    hostMutation: false,
+    launchAuthorized: false,
+    launchExecuted: false,
+    ...extra,
+  };
+}
+
+function phase69Governance(extra = {}) {
+  return {
+    phase: "phase-69",
+    credentialValueReadTaskShellOnly: true,
+    requiresCredentialValueReadinessPreflightEvidence: true,
+    createsTask: false,
+    createsApproval: false,
+    credentialValueReadTaskCreated: false,
+    credentialValueReadTaskApproved: false,
+    credentialValueReadDeferred: true,
     credentialValueAccessAuthorized: false,
     credentialValueAccessDenied: true,
     credentialValueIncluded: false,
@@ -5725,6 +5759,247 @@ export function createCloudLiveProviderRuntimeImplementation(deps) {
     };
   }
 
+  async function createCloudConsciousnessLiveProviderCredentialValueReadTask({ confirm = false } = {}) {
+    if (confirm !== true) {
+      throw new Error("Cloud consciousness live provider credential value read task creation requires confirm=true.");
+    }
+
+    const preflight = await buildCloudConsciousnessLiveProviderCredentialValueReadinessPreflight();
+    if (preflight.summary?.ready !== true
+      || preflight.next?.recommendedSlice !== "openclaw-cloud-consciousness-live-provider-credential-value-read-task-shell") {
+      throw new Error("Cloud consciousness live provider credential value read task requires a ready Phase 68 credential value readiness preflight.");
+    }
+
+    const policyRequest = {
+      intent: "cloud_consciousness.live_provider_call.credential_value_read_task",
+      domain: "cross_boundary",
+      risk: "high",
+      requiresApproval: true,
+      audit: true,
+      tags: ["cloud_consciousness", "live_provider_call", "credential_value_read", "operator_reviewed"],
+    };
+    const goal = "Prepare approval-gated credential value read task shell without reading credential values";
+    const policyDecision = evaluatePolicyIntent({
+      type: "cloud_consciousness_live_provider_credential_value_read_task",
+      goal,
+      policy: policyRequest,
+    }, {
+      stage: "cloud_consciousness.live_provider_credential_value_read_task.draft",
+      type: "cloud_consciousness_live_provider_credential_value_read_task",
+      goal,
+    });
+
+    const task = createTask({
+      goal,
+      type: "cloud_consciousness_live_provider_credential_value_read_task",
+      workViewStrategy: "cloud-consciousness-live-provider-credential-value-read",
+      policy: policyRequest,
+      plan: {
+        planner: "cloud-consciousness-live-provider-credential-value-read-task-v0",
+        strategy: "approval-gated-cloud-consciousness-live-provider-credential-value-read-shell",
+        summary: "Create an approval-gated credential value read task shell while keeping credential values unread and endpoint/network activity disabled.",
+        governance: phase69Governance({ createsTask: true, createsApproval: true, credentialValueReadTaskCreated: true }),
+        steps: [
+          {
+            id: "review-credential-value-readiness-preflight",
+            phase: "review_live_provider_credential_value_readiness_preflight",
+            title: "Review Phase 68 credential value readiness preflight",
+            status: "pending",
+            requiresApproval: false,
+          },
+          {
+            id: "operator-approval",
+            phase: "waiting_for_approval",
+            title: "Wait for operator approval before any credential value read can be considered",
+            status: "pending",
+            capabilityId: "act.system.command.dry_run",
+            requiresApproval: true,
+            risk: "high",
+          },
+          {
+            id: "defer-credential-value-read",
+            phase: "cloud_consciousness_live_provider_credential_value_read_task_shell_deferred",
+            title: "Record read task shell and defer credential value reads, endpoint contact, and network egress",
+            status: "pending",
+            requiresApproval: true,
+            executesNow: false,
+          },
+        ],
+      },
+    }, { skipInitialPolicy: true });
+
+    task.policy = {
+      request: policyRequest,
+      decision: policyDecision,
+    };
+    task.cloudConsciousnessLiveProviderCredentialValueRead = {
+      registry: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CREDENTIAL_VALUE_READ_TASK_REGISTRY,
+      sourceRegistry: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CREDENTIAL_VALUE_READINESS_PREFLIGHT_REGISTRY,
+      sourceTaskId: preflight.summary?.sourceTaskId ?? null,
+      implementationStatus: "task_shell_only",
+      credentialReference: preflight.preflight?.credentialReference ?? "openclaw://credential/provider/live-provider-fixture",
+      credentialValueReadinessPreflightRecorded: preflight.summary?.credentialValueReadinessPreflightRecorded === true,
+      credentialValueReadTaskCreated: true,
+      credentialValueReadTaskApproved: false,
+      credentialValueReadDeferred: true,
+      credentialValueAccessAuthorized: false,
+      credentialValueAccessDenied: true,
+      credentialValueIncluded: false,
+      credentialValueRead: false,
+      credentialValueExposed: false,
+      providerCredentialRead: false,
+      endpointNetworkEgressAuthorized: false,
+      endpointNetworkEgressDenied: true,
+      endpointContacted: false,
+      networkEgress: false,
+      providerResponseCreated: false,
+      rollbackExecuted: false,
+      rollbackCommandCreated: false,
+      hostMutation: false,
+      transmitsExternally: false,
+      liveProviderCallEnabled: false,
+      launchAuthorized: false,
+      launchExecuted: false,
+    };
+
+    const approval = createApprovalRequestForTask(task, policyDecision);
+    const reclaimedTasks = supersedeOtherActiveTasks(task.id);
+    reconcileRuntimeState();
+    persistState();
+
+    await publishEvent("task.created", {
+      task: serialiseTask(task),
+      planner: "cloud-consciousness-live-provider-credential-value-read-task-v0",
+    });
+    await publishTaskApprovalIfPending(task);
+    await publishEvent("task.planned", {
+      task: serialiseTask(task),
+      plan: task.plan,
+    });
+    await Promise.all(reclaimedTasks.map((reclaimedTask) => publishEvent("task.phase_changed", {
+      task: serialiseTask(reclaimedTask),
+    })));
+
+    return {
+      ok: true,
+      registry: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CREDENTIAL_VALUE_READ_TASK_REGISTRY,
+      mode: "approval-gated-cloud-consciousness-live-provider-credential-value-read-task",
+      generatedAt: new Date().toISOString(),
+      sourceRegistry: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CREDENTIAL_VALUE_READINESS_PREFLIGHT_REGISTRY,
+      preflight,
+      task,
+      approval,
+      governance: phase69Governance({ createsTask: true, createsApproval: true, credentialValueReadTaskCreated: true }),
+    };
+  }
+
+  function isCloudConsciousnessLiveProviderCredentialValueReadTask(task) {
+    return task?.type === "cloud_consciousness_live_provider_credential_value_read_task"
+      && task?.cloudConsciousnessLiveProviderCredentialValueRead?.registry
+        === CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CREDENTIAL_VALUE_READ_TASK_REGISTRY;
+  }
+
+  async function executeCloudConsciousnessLiveProviderCredentialValueReadTask(task) {
+    const approval = task.approval?.requestId ? approvals.get(task.approval.requestId) : null;
+    if (approval?.status !== "approved") {
+      return {
+        blocked: true,
+        reason: "approval_required",
+        task,
+        approval: approval ? { ...approval } : null,
+      };
+    }
+
+    const recordedAt = new Date().toISOString();
+    task.cloudConsciousnessLiveProviderCredentialValueRead = {
+      ...(task.cloudConsciousnessLiveProviderCredentialValueRead ?? {}),
+      implementationStatus: "deferred_after_approval",
+      approvedAt: approval.updatedAt,
+      credentialValueReadTaskCreated: true,
+      credentialValueReadTaskApproved: true,
+      credentialValueReadDeferred: true,
+      credentialValueAccessAuthorized: false,
+      credentialValueAccessDenied: true,
+      credentialValueIncluded: false,
+      credentialValueRead: false,
+      credentialValueExposed: false,
+      providerCredentialRead: false,
+      endpointNetworkEgressAuthorized: false,
+      endpointNetworkEgressDenied: true,
+      endpointContacted: false,
+      networkEgress: false,
+      providerResponseCreated: false,
+      rollbackExecuted: false,
+      rollbackCommandCreated: false,
+      hostMutation: false,
+      transmitsExternally: false,
+      liveProviderCallEnabled: false,
+      launchAuthorized: false,
+      launchExecuted: false,
+    };
+    appendTaskPhase(task, "cloud_consciousness_live_provider_credential_value_read_task_shell_deferred", {
+      taskRegistry: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CREDENTIAL_VALUE_READ_TASK_REGISTRY,
+      recordedAt,
+      sourcePhase: "cloud_consciousness_live_provider_credential_value_readiness_preflight",
+      deferredSlice: "openclaw-cloud-consciousness-live-provider-credential-value-read-approved-deferred",
+      reason: "credential value read task shell approved; credential value read remains deferred",
+      credentialValueReadTaskCreated: true,
+      credentialValueReadTaskApproved: true,
+      credentialValueReadDeferred: true,
+      credentialValueAccessAuthorized: false,
+      credentialValueAccessDenied: true,
+      credentialValueRead: false,
+      endpointContacted: false,
+      networkEgress: false,
+      liveProviderCallEnabled: false,
+    });
+    completeTask(task, {
+      summary: "Approved credential value read task shell recorded; credential values remain unread.",
+      taskRegistry: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CREDENTIAL_VALUE_READ_TASK_REGISTRY,
+      phase: "cloud_consciousness_live_provider_credential_value_read_task_shell_deferred",
+      credentialValueReadTaskCreated: true,
+      credentialValueReadTaskApproved: true,
+      credentialValueReadDeferred: true,
+      credentialValueAccessAuthorized: false,
+      credentialValueAccessDenied: true,
+      credentialValueRead: false,
+      endpointContacted: false,
+      networkEgress: false,
+      liveProviderCallEnabled: false,
+    });
+    reconcileRuntimeState();
+    persistState();
+    await publishEvent("task.phase_changed", { task: serialiseTask(task) });
+
+    return {
+      ok: true,
+      executor: "cloud-consciousness-live-provider-credential-value-read-task-v0",
+      status: "credential_value_read_task_shell_deferred_after_approval",
+      task,
+      governance: phase69Governance({
+        createsTask: true,
+        createsApproval: true,
+        credentialValueReadTaskCreated: true,
+        credentialValueReadTaskApproved: true,
+      }),
+      summary: {
+        ready: true,
+        implementationStatus: "deferred_after_approval",
+        credentialValueReadTaskCreated: true,
+        credentialValueReadTaskApproved: true,
+        credentialValueReadDeferred: true,
+        credentialValueAccessAuthorized: false,
+        credentialValueAccessDenied: true,
+        credentialValueIncluded: false,
+        credentialValueRead: false,
+        credentialValueExposed: false,
+        endpointContacted: false,
+        networkEgress: false,
+        liveProviderCallEnabled: false,
+      },
+    };
+  }
+
   async function executeCloudConsciousnessLiveProviderCredentialValueAuthorizationTask(task) {
     const approval = task.approval?.requestId ? approvals.get(task.approval.requestId) : null;
     if (approval?.status !== "approved") {
@@ -6554,6 +6829,9 @@ export function createCloudLiveProviderRuntimeImplementation(deps) {
     buildCloudConsciousnessLiveProviderCredentialValueAuthorizationApprovedDeferred,
     buildCloudConsciousnessLiveProviderCredentialValueReadinessPreflight,
     recordCloudConsciousnessLiveProviderCredentialValueReadinessPreflight,
+    createCloudConsciousnessLiveProviderCredentialValueReadTask,
+    isCloudConsciousnessLiveProviderCredentialValueReadTask,
+    executeCloudConsciousnessLiveProviderCredentialValueReadTask,
     isCloudConsciousnessLiveProviderCredentialValueAuthorizationTask,
     executeCloudConsciousnessLiveProviderCredentialValueAuthorizationTask,
     isCloudConsciousnessLiveProviderEgressExecutionTask,
