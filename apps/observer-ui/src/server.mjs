@@ -1105,6 +1105,14 @@ function observerHtml() {
           <div class="metric"><span>Next</span><span id="cloud-live-provider-credential-value-access-authorized-local-proof-next">loading</span></div>
           <pre id="cloud-live-provider-credential-value-access-authorized-local-proof-json">Loading credential value access authorized local proof...</pre>
         </section>
+        <section class="panel" id="cloud-consciousness-live-provider-credential-value-local-read-route-panel">
+          <h2>Cloud Consciousness Live Provider Credential Value Local Read Route</h2>
+          <div class="metric"><span>Ready</span><span id="cloud-live-provider-credential-value-local-read-route-ready">false</span></div>
+          <div class="metric"><span>Credential</span><span id="cloud-live-provider-credential-value-local-read-route-credential">not read</span></div>
+          <div class="metric"><span>Network</span><span id="cloud-live-provider-credential-value-local-read-route-network">no egress</span></div>
+          <div class="metric"><span>Next</span><span id="cloud-live-provider-credential-value-local-read-route-next">loading</span></div>
+          <pre id="cloud-live-provider-credential-value-local-read-route-json">Loading credential value local read route...</pre>
+        </section>
         <section class="panel">
           <h2>Controls</h2>
           <div class="control-stack">
@@ -2559,6 +2567,11 @@ const cloudLiveProviderCredentialValueAccessAuthorizedLocalProofSource = documen
 const cloudLiveProviderCredentialValueAccessAuthorizedLocalProofCredential = document.querySelector("#cloud-live-provider-credential-value-access-authorized-local-proof-credential");
 const cloudLiveProviderCredentialValueAccessAuthorizedLocalProofNext = document.querySelector("#cloud-live-provider-credential-value-access-authorized-local-proof-next");
 const cloudLiveProviderCredentialValueAccessAuthorizedLocalProofJson = document.querySelector("#cloud-live-provider-credential-value-access-authorized-local-proof-json");
+const cloudLiveProviderCredentialValueLocalReadRouteReady = document.querySelector("#cloud-live-provider-credential-value-local-read-route-ready");
+const cloudLiveProviderCredentialValueLocalReadRouteCredential = document.querySelector("#cloud-live-provider-credential-value-local-read-route-credential");
+const cloudLiveProviderCredentialValueLocalReadRouteNetwork = document.querySelector("#cloud-live-provider-credential-value-local-read-route-network");
+const cloudLiveProviderCredentialValueLocalReadRouteNext = document.querySelector("#cloud-live-provider-credential-value-local-read-route-next");
+const cloudLiveProviderCredentialValueLocalReadRouteJson = document.querySelector("#cloud-live-provider-credential-value-local-read-route-json");
 const screenWindow = document.querySelector("#screen-window");
 const screenSession = document.querySelector("#screen-session");
 const screenReadiness = document.querySelector("#screen-readiness");
@@ -8426,6 +8439,38 @@ async function refreshCloudConsciousnessLiveProviderCredentialValueAccessAuthori
   }
 }
 
+async function refreshCloudConsciousnessLiveProviderCredentialValueLocalReadRoute() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/cloud-consciousness/live-provider-credential-value-local-read-route\`);
+    const summary = data.summary ?? {};
+    cloudLiveProviderCredentialValueLocalReadRouteReady.textContent = String(Boolean(summary.ready));
+    cloudLiveProviderCredentialValueLocalReadRouteCredential.textContent = summary.credentialValueRead === true ? "read" : "not read";
+    cloudLiveProviderCredentialValueLocalReadRouteNetwork.textContent = summary.networkEgress === true ? "egress" : "no egress";
+    cloudLiveProviderCredentialValueLocalReadRouteNext.textContent = data.next?.recommendedSlice ?? "openclaw-cloud-consciousness-live-provider-credential-value-local-read-task-shell";
+    cloudLiveProviderCredentialValueLocalReadRouteJson.textContent = [
+      "Registry: " + (data.registry ?? "openclaw-cloud-consciousness-live-provider-credential-value-local-read-route-v0"),
+      "Ready: " + Boolean(summary.ready) + " percent=" + (summary.completionPercent ?? 0),
+      "Source Task: " + (summary.sourceTaskId ?? "none"),
+      "Source Registry: " + (summary.sourceRegistry ?? "openclaw-cloud-consciousness-live-provider-credential-value-access-authorized-local-proof-v0"),
+      "Selected: " + (summary.selectedSlice ?? "openclaw-cloud-consciousness-live-provider-credential-value-local-read-task-shell"),
+      "Local read task created: " + Boolean(summary.credentialValueLocalReadTaskCreated),
+      "Credential value read: " + Boolean(summary.credentialValueRead),
+      "Provider credential read: " + Boolean(summary.providerCredentialRead),
+      "Endpoint contacted: " + Boolean(summary.endpointContacted),
+      "Network egress: " + Boolean(summary.networkEgress),
+      "Live provider call: " + Boolean(summary.liveProviderCallEnabled),
+      "Endpoint: /cloud-consciousness/live-provider-credential-value-local-read-route",
+      "Next: " + (data.next?.recommendedSlice ?? "openclaw-cloud-consciousness-live-provider-credential-value-local-read-task-shell"),
+    ].join("\\n");
+  } catch {
+    cloudLiveProviderCredentialValueLocalReadRouteReady.textContent = "false";
+    cloudLiveProviderCredentialValueLocalReadRouteCredential.textContent = "not read";
+    cloudLiveProviderCredentialValueLocalReadRouteNetwork.textContent = "no egress";
+    cloudLiveProviderCredentialValueLocalReadRouteNext.textContent = "openclaw-cloud-consciousness-live-provider-credential-value-local-read-task-shell";
+    cloudLiveProviderCredentialValueLocalReadRouteJson.textContent = "Unable to read live provider credential value local read route.";
+  }
+}
+
 async function refreshRuntime() {
   try {
     const data = await fetchJson(\`\${observerConfig.coreUrl}/state/runtime\`);
@@ -11534,6 +11579,7 @@ await refreshCloudConsciousnessLiveProviderCredentialValueAccessAuthorizationDec
 await refreshCloudConsciousnessLiveProviderCredentialValueAccessAuthorizationDecisionTaskShell();
 await refreshCloudConsciousnessLiveProviderCredentialValueAccessAuthorizationDecisionApprovedDeferred();
 await refreshCloudConsciousnessLiveProviderCredentialValueAccessAuthorizedLocalProof();
+await refreshCloudConsciousnessLiveProviderCredentialValueLocalReadRoute();
 await refreshRuntime();
 await refreshTaskList();
 await refreshTaskHistoryDetail();
@@ -11746,6 +11792,7 @@ setInterval(refreshCloudConsciousnessLiveProviderCredentialValueAccessAuthorizat
 setInterval(refreshCloudConsciousnessLiveProviderCredentialValueAccessAuthorizationDecisionTaskShell, 5000);
 setInterval(refreshCloudConsciousnessLiveProviderCredentialValueAccessAuthorizationDecisionApprovedDeferred, 5000);
 setInterval(refreshCloudConsciousnessLiveProviderCredentialValueAccessAuthorizedLocalProof, 5000);
+setInterval(refreshCloudConsciousnessLiveProviderCredentialValueLocalReadRoute, 5000);
 setInterval(refreshRuntime, 5000);
 setInterval(refreshTaskList, 5000);
 setInterval(refreshTaskHistoryDetail, 5000);
