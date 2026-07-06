@@ -1,0 +1,137 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+OBSERVER_CHECK="${PHASE100_OBSERVER_CHECK:-false}"
+PORT_BASE="${PHASE100_PORT_BASE:-24900}"
+PLAN_DOC="$REPO_ROOT/docs/plans/OPENCLAW_PHASE_100_PLAN.md"
+
+export OPENCLAW_CORE_PORT="${OPENCLAW_CORE_PORT:-$PORT_BASE}"
+export OPENCLAW_EVENT_HUB_PORT="${OPENCLAW_EVENT_HUB_PORT:-$((PORT_BASE + 1))}"
+export OPENCLAW_SESSION_MANAGER_PORT="${OPENCLAW_SESSION_MANAGER_PORT:-$((PORT_BASE + 2))}"
+export OPENCLAW_BROWSER_RUNTIME_PORT="${OPENCLAW_BROWSER_RUNTIME_PORT:-$((PORT_BASE + 3))}"
+export OPENCLAW_SCREEN_SENSE_PORT="${OPENCLAW_SCREEN_SENSE_PORT:-$((PORT_BASE + 4))}"
+export OPENCLAW_SCREEN_ACT_PORT="${OPENCLAW_SCREEN_ACT_PORT:-$((PORT_BASE + 5))}"
+export OPENCLAW_SYSTEM_SENSE_PORT="${OPENCLAW_SYSTEM_SENSE_PORT:-$((PORT_BASE + 6))}"
+export OPENCLAW_SYSTEM_HEAL_PORT="${OPENCLAW_SYSTEM_HEAL_PORT:-$((PORT_BASE + 7))}"
+export OBSERVER_UI_PORT="${OBSERVER_UI_PORT:-$((PORT_BASE + 8))}"
+export OPENCLAW_CORE_STATE_FILE="${OPENCLAW_CORE_STATE_FILE:-$REPO_ROOT/.artifacts/openclaw-core-phase-100-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-task-shell-check.json}"
+export OPENCLAW_SYSTEM_HEAL_STATE_FILE="${OPENCLAW_SYSTEM_HEAL_STATE_FILE:-$REPO_ROOT/.artifacts/openclaw-system-heal-phase-100-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-task-shell-check.json}"
+
+CORE_URL="http://127.0.0.1:$OPENCLAW_CORE_PORT"
+OBSERVER_URL="http://127.0.0.1:$OBSERVER_UI_PORT"
+RESULT_ENVELOPE_ROUTE_REGISTRY="openclaw-cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-route-v0"
+RESULT_ENVELOPE_TASK_REGISTRY="openclaw-cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-task-v0"
+
+post_json() {
+  local url="$1"
+  local payload="$2"
+  curl --silent --fail -X POST "$url" -H 'content-type: application/json' --data "$payload"
+}
+
+cleanup() {
+  rm -f "${HTML_FILE:-}" "${CLIENT_FILE:-}" "${TASK_FILE:-}" "${APPROVED_FILE:-}" "${STEP_FILE:-}"
+  "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
+}
+trap cleanup EXIT
+
+"$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
+
+if [[ "$OBSERVER_CHECK" == "true" ]]; then
+  "$SCRIPT_DIR/dev-up.sh"
+  HTML_FILE="$(mktemp)"
+  CLIENT_FILE="$(mktemp)"
+  curl --silent --fail "$OBSERVER_URL/" > "$HTML_FILE"
+  curl --silent --fail "$OBSERVER_URL/client-v5.js" > "$CLIENT_FILE"
+  node - <<'EOF' "$RESULT_ENVELOPE_ROUTE_REGISTRY" "$RESULT_ENVELOPE_TASK_REGISTRY" "$HTML_FILE" "$CLIENT_FILE"
+const fs = require("node:fs");
+const resultEnvelopeRouteRegistry = process.argv[2];
+const resultEnvelopeTaskRegistry = process.argv[3];
+const html = fs.readFileSync(process.argv[4], "utf8");
+const client = fs.readFileSync(process.argv[5], "utf8");
+for (const token of [
+  "Cloud Consciousness Live Provider Credential Value Local Read Execution Local Read Attempt Local Read Result Envelope Task Shell",
+  "cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-task-shell-panel",
+]) {
+  if (!html.includes(token)) throw new Error(`Observer HTML missing ${token}`);
+}
+for (const token of [
+  "/cloud-consciousness/live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-tasks",
+  "refreshCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeTaskShell",
+  "openclaw-cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-approved-deferred",
+  resultEnvelopeRouteRegistry,
+  resultEnvelopeTaskRegistry,
+]) {
+  if (!client.includes(token)) throw new Error(`Observer client missing ${token}`);
+}
+console.log(JSON.stringify({ observerOpenClawCloudConsciousnessCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeTaskShell: { status: "passed", resultEnvelopeRouteRegistry, resultEnvelopeTaskRegistry } }, null, 2));
+EOF
+  exit 0
+fi
+
+rm -f "$OPENCLAW_CORE_STATE_FILE" "$OPENCLAW_CORE_STATE_FILE.tmp" "$OPENCLAW_SYSTEM_HEAL_STATE_FILE" "$OPENCLAW_SYSTEM_HEAL_STATE_FILE.tmp"
+PHASE99_PORT_BASE="$PORT_BASE" OPENCLAW_CORE_STATE_FILE="$OPENCLAW_CORE_STATE_FILE" OPENCLAW_SYSTEM_HEAL_STATE_FILE="$OPENCLAW_SYSTEM_HEAL_STATE_FILE" \
+  bash "$SCRIPT_DIR/dev-openclaw-cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-route-common-check.sh" >/dev/null
+
+"$SCRIPT_DIR/dev-up.sh"
+TASK_FILE="$(mktemp)"
+APPROVED_FILE="$(mktemp)"
+STEP_FILE="$(mktemp)"
+post_json "$CORE_URL/cloud-consciousness/live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-tasks" '{"confirm":true}' > "$TASK_FILE"
+approval_id="$(node -e 'const fs=require("node:fs"); const data=JSON.parse(fs.readFileSync(process.argv[1], "utf8")); if(!data.approval?.id) throw new Error("missing approval id"); console.log(data.approval.id)' "$TASK_FILE")"
+post_json "$CORE_URL/approvals/$approval_id/approve" '{"approvedBy":"phase-100-check","reason":"Approve credential value local read result envelope task shell while keeping credential values unread and envelopes uncreated."}' > "$APPROVED_FILE"
+post_json "$CORE_URL/operator/step" '{}' > "$STEP_FILE"
+
+node - <<'EOF' "$RESULT_ENVELOPE_ROUTE_REGISTRY" "$RESULT_ENVELOPE_TASK_REGISTRY" "$PLAN_DOC" "$TASK_FILE" "$STEP_FILE"
+const fs = require("node:fs");
+const resultEnvelopeRouteRegistry = process.argv[2];
+const resultEnvelopeTaskRegistry = process.argv[3];
+const doc = fs.readFileSync(process.argv[4], "utf8");
+const taskRecord = JSON.parse(fs.readFileSync(process.argv[5], "utf8"));
+const stepRecord = JSON.parse(fs.readFileSync(process.argv[6], "utf8"));
+for (const token of [
+  "openclaw-cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-task-shell",
+  "Requires Phase 99 credential value local read execution local-read attempt local-read result envelope route evidence",
+  "credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeTaskApproved: true",
+]) {
+  if (!doc.includes(token)) throw new Error(`Phase 100 plan doc missing ${token}`);
+}
+const taskShell = taskRecord.task?.cloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelope;
+const completedShell = stepRecord.task?.cloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelope;
+if (
+  !taskRecord.ok
+  || taskRecord.registry !== resultEnvelopeTaskRegistry
+  || taskRecord.approval?.status !== "pending"
+  || taskShell?.registry !== resultEnvelopeTaskRegistry
+  || taskShell?.sourceRegistry !== resultEnvelopeRouteRegistry
+  || taskShell?.implementationStatus !== "task_shell_only"
+  || taskShell?.credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeTaskCreated !== true
+  || taskShell?.credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeTaskApproved !== false
+  || taskShell?.credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeDeferred !== true
+  || taskShell?.credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreated !== false
+  || !stepRecord.ok
+  || stepRecord.task?.status !== "completed"
+  || stepRecord.task?.outcome?.details?.phase !== "cloud_consciousness_live_provider_credential_value_local_read_execution_local_read_attempt_local_read_result_envelope_task_shell_deferred"
+  || completedShell?.registry !== resultEnvelopeTaskRegistry
+  || completedShell?.implementationStatus !== "deferred_after_approval"
+  || completedShell?.credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeTaskCreated !== true
+  || completedShell?.credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeTaskApproved !== true
+  || completedShell?.credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeDeferred !== true
+  || completedShell?.credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreated !== false
+) {
+  throw new Error(`Phase 100 should create and approve deferred credential value local read result envelope task shell evidence: ${JSON.stringify({ taskRecord, stepRecord })}`);
+}
+if (
+  completedShell.credentialValueIncluded !== false
+  || completedShell.credentialValueRead !== false
+  || completedShell.credentialValueExposed !== false
+  || completedShell.providerCredentialRead !== false
+  || completedShell.endpointContacted !== false
+  || completedShell.networkEgress !== false
+  || completedShell.liveProviderCallEnabled !== false
+) {
+  throw new Error(`Phase 100 result envelope task shell must not read credentials, create envelopes, or perform egress: ${JSON.stringify(stepRecord)}`);
+}
+console.log(JSON.stringify({ openclawCloudConsciousnessCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeTaskShell: { status: "passed", taskId: taskRecord.task.id, completedTaskId: stepRecord.task.id, sourceTaskId: taskShell.sourceTaskId, resultEnvelopeRouteRegistry, resultEnvelopeTaskRegistry } }, null, 2));
+EOF
