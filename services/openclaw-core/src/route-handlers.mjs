@@ -141,6 +141,8 @@ export function registerRoutes(deps) {
     buildCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionRoute,
     createCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionTask,
     buildCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionApprovedDeferred,
+    buildCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionFinalReadinessPreflight,
+    recordCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionFinalReadinessPreflight,
     createCloudConsciousnessLiveProviderNoNetworkSenderTask,
     createCloudConsciousnessLiveProviderEgressTranscriptRecorderTask,
     createCloudConsciousnessLiveProviderResponseVerifierTask,
@@ -756,6 +758,11 @@ export function registerRoutes(deps) {
 
   if (req.method === "GET" && requestUrl.pathname === "/cloud-consciousness/live-provider-credential-value-local-read-execution-approved-deferred") {
     sendJson(res, 200, await buildCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionApprovedDeferred());
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/cloud-consciousness/live-provider-credential-value-local-read-execution-final-readiness-preflight") {
+    sendJson(res, 200, await buildCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionFinalReadinessPreflight());
     return;
   }
 
@@ -2932,6 +2939,30 @@ export function registerRoutes(deps) {
         route: result.route,
         task: serialiseTask(result.task),
         approval: serialiseApproval(result.approval),
+        governance: result.governance,
+        summary: buildTaskSummary(),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/cloud-consciousness/live-provider-credential-value-local-read-execution-final-readiness-preflight") {
+    try {
+      const body = await readJsonBody(req);
+      const result = await recordCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionFinalReadinessPreflight({
+        confirm: body.confirm === true,
+      });
+      sendJson(res, 201, {
+        ok: true,
+        registry: result.registry,
+        mode: result.mode,
+        generatedAt: result.generatedAt,
+        status: result.status,
+        preflight: result.preflight,
+        task: result.task,
         governance: result.governance,
         summary: buildTaskSummary(),
       });

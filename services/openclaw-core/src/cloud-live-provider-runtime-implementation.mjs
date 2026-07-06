@@ -90,6 +90,8 @@ const CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CREDENTIAL_VALUE_LOCAL_READ_EXECUTION_TA
   "openclaw-cloud-consciousness-live-provider-credential-value-local-read-execution-task-v0";
 const CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CREDENTIAL_VALUE_LOCAL_READ_EXECUTION_APPROVED_DEFERRED_REGISTRY =
   "openclaw-cloud-consciousness-live-provider-credential-value-local-read-execution-approved-deferred-v0";
+const CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CREDENTIAL_VALUE_LOCAL_READ_EXECUTION_FINAL_READINESS_PREFLIGHT_REGISTRY =
+  "openclaw-cloud-consciousness-live-provider-credential-value-local-read-execution-final-readiness-preflight-v0";
 
 function phase18Governance(extra = {}) {
   return {
@@ -1278,6 +1280,34 @@ function phase85Governance(extra = {}) {
     credentialValueLocalReadExecutionTaskCreated: true,
     credentialValueLocalReadExecutionTaskApproved: true,
     credentialValueLocalReadExecutionDeferred: true,
+    credentialValueRead: false,
+    credentialValueIncluded: false,
+    credentialValueExposed: false,
+    providerCredentialRead: false,
+    endpointNetworkEgressAuthorized: false,
+    endpointNetworkEgressDenied: true,
+    endpointContacted: false,
+    networkEgress: false,
+    transmitsExternally: false,
+    liveProviderCallEnabled: false,
+    providerResponseCreated: false,
+    rollbackExecuted: false,
+    rollbackCommandCreated: false,
+    hostMutation: false,
+    launchAuthorized: false,
+    launchExecuted: false,
+    ...extra,
+  };
+}
+
+function phase86Governance(extra = {}) {
+  return {
+    phase: "phase-86",
+    credentialValueLocalReadExecutionFinalReadinessPreflightOnly: true,
+    requiresCredentialValueLocalReadExecutionApprovedDeferredEvidence: true,
+    createsTask: false,
+    createsApproval: false,
+    credentialValueLocalReadExecutionFinalReadinessPreflightRecorded: false,
     credentialValueRead: false,
     credentialValueIncluded: false,
     credentialValueExposed: false,
@@ -8460,7 +8490,8 @@ export function createCloudLiveProviderRuntimeImplementation(deps) {
         const shell = task?.cloudConsciousnessLiveProviderCredentialValueLocalReadExecution ?? {};
         return isCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionTask(task)
           && task.status === "completed"
-          && shell.implementationStatus === "deferred_after_approval"
+          && (shell.implementationStatus === "deferred_after_approval"
+            || shell.implementationStatus === "credential_value_local_read_execution_final_readiness_preflight_recorded")
           && shell.credentialValueLocalReadExecutionTaskCreated === true
           && shell.credentialValueLocalReadExecutionTaskApproved === true
           && shell.credentialValueLocalReadExecutionDeferred === true
@@ -8475,6 +8506,199 @@ export function createCloudLiveProviderRuntimeImplementation(deps) {
       })
       .sort((a, b) => String(b.updatedAt ?? "").localeCompare(String(a.updatedAt ?? "")));
     return candidates[0]?.id ? getTaskById(candidates[0].id) ?? candidates[0] : null;
+  }
+
+  async function buildCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionFinalReadinessPreflight() {
+    const approvedDeferred = await buildCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionApprovedDeferred();
+    const task = findLatestApprovedDeferredCredentialValueLocalReadExecutionTask();
+    const shell = task?.cloudConsciousnessLiveProviderCredentialValueLocalReadExecution ?? {};
+    const preflight = {
+      registry: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CREDENTIAL_VALUE_LOCAL_READ_EXECUTION_FINAL_READINESS_PREFLIGHT_REGISTRY,
+      sourceRegistry: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CREDENTIAL_VALUE_LOCAL_READ_EXECUTION_APPROVED_DEFERRED_REGISTRY,
+      sourceTaskId: task?.id ?? null,
+      preflightState: shell.credentialValueLocalReadExecutionFinalReadinessPreflightRecorded === true ? "recorded_deferred" : "ready_to_record_deferred",
+      credentialReference: shell.credentialReference ?? "openclaw://credential/provider/live-provider-fixture",
+      credentialValueLocalReadExecutionFinalReadinessPreflightRecorded: shell.credentialValueLocalReadExecutionFinalReadinessPreflightRecorded === true,
+      credentialValueLocalReadExecutionTaskApproved: shell.credentialValueLocalReadExecutionTaskApproved === true,
+      credentialValueLocalReadExecutionDeferred: shell.credentialValueLocalReadExecutionDeferred === true,
+      credentialValueRead: false,
+      credentialValueIncluded: false,
+      credentialValueExposed: false,
+      providerCredentialRead: false,
+      endpointContacted: false,
+      networkEgress: false,
+      transmitsExternally: false,
+      liveProviderCallEnabled: false,
+    };
+    const checks = [
+      {
+        id: "phase-85-local-read-execution-approved-deferred-ready",
+        label: "Phase 85 approved-deferred credential value local read execution evidence is ready",
+        passed: approvedDeferred.summary?.ready === true
+          && approvedDeferred.summary?.approvedDeferredEvidenceFound === true
+          && Boolean(task),
+        evidence: task?.id ?? null,
+      },
+      {
+        id: "local-read-execution-approved-but-still-deferred",
+        label: "Credential value local read execution task is approved but remains deferred",
+        passed: shell.credentialValueLocalReadExecutionTaskApproved === true
+          && shell.credentialValueLocalReadExecutionDeferred === true,
+        evidence: shell.implementationStatus ?? null,
+      },
+      {
+        id: "credential-value-local-read-execution-final-readiness-preflight-state",
+        label: "Final credential value local read execution readiness preflight is local-only and does not read credentials",
+        passed: preflight.credentialValueRead === false
+          && preflight.credentialValueIncluded === false
+          && preflight.credentialValueExposed === false
+          && preflight.providerCredentialRead === false,
+        evidence: preflight.preflightState,
+      },
+      {
+        id: "no-endpoint-network-or-live-call",
+        label: "Local read execution final readiness preflight does not contact endpoints, transmit externally, or enable live provider calls",
+        passed: preflight.endpointContacted === false
+          && preflight.networkEgress === false
+          && preflight.transmitsExternally === false
+          && preflight.liveProviderCallEnabled === false,
+        evidence: "no_network_activity",
+      },
+    ];
+    const passed = checks.filter((check) => check.passed).length;
+    const ready = passed === checks.length;
+    return {
+      ok: true,
+      registry: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CREDENTIAL_VALUE_LOCAL_READ_EXECUTION_FINAL_READINESS_PREFLIGHT_REGISTRY,
+      mode: "phase_86_live_provider_credential_value_local_read_execution_final_readiness_preflight",
+      generatedAt: new Date().toISOString(),
+      status: ready ? "credential_value_local_read_execution_final_readiness_preflight_ready_deferred" : "waiting_for_phase_85_local_read_execution_approved_deferred",
+      governance: phase86Governance({
+        credentialValueLocalReadExecutionFinalReadinessPreflightRecorded: shell.credentialValueLocalReadExecutionFinalReadinessPreflightRecorded === true,
+      }),
+      preflight,
+      checks,
+      summary: {
+        ready,
+        complete: ready,
+        passed,
+        total: checks.length,
+        completionPercent: ready ? 100 : Math.round((passed / checks.length) * 100),
+        phase: "phase-86",
+        credentialValueLocalReadExecutionFinalReadinessPreflightRecorded: shell.credentialValueLocalReadExecutionFinalReadinessPreflightRecorded === true,
+        credentialValueLocalReadExecutionApprovedDeferredRequired: true,
+        credentialValueLocalReadExecutionApprovedDeferredFound: Boolean(task),
+        sourceTaskId: task?.id ?? null,
+        sourceRegistry: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CREDENTIAL_VALUE_LOCAL_READ_EXECUTION_APPROVED_DEFERRED_REGISTRY,
+        credentialValueLocalReadExecutionTaskCreated: shell.credentialValueLocalReadExecutionTaskCreated === true,
+        credentialValueLocalReadExecutionTaskApproved: shell.credentialValueLocalReadExecutionTaskApproved === true,
+        credentialValueLocalReadExecutionDeferred: shell.credentialValueLocalReadExecutionDeferred === true,
+        credentialValueIncluded: false,
+        credentialValueRead: false,
+        credentialValueExposed: false,
+        providerCredentialRead: false,
+        endpointNetworkEgressAuthorized: false,
+        endpointNetworkEgressDenied: true,
+        endpointContacted: false,
+        networkEgress: false,
+        providerResponseCreated: false,
+        rollbackExecuted: false,
+        rollbackCommandCreated: false,
+        hostMutation: false,
+        transmitsExternally: false,
+        liveProviderCallEnabled: false,
+        launchAuthorized: false,
+        launchExecuted: false,
+      },
+      evidence: {
+        approvedDeferred,
+        localReadExecutionTask: task ? serialiseTask(task) : null,
+      },
+      next: {
+        recommendedSlice: "openclaw-cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-route",
+        boundary: "actual credential value reads, endpoint contact, network egress, provider response creation, rollback execution, host mutation, and live provider calls remain separate future gates",
+      },
+    };
+  }
+
+  async function recordCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionFinalReadinessPreflight({ confirm = false } = {}) {
+    if (confirm !== true) {
+      throw new Error("Cloud consciousness live provider credential value local read execution final readiness preflight requires confirm=true.");
+    }
+
+    const preflight = await buildCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionFinalReadinessPreflight();
+    if (preflight.summary?.credentialValueLocalReadExecutionApprovedDeferredFound !== true) {
+      throw new Error("Cloud consciousness live provider credential value local read execution final readiness preflight requires Phase 85 approved deferred local read execution evidence.");
+    }
+
+    const task = findLatestApprovedDeferredCredentialValueLocalReadExecutionTask();
+    if (!task) {
+      throw new Error("Unable to locate approved deferred credential value local read execution task for final readiness preflight.");
+    }
+
+    const recordedAt = new Date().toISOString();
+    task.cloudConsciousnessLiveProviderCredentialValueLocalReadExecution = {
+      ...(task.cloudConsciousnessLiveProviderCredentialValueLocalReadExecution ?? {}),
+      implementationStatus: "credential_value_local_read_execution_final_readiness_preflight_recorded",
+      credentialValueLocalReadExecutionFinalReadinessPreflightRecorded: true,
+      credentialValueLocalReadExecutionFinalReadinessPreflightRegistry: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CREDENTIAL_VALUE_LOCAL_READ_EXECUTION_FINAL_READINESS_PREFLIGHT_REGISTRY,
+      credentialValueLocalReadExecutionFinalReadinessPreflightRecordedAt: recordedAt,
+      credentialValueLocalReadExecutionFinalReadinessPreflight: {
+        ...preflight.preflight,
+        preflightState: "recorded_deferred",
+        credentialValueLocalReadExecutionFinalReadinessPreflightRecorded: true,
+      },
+      credentialValueLocalReadExecutionTaskCreated: true,
+      credentialValueLocalReadExecutionTaskApproved: true,
+      credentialValueLocalReadExecutionDeferred: true,
+      credentialValueIncluded: false,
+      credentialValueRead: false,
+      credentialValueExposed: false,
+      providerCredentialRead: false,
+      endpointNetworkEgressAuthorized: false,
+      endpointNetworkEgressDenied: true,
+      endpointContacted: false,
+      networkEgress: false,
+      providerResponseCreated: false,
+      rollbackExecuted: false,
+      rollbackCommandCreated: false,
+      hostMutation: false,
+      transmitsExternally: false,
+      liveProviderCallEnabled: false,
+      launchAuthorized: false,
+      launchExecuted: false,
+    };
+    appendTaskPhase(task, "cloud_consciousness_live_provider_credential_value_local_read_execution_final_readiness_preflight", {
+      preflightRegistry: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CREDENTIAL_VALUE_LOCAL_READ_EXECUTION_FINAL_READINESS_PREFLIGHT_REGISTRY,
+      recordedAt,
+      sourcePhase: "cloud_consciousness_live_provider_credential_value_local_read_execution_task_shell_deferred",
+      preflight: {
+        ...preflight.preflight,
+        preflightState: "recorded_deferred",
+        credentialValueLocalReadExecutionFinalReadinessPreflightRecorded: true,
+      },
+      nextSlice: "openclaw-cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-route",
+      credentialValueLocalReadExecutionFinalReadinessPreflightRecorded: true,
+      credentialValueRead: false,
+      endpointContacted: false,
+      networkEgress: false,
+      liveProviderCallEnabled: false,
+    });
+    task.updatedAt = recordedAt;
+    reconcileRuntimeState();
+    persistState();
+    await publishEvent("task.phase_changed", { task: serialiseTask(task) });
+
+    return {
+      ok: true,
+      registry: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CREDENTIAL_VALUE_LOCAL_READ_EXECUTION_FINAL_READINESS_PREFLIGHT_REGISTRY,
+      mode: "phase_86_live_provider_credential_value_local_read_execution_final_readiness_preflight_recorded",
+      generatedAt: recordedAt,
+      status: "credential_value_local_read_execution_final_readiness_preflight_recorded_deferred",
+      task: serialiseTask(task),
+      preflight: await buildCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionFinalReadinessPreflight(),
+      governance: phase86Governance({ credentialValueLocalReadExecutionFinalReadinessPreflightRecorded: true }),
+    };
   }
 
   async function buildCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionApprovedDeferred() {
@@ -8492,7 +8716,8 @@ export function createCloudLiveProviderRuntimeImplementation(deps) {
       {
         id: "credential-value-local-read-execution-remains-deferred",
         label: "Approved credential value local read execution remains deferred",
-        passed: shell.implementationStatus === "deferred_after_approval"
+        passed: (shell.implementationStatus === "deferred_after_approval"
+            || shell.implementationStatus === "credential_value_local_read_execution_final_readiness_preflight_recorded")
           && shell.credentialValueLocalReadExecutionDeferred === true,
         evidence: task?.outcome?.details?.phase ?? null,
       },
@@ -9909,6 +10134,8 @@ export function createCloudLiveProviderRuntimeImplementation(deps) {
     isCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionTask,
     executeCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionTask,
     buildCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionApprovedDeferred,
+    buildCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionFinalReadinessPreflight,
+    recordCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionFinalReadinessPreflight,
     isCloudConsciousnessLiveProviderCredentialValueAccessAuthorizationTask,
     executeCloudConsciousnessLiveProviderCredentialValueAccessAuthorizationTask,
     isCloudConsciousnessLiveProviderCredentialValueReadTask,
