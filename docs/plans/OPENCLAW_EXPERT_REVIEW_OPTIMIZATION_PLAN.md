@@ -18,7 +18,7 @@ The expert review items are considered complete only when each item has code-lev
 | Duplicate policy/risk types C2 | Policy domain and risk literals were duplicated. | Complete | `packages/shared-types/src/policy.ts` is the single source for `OpenClawPolicyDomain`, `PolicyDomain`, and `OpenClawRisk`. |
 | Event schema duplication C2 | `OpenClawEvent<T>` and `EventSchema` described the same event payload contract independently. | Complete | `EventSchema<T>` reuses `OpenClawEvent<T>` payload typing from shared-types. |
 | Shared package engineering E3 | Shared packages lacked independent tsconfig/barrel/type declarations. | Complete | Shared package `tsconfig.json` files, barrel entries, and `shared-utils` declarations added. |
-| Unit tests E2 | No focused unit tests existed for shared packages or services. | Partial, core policy and service-client tests complete | Node built-in tests added for plugin runtime, shared-events, shared-utils, and `openclaw-core` policy evaluation/service-client behavior. Broader service-layer unit tests remain pending for task execution and route handler contract helpers. |
+| Unit tests E2 | No focused unit tests existed for shared packages or services. | Partial, core service-layer unit coverage expanded | Node built-in tests added for plugin runtime, shared-events, shared-utils, and `openclaw-core` policy evaluation, service-client behavior, task-executor read models, and route handler contract helpers. Broader task dispatch execution branches remain pending for later focused tests. |
 | Shared-client empty shell C5 | `shared-client` only exported tiny service constants. | Complete | `service-descriptors` now provides typed and runtime service ids, default ports, URL env vars, and resolver helpers; core and Observer consume the shared runtime descriptors for defaults. |
 | Shared-events identity helper C5 | `createEventName` was a no-op identity function. | Complete | Runtime and typed event factory validate names against `eventNames`; shared registry now covers existing maintenance, screen-act, command, body evidence, long-term memory, cloud-consciousness, and systemd repair publish events. |
 | Root package script redundancy E1/P2 | `package.json` had many hard-coded `dev:*check:unix` milestone scripts. | Complete | Root scripts reduced to one milestone runner plus stable lifecycle/smoke aliases; `dev-milestone-check.sh` accepts milestone names as npm args. |
@@ -78,6 +78,8 @@ The expert review items are considered complete only when each item has code-lev
 - `services/openclaw-core` now has a workspace `test` script using Node's built-in test runner.
 - `policy-evaluator.test.mjs` covers cross-boundary approval gating, body-internal audit-only decisions, absolute deny boundaries, audit log capping/counts, and task approval creation without starting dev services.
 - `service-client.test.mjs` covers JSON fetch/post behavior, error propagation, tolerant JSON file reads, and system-sense URL construction without starting dev services.
+- `task-executor.test.mjs` covers command transcript and filesystem read/change read models without starting dev services.
+- `route-handlers.test.mjs` covers executor-backed GET response contracts and body-evidence follow-up task-shell POST serialization without starting dev services.
 - `openclaw-core-service-unit-tests` runs the focused service-layer unit tests as a milestone.
 
 ## Shared Client Runtime Descriptor Evidence
@@ -107,6 +109,6 @@ The expert review items are considered complete only when each item has code-lev
 
 ## Next Expert Items After This Slice
 
-1. Add more service-layer unit tests for task execution and route handler contract helpers.
+1. Add focused service-layer unit tests for task dispatch execution branches as those branches are touched.
 2. Continue moving shared event names into additional publish call sites as those modules are touched.
 3. Broaden compatible core/Observer pair batching and multi-phase lane batching without weakening real service assertions.
