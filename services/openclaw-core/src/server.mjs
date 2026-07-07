@@ -3,6 +3,7 @@ import http from "node:http";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { corsHeaders, sendJson, readJsonBody, createEventPublisher, registerService } from "../../../packages/shared-utils/src/http.mjs";
+import { getOpenClawServicePort, getOpenClawServiceUrl } from "../../../packages/shared-client/src/service-descriptors.mjs";
 
 
 import { createRuntimeState } from "./runtime-state.mjs";
@@ -18,14 +19,14 @@ import { registerRoutes } from "./route-handlers.mjs";
 
 // configure state & client
 const host = process.env.OPENCLAW_CORE_HOST ?? "127.0.0.1";
-const port = Number.parseInt(process.env.OPENCLAW_CORE_PORT ?? "4100", 10);
-const eventHubUrl = process.env.OPENCLAW_EVENT_HUB_URL ?? "http://127.0.0.1:4101";
-const sessionManagerUrl = process.env.OPENCLAW_SESSION_MANAGER_URL ?? "http://127.0.0.1:4102";
-const browserRuntimeUrl = process.env.OPENCLAW_BROWSER_RUNTIME_URL ?? "http://127.0.0.1:4103";
-const screenSenseUrl = process.env.OPENCLAW_SCREEN_SENSE_URL ?? "http://127.0.0.1:4104";
-const screenActUrl = process.env.OPENCLAW_SCREEN_ACT_URL ?? "http://127.0.0.1:4105";
-const systemSenseUrl = process.env.OPENCLAW_SYSTEM_SENSE_URL ?? "http://127.0.0.1:4106";
-const systemHealUrl = process.env.OPENCLAW_SYSTEM_HEAL_URL ?? "http://127.0.0.1:4107";
+const port = getOpenClawServicePort("core");
+const eventHubUrl = getOpenClawServiceUrl("eventHub");
+const sessionManagerUrl = getOpenClawServiceUrl("sessionManager");
+const browserRuntimeUrl = getOpenClawServiceUrl("browserRuntime");
+const screenSenseUrl = getOpenClawServiceUrl("screenSense");
+const screenActUrl = getOpenClawServiceUrl("screenAct");
+const systemSenseUrl = getOpenClawServiceUrl("systemSense");
+const systemHealUrl = getOpenClawServiceUrl("systemHeal");
 const stateFilePath = process.env.OPENCLAW_CORE_STATE_FILE
   ?? path.resolve(process.cwd(), "../../.artifacts/openclaw-core-state.json");
 

@@ -5,16 +5,17 @@
   "type": "module",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
-      "default": "./dist/index.js"
+      "types": "./src/index.d.ts",
+      "default": "./src/index.mjs"
     },
     "./service-descriptors": {
-      "types": "./src/service-descriptors.ts",
-      "default": "./dist/service-descriptors.js"
+      "types": "./src/service-descriptors.d.ts",
+      "default": "./src/service-descriptors.mjs"
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "build": "npm run typecheck && npm test",
+    "typecheck": "tsc -p tsconfig.json --noEmit && node --check src/service-descriptors.mjs && node --check src/index.mjs",
+    "test": "node --test test/*.test.mjs"
   }
 }

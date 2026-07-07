@@ -27,6 +27,8 @@ node --check packages/shared-types/src/plugin-registry.mjs
 node --check packages/shared-events/src/event-factory.mjs
 node --check packages/shared-events/src/event-names.mjs
 node --check packages/shared-events/src/index.mjs
+node --check packages/shared-client/src/service-descriptors.mjs
+node --check packages/shared-client/src/index.mjs
 node --check packages/shared-utils/src/http.mjs
 node --check packages/shared-utils/src/persist.mjs
 
@@ -54,6 +56,7 @@ NODE
 
 node --test \
   packages/plugin-runtime/test/*.test.mjs \
+  packages/shared-client/test/*.test.mjs \
   packages/shared-events/test/*.test.mjs \
   packages/shared-utils/test/*.test.mjs
 

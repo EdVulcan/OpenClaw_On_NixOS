@@ -19,7 +19,7 @@ The expert review items are considered complete only when each item has code-lev
 | Event schema duplication C2 | `OpenClawEvent<T>` and `EventSchema` described the same event payload contract independently. | Complete | `EventSchema<T>` reuses `OpenClawEvent<T>` payload typing from shared-types. |
 | Shared package engineering E3 | Shared packages lacked independent tsconfig/barrel/type declarations. | Complete | Shared package `tsconfig.json` files, barrel entries, and `shared-utils` declarations added. |
 | Unit tests E2 | No focused unit tests existed for shared packages or services. | Partial, core policy service tests complete | Node built-in tests added for plugin runtime, shared-events, shared-utils, and `openclaw-core` policy evaluation. Broader service-layer unit tests remain pending for task execution, route handlers, and service clients. |
-| Shared-client empty shell C5 | `shared-client` only exported tiny service constants. | Complete | `service-descriptors.ts` provides typed service ids, default ports, and env var names while preserving old exports. |
+| Shared-client empty shell C5 | `shared-client` only exported tiny service constants. | Complete | `service-descriptors` now provides typed and runtime service ids, default ports, URL env vars, and resolver helpers; core and Observer consume the shared runtime descriptors for defaults. |
 | Shared-events identity helper C5 | `createEventName` was a no-op identity function. | Complete | Runtime and typed event factory now validate names against `eventNames`. |
 | Root package script redundancy E1/P2 | `package.json` had many hard-coded `dev:*check:unix` milestone scripts. | Complete | Root scripts reduced to one milestone runner plus stable lifecycle/smoke aliases; `dev-milestone-check.sh` accepts milestone names as npm args. |
 | Shell helper duplication E4 | `post_json()` was copied across many scripts. | Complete | 257 local definitions migrated to `dev-openclaw-http-json-helper.sh`; helper mode compatibility covered by `openclaw-http-json-helper`. |
@@ -72,8 +72,14 @@ The expert review items are considered complete only when each item has code-lev
 - `policy-evaluator.test.mjs` covers cross-boundary approval gating, body-internal audit-only decisions, absolute deny boundaries, audit log capping/counts, and task approval creation without starting dev services.
 - `openclaw-core-service-unit-tests` runs the focused service-layer unit tests as a milestone.
 
+## Shared Client Runtime Descriptor Evidence
+
+- `shared-client` now exposes runtime `.mjs` service descriptors plus `.d.ts` declarations and Node unit tests.
+- `openclaw-core` and `observer-ui` use shared descriptor helpers for service default ports and URLs while preserving the existing environment variable names.
+- `openclaw-shared-package-contracts` checks the shared-client runtime modules and tests.
+
 ## Next Expert Items After This Slice
 
 1. Broaden safe state reuse for heavy prerequisite chains beyond the existing live-provider result-envelope path.
 2. Add more service-layer unit tests for task execution, route handler contract helpers, and service clients.
-3. Move shared-client/shared-events descriptors into real service/Observer call sites where doing so reduces duplicated runtime contracts.
+3. Move shared-events names into real service/Observer publish call sites where doing so reduces duplicated event contracts.
