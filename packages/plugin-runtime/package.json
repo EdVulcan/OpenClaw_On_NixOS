@@ -1,0 +1,15 @@
+{
+  "name": "@openclaw/plugin-runtime",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    "./plugin-contract": "./src/plugin-contract.mjs",
+    "./plugin-registry": "./src/plugin-registry.mjs"
+  },
+  "scripts": {
+    "build": "npm run typecheck && npm test",
+    "typecheck": "node --check src/plugin-contract.mjs && node --check src/plugin-registry.mjs",
+    "test": "node --test test/*.test.mjs"
+  }
+}

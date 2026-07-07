@@ -1,4 +1,4 @@
-import type { OpenClawNativePluginContract } from "./plugin-contract";
+import type { OpenClawNativePluginContract } from "./plugin-contract.js";
 
 export type OpenClawNativePluginRegistryItem = {
   id: string;

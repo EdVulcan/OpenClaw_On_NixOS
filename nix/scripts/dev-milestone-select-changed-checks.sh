@@ -45,6 +45,7 @@ const entries = registryText.split(/\n/)
 const byScript = new Map(entries.map((entry) => [entry.script, entry]));
 const byName = new Map(entries.map((entry) => [entry.name, entry]));
 const selected = new Set();
+const sharedPackageContractsCheck = "openclaw-shared-package-contracts";
 const structurallyCoveredCommonChecks = [];
 const resultEnvelopeManifestCheck = "openclaw-live-provider-result-envelope-milestone-manifest";
 const resultEnvelopeScriptNeedle = "credential-value-local-read-execution-local-read-attempt-local-read-result-envelope";
@@ -291,6 +292,19 @@ for (const file of changedFiles) {
     selectName("milestone-registry");
     selectName("milestone-script-audit");
     selectName(resultEnvelopeManifestCheck);
+    continue;
+  }
+
+  if (file === "package.json"
+    || file === "tsconfig.base.json"
+    || file === "flake.nix"
+    || file.startsWith("packages/shared-types/")
+    || file.startsWith("packages/shared-events/")
+    || file.startsWith("packages/shared-client/")
+    || file.startsWith("packages/shared-utils/")
+    || file.startsWith("packages/plugin-runtime/")) {
+    selectName("milestone-registry");
+    selectName(sharedPackageContractsCheck);
     continue;
   }
 

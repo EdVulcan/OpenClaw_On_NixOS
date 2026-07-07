@@ -1,6 +1,6 @@
 export type TaskStatus = "queued" | "running" | "completed" | "failed" | "paused" | "superseded";
 
-export type PolicyDomain = "body_internal" | "user_task" | "cross_boundary";
+import type { OpenClawRisk, PolicyDomain } from "./policy.js";
 
 export type PolicyDecision = "allow" | "audit_only" | "require_approval" | "deny";
 
@@ -8,7 +8,7 @@ export type TaskPolicy = {
   decision: {
     engine: string;
     domain: PolicyDomain;
-    risk: "low" | "medium" | "high" | "critical";
+    risk: OpenClawRisk;
     decision: PolicyDecision;
     reason: string;
     approved: boolean;

@@ -9,7 +9,15 @@
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
+    "baseUrl": ".",
+    "paths": {
+      "@openclaw/shared-types": ["packages/shared-types/src/index.ts"],
+      "@openclaw/shared-types/*": ["packages/shared-types/src/*.ts"],
+      "@openclaw/shared-events": ["packages/shared-events/src/index.ts"],
+      "@openclaw/shared-events/*": ["packages/shared-events/src/*.ts"],
+      "@openclaw/shared-client": ["packages/shared-client/src/index.ts"],
+      "@openclaw/shared-client/*": ["packages/shared-client/src/*.ts"]
+    },
     "outDir": "dist"
   }
 }
-

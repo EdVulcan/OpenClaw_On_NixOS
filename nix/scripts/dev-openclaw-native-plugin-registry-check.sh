@@ -4,13 +4,13 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-node --check "$REPO_ROOT/packages/shared-types/src/plugin-registry.mjs" >/dev/null
+node --check "$REPO_ROOT/packages/plugin-runtime/src/plugin-registry.mjs" >/dev/null
 
 node --input-type=module - <<'EOF' "$REPO_ROOT"
 import { pathToFileURL } from "node:url";
 
 const repoRoot = process.argv[2];
-const registryModuleUrl = pathToFileURL(`${repoRoot}/packages/shared-types/src/plugin-registry.mjs`).href;
+const registryModuleUrl = pathToFileURL(`${repoRoot}/packages/plugin-runtime/src/plugin-registry.mjs`).href;
 const {
   OPENCLAW_NATIVE_PLUGIN_ACTIVATION_MODE,
   OPENCLAW_NATIVE_PLUGIN_REGISTRY_VERSION,

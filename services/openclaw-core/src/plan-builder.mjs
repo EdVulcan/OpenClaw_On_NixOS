@@ -1,4 +1,4 @@
-import { createOpenClawNativePluginRegistry } from "../../../packages/shared-types/src/plugin-registry.mjs";
+import { createOpenClawNativePluginRegistry } from "../../../packages/plugin-runtime/src/plugin-registry.mjs";
 import { createCloudLiveProviderRuntimeImplementation } from "./cloud-live-provider-runtime-implementation.mjs";
 import { createHash, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";

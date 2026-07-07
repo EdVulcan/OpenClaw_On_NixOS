@@ -1,4 +1,3 @@
-export const coreClient = {
-  service: "openclaw-core",
-};
+import { openClawServiceDescriptors } from "./service-descriptors.js";
 
+export const coreClient = openClawServiceDescriptors.core;

@@ -25,6 +25,7 @@
           nodejs
           git
           nixpkgs-fmt
+          typescript
         ];
       };
     };

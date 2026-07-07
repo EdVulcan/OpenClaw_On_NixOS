@@ -2,12 +2,12 @@ import {
   OPENCLAW_NATIVE_PLUGIN_CONTRACT_VERSION,
   summariseOpenClawNativePluginContract,
   validateOpenClawNativePluginContract,
-} from "../../../packages/shared-types/src/plugin-contract.mjs";
+} from "../../../packages/plugin-runtime/src/plugin-contract.mjs";
 import {
   createOpenClawNativePluginRegistry,
   summariseOpenClawNativePluginRegistry,
   validateOpenClawNativePluginRegistry,
-} from "../../../packages/shared-types/src/plugin-registry.mjs";
+} from "../../../packages/plugin-runtime/src/plugin-registry.mjs";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { createHash, randomUUID } from "node:crypto";
 import path from "node:path";

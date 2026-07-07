@@ -3,9 +3,29 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.mjs"
+    },
+    "./event-factory": {
+      "types": "./src/event-factory.ts",
+      "default": "./src/event-factory.mjs"
+    },
+    "./event-names": {
+      "types": "./src/event-names.ts",
+      "default": "./src/event-names.mjs"
+    },
+    "./event-schema": {
+      "types": "./src/event-schema.ts"
+    }
+  },
+  "dependencies": {
+    "@openclaw/shared-types": "workspace:*"
+  },
   "scripts": {
-    "build": "node -e \"console.log('shared-events build placeholder')\"",
-    "typecheck": "node -e \"console.log('shared-events typecheck placeholder')\""
+    "build": "npm run typecheck && node --check src/event-factory.mjs && node --check src/event-names.mjs && node --check src/index.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test test/*.test.mjs"
   }
 }
-

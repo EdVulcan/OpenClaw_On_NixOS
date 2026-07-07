@@ -4,6 +4,18 @@
   "version": "0.1.0",
   "type": "module",
   "exports": {
+    ".": {
+      "types": "./src/index.ts"
+    },
+    "./api": {
+      "types": "./src/api.ts"
+    },
+    "./events": {
+      "types": "./src/events.ts"
+    },
+    "./policy": {
+      "types": "./src/policy.ts"
+    },
     "./plugin-contract": {
       "types": "./src/plugin-contract.ts",
       "default": "./src/plugin-contract.mjs"
@@ -11,10 +23,22 @@
     "./plugin-registry": {
       "types": "./src/plugin-registry.ts",
       "default": "./src/plugin-registry.mjs"
+    },
+    "./screen": {
+      "types": "./src/screen.ts"
+    },
+    "./session": {
+      "types": "./src/session.ts"
+    },
+    "./system": {
+      "types": "./src/system.ts"
+    },
+    "./task": {
+      "types": "./src/task.ts"
     }
   },
   "scripts": {
-    "build": "node -e \"console.log('shared-types build placeholder')\"",
-    "typecheck": "node --check src/plugin-contract.mjs && node --check src/plugin-registry.mjs"
+    "build": "npm run typecheck",
+    "typecheck": "tsc -p tsconfig.json --noEmit && node --check src/plugin-contract.mjs && node --check src/plugin-registry.mjs"
   }
 }

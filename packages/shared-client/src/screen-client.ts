@@ -1,4 +1,3 @@
-export const screenClient = {
-  service: "openclaw-screen-sense",
-};
+import { openClawServiceDescriptors } from "./service-descriptors.js";
 
+export const screenClient = openClawServiceDescriptors.screenSense;

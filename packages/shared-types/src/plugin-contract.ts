@@ -1,6 +1,5 @@
-export type OpenClawRisk = "low" | "medium" | "high" | "critical";
-
-export type OpenClawPolicyDomain = "body_internal" | "user_task" | "cross_boundary";
+import type { OpenClawPolicyDomain, OpenClawRisk } from "./policy.js";
+export type { OpenClawPolicyDomain, OpenClawRisk } from "./policy.js";
 
 export type OpenClawCapabilityKind =
   | "sense"

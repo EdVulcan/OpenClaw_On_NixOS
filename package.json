@@ -11,6 +11,7 @@
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
     "dev:up": "powershell -ExecutionPolicy Bypass -File .\\nix\\scripts\\dev-up.ps1",
     "dev:up:unix": "bash ./nix/scripts/dev-up.sh",
     "dev:check": "powershell -ExecutionPolicy Bypass -File .\\nix\\scripts\\dev-check.ps1",

@@ -1,4 +1,3 @@
-export const eventHubClient = {
-  service: "openclaw-event-hub",
-};
+import { openClawServiceDescriptors } from "./service-descriptors.js";
 
+export const eventHubClient = openClawServiceDescriptors.eventHub;

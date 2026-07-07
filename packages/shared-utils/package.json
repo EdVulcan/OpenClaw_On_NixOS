@@ -4,7 +4,21 @@
   "version": "0.1.0",
   "type": "module",
   "exports": {
-    "./http": "./src/http.mjs",
-    "./persist": "./src/persist.mjs"
+    ".": {
+      "types": "./src/index.d.ts"
+    },
+    "./http": {
+      "types": "./src/http.d.ts",
+      "default": "./src/http.mjs"
+    },
+    "./persist": {
+      "types": "./src/persist.d.ts",
+      "default": "./src/persist.mjs"
+    }
+  },
+  "scripts": {
+    "build": "npm run typecheck && npm test",
+    "typecheck": "tsc -p tsconfig.json --noEmit && node --check src/http.mjs && node --check src/persist.mjs",
+    "test": "node --test test/*.test.mjs"
   }
 }
