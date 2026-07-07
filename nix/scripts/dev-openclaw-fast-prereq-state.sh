@@ -13,12 +13,17 @@ openclaw_reuse_prereq_state() {
     return 1
   fi
 
-  if [[ ! -f "$source_core_state" ]]; then
-    echo "Fast prerequisite state for $prereq_name not found: $source_core_state" >&2
+  local validation_state="$source_core_state"
+  if [[ -z "$validation_state" ]]; then
+    validation_state="$source_system_heal_state"
+  fi
+
+  if [[ -z "$validation_state" || ! -f "$validation_state" ]]; then
+    echo "Fast prerequisite state for $prereq_name not found: ${validation_state:-<none>}" >&2
     return 1
   fi
 
-  if ! node - <<'EOF' "$source_core_state" "$expected_registry" "$expected_marker" "$prereq_name"; then
+  if ! node - <<'EOF' "$validation_state" "$expected_registry" "$expected_marker" "$prereq_name"; then
 const fs = require("node:fs");
 const [stateFile, expectedRegistry, expectedMarker, prereqName] = process.argv.slice(2);
 const raw = fs.readFileSync(stateFile, "utf8");
@@ -33,9 +38,11 @@ EOF
     return 1
   fi
 
-  mkdir -p "$(dirname "$target_core_state")"
-  cp "$source_core_state" "$target_core_state"
-  rm -f "$target_core_state.tmp"
+  if [[ -n "$source_core_state" && -f "$source_core_state" && -n "$target_core_state" ]]; then
+    mkdir -p "$(dirname "$target_core_state")"
+    cp "$source_core_state" "$target_core_state"
+    rm -f "$target_core_state.tmp"
+  fi
 
   if [[ -n "$source_system_heal_state" && -f "$source_system_heal_state" && -n "$target_system_heal_state" ]]; then
     mkdir -p "$(dirname "$target_system_heal_state")"
@@ -43,6 +50,6 @@ EOF
     rm -f "$target_system_heal_state.tmp"
   fi
 
-  echo "Reused fast prerequisite state for $prereq_name from $source_core_state"
+  echo "Reused fast prerequisite state for $prereq_name from $validation_state"
   return 0
 }

@@ -16,12 +16,27 @@ export OPENCLAW_SYSTEM_HEAL_STATE_FILE="${OPENCLAW_SYSTEM_HEAL_STATE_FILE:-$REPO
 CORE_URL="http://127.0.0.1:$OPENCLAW_CORE_PORT"
 HEAL_URL="http://127.0.0.1:$OPENCLAW_SYSTEM_HEAL_PORT"
 . "$SCRIPT_DIR/dev-phase-4-prereqs.sh"
+if [[ -f "$SCRIPT_DIR/dev-openclaw-phase4-prereq-state.sh" ]]; then
+  # shellcheck source=/dev/null
+  source "$SCRIPT_DIR/dev-openclaw-phase4-prereq-state.sh"
+fi
 "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 rm -f "$OPENCLAW_CORE_STATE_FILE" "$OPENCLAW_CORE_STATE_FILE.tmp" "$OPENCLAW_SYSTEM_HEAL_STATE_FILE" "$OPENCLAW_SYSTEM_HEAL_STATE_FILE.tmp"
+PHASE4_FAST_PREREQ_REUSED=false
+if declare -F openclaw_phase4_prepare_system_heal_prereq_state >/dev/null \
+  && openclaw_phase4_prepare_system_heal_prereq_state "$SCRIPT_DIR" "$REPO_ROOT" "$OPENCLAW_SYSTEM_HEAL_STATE_FILE"; then
+  PHASE4_FAST_PREREQ_REUSED=true
+fi
 cleanup() { rm -f "${CONTEXT_FILE:-}"; "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true; }
 trap cleanup EXIT
 "$SCRIPT_DIR/dev-up.sh"
-prepare_phase_4_self_heal_evidence "$HEAL_URL"
+if [[ "$PHASE4_FAST_PREREQ_REUSED" != "true" ]]; then
+  if [[ "${OPENCLAW_PHASE4_FAST_PREREQ_REQUIRED:-false}" == "true" ]]; then
+    echo "Phase 4 fast prerequisite state was required but not reused." >&2
+    exit 1
+  fi
+  prepare_phase_4_self_heal_evidence "$HEAL_URL"
+fi
 CONTEXT_FILE="$(mktemp)"
 curl --silent --fail "$CORE_URL/phase-6/consciousness-context-envelope" > "$CONTEXT_FILE"
 node - <<'EOF' "$CONTEXT_FILE"
