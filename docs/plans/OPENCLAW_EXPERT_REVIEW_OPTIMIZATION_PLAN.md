@@ -25,7 +25,7 @@ The expert review items are considered complete only when each item has code-lev
 | Shell helper duplication E4 | `post_json()` was copied across many scripts. | Complete | 257 local definitions migrated to `dev-openclaw-http-json-helper.sh`; helper mode compatibility covered by `openclaw-http-json-helper`. |
 | Observer mirror test duplication T2 | Observer checks duplicate core setup. | Partial, reusable pair runner complete | Result-envelope batch milestone covers core and Observer in one live service lifecycle; `dev-openclaw-core-observer-pair-runner.sh` lets compatible core/Observer pairs reuse one service lifecycle while preserving real Observer HTML/client checks. Legacy standalone Observer scripts remain for compatibility. |
 | Fixed sleeps T4 | Scripts use fixed sleeps instead of polling. | Complete | `dev-openclaw-wait-helper.sh` replaces fixed numeric sleeps with bounded polling; audit has no `sleep N` matches under `nix/scripts`; `openclaw-wait-helper` and `@changed` passed. |
-| State reuse P1/T5 | Heavy prerequisite chains are replayed. | Partial, Phase 4 and result-envelope reuse complete | Fast prerequisite helper exists for live-provider result-envelope chain; Phase 4 system-heal prerequisite state can now be reused by downstream Phase 6 checks in explicit fast mode. Broader body-evidence/common prerequisite migration remains pending. |
+| State reuse P1/T5 | Heavy prerequisite chains are replayed. | Partial, Phase 4/body-evidence/result-envelope reuse complete | Fast prerequisite helper exists for live-provider result-envelope chain; Phase 4 system-heal prerequisite state can be reused by downstream Phase 6 checks; body-evidence demo-status core state and ledger JSONL can be reused by follow-up readiness in explicit fast mode. Broader common prerequisite migration remains pending. |
 
 ## Current Slice Exit Evidence
 
@@ -98,8 +98,14 @@ The expert review items are considered complete only when each item has code-lev
 - `dev-openclaw-phase-6-consciousness-context-envelope-check.sh` can consume the reused Phase 4 state before service startup, then run the real Phase 6 endpoint check without replaying maintenance setup.
 - `openclaw-phase4-fast-prereq-state` is a self-contained milestone that creates the Phase 4 source artifact if needed and then requires fast reuse for the Phase 6 proof.
 
+## Body Evidence Fast Prerequisite Evidence
+
+- `dev-openclaw-body-evidence-fast-prereq-state.sh` reuses validated body-evidence demo-status core state plus the matching one-line bootstrap ledger JSONL only when `OPENCLAW_MILESTONE_PREREQ_MODE=fast`.
+- `dev-openclaw-body-evidence-ledger-followup-record-readiness-check.sh` can consume the reused body-evidence state before service startup, then run the real follow-up task and readiness assertions.
+- `openclaw-body-evidence-fast-prereq-state` creates the source demo-status evidence if needed and then requires fast reuse for the follow-up readiness proof.
+
 ## Next Expert Items After This Slice
 
-1. Extend body-evidence prerequisite reuse for checks that repeatedly bootstrap next-repair and ledger demo state.
+1. Extend body-evidence prerequisite reuse to the remaining follow-up task/append route checks that repeat the same demo-status bootstrap.
 2. Add more service-layer unit tests for task execution and route handler contract helpers.
 3. Continue moving shared event names into additional publish call sites as those modules are touched.

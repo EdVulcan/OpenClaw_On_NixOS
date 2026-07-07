@@ -441,6 +441,12 @@ for (const file of changedFiles) {
       selectName("openclaw-live-provider-result-envelope-batch-reuse");
       continue;
     }
+    if (scriptBasename === "dev-openclaw-body-evidence-fast-prereq-state.sh"
+      || scriptBasename === "dev-openclaw-body-evidence-fast-prereq-state-check.sh"
+      || scriptBasename === "dev-openclaw-body-evidence-ledger-followup-record-readiness-check.sh") {
+      selectName("openclaw-body-evidence-fast-prereq-state");
+      continue;
+    }
     if (scriptBasename === "dev-up.sh" || scriptBasename === "dev-down.sh") {
       selectName("openclaw-service-lifecycle-scope");
       selectName("openclaw-live-provider-result-envelope-batch-reuse");
