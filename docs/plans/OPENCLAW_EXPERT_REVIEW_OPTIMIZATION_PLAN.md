@@ -22,7 +22,7 @@ The expert review items are considered complete only when each item has code-lev
 | Shared-client empty shell C5 | `shared-client` only exported tiny service constants. | Complete | `service-descriptors.ts` provides typed service ids, default ports, and env var names while preserving old exports. |
 | Shared-events identity helper C5 | `createEventName` was a no-op identity function. | Complete | Runtime and typed event factory now validate names against `eventNames`. |
 | Root package script redundancy E1/P2 | `package.json` had many hard-coded `dev:*check:unix` milestone scripts. | Complete | Root scripts reduced to one milestone runner plus stable lifecycle/smoke aliases; `dev-milestone-check.sh` accepts milestone names as npm args. |
-| Shell helper duplication E4 | `post_json()` is copied across many scripts. | Pending | Add shared shell helper and migrate representative lanes before broad rewrite. |
+| Shell helper duplication E4 | `post_json()` was copied across many scripts. | Complete | 257 local definitions migrated to `dev-openclaw-http-json-helper.sh`; helper mode compatibility covered by `openclaw-http-json-helper`. |
 | Observer mirror test duplication T2 | Observer checks duplicate core setup. | Partial | Result-envelope batch milestone covers core and Observer in one live service lifecycle; broader migration pending. |
 | Fixed sleeps T4 | Scripts use fixed sleeps instead of polling. | Pending | Audit complete; high-impact waits still need helper-based migration. |
 | State reuse P1/T5 | Heavy prerequisite chains are replayed. | Partial | Fast prerequisite helper exists for live-provider result-envelope chain; broader coverage pending. |
@@ -43,6 +43,14 @@ The expert review items are considered complete only when each item has code-lev
 - `npm run dev:milestone-check:unix -- openclaw-shared-package-contracts` passed, proving argument-based milestone selection.
 - `OPENCLAW_MILESTONE_CHECKS=@changed bash nix/scripts/dev-milestone-check.sh` passed and selected only static/shared checks for the script reduction slice.
 - `npm run typecheck --workspaces --if-present`, `npm run build --workspaces --if-present`, `npm run test --workspaces --if-present`, and `git diff --check` passed.
+
+## Shell HTTP Helper Evidence
+
+- Local `post_json()` helper definitions reduced to the single shared definition in `nix/scripts/dev-openclaw-http-json-helper.sh`.
+- The helper preserves default fail, `-d`, no-fail, fail-with-body, and file upload modes through explicit per-script configuration.
+- `OPENCLAW_MILESTONE_CHECKS=openclaw-http-json-helper bash nix/scripts/dev-milestone-check.sh` passed.
+- `OPENCLAW_MILESTONE_CHECKS=@changed bash nix/scripts/dev-milestone-check.sh` passed and selected `task-workbench` as the representative real service check for the mechanical extraction.
+- `bash -n` passed for all changed shell scripts.
 
 ## Next Expert Items After This Slice
 

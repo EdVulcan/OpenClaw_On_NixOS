@@ -12,11 +12,9 @@ RESULT_ENVELOPE_CREATION_TASK_REGISTRY="openclaw-cloud-consciousness-live-provid
 PHASE102_CORE_STATE="$REPO_ROOT/.artifacts/openclaw-core-phase-102-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-final-readiness-preflight-check.json"
 PHASE102_SYSTEM_HEAL_STATE="$REPO_ROOT/.artifacts/openclaw-system-heal-phase-102-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-final-readiness-preflight-check.json"
 
-post_json() {
-  local url="$1"
-  local payload="$2"
-  curl --silent --fail -X POST "$url" -H 'content-type: application/json' --data "$payload"
-}
+# shellcheck source=/dev/null
+source "$SCRIPT_DIR/dev-openclaw-http-json-helper.sh"
+
 
 cleanup() {
   rm -f "${HTML_FILE:-}" "${CLIENT_FILE:-}" "${TASK_FILE:-}" "${APPROVED_FILE:-}" "${STEP_FILE:-}"

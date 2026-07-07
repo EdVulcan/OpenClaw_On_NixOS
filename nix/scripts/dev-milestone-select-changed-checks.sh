@@ -47,6 +47,7 @@ const byName = new Map(entries.map((entry) => [entry.name, entry]));
 const selected = new Set();
 const sharedPackageContractsCheck = "openclaw-shared-package-contracts";
 const structurallyCoveredCommonChecks = [];
+const httpJsonHelperCheck = "openclaw-http-json-helper";
 const resultEnvelopeManifestCheck = "openclaw-live-provider-result-envelope-milestone-manifest";
 const resultEnvelopeScriptNeedle = "credential-value-local-read-execution-local-read-attempt-local-read-result-envelope";
 const resultEnvelopeCommonEnvHelper = "dev-openclaw-live-provider-result-envelope-common-env.sh";
@@ -231,6 +232,44 @@ function isResultEnvelopeRouteExtractionOnly(file) {
   });
 }
 
+function isAllowedHttpJsonHelperExtractionAddition(text) {
+  return text === ""
+    || /^OPENCLAW_POST_JSON_FAILURE="(allow|fail-with-body)"$/.test(text)
+    || /^OPENCLAW_POST_JSON_PAYLOAD_MODE="file"$/.test(text)
+    || /^OPENCLAW_POST_JSON_DATA_FLAG="-d"$/.test(text)
+    || text === "# shellcheck source=/dev/null"
+    || text === 'source "$SCRIPT_DIR/dev-openclaw-http-json-helper.sh"';
+}
+
+function isAllowedHttpJsonHelperExtractionRemoval(text) {
+  return text === ""
+    || text === "post_json() {"
+    || /^  local (url|body|payload|file)="\$[12]"$/.test(text)
+    || /^  curl --silent( --show-error)?( --fail| --fail-with-body)? -X POST "\$(url|1)" -H ['"]content-type: application\/json['"] (-(d)|--data) "\$(body|payload|2)"$/.test(text)
+    || /^  curl --silent( --fail)? -H "content-type: application\/json" -d "\$payload" "\$url"$/.test(text)
+    || /^  curl --silent( --fail)? -X POST "\$(url|1)" -H ['"]content-type: application\/json['"] --data-binary "@\$(file|2)"$/.test(text)
+    || text === "}";
+}
+
+function isHttpJsonHelperExtractionOnly(file) {
+  if (!file.startsWith("nix/scripts/") || path.basename(file) === "dev-openclaw-http-json-helper.sh") {
+    return false;
+  }
+
+  const fullPath = path.join(process.cwd(), file);
+  if (!fs.existsSync(fullPath)) return false;
+  const currentText = fs.readFileSync(fullPath, "utf8");
+  if (!currentText.includes("dev-openclaw-http-json-helper.sh")) return false;
+
+  const changedLines = readDiffChangedLines(file);
+  if (!changedLines || changedLines.length === 0) return false;
+  return changedLines.every(({ op, text }) => {
+    if (op === "+") return isAllowedHttpJsonHelperExtractionAddition(text);
+    if (op === "-") return isAllowedHttpJsonHelperExtractionRemoval(text);
+    return false;
+  });
+}
+
 function selectPhasePlanChecks(file) {
   const match = /docs\/plans\/OPENCLAW_PHASE_(\d+)_PLAN\.md$/.exec(file);
   if (!match) return;
@@ -277,6 +316,13 @@ function selectSourceHeuristics(file) {
 }
 
 for (const file of changedFiles) {
+  if (isHttpJsonHelperExtractionOnly(file)) {
+    selectName("milestone-script-audit");
+    selectName(httpJsonHelperCheck);
+    selectName("task-workbench");
+    continue;
+  }
+
   if (isResultEnvelopeRouteExtractionOnly(file)) {
     selectName("openclaw-live-provider-result-envelope-batch-reuse");
     continue;
@@ -311,6 +357,12 @@ for (const file of changedFiles) {
   if (file.startsWith("nix/scripts/")) {
     const scriptBasename = path.basename(file);
     selectName("milestone-script-audit");
+    if (scriptBasename === "dev-openclaw-http-json-helper.sh"
+      || scriptBasename === "dev-openclaw-http-json-helper-check.sh") {
+      selectName(httpJsonHelperCheck);
+      selectName("task-workbench");
+      continue;
+    }
     if (scriptBasename === "dev-up.sh" || scriptBasename === "dev-down.sh") {
       selectName("openclaw-service-lifecycle-scope");
       selectName("openclaw-live-provider-result-envelope-batch-reuse");

@@ -27,11 +27,11 @@ cleanup() {
 }
 trap cleanup EXIT
 
-post_json() {
-  local url="$1"
-  local file="$2"
-  curl --silent -X POST "$url" -H 'content-type: application/json' --data-binary "@$file"
-}
+OPENCLAW_POST_JSON_FAILURE="allow"
+OPENCLAW_POST_JSON_PAYLOAD_MODE="file"
+# shellcheck source=/dev/null
+source "$SCRIPT_DIR/dev-openclaw-http-json-helper.sh"
+
 
 "$SCRIPT_DIR/dev-up.sh"
 

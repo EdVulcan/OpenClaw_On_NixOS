@@ -35,11 +35,9 @@ trap cleanup EXIT
 
 "$SCRIPT_DIR/dev-up.sh"
 
-post_json() {
-  local url="$1"
-  local payload="$2"
-  curl --silent --fail -X POST "$url" -H 'content-type: application/json' --data "$payload"
-}
+# shellcheck source=/dev/null
+source "$SCRIPT_DIR/dev-openclaw-http-json-helper.sh"
+
 
 created_next_repair="$(post_json "$CORE_URL/system/systemd/next-repair-tasks" '{"confirm":true,"execute":true}')"
 next_repair_approval_id="$(node -e 'const data = JSON.parse(process.argv[1]); process.stdout.write(data.approval.id)' "$created_next_repair")"

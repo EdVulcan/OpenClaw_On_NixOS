@@ -42,11 +42,11 @@ json_value() {
   node -e "$script" "$json"
 }
 
-post_json() {
-  local url="$1"
-  local body="$2"
-  curl --silent -X POST "$url" -H 'content-type: application/json' -d "$body"
-}
+OPENCLAW_POST_JSON_FAILURE="allow"
+OPENCLAW_POST_JSON_DATA_FLAG="-d"
+# shellcheck source=/dev/null
+source "$SCRIPT_DIR/dev-openclaw-http-json-helper.sh"
+
 
 launch_task_into_work_view() {
   local task_id="$1"

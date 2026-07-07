@@ -17,11 +17,9 @@ if [[ -f "$SCRIPT_DIR/dev-openclaw-service-reuse.sh" ]]; then
   source "$SCRIPT_DIR/dev-openclaw-service-reuse.sh"
 fi
 
-post_json() {
-  local url="$1"
-  local payload="$2"
-  curl --silent --fail -X POST "$url" -H 'content-type: application/json' --data "$payload"
-}
+# shellcheck source=/dev/null
+source "$SCRIPT_DIR/dev-openclaw-http-json-helper.sh"
+
 
 cleanup() {
   rm -f "${HTML_FILE:-}" "${CLIENT_FILE:-}" "${ROUTE_FILE:-}" "${TASK_FILE:-}" "${APPROVED_FILE:-}" "${STEP_FILE:-}"

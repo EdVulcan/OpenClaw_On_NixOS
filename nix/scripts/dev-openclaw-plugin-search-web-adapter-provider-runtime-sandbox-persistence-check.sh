@@ -25,9 +25,10 @@ export OPENCLAW_EVENT_LOG_FILE="${OPENCLAW_EVENT_LOG_FILE:-$REPO_ROOT/.artifacts
 
 CORE_URL="http://127.0.0.1:$OPENCLAW_CORE_PORT"
 
-post_json() {
-  curl --silent --fail -X POST "$1" -H 'content-type: application/json' -d "$2"
-}
+OPENCLAW_POST_JSON_DATA_FLAG="-d"
+# shellcheck source=/dev/null
+source "$SCRIPT_DIR/dev-openclaw-http-json-helper.sh"
+
 
 "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 rm -rf "$FIXTURE_DIR"

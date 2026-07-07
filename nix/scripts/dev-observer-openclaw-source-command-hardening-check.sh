@@ -81,9 +81,10 @@ cleanup() {
 }
 trap cleanup EXIT
 
-post_json() {
-  curl --silent --fail -X POST "$1" -H 'content-type: application/json' -d "$2"
-}
+OPENCLAW_POST_JSON_DATA_FLAG="-d"
+# shellcheck source=/dev/null
+source "$SCRIPT_DIR/dev-openclaw-http-json-helper.sh"
+
 
 post_json_status() {
   curl --silent --output "$3" --write-out "%{http_code}" -X POST "$1" -H 'content-type: application/json' -d "$2"

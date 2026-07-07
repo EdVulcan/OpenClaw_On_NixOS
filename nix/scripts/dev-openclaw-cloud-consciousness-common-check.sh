@@ -27,11 +27,9 @@ HEAL_URL="http://127.0.0.1:$OPENCLAW_SYSTEM_HEAL_PORT"
 OBSERVER_URL="http://127.0.0.1:$OBSERVER_UI_PORT"
 . "$SCRIPT_DIR/dev-phase-4-prereqs.sh"
 
-post_json() {
-  local url="$1"
-  local payload="$2"
-  curl --silent --fail -X POST "$url" -H 'content-type: application/json' --data "$payload"
-}
+# shellcheck source=/dev/null
+source "$SCRIPT_DIR/dev-openclaw-http-json-helper.sh"
+
 
 reset_cloud_handoff_file() {
   rm -f "$CLOUD_HANDOFF_FILE"

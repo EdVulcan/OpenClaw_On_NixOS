@@ -27,11 +27,9 @@ LOCAL_READ_TASK_REGISTRY="openclaw-cloud-consciousness-live-provider-credential-
 PHASE97_CORE_STATE="$REPO_ROOT/.artifacts/openclaw-core-phase-97-credential-value-local-read-execution-local-read-attempt-local-read-approved-deferred-check.json"
 PHASE97_SYSTEM_HEAL_STATE="$REPO_ROOT/.artifacts/openclaw-system-heal-phase-97-credential-value-local-read-execution-local-read-attempt-local-read-approved-deferred-check.json"
 
-post_json() {
-  local url="$1"
-  local payload="$2"
-  curl --silent --fail -X POST "$url" -H 'content-type: application/json' --data "$payload"
-}
+# shellcheck source=/dev/null
+source "$SCRIPT_DIR/dev-openclaw-http-json-helper.sh"
+
 
 cleanup() {
   rm -f "${HTML_FILE:-}" "${CLIENT_FILE:-}" "${BEFORE_FILE:-}" "${RECORD_FILE:-}" "${AFTER_FILE:-}"

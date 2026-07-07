@@ -63,11 +63,10 @@ cat > "$PLUGIN_SDK_DIR/src/index.ts" <<'TS'
 export const OBSERVER_RUNTIME_ADAPTER_DENIAL_RECOVERY_SDK_SECRET_SOURCE_CONTENT = "must-not-leak";
 TS
 
-post_json() {
-  local url="$1"
-  local payload="$2"
-  curl --silent --fail -H "content-type: application/json" -d "$payload" "$url"
-}
+OPENCLAW_POST_JSON_DATA_FLAG="-d"
+# shellcheck source=/dev/null
+source "$SCRIPT_DIR/dev-openclaw-http-json-helper.sh"
+
 
 cleanup() {
   rm -f "${HTML_FILE:-}" "${CLIENT_FILE:-}" "${TASK_FILE:-}" "${BLOCKED_FILE:-}" "${DENIED_FILE:-}" "${RECOVERED_FILE:-}" "${RECOVERED_BLOCKED_FILE:-}" "${APPROVED_FILE:-}" "${DEFERRED_FILE:-}" "${TASKS_FILE:-}" "${APPROVALS_FILE:-}" "${HISTORY_FILE:-}"
