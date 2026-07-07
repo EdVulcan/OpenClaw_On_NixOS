@@ -62,6 +62,8 @@ Audit sources used for this revision:
     registry and verify the repeated common-check registry inputs.
 11. Extended the same manifest check to derive and verify the repeated
     route/approved/final-readiness/task-shell status markers in common checks.
+12. Extended the manifest check to derive and verify the repeated Phase 99-116
+    core/system-heal state artifact filenames in common checks.
 
 These slices reduced live-provider runtime and milestone orchestration coupling
 while preserving the public runtime API and existing milestone entry names.

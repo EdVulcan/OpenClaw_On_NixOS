@@ -61,6 +61,18 @@ function markerBaseForSlug(slug) {
     .replace(/-/g, "_");
 }
 
+function artifactSuffixForSlug(slug) {
+  return slug.replace(/^openclaw-cloud-consciousness-live-provider-/, "");
+}
+
+function stateArtifactFilenamesForMilestone(milestone) {
+  const suffix = artifactSuffixForSlug(milestone.slug);
+  return [
+    `openclaw-core-phase-${milestone.phase}-${suffix}-check.json`,
+    `openclaw-system-heal-phase-${milestone.phase}-${suffix}-check.json`,
+  ];
+}
+
 function primaryStatusMarkersForSlug(slug) {
   const base = markerBaseForSlug(slug);
   if (slug.endsWith("-task-shell")) {
@@ -126,6 +138,7 @@ for (const [index, milestone] of milestones.entries()) {
   const observerScript = `dev-observer-${milestone.slug}-check.sh`;
   const primaryRegistry = primaryRegistryForSlug(milestone.slug);
   const primaryStatusMarkers = primaryStatusMarkersForSlug(milestone.slug);
+  const stateArtifactFilenames = stateArtifactFilenamesForMilestone(milestone);
   const coreRegistry = registryByName.get(milestone.slug);
   const observerRegistry = registryByName.get(observerName);
   const expectedCoreDescription = `Phase ${milestone.phase} ${milestone.coreDescription}`;
@@ -182,6 +195,9 @@ for (const [index, milestone] of milestones.entries()) {
   for (const statusMarker of primaryStatusMarkers) {
     requireContains(commonCheck, statusMarker, { phase: milestone.phase, file: commonScriptPath });
   }
+  for (const artifactFilename of stateArtifactFilenames) {
+    requireContains(commonCheck, artifactFilename, { phase: milestone.phase, file: commonScriptPath });
+  }
 }
 
 const summary = {
@@ -194,6 +210,7 @@ const summary = {
       slug: milestone.slug,
       primaryRegistry: primaryRegistryForSlug(milestone.slug),
       primaryStatusMarkers: primaryStatusMarkersForSlug(milestone.slug),
+      stateArtifactFilenames: stateArtifactFilenamesForMilestone(milestone),
       predecessorSlug: milestone.predecessorSlug,
       nextSlug: milestone.nextSlug,
     })),
@@ -206,9 +223,10 @@ const summary = {
       commonChecksChecked: milestones.length,
       commonPrimaryRegistriesChecked: milestones.length,
       commonStatusMarkersChecked: milestones.reduce((total, milestone) => total + primaryStatusMarkersForSlug(milestone.slug).length, 0),
+      commonStateArtifactsChecked: milestones.length * 2,
     },
     issues,
-    nextRecommendedSlice: "Extend the manifest check to cover repeated Phase 99-116 common-check artifact paths before renaming or deleting legacy scripts.",
+    nextRecommendedSlice: "Use the manifest-derived registry, status, and artifact inputs to extract shared Phase 99-116 common-check setup helpers without changing service assertions.",
   },
 };
 
