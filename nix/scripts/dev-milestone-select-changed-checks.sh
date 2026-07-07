@@ -75,6 +75,7 @@ const credentialValueLocalReadHelperScripts = new Set([
   "dev-openclaw-live-provider-credential-value-local-read-common-env.sh",
   "dev-openclaw-live-provider-credential-value-local-read-prereq.sh",
   "dev-openclaw-live-provider-credential-value-local-read-milestone-manifest-check.sh",
+  "dev-openclaw-live-provider-credential-value-local-read-batch-reuse-check.sh",
 ]);
 
 function readCredentialValueLocalReadAttemptCommonScripts() {
@@ -593,6 +594,10 @@ for (const file of changedFiles) {
     if (credentialValueLocalReadHelperScripts.has(scriptBasename)
       || credentialValueLocalReadCommonScripts.has(scriptBasename)) {
       selectName(credentialValueLocalReadManifestCheck);
+      if (scriptBasename === "dev-openclaw-live-provider-credential-value-local-read-batch-reuse-check.sh"
+        || scriptBasename === "dev-openclaw-live-provider-credential-value-local-read-prereq.sh") {
+        selectName("openclaw-live-provider-credential-value-local-read-batch-reuse");
+      }
     }
     if (credentialValueLocalReadHelperScripts.has(scriptBasename)) {
       continue;

@@ -112,6 +112,9 @@ const commonEnvHelper = readIfExists(commonEnvHelperPath, "credential-value loca
 const prereqHelperScript = "dev-openclaw-live-provider-credential-value-local-read-prereq.sh";
 const prereqHelperPath = path.join(scriptDir, prereqHelperScript);
 const prereqHelper = readIfExists(prereqHelperPath, "credential-value local-read prerequisite helper");
+const batchReuseScript = "dev-openclaw-live-provider-credential-value-local-read-batch-reuse-check.sh";
+const batchReusePath = path.join(scriptDir, batchReuseScript);
+const batchReuse = readIfExists(batchReusePath, "credential-value local-read batch reuse check");
 const milestones = readTsv(manifestFile, [
   "phase",
   "slug",
@@ -136,7 +139,14 @@ requireContains(prereqHelper, "openclaw_credential_value_local_read_prepare_prer
 requireContains(prereqHelper, "dev-openclaw-fast-prereq-state.sh", { file: prereqHelperPath });
 requireContains(prereqHelper, "openclaw_reuse_prereq_state", { file: prereqHelperPath });
 requireContains(prereqHelper, "fallback_common_check", { file: prereqHelperPath });
+requireContains(batchReuse, "openclaw-live-provider-credential-value-local-read-milestones.tsv", { file: batchReusePath });
+requireContains(batchReuse, "START_PHASE", { file: batchReusePath });
+requireContains(batchReuse, "END_PHASE", { file: batchReusePath });
+requireContains(batchReuse, "OPENCLAW_DEV_SERVICES_KEEP_UP=true", { file: batchReusePath });
+requireContains(batchReuse, "OPENCLAW_DEV_SERVICES_ALREADY_UP", { file: batchReusePath });
+requireContains(batchReuse, "openclawCredentialValueLocalReadBatchReuse", { file: batchReusePath });
 requireContains(registrySourceText, "openclaw-live-provider-credential-value-local-read-milestone-manifest", { file: registrySourceFile });
+requireContains(registrySourceText, "openclaw-live-provider-credential-value-local-read-batch-reuse", { file: registrySourceFile });
 
 const byPhase = new Map(milestones.map((milestone) => [milestone.phase, milestone]));
 for (const [index, milestone] of milestones.entries()) {
