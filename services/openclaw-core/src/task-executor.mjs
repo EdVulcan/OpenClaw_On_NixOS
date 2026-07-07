@@ -2625,551 +2625,96 @@ function serialiseExecutionResult(executionResult) {
   };
 }
 
+function buildNonRecoverableExecutionResult(finalExecution) {
+  return {
+    finalExecution,
+    attempts: [finalExecution],
+    recovery: {
+      attempted: false,
+      maxAttempts: 0,
+    },
+  };
+}
+
+const NON_RECOVERABLE_TASK_HANDLERS = [
+  { name: "native-plugin-capability", predicate: isNativePluginCapabilityTask, execute: deferNativePluginCapabilityExecution },
+  { name: "native-plugin-runtime-activation", predicate: isNativePluginRuntimeActivationTask, execute: deferNativePluginRuntimeActivation },
+  { name: "native-plugin-runtime-adapter", predicate: isNativePluginRuntimeAdapterTask, execute: deferNativePluginRuntimeAdapterImplementation },
+  { name: "openclaw-search-web-adapter", predicate: isOpenClawSearchWebAdapterTask, execute: deferOpenClawSearchWebAdapterExecution },
+  { name: "openclaw-search-web-runtime-activation", predicate: isOpenClawSearchWebRuntimeActivationTask, execute: deferOpenClawSearchWebRuntimeActivation },
+  { name: "openclaw-search-web-provider-runtime-sandbox", predicate: isOpenClawSearchWebProviderRuntimeSandboxTask, execute: deferOpenClawSearchWebProviderRuntimeSandbox },
+  {
+    name: "systemd-repair-execution",
+    predicate: isSystemdRepairExecutionTask,
+    execute: (task) => task.systemdRepair?.execution?.realExecutionEnabled === true
+      ? executeSystemdRepairExecutionTask(task)
+      : deferSystemdRepairExecutionTask(task),
+  },
+  {
+    name: "systemd-next-repair",
+    predicate: isSystemdNextRepairTask,
+    execute: (task) => task.systemdNextRepair?.execution?.realExecutionEnabled === true
+      ? executeSystemdNextRepairTask(task)
+      : deferSystemdNextRepairTask(task),
+  },
+  { name: "body-evidence-ledger-directory", predicate: isBodyEvidenceLedgerDirectoryTask, execute: executeBodyEvidenceLedgerDirectoryTask },
+  { name: "body-evidence-ledger-first-record", predicate: isBodyEvidenceLedgerFirstRecordTask, execute: executeBodyEvidenceLedgerFirstRecordTask },
+  {
+    name: "body-evidence-ledger-followup-record",
+    predicate: isBodyEvidenceLedgerFollowupRecordTask,
+    execute: (task) => task.bodyEvidenceLedgerFollowupRecord?.appendExecutionEnabled === true
+      ? executeBodyEvidenceLedgerFollowupRecordTask(task)
+      : deferBodyEvidenceLedgerFollowupRecordTask(task),
+  },
+  { name: "long-term-memory-write", predicate: isLongTermMemoryWriteTask, execute: executeLongTermMemoryWriteTask },
+  { name: "cloud-consciousness-handoff", predicate: isCloudConsciousnessHandoffTask, execute: executeCloudConsciousnessHandoffTask },
+  { name: "cloud-consciousness-provider-dry-run", predicate: isCloudConsciousnessProviderDryRunTask, execute: executeCloudConsciousnessProviderDryRunTask },
+  { name: "cloud-consciousness-provider-call-rehearsal", predicate: isCloudConsciousnessProviderCallRehearsalTask, execute: executeCloudConsciousnessProviderCallRehearsalTask },
+  { name: "cloud-consciousness-live-provider-runbook", predicate: isCloudConsciousnessLiveProviderRunbookTask, execute: executeCloudConsciousnessLiveProviderRunbookTask },
+  { name: "cloud-consciousness-live-provider-execution-plan", predicate: isCloudConsciousnessLiveProviderExecutionPlanTask, execute: executeCloudConsciousnessLiveProviderExecutionPlanTask },
+  { name: "cloud-consciousness-live-provider-runtime-adapter", predicate: isCloudConsciousnessLiveProviderRuntimeAdapterTask, execute: executeCloudConsciousnessLiveProviderRuntimeAdapterTask },
+  { name: "cloud-consciousness-live-provider-runtime-implementation", predicate: isCloudConsciousnessLiveProviderRuntimeImplementationTask, execute: executeCloudConsciousnessLiveProviderRuntimeImplementationTask },
+  { name: "cloud-consciousness-live-provider-runtime-adapter-implementation", predicate: isCloudConsciousnessLiveProviderRuntimeAdapterImplementationTask, execute: executeCloudConsciousnessLiveProviderRuntimeAdapterImplementationTask },
+  { name: "cloud-consciousness-live-provider-runtime-adapter-module", predicate: isCloudConsciousnessLiveProviderRuntimeAdapterModuleTask, execute: executeCloudConsciousnessLiveProviderRuntimeAdapterModuleTask },
+  { name: "cloud-consciousness-live-provider-request-builder", predicate: isCloudConsciousnessLiveProviderRequestBuilderTask, execute: executeCloudConsciousnessLiveProviderRequestBuilderTask },
+  { name: "cloud-consciousness-live-provider-credential-reference-resolver", predicate: isCloudConsciousnessLiveProviderCredentialReferenceResolverTask, execute: executeCloudConsciousnessLiveProviderCredentialReferenceResolverTask },
+  { name: "cloud-consciousness-live-provider-no-network-sender", predicate: isCloudConsciousnessLiveProviderNoNetworkSenderTask, execute: executeCloudConsciousnessLiveProviderNoNetworkSenderTask },
+  { name: "cloud-consciousness-live-provider-egress-transcript-recorder", predicate: isCloudConsciousnessLiveProviderEgressTranscriptRecorderTask, execute: executeCloudConsciousnessLiveProviderEgressTranscriptRecorderTask },
+  { name: "cloud-consciousness-live-provider-response-verifier", predicate: isCloudConsciousnessLiveProviderResponseVerifierTask, execute: executeCloudConsciousnessLiveProviderResponseVerifierTask },
+  { name: "cloud-consciousness-live-provider-rollback-note", predicate: isCloudConsciousnessLiveProviderRollbackNoteTask, execute: executeCloudConsciousnessLiveProviderRollbackNoteTask },
+  { name: "cloud-consciousness-live-provider-runtime-adapter-closure", predicate: isCloudConsciousnessLiveProviderRuntimeAdapterClosureTask, execute: executeCloudConsciousnessLiveProviderRuntimeAdapterClosureTask },
+  { name: "cloud-consciousness-live-provider-real-launch", predicate: isCloudConsciousnessLiveProviderRealLaunchTask, execute: executeCloudConsciousnessLiveProviderRealLaunchTask },
+  { name: "cloud-consciousness-live-provider-egress-execution", predicate: isCloudConsciousnessLiveProviderEgressExecutionTask, execute: executeCloudConsciousnessLiveProviderEgressExecutionTask },
+  { name: "cloud-consciousness-live-provider-credential-value-authorization", predicate: isCloudConsciousnessLiveProviderCredentialValueAuthorizationTask, execute: executeCloudConsciousnessLiveProviderCredentialValueAuthorizationTask },
+  { name: "cloud-consciousness-live-provider-credential-value-read", predicate: isCloudConsciousnessLiveProviderCredentialValueReadTask, execute: executeCloudConsciousnessLiveProviderCredentialValueReadTask },
+  { name: "cloud-consciousness-live-provider-credential-value-access-authorization", predicate: isCloudConsciousnessLiveProviderCredentialValueAccessAuthorizationTask, execute: executeCloudConsciousnessLiveProviderCredentialValueAccessAuthorizationTask },
+  { name: "cloud-consciousness-live-provider-credential-value-access-authorization-decision", predicate: isCloudConsciousnessLiveProviderCredentialValueAccessAuthorizationDecisionTask, execute: executeCloudConsciousnessLiveProviderCredentialValueAccessAuthorizationDecisionTask },
+  { name: "cloud-consciousness-live-provider-credential-value-local-read", predicate: isCloudConsciousnessLiveProviderCredentialValueLocalReadTask, execute: executeCloudConsciousnessLiveProviderCredentialValueLocalReadTask },
+  { name: "cloud-consciousness-live-provider-credential-value-local-read-execution", predicate: isCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionTask, execute: executeCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionTask },
+  { name: "cloud-consciousness-live-provider-credential-value-local-read-execution-local-read", predicate: isCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadTask, execute: executeCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadTask },
+  { name: "cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt", predicate: isCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptTask, execute: executeCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptTask },
+  { name: "cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read", predicate: isCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadTask, execute: executeCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadTask },
+  { name: "cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope", predicate: isCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeTask, execute: executeCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeTask },
+  { name: "cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation", predicate: isCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationTask, execute: executeCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationTask },
+  { name: "cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution", predicate: isCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionTask, execute: executeCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionTask },
+  { name: "cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt", predicate: isCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptTask, execute: executeCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptTask },
+  { name: "cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt-local-read", predicate: isCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadTask, execute: executeCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadTask },
+  { name: "capability-plan", predicate: shouldExecuteCapabilityPlan, execute: executeCapabilityPlanTask },
+];
+
+async function executeMatchedNonRecoverableTask(task, options) {
+  const entry = NON_RECOVERABLE_TASK_HANDLERS.find(({ predicate }) => predicate(task));
+  if (!entry) {
+    return null;
+  }
+
+  return buildNonRecoverableExecutionResult(await entry.execute(task, options));
+}
+
 async function executeTaskWithRecovery(task, options = {}) {
-  if (isNativePluginCapabilityTask(task)) {
-    const deferredExecution = await deferNativePluginCapabilityExecution(task);
-    return {
-      finalExecution: deferredExecution,
-      attempts: [deferredExecution],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
-  }
-
-  if (isNativePluginRuntimeActivationTask(task)) {
-    const deferredExecution = await deferNativePluginRuntimeActivation(task);
-    return {
-      finalExecution: deferredExecution,
-      attempts: [deferredExecution],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
-  }
-
-  if (isNativePluginRuntimeAdapterTask(task)) {
-    const deferredExecution = await deferNativePluginRuntimeAdapterImplementation(task);
-    return {
-      finalExecution: deferredExecution,
-      attempts: [deferredExecution],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
-  }
-
-  if (isOpenClawSearchWebAdapterTask(task)) {
-    const deferredExecution = await deferOpenClawSearchWebAdapterExecution(task);
-    return {
-      finalExecution: deferredExecution,
-      attempts: [deferredExecution],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
-  }
-
-  if (isOpenClawSearchWebRuntimeActivationTask(task)) {
-    const deferredExecution = await deferOpenClawSearchWebRuntimeActivation(task);
-    return {
-      finalExecution: deferredExecution,
-      attempts: [deferredExecution],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
-  }
-
-  if (isOpenClawSearchWebProviderRuntimeSandboxTask(task)) {
-    const deferredExecution = await deferOpenClawSearchWebProviderRuntimeSandbox(task);
-    return {
-      finalExecution: deferredExecution,
-      attempts: [deferredExecution],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
-  }
-
-  if (isSystemdRepairExecutionTask(task)) {
-    const deferredExecution = task.systemdRepair?.execution?.realExecutionEnabled === true
-      ? await executeSystemdRepairExecutionTask(task)
-      : await deferSystemdRepairExecutionTask(task);
-    return {
-      finalExecution: deferredExecution,
-      attempts: [deferredExecution],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
-  }
-
-  if (isSystemdNextRepairTask(task)) {
-    const deferredExecution = task.systemdNextRepair?.execution?.realExecutionEnabled === true
-      ? await executeSystemdNextRepairTask(task)
-      : await deferSystemdNextRepairTask(task);
-    return {
-      finalExecution: deferredExecution,
-      attempts: [deferredExecution],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
-  }
-
-  if (isBodyEvidenceLedgerDirectoryTask(task)) {
-    const directoryExecution = await executeBodyEvidenceLedgerDirectoryTask(task);
-    return {
-      finalExecution: directoryExecution,
-      attempts: [directoryExecution],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
-  }
-
-  if (isBodyEvidenceLedgerFirstRecordTask(task)) {
-    const firstRecordExecution = await executeBodyEvidenceLedgerFirstRecordTask(task);
-    return {
-      finalExecution: firstRecordExecution,
-      attempts: [firstRecordExecution],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
-  }
-
-  if (isBodyEvidenceLedgerFollowupRecordTask(task)) {
-    const followupRecordExecution = task.bodyEvidenceLedgerFollowupRecord?.appendExecutionEnabled === true
-      ? await executeBodyEvidenceLedgerFollowupRecordTask(task)
-      : await deferBodyEvidenceLedgerFollowupRecordTask(task);
-    return {
-      finalExecution: followupRecordExecution,
-      attempts: [followupRecordExecution],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
-  }
-
-  if (isLongTermMemoryWriteTask(task)) {
-    const longTermMemoryExecution = await executeLongTermMemoryWriteTask(task);
-    return {
-      finalExecution: longTermMemoryExecution,
-      attempts: [longTermMemoryExecution],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
-  }
-
-  if (isCloudConsciousnessHandoffTask(task)) {
-    const cloudConsciousnessExecution = await executeCloudConsciousnessHandoffTask(task);
-    return {
-      finalExecution: cloudConsciousnessExecution,
-      attempts: [cloudConsciousnessExecution],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
-  }
-
-  if (isCloudConsciousnessProviderDryRunTask(task)) {
-    const cloudConsciousnessProviderDryRunExecution = await executeCloudConsciousnessProviderDryRunTask(task);
-    return {
-      finalExecution: cloudConsciousnessProviderDryRunExecution,
-      attempts: [cloudConsciousnessProviderDryRunExecution],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
-  }
-
-  if (isCloudConsciousnessProviderCallRehearsalTask(task)) {
-    const cloudConsciousnessProviderCallRehearsalExecution = await executeCloudConsciousnessProviderCallRehearsalTask(task);
-    return {
-      finalExecution: cloudConsciousnessProviderCallRehearsalExecution,
-      attempts: [cloudConsciousnessProviderCallRehearsalExecution],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
-  }
-
-  if (isCloudConsciousnessLiveProviderRunbookTask(task)) {
-    const cloudConsciousnessLiveProviderRunbookExecution = await executeCloudConsciousnessLiveProviderRunbookTask(task);
-    return {
-      finalExecution: cloudConsciousnessLiveProviderRunbookExecution,
-      attempts: [cloudConsciousnessLiveProviderRunbookExecution],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
-  }
-
-  if (isCloudConsciousnessLiveProviderExecutionPlanTask(task)) {
-    const cloudConsciousnessLiveProviderExecutionPlanExecution = await executeCloudConsciousnessLiveProviderExecutionPlanTask(task);
-    return {
-      finalExecution: cloudConsciousnessLiveProviderExecutionPlanExecution,
-      attempts: [cloudConsciousnessLiveProviderExecutionPlanExecution],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
-  }
-
-  if (isCloudConsciousnessLiveProviderRuntimeAdapterTask(task)) {
-    const cloudConsciousnessLiveProviderRuntimeAdapterExecution = await executeCloudConsciousnessLiveProviderRuntimeAdapterTask(task);
-    return {
-      finalExecution: cloudConsciousnessLiveProviderRuntimeAdapterExecution,
-      attempts: [cloudConsciousnessLiveProviderRuntimeAdapterExecution],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
-  }
-
-  if (isCloudConsciousnessLiveProviderRuntimeImplementationTask(task)) {
-    const cloudConsciousnessLiveProviderRuntimeImplementationExecution = await executeCloudConsciousnessLiveProviderRuntimeImplementationTask(task);
-    return {
-      finalExecution: cloudConsciousnessLiveProviderRuntimeImplementationExecution,
-      attempts: [cloudConsciousnessLiveProviderRuntimeImplementationExecution],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
-  }
-
-  if (isCloudConsciousnessLiveProviderRuntimeAdapterImplementationTask(task)) {
-    const cloudConsciousnessLiveProviderRuntimeAdapterImplementationExecution = await executeCloudConsciousnessLiveProviderRuntimeAdapterImplementationTask(task);
-    return {
-      finalExecution: cloudConsciousnessLiveProviderRuntimeAdapterImplementationExecution,
-      attempts: [cloudConsciousnessLiveProviderRuntimeAdapterImplementationExecution],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
-  }
-
-  if (isCloudConsciousnessLiveProviderRuntimeAdapterModuleTask(task)) {
-    const cloudConsciousnessLiveProviderRuntimeAdapterModuleExecution = await executeCloudConsciousnessLiveProviderRuntimeAdapterModuleTask(task);
-    return {
-      finalExecution: cloudConsciousnessLiveProviderRuntimeAdapterModuleExecution,
-      attempts: [cloudConsciousnessLiveProviderRuntimeAdapterModuleExecution],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
-  }
-
-  if (isCloudConsciousnessLiveProviderRequestBuilderTask(task)) {
-    const cloudConsciousnessLiveProviderRequestBuilderExecution = await executeCloudConsciousnessLiveProviderRequestBuilderTask(task);
-    return {
-      finalExecution: cloudConsciousnessLiveProviderRequestBuilderExecution,
-      attempts: [cloudConsciousnessLiveProviderRequestBuilderExecution],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
-  }
-
-  if (isCloudConsciousnessLiveProviderCredentialReferenceResolverTask(task)) {
-    const cloudConsciousnessLiveProviderCredentialReferenceResolverExecution = await executeCloudConsciousnessLiveProviderCredentialReferenceResolverTask(task);
-    return {
-      finalExecution: cloudConsciousnessLiveProviderCredentialReferenceResolverExecution,
-      attempts: [cloudConsciousnessLiveProviderCredentialReferenceResolverExecution],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
-  }
-
-  if (isCloudConsciousnessLiveProviderNoNetworkSenderTask(task)) {
-    const cloudConsciousnessLiveProviderNoNetworkSenderExecution = await executeCloudConsciousnessLiveProviderNoNetworkSenderTask(task);
-    return {
-      finalExecution: cloudConsciousnessLiveProviderNoNetworkSenderExecution,
-      attempts: [cloudConsciousnessLiveProviderNoNetworkSenderExecution],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
-  }
-
-  if (isCloudConsciousnessLiveProviderEgressTranscriptRecorderTask(task)) {
-    const cloudConsciousnessLiveProviderEgressTranscriptRecorderExecution = await executeCloudConsciousnessLiveProviderEgressTranscriptRecorderTask(task);
-    return {
-      finalExecution: cloudConsciousnessLiveProviderEgressTranscriptRecorderExecution,
-      attempts: [cloudConsciousnessLiveProviderEgressTranscriptRecorderExecution],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
-  }
-
-  if (isCloudConsciousnessLiveProviderResponseVerifierTask(task)) {
-    const cloudConsciousnessLiveProviderResponseVerifierExecution = await executeCloudConsciousnessLiveProviderResponseVerifierTask(task);
-    return {
-      finalExecution: cloudConsciousnessLiveProviderResponseVerifierExecution,
-      attempts: [cloudConsciousnessLiveProviderResponseVerifierExecution],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
-  }
-
-  if (isCloudConsciousnessLiveProviderRollbackNoteTask(task)) {
-    const cloudConsciousnessLiveProviderRollbackNoteExecution = await executeCloudConsciousnessLiveProviderRollbackNoteTask(task);
-    return {
-      finalExecution: cloudConsciousnessLiveProviderRollbackNoteExecution,
-      attempts: [cloudConsciousnessLiveProviderRollbackNoteExecution],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
-  }
-
-  if (isCloudConsciousnessLiveProviderRuntimeAdapterClosureTask(task)) {
-    const cloudConsciousnessLiveProviderRuntimeAdapterClosureExecution = await executeCloudConsciousnessLiveProviderRuntimeAdapterClosureTask(task);
-    return {
-      finalExecution: cloudConsciousnessLiveProviderRuntimeAdapterClosureExecution,
-      attempts: [cloudConsciousnessLiveProviderRuntimeAdapterClosureExecution],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
-  }
-
-  if (isCloudConsciousnessLiveProviderRealLaunchTask(task)) {
-    const cloudConsciousnessLiveProviderRealLaunchExecution = await executeCloudConsciousnessLiveProviderRealLaunchTask(task);
-    return {
-      finalExecution: cloudConsciousnessLiveProviderRealLaunchExecution,
-      attempts: [cloudConsciousnessLiveProviderRealLaunchExecution],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
-  }
-
-  if (isCloudConsciousnessLiveProviderEgressExecutionTask(task)) {
-    const cloudConsciousnessLiveProviderEgressExecution = await executeCloudConsciousnessLiveProviderEgressExecutionTask(task);
-    return {
-      finalExecution: cloudConsciousnessLiveProviderEgressExecution,
-      attempts: [cloudConsciousnessLiveProviderEgressExecution],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
-  }
-
-  if (isCloudConsciousnessLiveProviderCredentialValueAuthorizationTask(task)) {
-    const cloudConsciousnessLiveProviderCredentialValueAuthorization = await executeCloudConsciousnessLiveProviderCredentialValueAuthorizationTask(task);
-    return {
-      finalExecution: cloudConsciousnessLiveProviderCredentialValueAuthorization,
-      attempts: [cloudConsciousnessLiveProviderCredentialValueAuthorization],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
-  }
-
-  if (isCloudConsciousnessLiveProviderCredentialValueReadTask(task)) {
-    const cloudConsciousnessLiveProviderCredentialValueRead = await executeCloudConsciousnessLiveProviderCredentialValueReadTask(task);
-    return {
-      finalExecution: cloudConsciousnessLiveProviderCredentialValueRead,
-      attempts: [cloudConsciousnessLiveProviderCredentialValueRead],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
-  }
-
-  if (isCloudConsciousnessLiveProviderCredentialValueAccessAuthorizationTask(task)) {
-    const cloudConsciousnessLiveProviderCredentialValueAccessAuthorization = await executeCloudConsciousnessLiveProviderCredentialValueAccessAuthorizationTask(task);
-    return {
-      finalExecution: cloudConsciousnessLiveProviderCredentialValueAccessAuthorization,
-      attempts: [cloudConsciousnessLiveProviderCredentialValueAccessAuthorization],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
-  }
-
-  if (isCloudConsciousnessLiveProviderCredentialValueAccessAuthorizationDecisionTask(task)) {
-    const cloudConsciousnessLiveProviderCredentialValueAccessAuthorizationDecision = await executeCloudConsciousnessLiveProviderCredentialValueAccessAuthorizationDecisionTask(task);
-    return {
-      finalExecution: cloudConsciousnessLiveProviderCredentialValueAccessAuthorizationDecision,
-      attempts: [cloudConsciousnessLiveProviderCredentialValueAccessAuthorizationDecision],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
-  }
-
-  if (isCloudConsciousnessLiveProviderCredentialValueLocalReadTask(task)) {
-    const cloudConsciousnessLiveProviderCredentialValueLocalRead = await executeCloudConsciousnessLiveProviderCredentialValueLocalReadTask(task);
-    return {
-      finalExecution: cloudConsciousnessLiveProviderCredentialValueLocalRead,
-      attempts: [cloudConsciousnessLiveProviderCredentialValueLocalRead],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
-  }
-
-  if (isCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionTask(task)) {
-    const cloudConsciousnessLiveProviderCredentialValueLocalReadExecution = await executeCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionTask(task);
-    return {
-      finalExecution: cloudConsciousnessLiveProviderCredentialValueLocalReadExecution,
-      attempts: [cloudConsciousnessLiveProviderCredentialValueLocalReadExecution],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
-  }
-
-  if (isCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadTask(task)) {
-    const cloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalRead = await executeCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadTask(task);
-    return {
-      finalExecution: cloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalRead,
-      attempts: [cloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalRead],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
-  }
-
-  if (isCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptTask(task)) {
-    const cloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttempt = await executeCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptTask(task);
-    return {
-      finalExecution: cloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttempt,
-      attempts: [cloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttempt],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
-  }
-
-  if (isCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadTask(task)) {
-    const cloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalRead = await executeCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadTask(task);
-    return {
-      finalExecution: cloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalRead,
-      attempts: [cloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalRead],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
-  }
-
-  if (isCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeTask(task)) {
-    const cloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelope = await executeCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeTask(task);
-    return {
-      finalExecution: cloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelope,
-      attempts: [cloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelope],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
-  }
-
-  if (isCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationTask(task)) {
-    const cloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreation = await executeCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationTask(task);
-    return {
-      finalExecution: cloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreation,
-      attempts: [cloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreation],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
-  }
-
-  if (isCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionTask(task)) {
-    const cloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecution = await executeCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionTask(task);
-    return {
-      finalExecution: cloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecution,
-      attempts: [cloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecution],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
-  }
-
-  if (isCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptTask(task)) {
-    const cloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttempt = await executeCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptTask(task);
-    return {
-      finalExecution: cloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttempt,
-      attempts: [cloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttempt],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
-  }
-
-  if (isCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadTask(task)) {
-    const cloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalRead = await executeCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadTask(task);
-    return {
-      finalExecution: cloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalRead,
-      attempts: [cloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalRead],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
-  }
-
-  if (shouldExecuteCapabilityPlan(task)) {
-    const capabilityExecution = await executeCapabilityPlanTask(task, options);
-    return {
-      finalExecution: capabilityExecution,
-      attempts: [capabilityExecution],
-      recovery: {
-        attempted: false,
-        maxAttempts: 0,
-      },
-    };
+  const nonRecoverableExecution = await executeMatchedNonRecoverableTask(task, options);
+  if (nonRecoverableExecution) {
+    return nonRecoverableExecution;
   }
 
   const firstExecution = await executeTask(task, options);
