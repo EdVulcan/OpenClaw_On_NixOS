@@ -29,6 +29,7 @@ const maintenancePolicy = {
 import { corsHeaders, sendJson, readJsonBody, createEventPublisher, registerService } from "../../../packages/shared-utils/src/http.mjs";
 
 import { createDebouncedPersist } from "../../../packages/shared-utils/src/persist.mjs";
+import { createEventName } from "../../../packages/shared-events/src/event-factory.mjs";
 
 
 function parseBooleanEnv(value, fallback) {
@@ -341,7 +342,7 @@ async function runMaintenance(body = {}) {
   const diagnosis = await buildDiagnosisFromRequest(body);
   const entries = [];
 
-  await publishEvent("maintenance.started", {
+  await publishEvent(createEventName("maintenance.started"), {
     diagnosis,
     autofix,
     governance: "body_internal_audit",
@@ -377,7 +378,7 @@ async function runMaintenance(body = {}) {
   };
   addMaintenanceRun(run);
 
-  await publishEvent("maintenance.completed", { run });
+  await publishEvent(createEventName("maintenance.completed"), { run });
   return run;
 }
 
@@ -401,7 +402,7 @@ async function tickMaintenance(body = {}) {
     };
     maintenancePolicy.lastTick = tick;
     persistState();
-    await publishEvent("maintenance.tick", { tick, policy: serialiseMaintenancePolicy() });
+    await publishEvent(createEventName("maintenance.tick"), { tick, policy: serialiseMaintenancePolicy() });
     return { tick, run: null };
   }
 
@@ -414,7 +415,7 @@ async function tickMaintenance(body = {}) {
     };
     maintenancePolicy.lastTick = tick;
     persistState();
-    await publishEvent("maintenance.tick", { tick, policy: serialiseMaintenancePolicy() });
+    await publishEvent(createEventName("maintenance.tick"), { tick, policy: serialiseMaintenancePolicy() });
     return { tick, run: null };
   }
 
@@ -435,7 +436,7 @@ async function tickMaintenance(body = {}) {
   };
   maintenancePolicy.lastTick = tick;
   persistState();
-  await publishEvent("maintenance.tick", { tick, policy: serialiseMaintenancePolicy(), run });
+  await publishEvent(createEventName("maintenance.tick"), { tick, policy: serialiseMaintenancePolicy(), run });
   return { tick, run };
 }
 
@@ -519,7 +520,7 @@ const server = http.createServer(async (req, res) => {
     try {
       const body = await readJsonBody(req);
       const policy = updateMaintenancePolicy(body);
-      await publishEvent("maintenance.policy.updated", { policy });
+      await publishEvent(createEventName("maintenance.policy.updated"), { policy });
       sendJson(res, 200, {
         ok: true,
         policy,

@@ -1,5 +1,6 @@
 import http from "node:http";
 import { randomUUID } from "node:crypto";
+import { createEventName } from "../../../packages/shared-events/src/event-factory.mjs";
 
 const host = process.env.OPENCLAW_SCREEN_ACT_HOST ?? "127.0.0.1";
 const port = Number.parseInt(process.env.OPENCLAW_SCREEN_ACT_PORT ?? "4105", 10);
@@ -77,7 +78,7 @@ async function executeAction(kind, params) {
   const startedAt = new Date().toISOString();
 
   // Audit: Record action started
-  await publishEvent("screen_act.action_started", {
+  await publishEvent(createEventName("screen_act.action_started"), {
     actionId, kind, params, startedAt,
   });
 
@@ -122,7 +123,7 @@ async function executeAction(kind, params) {
   updateActionState(action);
 
   // Audit: Record action completed
-  await publishEvent("screen_act.action_completed", {
+  await publishEvent(createEventName("screen_act.action_completed"), {
     actionId,
     kind,
     params,

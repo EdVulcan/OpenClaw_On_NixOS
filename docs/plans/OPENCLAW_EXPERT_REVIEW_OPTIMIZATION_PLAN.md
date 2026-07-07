@@ -20,7 +20,7 @@ The expert review items are considered complete only when each item has code-lev
 | Shared package engineering E3 | Shared packages lacked independent tsconfig/barrel/type declarations. | Complete | Shared package `tsconfig.json` files, barrel entries, and `shared-utils` declarations added. |
 | Unit tests E2 | No focused unit tests existed for shared packages or services. | Partial, core policy service tests complete | Node built-in tests added for plugin runtime, shared-events, shared-utils, and `openclaw-core` policy evaluation. Broader service-layer unit tests remain pending for task execution, route handlers, and service clients. |
 | Shared-client empty shell C5 | `shared-client` only exported tiny service constants. | Complete | `service-descriptors` now provides typed and runtime service ids, default ports, URL env vars, and resolver helpers; core and Observer consume the shared runtime descriptors for defaults. |
-| Shared-events identity helper C5 | `createEventName` was a no-op identity function. | Complete | Runtime and typed event factory now validate names against `eventNames`. |
+| Shared-events identity helper C5 | `createEventName` was a no-op identity function. | Complete | Runtime and typed event factory validate names against `eventNames`; shared registry now covers existing maintenance, screen-act, command, body evidence, long-term memory, cloud-consciousness, and systemd repair publish events. |
 | Root package script redundancy E1/P2 | `package.json` had many hard-coded `dev:*check:unix` milestone scripts. | Complete | Root scripts reduced to one milestone runner plus stable lifecycle/smoke aliases; `dev-milestone-check.sh` accepts milestone names as npm args. |
 | Shell helper duplication E4 | `post_json()` was copied across many scripts. | Complete | 257 local definitions migrated to `dev-openclaw-http-json-helper.sh`; helper mode compatibility covered by `openclaw-http-json-helper`. |
 | Observer mirror test duplication T2 | Observer checks duplicate core setup. | Partial, reusable pair runner complete | Result-envelope batch milestone covers core and Observer in one live service lifecycle; `dev-openclaw-core-observer-pair-runner.sh` lets compatible core/Observer pairs reuse one service lifecycle while preserving real Observer HTML/client checks. Legacy standalone Observer scripts remain for compatibility. |
@@ -78,8 +78,14 @@ The expert review items are considered complete only when each item has code-lev
 - `openclaw-core` and `observer-ui` use shared descriptor helpers for service default ports and URLs while preserving the existing environment variable names.
 - `openclaw-shared-package-contracts` checks the shared-client runtime modules and tests.
 
+## Shared Events Runtime Registry Evidence
+
+- `shared-events` now includes the event names currently published by maintenance, screen action, system command, body evidence, long-term memory, cloud-consciousness, and systemd repair paths.
+- `screen-act`, `system-heal`, and `system-sense` use `createEventName()` on representative previously-unregistered publish events.
+- `shared-events` unit tests cover the newly registered names.
+
 ## Next Expert Items After This Slice
 
 1. Broaden safe state reuse for heavy prerequisite chains beyond the existing live-provider result-envelope path.
 2. Add more service-layer unit tests for task execution, route handler contract helpers, and service clients.
-3. Move shared-events names into real service/Observer publish call sites where doing so reduces duplicated event contracts.
+3. Continue moving shared event names into additional publish call sites as those modules are touched.

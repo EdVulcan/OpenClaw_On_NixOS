@@ -208,6 +208,7 @@ const healthSnapshots = [];
 let previousCpuSnapshot = null;
 
 import { corsHeaders, sendJson, readJsonBody, createEventPublisher, registerService } from "../../../packages/shared-utils/src/http.mjs";
+import { createEventName } from "../../../packages/shared-events/src/event-factory.mjs";
 
 
 const publishEvent = createEventPublisher(eventHubUrl, "openclaw-system-sense");
@@ -4958,7 +4959,7 @@ const server = http.createServer(async (req, res) => {
     try {
       const body = await readJsonBody(req);
       const execution = await executeCommand(body);
-      await publishEvent("system.command.executed", {
+      await publishEvent(createEventName("system.command.executed"), {
         command: execution.command,
         cwd: execution.cwd,
         exitCode: execution.result.exitCode,
