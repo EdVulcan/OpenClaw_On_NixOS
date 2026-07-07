@@ -11,7 +11,7 @@ The expert review items are considered complete only when each item has code-lev
 | Area | Review Finding | Status | Evidence |
 | --- | --- | --- | --- |
 | Test lifecycle P0/T3 | `dev-down.sh` used global process killing and prevented parallel runs. | Complete | Commit `6a7fcf3`; `openclaw-service-lifecycle-scope` milestone. |
-| Test batch reuse P0/T1 | Every selected milestone restarted the full service stack. | Partial, result-envelope lane plus core/Observer pair reuse complete | Commit `eff4beb`; `openclaw-live-provider-result-envelope-batch-reuse` milestone; `openclaw-core-observer-pair-batch-reuse` covers non-result-envelope core/Observer pairs. Broader multi-phase lane batching remains pending. |
+| Test batch reuse P0/T1 | Every selected milestone restarted the full service stack. | Partial, result-envelope lane plus core/Observer pair reuse complete | Commit `eff4beb`; `openclaw-live-provider-result-envelope-batch-reuse` milestone; `openclaw-live-provider-result-envelope-phase-115-116-batch-reuse` covers the old bespoke 115-116 batch through the manifest runner; `openclaw-core-observer-pair-batch-reuse` covers non-result-envelope core/Observer pairs. Broader multi-phase lane batching remains pending. |
 | Task executor branch chain | Large independent task dispatch branches. | Already complete before this plan | `NON_RECOVERABLE_TASK_HANDLERS` registry is present in `services/openclaw-core/src/task-executor.mjs`. |
 | Shared types runtime coupling C1 | `shared-types` owned plugin runtime `.mjs` logic. | Complete | Runtime moved to `packages/plugin-runtime`; old `shared-types` paths are compatibility re-export shims. |
 | Shared type exports E3 | Domain type files were not exported. | Complete | `@openclaw/shared-types` now exposes `api`, `events`, `policy`, `screen`, `session`, `system`, and `task` type subpaths. |
@@ -65,6 +65,12 @@ The expert review items are considered complete only when each item has code-lev
 - `dev-openclaw-core-observer-pair-runner.sh` runs a compatible common-check once for core behavior and once for Observer HTML/client tokens while reusing the same live service lifecycle.
 - `openclaw-core-observer-pair-batch-reuse` covers Phase 59 and Phase 60 cloud-consciousness launch/credential-gate pairs outside the result-envelope lane.
 - The pair runner preserves existing public core and Observer milestone scripts; it adds a faster co-validation path without deleting compatibility wrappers.
+
+## Result-Envelope 115-116 Batch Evidence
+
+- The Phase 115-116 local-read batch script is now a thin wrapper over `dev-openclaw-live-provider-result-envelope-batch-reuse-check.sh`.
+- `openclaw-live-provider-result-envelope-phase-115-116-batch-reuse` registers that wrapper as a milestone and keeps the public script path stable.
+- The wrapper uses the same manifest-backed core and Observer assertions as the broader Phase 99-116 result-envelope batch runner.
 
 ## Core Service Unit Test Evidence
 

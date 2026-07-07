@@ -10,6 +10,7 @@ openclaw-core-observer-pair-batch-reuse	dev-openclaw-core-observer-pair-batch-re
 openclaw-phase4-fast-prereq-state	dev-openclaw-phase4-fast-prereq-state-check.sh	Phase 4 system-heal prerequisite state reuse for downstream Phase 6 checks
 openclaw-live-provider-result-envelope-milestone-manifest	dev-openclaw-live-provider-result-envelope-milestone-manifest-check.sh	Phase 99-116 live-provider result-envelope milestone metadata alignment
 openclaw-live-provider-result-envelope-batch-reuse	dev-openclaw-live-provider-result-envelope-batch-reuse-check.sh	Phase 99-116 result-envelope batch validation with one reusable service lifecycle
+openclaw-live-provider-result-envelope-phase-115-116-batch-reuse	dev-openclaw-cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt-local-read-batch-check.sh	Phase 115-116 manifest-backed result-envelope batch validation
 body-config	dev-body-config-check.sh	NixOS body module, profiles, and systemd service skeleton
 state-settling	dev-state-settling-check.sh	Session/browser/screen first-frame settling
 openclaw-ai-work-view-capture	dev-openclaw-ai-work-view-capture-check.sh	Browser-runtime-backed AI work view capture metadata through screen-sense

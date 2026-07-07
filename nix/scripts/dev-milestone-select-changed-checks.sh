@@ -463,6 +463,10 @@ for (const file of changedFiles) {
       continue;
     }
     if (scriptBasename.includes(resultEnvelopeScriptNeedle)) {
+      if (scriptBasename.endsWith("-batch-check.sh") && byScript.has(scriptBasename)) {
+        selected.add(byScript.get(scriptBasename).name);
+        continue;
+      }
       if (scriptBasename.endsWith("-common-check.sh")) {
         if (isResultEnvelopeCommonEnvExtractionOnly(file, scriptBasename)) {
           structurallyCoveredCommonChecks.push(file);
