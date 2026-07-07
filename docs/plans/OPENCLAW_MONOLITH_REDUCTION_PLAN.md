@@ -52,9 +52,12 @@ Audit sources used for this revision:
    `@changed` affected-check selection.
 7. Added a milestone script taxonomy audit for script counts, registry
    coverage, long filename pressure, and unregistered non-common check scripts.
+8. Added a Phase 99-116 live-provider result-envelope milestone manifest that
+   statically proves registry rows, phase plans, core wrappers, Observer
+   wrappers, and common checks still align with one metadata source.
 
-These slices reduced live-provider runtime coupling by moving cohesive phase
-lanes out of the shared runtime while preserving the public runtime API.
+These slices reduced live-provider runtime and milestone orchestration coupling
+while preserving the public runtime API and existing milestone entry names.
 
 ## High-Coupling Hotspots
 
@@ -85,8 +88,9 @@ lanes out of the shared runtime while preserving the public runtime API.
 
 1. Finish reducing active live-provider lane coupling while it remains the
    current development surface.
-2. Add Phase 99-116 milestone metadata for the active credential/result-envelope
-   lane so validation no longer depends on hand-repeated strings.
+2. Generate Phase 99-116 milestone wrappers from the active
+   credential/result-envelope manifest so validation no longer depends on
+   hand-repeated wrapper strings.
 3. Split `route-handlers.mjs` by domain so future phases do not keep editing
    one router chain.
 4. Split `task-executor.mjs` dispatch so new task types register through a

@@ -37,6 +37,8 @@ const entries = registryText.split(/\n/)
 const byScript = new Map(entries.map((entry) => [entry.script, entry]));
 const byName = new Map(entries.map((entry) => [entry.name, entry]));
 const selected = new Set();
+const resultEnvelopeManifestCheck = "openclaw-live-provider-result-envelope-milestone-manifest";
+const resultEnvelopeScriptNeedle = "credential-value-local-read-execution-local-read-attempt-local-read-result-envelope";
 
 function selectName(name) {
   if (byName.has(name)) selected.add(name);
@@ -58,6 +60,11 @@ function selectPhasePlanChecks(file) {
   if (!match) return;
 
   const phaseNumber = match[1];
+  const numericPhase = Number.parseInt(phaseNumber, 10);
+  if (numericPhase >= 99 && numericPhase <= 116) {
+    selectName(resultEnvelopeManifestCheck);
+  }
+
   const phaseNameNeedle = `phase-${phaseNumber}`;
   const phaseDescriptionNeedle = `Phase ${phaseNumber}`;
   for (const entry of entries) {
@@ -100,12 +107,17 @@ for (const file of changedFiles) {
     || file === "nix/scripts/dev-milestone-select-changed-checks.sh") {
     selectName("milestone-registry");
     selectName("milestone-script-audit");
+    selectName(resultEnvelopeManifestCheck);
     continue;
   }
 
   if (file.startsWith("nix/scripts/")) {
     const scriptBasename = path.basename(file);
     selectName("milestone-script-audit");
+    if (scriptBasename === "openclaw-live-provider-result-envelope-milestones.tsv"
+      || scriptBasename.includes(resultEnvelopeScriptNeedle)) {
+      selectName(resultEnvelopeManifestCheck);
+    }
     if (byScript.has(scriptBasename)) {
       selected.add(byScript.get(scriptBasename).name);
     }
