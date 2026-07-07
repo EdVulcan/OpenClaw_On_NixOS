@@ -23,6 +23,11 @@ else
   STATE_FILE="$ARTIFACT_DIR/dev-services-unix.tsv"
 fi
 
+if [[ "${OPENCLAW_DEV_SERVICES_KEEP_UP:-false}" == "true" && "${OPENCLAW_DEV_DOWN_FORCE:-false}" != "true" ]]; then
+  echo "Keeping OpenClaw dev services up for batch validation."
+  exit 0
+fi
+
 ports=(
   "$CORE_PORT"
   "${OPENCLAW_EVENT_HUB_PORT:-4101}"

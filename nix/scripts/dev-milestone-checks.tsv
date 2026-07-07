@@ -3,6 +3,7 @@ milestone-registry	dev-milestone-registry-check.sh	Milestone registry structure,
 milestone-script-audit	dev-milestone-script-audit-check.sh	Milestone script taxonomy, long filename pressure, and registry coverage audit
 openclaw-service-lifecycle-scope	dev-openclaw-service-lifecycle-scope-check.sh	Scoped Unix dev service lifecycle isolation and legacy state compatibility
 openclaw-live-provider-result-envelope-milestone-manifest	dev-openclaw-live-provider-result-envelope-milestone-manifest-check.sh	Phase 99-116 live-provider result-envelope milestone metadata alignment
+openclaw-live-provider-result-envelope-batch-reuse	dev-openclaw-live-provider-result-envelope-batch-reuse-check.sh	Phase 99-116 result-envelope batch validation with one reusable service lifecycle
 body-config	dev-body-config-check.sh	NixOS body module, profiles, and systemd service skeleton
 state-settling	dev-state-settling-check.sh	Session/browser/screen first-frame settling
 openclaw-ai-work-view-capture	dev-openclaw-ai-work-view-capture-check.sh	Browser-runtime-backed AI work view capture metadata through screen-sense

@@ -261,6 +261,20 @@ services=(
   "observer-ui|$REPO_ROOT/apps/observer-ui|$OBSERVER_UI_URL/health|$OBSERVER_UI_PORT"
 )
 
+if [[ "${OPENCLAW_DEV_SERVICES_ALREADY_UP:-false}" == "true" ]]; then
+  for entry in "${services[@]}"; do
+    IFS="|" read -r name _working_dir health_url _port <<<"$entry"
+    if ! wait_health "$health_url" 5; then
+      echo "Expected reusable OpenClaw dev service to be healthy: $name at $health_url" >&2
+      exit 1
+    fi
+  done
+  echo "Reusing already-running OpenClaw dev services."
+  echo "Run id: $OPENCLAW_DEV_RUN_ID"
+  echo "State file: $STATE_FILE"
+  exit 0
+fi
+
 : >"$STATE_FILE"
 
 for entry in "${services[@]}"; do

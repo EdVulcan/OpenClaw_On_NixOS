@@ -28,6 +28,11 @@ openclaw_result_envelope_prepare_prereq_state() {
   local fallback_port_base_env="$9"
   local fallback_common_check="${10}"
 
+  if [[ "${OPENCLAW_DEV_SERVICES_ALREADY_UP:-false}" == "true" ]]; then
+    echo "Using already-running OpenClaw dev services as the live $prereq_name prerequisite state."
+    return 0
+  fi
+
   openclaw_result_envelope_clear_target_state "$target_core_state" "$target_system_heal_state"
   openclaw_result_envelope_load_fast_prereq_helper "$script_dir"
 

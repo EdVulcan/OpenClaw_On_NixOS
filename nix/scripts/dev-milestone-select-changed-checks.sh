@@ -258,6 +258,7 @@ for (const file of changedFiles) {
     selectName("milestone-script-audit");
     if (scriptBasename === "dev-up.sh" || scriptBasename === "dev-down.sh") {
       selectName("openclaw-service-lifecycle-scope");
+      selectName("openclaw-live-provider-result-envelope-batch-reuse");
       continue;
     }
     if (scriptBasename === "openclaw-live-provider-result-envelope-milestones.tsv"
@@ -266,6 +267,9 @@ for (const file of changedFiles) {
       || scriptBasename === "dev-openclaw-live-provider-result-envelope-wrapper.sh"
       || scriptBasename.includes(resultEnvelopeScriptNeedle)) {
       selectName(resultEnvelopeManifestCheck);
+      if (scriptBasename === "dev-openclaw-live-provider-result-envelope-prereq.sh") {
+        selectName("openclaw-live-provider-result-envelope-batch-reuse");
+      }
     }
     if (scriptBasename === "openclaw-live-provider-result-envelope-milestones.tsv"
       || scriptBasename === "dev-openclaw-live-provider-result-envelope-common-env.sh"
