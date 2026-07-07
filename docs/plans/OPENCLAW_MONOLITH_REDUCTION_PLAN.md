@@ -1,7 +1,7 @@
 # OpenClaw Coupling Reduction Plan
 
 Created after Phase 116. Updated after the first live-provider runtime
-extraction slices.
+extraction slices and milestone registry/audit slices.
 
 ## Audit Policy
 
@@ -47,6 +47,11 @@ Audit sources used for this revision:
    focused module.
 5. Extracted Phase 103-106 result-envelope creation runtime into a focused
    module.
+6. Externalized the milestone runner registry into
+   `nix/scripts/dev-milestone-checks.tsv` with registry validation and
+   `@changed` affected-check selection.
+7. Added a milestone script taxonomy audit for script counts, registry
+   coverage, long filename pressure, and unregistered non-common check scripts.
 
 These slices reduced live-provider runtime coupling by moving cohesive phase
 lanes out of the shared runtime while preserving the public runtime API.
@@ -64,7 +69,7 @@ lanes out of the shared runtime while preserving the public runtime API.
 | P1 | `services/openclaw-system-sense/src/server.mjs` | HTTP server, filesystem operations, command execution, process listing, service discovery, health trends, route-aware recommendations, systemd inventory/dependency maps, and body evidence route reviews share one service file. | Extract system-sense domain modules behind stable endpoints: filesystem ops, command/process ops, health/systemd sensing, body-evidence route builders. |
 | P1 | `services/openclaw-core/src/plugin-review.mjs` | Plugin contract review, source review, native adapter checks, capability planning, runtime activation checks, and policy/approval evidence are bundled together. | Split review surfaces into contract/source/runtime/capability modules. Keep public plugin review methods stable. |
 | P1 | `services/openclaw-core/src/task-manager.mjs` | Task serialization manually knows domain-specific extension fields, recovery predicates, phase histories, persistence, and lifecycle events. Every new task family risks adding another top-level serialization field by hand. | Add a local `TASK_EXTENSION_FIELDS` descriptor used by serialization and creation while preserving today's top-level output keys. |
-| P1 | `nix/scripts/dev-milestone-check.sh` milestone registry | Check IDs, script paths, descriptions, ordering, observer/core pairing, and docs commands are maintained manually in one array. | Add a read-only `--verify-manifest` mode or external manifest while keeping current runner behavior. Verify every registered script exists and every selected check ID resolves. |
+| P1 | `nix/scripts` milestone script taxonomy | The runner registry is externalized, but common/core/observer scripts still grow by hand and include long filenames, unregistered helper checks, and repeated shell wiring. | Use the `milestone-script-audit` artifact as the baseline, then add metadata-generated shims for the repeated Phase 99-116 live-provider chain before deleting or renaming legacy scripts. |
 | P2 | `apps/observer-ui/src/client-script-runtime-actions.mjs` | Runtime action handlers combine form reads, fetch calls, approval flows, command/workspace actions, event-to-refresh fan-out, task focus state, and display updates. | Extract an event-to-refresh map and button-action registration table while preserving global function names. |
 | P2 | `services/openclaw-core/src/workspace-ops.mjs` | Target resolution, patch parsing, diff preview, proposals, source-derived proposals, policy metadata, task creation, approval, and event publication share one operational surface. | Split pure patch/diff/proposal builders from task materializers. Keep registry strings and task payload shape unchanged. |
 | P2 | Shared plugin contract (`packages/shared-types/src/plugin-registry.mjs`, `plugin-contract.mjs`) | Native capability IDs and validators are small but drive plan-builder capability mapping, plugin review, workspace ops, route behavior, executor handling, and milestone assertions. | Move capability descriptors into a data module while preserving `createOpenClawNativePluginRegistry` and exact capability IDs. |

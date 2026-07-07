@@ -96,13 +96,16 @@ for (const file of changedFiles) {
   if (file === "nix/scripts/dev-milestone-check.sh"
     || file === "nix/scripts/dev-milestone-checks.tsv"
     || file === "nix/scripts/dev-milestone-registry-check.sh"
+    || file === "nix/scripts/dev-milestone-script-audit-check.sh"
     || file === "nix/scripts/dev-milestone-select-changed-checks.sh") {
     selectName("milestone-registry");
+    selectName("milestone-script-audit");
     continue;
   }
 
   if (file.startsWith("nix/scripts/")) {
     const scriptBasename = path.basename(file);
+    selectName("milestone-script-audit");
     if (byScript.has(scriptBasename)) {
       selected.add(byScript.get(scriptBasename).name);
     }
