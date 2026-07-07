@@ -5,12 +5,17 @@ extraction slices.
 
 ## Current Audit
 
-Hard governance threshold: tracked files over 2000 lines.
+Primary governance signal: mixed responsibility and excessive coupling.
+
+Line-count signal: tracked files over 2000 lines usually deserve inspection,
+but a cohesive domain module can exceed that temporarily, and a smaller file can
+still be a refactor target when unrelated responsibilities are bundled together.
 
 Tracked files over 2000 lines: 10.
 
-Tracked files between 1000 and 2000 lines: 4. These are acceptable for now and
-kept in observation only.
+Tracked files between 1000 and 2000 lines: 4. These are acceptable for now when
+they remain cohesive, and kept in observation unless they become mixed-responsibility
+edit surfaces.
 
 Tracked files over 5000 lines: 4.
 
@@ -19,7 +24,7 @@ Largest files:
 | Lines | File | Priority | Notes |
 | ---: | --- | --- | --- |
 | 12575 | `services/openclaw-core/src/plan-builder.mjs` | P0 | Plan construction and many phase surfaces share one module. |
-| 12360 | `services/openclaw-core/src/cloud-live-provider-runtime-implementation.mjs` | P0 | Reduced from 16195 lines by extracting governance and Phase 107-116 local-read/result-envelope runtime slices; still contains registry, earlier local-read/result-envelope route builders, task factories, executor helpers, and future live-provider growth risk. |
+| 11715 | `services/openclaw-core/src/cloud-live-provider-runtime-implementation.mjs` | P0 | Reduced from 16195 lines by extracting governance and Phase 103-116 local-read/result-envelope runtime slices; still contains registry, earlier local-read/result-envelope route builders, task factories, executor helpers, and future live-provider growth risk. |
 | 5723 | `services/openclaw-core/src/plugin-review.mjs` | P1 | Plugin review flows should be split by review surface and provider/runtime checks. |
 | 5004 | `services/openclaw-system-sense/src/server.mjs` | P1 | HTTP server, probes, summaries, and body/system sensing logic share one file. |
 | 4388 | `services/openclaw-core/src/route-handlers.mjs` | P0 | Core route router is a single branch chain; live-provider routes are especially dense. |
@@ -43,10 +48,11 @@ Observation-only files under the hard threshold:
 - Do not change runtime behavior while reducing monoliths unless a phase explicitly requires it.
 - Prefer thin compatibility shims so existing exports and routes remain stable.
 - Move pure constants, governance records, route groups, and renderer/refresh groups before moving stateful execution logic.
-- Keep new modules under 1000 lines whenever practical, and require an explicit
-  reason before any new or edited module exceeds 2000 lines.
-- Treat 1000-2000 line files as acceptable observation targets, not immediate
-  blockers.
+- Keep new modules under 1000 lines whenever practical, but judge acceptability
+  by cohesion first: one tightly coupled domain can be larger, while a smaller
+  mixed route/UI/state/executor file should still be split.
+- Treat 1000-2000 line files as observation targets, not immediate blockers,
+  unless coupling or repeated edits show they are becoming replacement monoliths.
 - Every extraction slice must pass `npm run typecheck`, `npm run build`, and a focused milestone/regression check that exercises the moved code.
 - Do not continue feature phases in the live-provider lane until the P0 live-provider/core-router/task-executor split has started.
 
@@ -59,8 +65,10 @@ Observation-only files under the hard threshold:
    into a focused module.
 4. Extracted Phase 107-110 result-envelope creation execution runtime into a
    focused module.
+5. Extracted Phase 103-106 result-envelope creation runtime into a focused
+   module.
 
-The largest live-provider runtime file is now 12360 lines, down from 16195.
+The largest live-provider runtime file is now 11715 lines, down from 16195.
 
 ## Optimization Order
 
