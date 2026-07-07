@@ -1,65 +1,45 @@
-# OpenClaw Monolith Reduction Plan
+# OpenClaw Coupling Reduction Plan
 
 Created after Phase 116. Updated after the first live-provider runtime
 extraction slices.
 
-## Current Audit
+## Audit Policy
 
-Primary governance signal: mixed responsibility and excessive coupling.
+Line count is no longer a decision metric.
 
-Line-count signal: tracked files over 2000 lines usually deserve inspection,
-but a cohesive domain module can exceed that temporarily, and a smaller file can
-still be a refactor target when unrelated responsibilities are bundled together.
+The project should reduce files and workflows that bundle unrelated
+responsibilities, require repeated hand synchronization, or make one small
+feature touch many stateful surfaces. A large cohesive domain module can be
+acceptable temporarily. A smaller file should still be split when it mixes
+route dispatch, state mutation, approval logic, UI ids, validation fixtures, or
+milestone orchestration.
 
-Tracked files over 2000 lines: 10.
+Primary coupling signals:
 
-Tracked files between 1000 and 2000 lines: 4. These are acceptable for now when
-they remain cohesive, and kept in observation unless they become mixed-responsibility
-edit surfaces.
+- Mixed responsibilities in one module.
+- Hand-synchronized tokens across core routes, runtime builders, task
+  executors, Observer panels, DOM selectors, refreshers, startup timers, and
+  milestone scripts.
+- State, approval, event, and persistence operations interleaved with route or
+  presentation code.
+- Recursive milestone checks that rebuild long prerequisite chains when an
+  artifact could prove the prerequisite safely.
+- Changes that require broad validation because ownership boundaries are not
+  explicit.
 
-Tracked files over 5000 lines: 4.
+Audit sources used for this revision:
 
-Largest files:
+- Core static scan and read-only subagent audit of `services/openclaw-core` and
+  shared packages.
+- Observer UI static scan and read-only subagent audit of HTML, DOM selectors,
+  refreshers, runtime actions, and startup polling.
+- `nix/scripts` and docs read-only subagent audit of recursive common-checks,
+  artifact naming, observer/core drift, and milestone registry coupling.
 
-| Lines | File | Priority | Notes |
-| ---: | --- | --- | --- |
-| 12575 | `services/openclaw-core/src/plan-builder.mjs` | P0 | Plan construction and many phase surfaces share one module. |
-| 11715 | `services/openclaw-core/src/cloud-live-provider-runtime-implementation.mjs` | P0 | Reduced from 16195 lines by extracting governance and Phase 103-116 local-read/result-envelope runtime slices; still contains registry, earlier local-read/result-envelope route builders, task factories, executor helpers, and future live-provider growth risk. |
-| 5723 | `services/openclaw-core/src/plugin-review.mjs` | P1 | Plugin review flows should be split by review surface and provider/runtime checks. |
-| 5004 | `services/openclaw-system-sense/src/server.mjs` | P1 | HTTP server, probes, summaries, and body/system sensing logic share one file. |
-| 4388 | `services/openclaw-core/src/route-handlers.mjs` | P0 | Core route router is a single branch chain; live-provider routes are especially dense. |
-| 3423 | `services/openclaw-core/src/task-executor.mjs` | P0 | Execution dispatch and executor implementations are mixed. |
-| 3259 | `apps/observer-ui/src/client-script-refreshers-cloud.mjs` | P1 | Cloud refreshers should be split by provider/runtime/credential lane. |
-| 2993 | `apps/observer-ui/src/client-script-runtime-actions.mjs` | P1 | Runtime actions should be split by command domain. |
-| 2371 | `apps/observer-ui/src/server.mjs` | P1 | HTML shell is still embedded in the HTTP server. |
-| 2347 | `docs/plans/OPENCLAW_SOURCE_INTEGRATION_STAGE_PLAN.md` | P3 | Long documentation, lower risk. |
-
-Observation-only files under the hard threshold:
-
-| Lines | File | Priority | Notes |
-| ---: | --- | --- | --- |
-| 1803 | `apps/observer-ui/src/client-script-refreshers-app.mjs` | P2 | App refreshers can be split after cloud refreshers. |
-| 1746 | `services/openclaw-core/src/workspace-ops.mjs` | P2 | Workspace operations can be grouped by read/index/edit surfaces. |
-| 1503 | `apps/observer-ui/src/client-script-renderers.mjs` | P2 | Renderer helpers can be grouped by task/event/workspace surfaces. |
-| 1266 | `apps/observer-ui/src/client-script-config-dom.mjs` | P2 | DOM selector registry can be split after Observer panels are modularized. |
-
-## Guardrails
-
-- Do not change runtime behavior while reducing monoliths unless a phase explicitly requires it.
-- Prefer thin compatibility shims so existing exports and routes remain stable.
-- Move pure constants, governance records, route groups, and renderer/refresh groups before moving stateful execution logic.
-- Keep new modules under 1000 lines whenever practical, but judge acceptability
-  by cohesion first: one tightly coupled domain can be larger, while a smaller
-  mixed route/UI/state/executor file should still be split.
-- Treat 1000-2000 line files as observation targets, not immediate blockers,
-  unless coupling or repeated edits show they are becoming replacement monoliths.
-- Every extraction slice must pass `npm run typecheck`, `npm run build`, and a focused milestone/regression check that exercises the moved code.
-- Do not continue feature phases in the live-provider lane until the P0 live-provider/core-router/task-executor split has started.
-
-## Completed Slices
+## Completed Coupling Work
 
 1. Extracted live-provider governance helpers from
-   `cloud-live-provider-runtime-implementation.mjs`.
+   `services/openclaw-core/src/cloud-live-provider-runtime-implementation.mjs`.
 2. Extracted Phase 115-116 local-read task shell runtime into a focused module.
 3. Extracted Phase 111-114 result-envelope creation execution attempt runtime
    into a focused module.
@@ -68,57 +48,58 @@ Observation-only files under the hard threshold:
 5. Extracted Phase 103-106 result-envelope creation runtime into a focused
    module.
 
-The largest live-provider runtime file is now 11715 lines, down from 16195.
+These slices reduced live-provider runtime coupling by moving cohesive phase
+lanes out of the shared runtime while preserving the public runtime API.
 
-## Optimization Order
+## High-Coupling Hotspots
 
-1. Split `cloud-live-provider-runtime-implementation.mjs` pure phase metadata:
-   - Extract registry constants into focused registry modules.
-   - Extract phase governance helpers into stage-scoped modules.
-   - Keep the public `createCloudLiveProviderRuntimeImplementation(deps)` API unchanged.
+| Priority | Area | Coupling Evidence | Safe First Boundary |
+| --- | --- | --- | --- |
+| P0 | `nix/scripts` late credential-value/result-envelope phase chain | Phase number, slug, predecessor, artifact path, registry, status marker, docs token, observer token, endpoint, and `next.recommendedSlice` are repeated across the Phase 99-116 chain. Partial fast-prereq reuse means validation speed and evidence quality depend on per-script string wiring. | Introduce a metadata table for Phases 99-116 and keep existing scripts as shims. First proof should statically compare metadata to current script/doc strings, then run representative phases 100, 108, and 116 in full and fast modes. |
+| P0 | `services/openclaw-core/src/route-handlers.mjs` | Core HTTP dispatch, proxying, phase route mapping, plugin routes, task POST routes, approval surfaces, and workspace/body routes are all in one request chain. Route tokens must be hand-synced with runtime exports, Observer refreshers, and milestone scripts. | Add a route group registration layer while keeping `registerRoutes(deps)` stable. Start with the live-provider credential POST cluster because branches share `{ confirm }` parsing and `201` response shape. |
+| P0 | `services/openclaw-core/src/task-executor.mjs` | Execution dispatch imports many `is...Task`/`execute...Task` pairs and uses a long ordered branch chain for systemd, body evidence, plugins, workspace commands, long-term memory, and cloud live-provider tasks. | Introduce a task execution registry keyed by predicate/handler. Start with cloud live-provider handlers so `executeTaskWithRecovery` can iterate a table instead of growing branches. |
+| P0 | Observer UI startup and panel synchronization (`client-script-startup.mjs`, `server.mjs`, `client-script-config-dom.mjs`, `client-script-refreshers-cloud.mjs`) | Current contracts are internally consistent, but adding one panel requires matching HTML ids, DOM constants, refresh function, startup call, interval, and milestone token checks. Startup hard-codes every refresher twice: initial `await` sequence and `setInterval` registry. | Introduce a refresh descriptor list grouped by surface and generate startup calls/intervals from it. Then add grouped DOM descriptors for one cloud lane while preserving legacy aliases. |
+| P1 | `services/openclaw-core/src/plan-builder.mjs` | Plugin plans, runtime activation, systemd repair, body evidence, long-term memory, cloud live-provider wiring, policy intent, task creation, approval creation, event publishing, and system-sense fetches share one builder. | Extract the capability registry/invocation slice first: `baseCapabilities`, backend dispatch, result summarization, invocation logging, and registry build behind the same public return names. |
+| P1 | `services/openclaw-core/src/cloud-live-provider-runtime-implementation.mjs` | Still mixes early live-provider route/task lanes with registry constants, approval gates, task phase mutation, persistence, event publication, and repeated deferred execution envelopes. Recent extraction reduced the worst phase-lane coupling. | Continue lane extraction only where it removes cross-phase coupling. Next cohesive target is Phase 99-102 result-envelope route/task/approved-deferred/final-readiness. Separately consider an approved-deferred lifecycle helper that preserves status strings. |
+| P1 | `services/openclaw-system-sense/src/server.mjs` | HTTP server, filesystem operations, command execution, process listing, service discovery, health trends, route-aware recommendations, systemd inventory/dependency maps, and body evidence route reviews share one service file. | Extract system-sense domain modules behind stable endpoints: filesystem ops, command/process ops, health/systemd sensing, body-evidence route builders. |
+| P1 | `services/openclaw-core/src/plugin-review.mjs` | Plugin contract review, source review, native adapter checks, capability planning, runtime activation checks, and policy/approval evidence are bundled together. | Split review surfaces into contract/source/runtime/capability modules. Keep public plugin review methods stable. |
+| P1 | `services/openclaw-core/src/task-manager.mjs` | Task serialization manually knows domain-specific extension fields, recovery predicates, phase histories, persistence, and lifecycle events. Every new task family risks adding another top-level serialization field by hand. | Add a local `TASK_EXTENSION_FIELDS` descriptor used by serialization and creation while preserving today's top-level output keys. |
+| P1 | `nix/scripts/dev-milestone-check.sh` milestone registry | Check IDs, script paths, descriptions, ordering, observer/core pairing, and docs commands are maintained manually in one array. | Add a read-only `--verify-manifest` mode or external manifest while keeping current runner behavior. Verify every registered script exists and every selected check ID resolves. |
+| P2 | `apps/observer-ui/src/client-script-runtime-actions.mjs` | Runtime action handlers combine form reads, fetch calls, approval flows, command/workspace actions, event-to-refresh fan-out, task focus state, and display updates. | Extract an event-to-refresh map and button-action registration table while preserving global function names. |
+| P2 | `services/openclaw-core/src/workspace-ops.mjs` | Target resolution, patch parsing, diff preview, proposals, source-derived proposals, policy metadata, task creation, approval, and event publication share one operational surface. | Split pure patch/diff/proposal builders from task materializers. Keep registry strings and task payload shape unchanged. |
+| P2 | Shared plugin contract (`packages/shared-types/src/plugin-registry.mjs`, `plugin-contract.mjs`) | Native capability IDs and validators are small but drive plan-builder capability mapping, plugin review, workspace ops, route behavior, executor handling, and milestone assertions. | Move capability descriptors into a data module while preserving `createOpenClawNativePluginRegistry` and exact capability IDs. |
 
-2. Continue splitting the credential local-read/result-envelope lane:
-   - Next low-risk target: Phase 103-106 result-envelope creation route/task/
-     approved-deferred/final-readiness preflight.
-   - Then split Phase 99-102 result-envelope route/task/approved-deferred/
-     final-readiness preflight.
-   - Keep the public runtime return API unchanged.
+## Deprioritized By Coupling
 
-3. Split the remaining Phase 107-116 credential local-read/result-envelope execution-attempt lane if new growth appears:
-   - Move route builders, task shell factories, `is...Task` predicates, and executor helpers into a lane module.
-   - Pass only the required runtime context from the main implementation.
-   - Verify Phase 111-116 route/task/deferred/preflight/local-read checks still pass.
+- Long docs are not refactor targets unless they cause process drift.
+- Files under any line threshold are not automatically acceptable.
+- Files over any line threshold are not automatically bad when they own one
+  cohesive domain and have stable validation.
 
-4. Split `route-handlers.mjs` by route domain:
-   - Move cloud live-provider GET/POST route groups to `route-handlers-cloud-live-provider.mjs`.
-   - Move plugin/native-adapter route groups to a plugin route module.
-   - Preserve `registerRoutes(deps)` as the stable entry point.
+## Refactor Order
 
-5. Split `task-executor.mjs` dispatch:
-   - Extract cloud live-provider executor dispatch into a table-driven module.
-   - Extract body/systemd/plugin/workspace executors into domain modules.
-   - Keep `runOperatorStep` and recovery behavior stable.
+1. Finish reducing active live-provider lane coupling while it remains the
+   current development surface.
+2. Add Phase 99-116 milestone metadata for the active credential/result-envelope
+   lane so validation no longer depends on hand-repeated strings.
+3. Split `route-handlers.mjs` by domain so future phases do not keep editing
+   one router chain.
+4. Split `task-executor.mjs` dispatch so new task types register through a
+   domain table instead of a global branch chain.
+5. Add Observer startup/panel/selector descriptors to stop HTML/DOM/refresher/startup
+   drift.
+6. Add broader milestone phase descriptors and shared assertion helpers to reduce slow,
+   recursive, hand-written validation scripts.
+7. Split `plan-builder.mjs`, `plugin-review.mjs`, and `openclaw-system-sense`
+   after the active provider lane no longer forces changes through the current
+   monoliths.
 
-6. Split Observer cloud scripts:
-   - Split `client-script-refreshers-cloud.mjs` by cloud lane.
-   - Split cloud DOM selector declarations in parallel or move to grouped selector objects.
-   - Keep `/client-v5.js` assembly stable through `client-script.mjs`.
+## Minimum Proof For Each Slice
 
-7. Split remaining P1 files:
-   - `plan-builder.mjs` by phase family.
-   - `plugin-review.mjs` by review surface.
-   - `openclaw-system-sense/src/server.mjs` into HTTP, probe, and summary modules.
-   - Keep `workspace-ops.mjs`, app refreshers, renderers, and config DOM in
-     observation unless they exceed 2000 lines or become active edit surfaces.
-
-## First Slice
-
-Start with a behavior-preserving extraction from `cloud-live-provider-runtime-implementation.mjs` because it remains one of the largest files and is most likely to keep growing during future provider phases.
-
-Minimum proof:
-
-- File line count decreases for `cloud-live-provider-runtime-implementation.mjs`.
-- No new file exceeds 1000 lines.
-- `npm run typecheck` passes.
-- `npm run build` passes.
-- Phase 116 core and observer milestone pair still passes.
+- The extracted boundary has one clear responsibility.
+- Public entry points remain stable or are explicitly shimmed.
+- No new replacement module bundles unrelated domains.
+- `npm run typecheck` and `npm run build` pass for JavaScript changes.
+- A focused milestone or regression check exercises the moved behavior.
+- Validation notes state whether fast prerequisite reuse or full-chain
+  validation was used.
