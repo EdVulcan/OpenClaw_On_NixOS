@@ -4,7 +4,9 @@ import { execFile } from "node:child_process";
 import path from "node:path";
 import { promisify } from "node:util";
 import { createSystemBodyEvidence } from "./system-body-evidence.mjs";
+import { handleSystemCommandRoutes } from "./system-command-routes.mjs";
 import { createSystemCommandOperations } from "./system-command-operations.mjs";
+import { handleSystemFileRoutes } from "./system-file-routes.mjs";
 import { createSystemFileOperations } from "./system-file-operations.mjs";
 import { createSystemHealthGovernance } from "./system-health-governance.mjs";
 import { createSystemdInspection } from "./systemd-inspection.mjs";
@@ -212,23 +214,14 @@ const systemState = {
 const healthSnapshots = [];
 
 
-import { corsHeaders, sendJson, readJsonBody, createEventPublisher, registerService } from "../../../packages/shared-utils/src/http.mjs";
+import { corsHeaders, sendJson, createEventPublisher, registerService } from "../../../packages/shared-utils/src/http.mjs";
 import { createEventName } from "../../../packages/shared-events/src/event-factory.mjs";
 
 
 const publishEvent = createEventPublisher(eventHubUrl, "openclaw-system-sense");
 
 
-const {
-  resolveAllowedPath,
-  buildFileMetadata,
-  listFiles,
-  searchFiles,
-  readTextFile,
-  writeTextFile,
-  appendTextFile,
-  createDirectory,
-} = createSystemFileOperations({
+const systemFileOperations = createSystemFileOperations({
   allowedRoots,
   maxFileListLimit,
   maxSearchLimit,
@@ -237,17 +230,14 @@ const {
   maxFileWriteBytes,
 });
 
-const {
-  listProcesses,
-  buildCommandDryRun,
-  executeCommand,
-} = createSystemCommandOperations({
+const systemCommandOperations = createSystemCommandOperations({
   commandAllowlist,
   commandTimeoutMs,
   commandOutputLimit,
-  resolveAllowedPath,
+  resolveAllowedPath: systemFileOperations.resolveAllowedPath,
   defaultCwd: allowedRoots[0],
 });
+const { buildCommandDryRun } = systemCommandOperations;
 
 const {
   buildBodyState,
@@ -768,209 +758,24 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  if (req.method === "GET" && requestUrl.pathname === "/system/files/metadata") {
-    try {
-      const result = resolveAllowedPath(requestUrl.searchParams.get("path"));
-      const metadata = buildFileMetadata(result.path);
-      sendJson(res, 200, {
-        ok: true,
-        allowedRoots,
-        ...result,
-        metadata,
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      sendJson(res, 400, { ok: false, error: message, details: error.details ?? null });
-    }
+  if (await handleSystemFileRoutes({
+    req,
+    res,
+    requestUrl,
+    publishEvent,
+    allowedRoots,
+    operations: systemFileOperations,
+  })) {
     return;
   }
 
-  if (req.method === "GET" && requestUrl.pathname === "/system/files/list") {
-    try {
-      const limit = Number.parseInt(requestUrl.searchParams.get("limit") ?? "50", 10);
-      const result = listFiles(requestUrl.searchParams.get("path"), limit);
-      await publishEvent(createEventName("system.files.listed"), {
-        path: result.path,
-        count: result.count,
-      });
-      sendJson(res, 200, {
-        ok: true,
-        allowedRoots,
-        ...result,
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      sendJson(res, 400, { ok: false, error: message, details: error.details ?? null });
-    }
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/system/files/search") {
-    try {
-      const limit = Number.parseInt(requestUrl.searchParams.get("limit") ?? "50", 10);
-      const result = searchFiles(
-        requestUrl.searchParams.get("path"),
-        requestUrl.searchParams.get("query") ?? requestUrl.searchParams.get("q"),
-        limit,
-      );
-      await publishEvent(createEventName("system.files.searched"), {
-        path: result.path,
-        query: result.query,
-        count: result.count,
-      });
-      sendJson(res, 200, {
-        ok: true,
-        allowedRoots,
-        ...result,
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      sendJson(res, 400, { ok: false, error: message, details: error.details ?? null });
-    }
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/system/files/read-text") {
-    try {
-      const result = readTextFile(requestUrl.searchParams.get("path"));
-      await publishEvent(createEventName("system.files.read"), {
-        path: result.path,
-        contentBytes: result.contentBytes,
-        mode: result.mode,
-      });
-      sendJson(res, 200, {
-        ok: true,
-        allowedRoots,
-        ...result,
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      sendJson(res, 400, { ok: false, error: message, code: error.code ?? null, details: error.details ?? null });
-    }
-    return;
-  }
-
-  if (req.method === "POST" && requestUrl.pathname === "/system/files/write-text") {
-    try {
-      const body = await readJsonBody(req);
-      const result = writeTextFile(body);
-      await publishEvent(createEventName("system.files.written"), {
-        path: result.path,
-        contentBytes: result.contentBytes,
-        overwrite: result.overwrite,
-      });
-      sendJson(res, 200, {
-        ok: true,
-        allowedRoots,
-        ...result,
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      sendJson(res, 400, { ok: false, error: message, code: error.code ?? null, details: error.details ?? null });
-    }
-    return;
-  }
-
-  if (req.method === "POST" && requestUrl.pathname === "/system/files/append-text") {
-    try {
-      const body = await readJsonBody(req);
-      const result = appendTextFile(body);
-      await publishEvent(createEventName("system.files.appended"), {
-        path: result.path,
-        contentBytes: result.contentBytes,
-        previousBytes: result.previousBytes,
-        totalBytes: result.totalBytes,
-      });
-      sendJson(res, 200, {
-        ok: true,
-        allowedRoots,
-        ...result,
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      sendJson(res, 400, { ok: false, error: message, code: error.code ?? null, details: error.details ?? null });
-    }
-    return;
-  }
-
-  if (req.method === "POST" && requestUrl.pathname === "/system/files/mkdir") {
-    try {
-      const body = await readJsonBody(req);
-      const result = createDirectory(body);
-      await publishEvent(createEventName("system.files.directory_created"), {
-        path: result.path,
-        recursive: result.recursive,
-        created: result.created,
-      });
-      sendJson(res, 200, {
-        ok: true,
-        allowedRoots,
-        ...result,
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      sendJson(res, 400, { ok: false, error: message, code: error.code ?? null, details: error.details ?? null });
-    }
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/system/processes") {
-    try {
-      const limit = Number.parseInt(requestUrl.searchParams.get("limit") ?? "50", 10);
-      const result = await listProcesses({
-        query: requestUrl.searchParams.get("query") ?? requestUrl.searchParams.get("q") ?? "",
-        limit,
-      });
-      await publishEvent(createEventName("system.processes.listed"), {
-        count: result.count,
-        query: result.query,
-      });
-      sendJson(res, 200, {
-        ok: true,
-        ...result,
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      sendJson(res, 500, { ok: false, error: message });
-    }
-    return;
-  }
-
-  if (req.method === "POST" && requestUrl.pathname === "/system/command/dry-run") {
-    try {
-      const body = await readJsonBody(req);
-      const plan = buildCommandDryRun(body);
-      await publishEvent(createEventName("system.command.planned"), { plan });
-      sendJson(res, 200, {
-        ok: true,
-        plan,
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      sendJson(res, 400, { ok: false, error: message });
-    }
-    return;
-  }
-
-  if (req.method === "POST" && requestUrl.pathname === "/system/command/execute") {
-    try {
-      const body = await readJsonBody(req);
-      const execution = await executeCommand(body);
-      await publishEvent(createEventName("system.command.executed"), {
-        command: execution.command,
-        cwd: execution.cwd,
-        exitCode: execution.result.exitCode,
-        timedOut: execution.result.timedOut,
-        durationMs: execution.result.durationMs,
-      });
-      sendJson(res, 200, {
-        ok: true,
-        execution,
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      sendJson(res, 400, { ok: false, error: message, code: error.code ?? null, details: error.details ?? null });
-    }
+  if (await handleSystemCommandRoutes({
+    req,
+    res,
+    requestUrl,
+    publishEvent,
+    operations: systemCommandOperations,
+  })) {
     return;
   }
 
