@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { createTaskRecovery } from "./task-recovery.mjs";
 
 export function createTaskManager(deps) {
   const {
@@ -23,6 +24,19 @@ export function createTaskManager(deps) {
     updateRuntimeState,
     getCurrentTask,
   } = state;
+
+  const {
+    recoverTask,
+    isRecoverableTask,
+    hasRecoverableCapabilityPlan,
+    hasRecoverableNativePluginRuntimeActivationPlan,
+    hasRecoverableSearchWebAdapterPlan,
+    buildEyeHandRecoveryEvidence,
+  } = createTaskRecovery({
+    tasks,
+    createTask,
+    persistState,
+  });
 
   // L9571-9611
 function serialiseTask(task) {
@@ -98,88 +112,6 @@ function serialiseTask(task) {
   // L9924-10040
 function isActiveTask(task) {
   return ACTIVE_TASK_STATUSES.has(task.status);
-}
-
-const OPERATOR_INVOKABLE_CAPABILITIES = new Set([
-  "sense.system.vitals",
-  "sense.filesystem.read",
-  "act.filesystem.write_text",
-  "act.filesystem.append_text",
-  "act.filesystem.mkdir",
-  "sense.process.list",
-  "act.system.command.dry_run",
-  "act.system.command.execute",
-  "act.system.heal",
-]);
-
-function planCapabilityActionSteps(task) {
-  return (task.plan?.steps ?? [])
-    .filter((step) => step.phase === "acting_on_target" && OPERATOR_INVOKABLE_CAPABILITIES.has(step.capabilityId));
-}
-
-function isNativePluginRuntimeActivationTask(task) {
-  return task?.type === "native_plugin_runtime_activation"
-    && task?.plan?.strategy === "native-plugin-runtime-activation-v0";
-}
-
-function isNativePluginRuntimeAdapterTask(task) {
-  return task?.type === "native_plugin_runtime_adapter_implementation"
-    && task?.plan?.strategy === "native-plugin-runtime-adapter-v0";
-}
-
-function isOpenClawSearchWebAdapterTask(task) {
-  return task?.type === "openclaw_search_web_adapter_invocation"
-    && task?.plan?.strategy === "openclaw-search-web-adapter-v0";
-}
-
-function isOpenClawSearchWebRuntimeActivationTask(task) {
-  return task?.type === "openclaw_search_web_runtime_activation"
-    && task?.plan?.strategy === "openclaw-search-web-runtime-activation-v0";
-}
-
-function isOpenClawSearchWebProviderRuntimeSandboxTask(task) {
-  return task?.type === "openclaw_search_web_provider_runtime_sandbox"
-    && task?.plan?.strategy === "openclaw-search-web-provider-runtime-sandbox-v0";
-}
-
-function hasRecoverableCapabilityPlan(task) {
-  return task?.type === "system_task" && planCapabilityActionSteps(task).length > 0;
-}
-
-function hasRecoverableNativePluginRuntimeActivationPlan(task) {
-  return (isNativePluginRuntimeActivationTask(task) || isNativePluginRuntimeAdapterTask(task))
-    && task?.plan?.governance?.requiresRuntimeAdapterBeforeExecution === true
-    && task?.plan?.governance?.canReadSourceFileContent === false
-    && task?.plan?.governance?.canImportModule === false
-    && task?.plan?.governance?.canExecutePluginCode === false
-    && task?.plan?.governance?.canActivateRuntime === false;
-}
-
-function hasRecoverableSearchWebAdapterPlan(task) {
-  const hasDeferredBoundary = isOpenClawSearchWebAdapterTask(task)
-    ? task?.plan?.governance?.requiresRuntimePreflightBeforeExecution === true
-    : isOpenClawSearchWebRuntimeActivationTask(task)
-      ? task?.plan?.governance?.requiresRuntimeAdapterBeforeExecution === true
-      : isOpenClawSearchWebProviderRuntimeSandboxTask(task)
-        ? task?.plan?.governance?.requiresRuntimeAdapterBeforeExecution === true
-        : false;
-  return hasDeferredBoundary
-    && task?.plan?.governance?.canUseNetwork === false
-    && task?.plan?.governance?.canExecutePluginCode === false;
-}
-
-function isRecoverableTask(task) {
-  if (!["completed", "failed", "superseded"].includes(task.status)) {
-    return false;
-  }
-
-  if (typeof task.targetUrl === "string" && task.targetUrl.trim().length > 0) {
-    return true;
-  }
-
-  return hasRecoverableCapabilityPlan(task)
-    || hasRecoverableNativePluginRuntimeActivationPlan(task)
-    || hasRecoverableSearchWebAdapterPlan(task);
 }
 
 function compareTasksForDisplay(left, right) {
@@ -532,45 +464,6 @@ function completeTask(task, details = null) {
   return task;
 }
 
-function buildEyeHandRecoveryEvidence(task, reason, details = null) {
-  if (!details || typeof details !== "object") {
-    return null;
-  }
-
-  const verification = details.verification ?? null;
-  const actionEvidence = details.actionEvidence ?? verification?.actionEvidence ?? null;
-  const workViewSummary = details.workViewSummary ?? verification?.workViewSummary ?? null;
-
-  if (!actionEvidence && !workViewSummary) {
-    return null;
-  }
-
-  const failedChecks = (verification?.failedChecks ?? []).map((check) => ({
-    name: check.name ?? null,
-    expected: check.expected ?? null,
-    actual: check.actual ?? null,
-  }));
-  const observedUrl = actionEvidence?.observedAfterActions?.url ?? workViewSummary?.url ?? details.targetUrl ?? task.targetUrl ?? null;
-
-  return {
-    kind: "eye-hand-recovery-evidence",
-    sourceTaskId: task.id,
-    reason,
-    failedChecks,
-    targetUrl: details.targetUrl ?? task.targetUrl ?? null,
-    observedUrl,
-    actionEvidence,
-    workViewSummary,
-    recommendation: {
-      strategy: "retry_with_fresh_observation",
-      targetUrl: observedUrl,
-      rationale: failedChecks.length > 0
-        ? `Recover by re-opening the work view and re-verifying failed check(s): ${failedChecks.map((check) => check.name).join(", ")}.`
-        : "Recover by re-opening the work view and re-checking the latest observation after the recorded action sequence.",
-    },
-  };
-}
-
 function failTask(task, reason, details = null) {
   const failureDetails = details && typeof details === "object"
     ? {
@@ -595,78 +488,6 @@ function failTask(task, reason, details = null) {
 
 function clonePlainObject(value) {
   return value && typeof value === "object" ? JSON.parse(JSON.stringify(value)) : {};
-}
-
-function buildRecoveredPolicyRequest(sourceTask) {
-  const request = clonePlainObject(sourceTask.policy?.request ?? sourceTask.policy ?? {});
-  delete request.approved;
-  return request;
-}
-
-function resetRecoveredPlan(plan) {
-  const now = new Date().toISOString();
-  const recoveredPlan = clonePlainObject(plan);
-  recoveredPlan.planId = `plan-${randomUUID()}`;
-  recoveredPlan.status = "planned";
-  recoveredPlan.createdAt = now;
-  recoveredPlan.updatedAt = now;
-  delete recoveredPlan.failure;
-
-  if (Array.isArray(recoveredPlan.steps)) {
-    recoveredPlan.steps = recoveredPlan.steps.map((step) => {
-      const recoveredStep = {
-        ...step,
-        status: "pending",
-      };
-      delete recoveredStep.completedAt;
-      delete recoveredStep.details;
-      return recoveredStep;
-    });
-  }
-
-  return recoveredPlan;
-}
-
-function recoverTask(sourceTask) {
-  if (sourceTask.recoveredByTaskId && tasks.has(sourceTask.recoveredByTaskId)) {
-    throw new Error(`Task already has a recovery task: ${sourceTask.recoveredByTaskId}`);
-  }
-
-  const recoveryAttempt = (sourceTask.recovery?.attempt ?? 0) + 1;
-  const recoverableCapabilityPlan = hasRecoverableCapabilityPlan(sourceTask);
-  const recoverableNativePluginRuntimeActivationPlan = hasRecoverableNativePluginRuntimeActivationPlan(sourceTask);
-  const recoverableSearchWebAdapterPlan = hasRecoverableSearchWebAdapterPlan(sourceTask);
-  const shouldRecoverExistingPlan = recoverableCapabilityPlan
-    || recoverableNativePluginRuntimeActivationPlan
-    || recoverableSearchWebAdapterPlan;
-  const recoveryBody = {
-    goal: sourceTask.goal,
-    type: sourceTask.type,
-    targetUrl: sourceTask.targetUrl,
-    workViewStrategy: sourceTask.workViewStrategy,
-    includePlan: Boolean(sourceTask.plan) && !shouldRecoverExistingPlan,
-    recovery: {
-      recoveredFromTaskId: sourceTask.id,
-      recoveredFromOutcome: sourceTask.outcome?.kind ?? sourceTask.status,
-      attempt: recoveryAttempt,
-      recoveryEvidence: sourceTask.outcome?.details?.recoveryEvidence ?? null,
-    },
-  };
-
-  if (shouldRecoverExistingPlan) {
-    recoveryBody.plan = resetRecoveredPlan(sourceTask.plan);
-    recoveryBody.policy = buildRecoveredPolicyRequest(sourceTask);
-  }
-  if (sourceTask.sourceCommand && typeof sourceTask.sourceCommand === "object") {
-    recoveryBody.sourceCommand = sourceTask.sourceCommand;
-  }
-
-  const recoveredTask = createTask(recoveryBody);
-
-  sourceTask.recoveredByTaskId = recoveredTask.id;
-  sourceTask.updatedAt = new Date().toISOString();
-  persistState();
-  return recoveredTask;
 }
 
 function buildWorkViewAttachPayload(data, targetUrl) {

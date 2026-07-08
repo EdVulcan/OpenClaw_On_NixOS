@@ -4,6 +4,14 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
 import { createEventName } from "../../../packages/shared-events/src/event-factory.mjs";
+import {
+  isNativePluginRuntimeActivationTask,
+  isNativePluginRuntimeAdapterTask,
+  isOpenClawSearchWebAdapterTask,
+  isOpenClawSearchWebRuntimeActivationTask,
+  isOpenClawSearchWebProviderRuntimeSandboxTask,
+  planCapabilityActionSteps,
+} from "./task-recovery.mjs";
 
 const execFileAsync = promisify(execFile);
 
@@ -40,9 +48,7 @@ export function createTaskExecutor(deps) {
     serialiseTask,
     createTask,
     isActiveTask,
-    hasRecoverableCapabilityPlan,
-    hasRecoverableNativePluginRuntimeActivationPlan,
-    hasRecoverableSearchWebAdapterPlan,
+    recoverTask,
     getTaskById,
     appendTaskPhase,
     setTaskPhase,
@@ -176,54 +182,12 @@ function normaliseExecutorActions(actions) {
     }));
 }
 
-const OPERATOR_INVOKABLE_CAPABILITIES = new Set([
-  "sense.system.vitals",
-  "sense.filesystem.read",
-  "act.filesystem.write_text",
-  "act.filesystem.append_text",
-  "act.filesystem.mkdir",
-  "sense.process.list",
-  "act.system.command.dry_run",
-  "act.system.command.execute",
-  "act.system.heal",
-]);
-
-function planCapabilityActionSteps(task) {
-  return (task.plan?.steps ?? [])
-    .filter((step) => step.phase === "acting_on_target" && OPERATOR_INVOKABLE_CAPABILITIES.has(step.capabilityId));
-}
-
 function shouldExecuteCapabilityPlan(task) {
   return task?.type === "system_task" && planCapabilityActionSteps(task).length > 0;
 }
 
 function isNativePluginCapabilityTask(task) {
   return task?.type === "native_plugin_capability";
-}
-
-function isNativePluginRuntimeActivationTask(task) {
-  return task?.type === "native_plugin_runtime_activation"
-    && task?.plan?.strategy === "native-plugin-runtime-activation-v0";
-}
-
-function isNativePluginRuntimeAdapterTask(task) {
-  return task?.type === "native_plugin_runtime_adapter_implementation"
-    && task?.plan?.strategy === "native-plugin-runtime-adapter-v0";
-}
-
-function isOpenClawSearchWebAdapterTask(task) {
-  return task?.type === "openclaw_search_web_adapter_invocation"
-    && task?.plan?.strategy === "openclaw-search-web-adapter-v0";
-}
-
-function isOpenClawSearchWebRuntimeActivationTask(task) {
-  return task?.type === "openclaw_search_web_runtime_activation"
-    && task?.plan?.strategy === "openclaw-search-web-runtime-activation-v0";
-}
-
-function isOpenClawSearchWebProviderRuntimeSandboxTask(task) {
-  return task?.type === "openclaw_search_web_provider_runtime_sandbox"
-    && task?.plan?.strategy === "openclaw-search-web-provider-runtime-sandbox-v0";
 }
 
 function isSystemdRepairExecutionTask(task) {
@@ -2479,82 +2443,6 @@ async function executeCapabilityPlanTask(task, options = {}) {
       policy: policy.decision,
     };
   }
-}
-
-function recoverTask(sourceTask) {
-  if (sourceTask.recoveredByTaskId && tasks.has(sourceTask.recoveredByTaskId)) {
-    throw new Error(`Task already has a recovery task: ${sourceTask.recoveredByTaskId}`);
-  }
-
-  const recoveryAttempt = (sourceTask.recovery?.attempt ?? 0) + 1;
-  const recoverableCapabilityPlan = hasRecoverableCapabilityPlan(sourceTask);
-  const recoverableNativePluginRuntimeActivationPlan = hasRecoverableNativePluginRuntimeActivationPlan(sourceTask);
-  const recoverableSearchWebAdapterPlan = hasRecoverableSearchWebAdapterPlan(sourceTask);
-  const shouldRecoverExistingPlan = recoverableCapabilityPlan
-    || recoverableNativePluginRuntimeActivationPlan
-    || recoverableSearchWebAdapterPlan;
-  const recoveryBody = {
-    goal: sourceTask.goal,
-    type: sourceTask.type,
-    targetUrl: sourceTask.targetUrl,
-    workViewStrategy: sourceTask.workViewStrategy,
-    includePlan: Boolean(sourceTask.plan) && !shouldRecoverExistingPlan,
-    recovery: {
-      recoveredFromTaskId: sourceTask.id,
-      recoveredFromOutcome: sourceTask.outcome?.kind ?? sourceTask.status,
-      attempt: recoveryAttempt,
-      recoveryEvidence: sourceTask.outcome?.details?.recoveryEvidence ?? null,
-    },
-  };
-
-  if (shouldRecoverExistingPlan) {
-    recoveryBody.plan = resetRecoveredPlan(sourceTask.plan);
-    recoveryBody.policy = buildRecoveredPolicyRequest(sourceTask);
-  }
-  if (sourceTask.sourceCommand && typeof sourceTask.sourceCommand === "object") {
-    recoveryBody.sourceCommand = sourceTask.sourceCommand;
-  }
-
-  const recoveredTask = createTask(recoveryBody);
-
-  sourceTask.recoveredByTaskId = recoveredTask.id;
-  sourceTask.updatedAt = new Date().toISOString();
-  persistState();
-  return recoveredTask;
-}
-
-function clonePlainObject(value) {
-  return value && typeof value === "object" ? JSON.parse(JSON.stringify(value)) : {};
-}
-
-function buildRecoveredPolicyRequest(sourceTask) {
-  const request = clonePlainObject(sourceTask.policy?.request ?? sourceTask.policy ?? {});
-  delete request.approved;
-  return request;
-}
-
-function resetRecoveredPlan(plan) {
-  const now = new Date().toISOString();
-  const recoveredPlan = clonePlainObject(plan);
-  recoveredPlan.planId = `plan-${randomUUID()}`;
-  recoveredPlan.status = "planned";
-  recoveredPlan.createdAt = now;
-  recoveredPlan.updatedAt = now;
-  delete recoveredPlan.failure;
-
-  if (Array.isArray(recoveredPlan.steps)) {
-    recoveredPlan.steps = recoveredPlan.steps.map((step) => {
-      const recoveredStep = {
-        ...step,
-        status: "pending",
-      };
-      delete recoveredStep.completedAt;
-      delete recoveredStep.details;
-      return recoveredStep;
-    });
-  }
-
-  return recoveredPlan;
 }
 
 function recoveryEvidenceTargetUrl(sourceTask) {
