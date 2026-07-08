@@ -568,6 +568,22 @@ Audit sources used for this revision:
     helper surface while the phase-family modules own milestone-specific
     refreshers. The assembled `/client.js` output remained byte-for-byte
     identical.
+85. Extracted Observer body governance/body-evidence runtime refreshers from
+    `apps/observer-ui/src/client-script-refreshers-runtime.mjs` into
+    `apps/observer-ui/src/client-script-refreshers-body-evidence.mjs`. The new
+    chunk owns health trends, route-aware body governance, evidence timeline,
+    body evidence ledger planning, storage root, first record, readiness, demo,
+    and follow-up record refreshers while the runtime refresher chunk keeps
+    core runtime/task/work-view/screen/action/system state and heal/maintenance
+    audit refreshers. The assembled `/client.js` output remained byte-for-byte
+    identical.
+86. Extracted Observer systemd repair runtime refreshers from
+    `apps/observer-ui/src/client-script-refreshers-runtime.mjs` into
+    `apps/observer-ui/src/client-script-refreshers-systemd.mjs`. The new chunk
+    owns Phase 2 route review, repair candidate, next repair, unit inventory,
+    dependency map, repair plan, and repair execution task draft refreshers
+    while the runtime refresher chunk keeps non-systemd runtime surfaces. The
+    assembled `/client.js` output remained byte-for-byte identical.
 
 These slices reduced live-provider runtime and milestone orchestration coupling
 while preserving the public runtime API and existing milestone entry names.
@@ -589,6 +605,7 @@ while preserving the public runtime API and existing milestone entry names.
 | P2 | `apps/observer-ui/src/client-script-runtime-actions.mjs` | Runtime/system/body/systemd refreshers are extracted into `client-script-refreshers-runtime.mjs`, approval-gated workspace/native-adapter/search-web task creation now lives in `client-script-runtime-approval-tasks.mjs`, system/body task-shell creation now lives in `client-script-runtime-system-body-tasks.mjs`, and DOM/input/task-card bindings now live in `client-script-runtime-bindings.mjs`; these splits preserved byte-for-byte assembled `/client.js` output. Remaining coupling is event stream refresh fan-out, task focus state, work-view helpers, and task completion/recovery flows. | Extract event-to-refresh descriptors or task focus helpers while preserving global function names and byte-for-byte or token-equivalent served output where feasible. |
 | P2 | `apps/observer-ui/src/client-script-renderers.mjs` | Workspace/source/native-adapter renderers now live in `client-script-renderers-workspace-source.mjs`, leaving the main renderer chunk focused on shared formatting, task/policy/capability/ledger renderers, native plugin runtime renderers, and the operator panel. The served client script was proven byte-for-byte identical after extraction. | Treat as largely reduced unless the remaining native plugin runtime renderer group grows; next higher-ROI Observer hotspots are `client-script-refreshers-runtime.mjs` and `client-script-config-dom.mjs`. |
 | P2 | `apps/observer-ui/src/client-script-refreshers-app.mjs` | Workspace/source/native-adapter refreshers now live in `client-script-refreshers-workspace-source.mjs`; MVP/Phase 2-5 refreshers live in `client-script-refreshers-mvp-phases.mjs`; Phase 6 and long-term-memory refreshers live in `client-script-refreshers-memory-phases.mjs`. The main app refresher chunk is now focused on core operator, policy, approval, capability, ledger, health, task summary, fetch, and event helpers. The assembled `/client.js` output was proven byte-for-byte identical. | Treat as largely reduced; keep future phase refreshers in phase-family modules rather than growing the core app refresher chunk. |
+| P2 | `apps/observer-ui/src/client-script-refreshers-runtime.mjs` | Body governance/body-evidence refreshers now live in `client-script-refreshers-body-evidence.mjs`, and systemd repair refreshers now live in `client-script-refreshers-systemd.mjs`. The runtime refresher chunk is now focused on core runtime, task list/history, work-view, screen/action, system state, heal, maintenance, and audit refreshers. The assembled `/client.js` output was proven byte-for-byte identical. | Treat as largely reduced; route future body-evidence and systemd refreshers into their domain chunks rather than growing the core runtime refresher chunk. |
 | P2 | `apps/observer-ui/src/client-script-refreshers-cloud.mjs` | Cloud/live-provider refreshers are now split into context/provider rehearsal, live runbook/runtime adapter, real launch/credential authorization, local-read, and result-envelope chunks, and startup refresh registration is descriptor-backed. Remaining coupling is the repeated endpoint-to-DOM rendering pattern inside each phase-family chunk. | Introduce descriptor-backed endpoint/DOM rendering for one cloud lane only after preserving global function names and served `/client.js` token compatibility. |
 | P2 | `services/openclaw-core/src/workspace-ops.mjs` | Target resolution, source signal collection, task creation, approval, and event publication still share one operational surface, but pure patch edit/diff utilities now live in `workspace-patch-utils.mjs`, proposal/rationale/check/risk bundle construction now lives in `workspace-proposal-utils.mjs`, and workspace/source command plan-only builders now live in `workspace-command-plan-builders.mjs` with direct unit coverage. | Treat as substantially reduced for now. Next split should target source-authored edit orchestration only if it grows, or separate approval-gated task materializers if future native workspace work touches this file heavily. |
 | P2 | Shared plugin contract (`packages/shared-types/src/plugin-registry.mjs`, `plugin-contract.mjs`) | Native capability IDs and validators are small but drive plan-builder capability mapping, plugin review, workspace ops, route behavior, executor handling, and milestone assertions. | Move capability descriptors into a data module while preserving `createOpenClawNativePluginRegistry` and exact capability IDs. |
