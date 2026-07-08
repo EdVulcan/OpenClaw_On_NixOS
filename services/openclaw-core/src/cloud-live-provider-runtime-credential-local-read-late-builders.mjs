@@ -5,6 +5,7 @@ import { createCredentialLocalReadResultEnvelopeCreationRuntime } from "./cloud-
 import { createCredentialLocalReadResultEnvelopeCreationExecutionAttemptLocalReadRuntime } from "./cloud-live-provider-runtime-credential-local-read-result-envelope-creation-execution-attempt-local-read.mjs";
 import { createCredentialLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeRuntime } from "./cloud-live-provider-runtime-credential-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope.mjs";
 import { createCredentialLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationRuntime } from "./cloud-live-provider-runtime-credential-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-creation.mjs";
+import { createCredentialLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationExecutionTaskShellRuntime } from "./cloud-live-provider-runtime-credential-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-creation-execution-task-shell.mjs";
 import { createCredentialLocalReadResultEnvelopeCreationExecutionAttemptRuntime } from "./cloud-live-provider-runtime-credential-local-read-result-envelope-creation-execution-attempt.mjs";
 import { createCredentialLocalReadResultEnvelopeCreationExecutionRuntime } from "./cloud-live-provider-runtime-credential-local-read-result-envelope-creation-execution.mjs";
 
@@ -98,6 +99,12 @@ export function createCloudLiveProviderRuntimeCredentialLocalReadLateBuilders(co
         resultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeRuntime.buildCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeFinalReadinessPreflight,
       ...taskRuntimeContext,
     });
+  const resultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationExecutionTaskShellRuntime =
+    createCredentialLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationExecutionTaskShellRuntime({
+      buildCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationExecutionRoute:
+        resultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationRuntime.buildCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationExecutionRoute,
+      ...taskRuntimeContext,
+    });
 
   return {
     ...attemptRuntime,
@@ -109,5 +116,6 @@ export function createCloudLiveProviderRuntimeCredentialLocalReadLateBuilders(co
     ...resultEnvelopeCreationExecutionAttemptLocalReadRuntime,
     ...resultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeRuntime,
     ...resultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationRuntime,
+    ...resultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationExecutionTaskShellRuntime,
   };
 }
