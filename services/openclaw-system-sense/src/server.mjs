@@ -10,6 +10,7 @@ import { createSystemCommandOperations } from "./system-command-operations.mjs";
 import { handleSystemFileRoutes } from "./system-file-routes.mjs";
 import { createSystemFileOperations } from "./system-file-operations.mjs";
 import { createSystemHealthGovernance } from "./system-health-governance.mjs";
+import { handleSystemHealthRoutes } from "./system-health-routes.mjs";
 import { createSystemdInspection } from "./systemd-inspection.mjs";
 import { createSystemdNextRepairPlanning } from "./systemd-next-repair-planning.mjs";
 import { createSystemdRepairCandidatePlanning } from "./systemd-repair-candidate-planning.mjs";
@@ -266,6 +267,14 @@ const {
     phase2RouteReview: PHASE_2_ROUTE_REVIEW_REGISTRY,
   },
 });
+
+const systemHealthRouteBuilders = {
+  buildHealthTrendSummary,
+  buildRouteAwareNextActionRecommendation,
+  buildConservativeRecoveryPolicyExplanation,
+  buildBodyGovernanceReadiness,
+  buildPhase2RouteReview,
+};
 
 async function checkService(name, baseUrl) {
   const startedAt = Date.now();
@@ -547,36 +556,15 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  if (req.method === "GET" && requestUrl.pathname === "/system/health") {
-    await refreshSystemState();
-    sendJson(res, 200, {
-      ok: true,
-      system: { ...systemState },
-    });
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/system/health/trends") {
-    const trendSummary = await buildHealthTrendSummary();
-    sendJson(res, 200, trendSummary);
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/system/route/next-action") {
-    const recommendation = await buildRouteAwareNextActionRecommendation();
-    sendJson(res, 200, recommendation);
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/system/route/recovery-policy") {
-    const policy = await buildConservativeRecoveryPolicyExplanation();
-    sendJson(res, 200, policy);
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/system/route/body-governance-readiness") {
-    const readiness = await buildBodyGovernanceReadiness();
-    sendJson(res, 200, readiness);
+  if (await handleSystemHealthRoutes({
+    req,
+    res,
+    requestUrl,
+    refreshSystemState,
+    getSystemState: () => systemState,
+    publishEvent,
+    builders: systemHealthRouteBuilders,
+  })) {
     return;
   }
 
@@ -589,47 +577,12 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  if (req.method === "GET" && requestUrl.pathname === "/system/route/phase-2-review") {
-    const review = await buildPhase2RouteReview();
-    sendJson(res, 200, review);
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/system/body") {
-    await refreshSystemState();
-    sendJson(res, 200, {
-      ok: true,
-      body: systemState.body,
-      resources: systemState.resources,
-      network: systemState.network,
-    });
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/system/services") {
-    await refreshSystemState();
-    sendJson(res, 200, {
-      ok: true,
-      services: systemState.services,
-    });
-    return;
-  }
-
   if (await handleSystemdRoutes({
     req,
     res,
     requestUrl,
     builders: systemdRouteBuilders,
   })) {
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/system/alerts") {
-    await refreshSystemState();
-    sendJson(res, 200, {
-      ok: true,
-      alerts: systemState.alerts,
-    });
     return;
   }
 
@@ -651,21 +604,6 @@ const server = http.createServer(async (req, res) => {
     publishEvent,
     operations: systemCommandOperations,
   })) {
-    return;
-  }
-
-  if (req.method === "POST" && requestUrl.pathname === "/system/refresh") {
-    await refreshSystemState();
-    await publishEvent(createEventName(systemState.alerts.length > 0 ? "service.failed" : "system.updated"), {
-      alerts: systemState.alerts,
-      services: systemState.services,
-      resources: systemState.resources,
-      body: systemState.body,
-    });
-    sendJson(res, 200, {
-      ok: true,
-      system: { ...systemState },
-    });
     return;
   }
 
