@@ -6,6 +6,7 @@ import path from "node:path";
 
 import { createBodyEvidenceTaskBuilders } from "../src/body-evidence-task-builders.mjs";
 import { createCloudConsciousnessHandoffBuilders } from "../src/cloud-consciousness-handoff-builders.mjs";
+import { createCloudConsciousnessProviderCallRehearsalBuilders } from "../src/cloud-consciousness-provider-call-rehearsal-builders.mjs";
 import { createCloudConsciousnessProviderDryRunBuilders } from "../src/cloud-consciousness-provider-dry-run-builders.mjs";
 import { createLongTermMemoryBuilders } from "../src/long-term-memory-builders.mjs";
 import { createSystemdTaskBuilders } from "../src/systemd-task-builders.mjs";
@@ -96,6 +97,7 @@ function createTaskLifecycleHarness(overrides = {}) {
       longTermMemoryWrite: task.longTermMemoryWrite ?? null,
       cloudConsciousnessHandoff: task.cloudConsciousnessHandoff ?? null,
       cloudConsciousnessProviderDryRun: task.cloudConsciousnessProviderDryRun ?? null,
+      cloudConsciousnessProviderCallRehearsal: task.cloudConsciousnessProviderCallRehearsal ?? null,
       bodyEvidenceLedgerDirectory: task.bodyEvidenceLedgerDirectory ?? null,
       bodyEvidenceLedgerFirstRecord: task.bodyEvidenceLedgerFirstRecord ?? null,
       bodyEvidenceLedgerFollowupRecord: task.bodyEvidenceLedgerFollowupRecord ?? null,
@@ -181,6 +183,35 @@ function createTaskLifecycleHarness(overrides = {}) {
         latestContentHash: "hash-cloud-handoff",
       },
     }),
+    buildCloudConsciousnessProviderAdapterExit: async () => ({
+      ok: true,
+      registry: "openclaw-cloud-consciousness-provider-adapter-exit-v0",
+      summary: { complete: true },
+      next: { recommendedSlice: "openclaw-cloud-consciousness-real-provider-call-plan" },
+    }),
+    buildCloudConsciousnessProviderRequestEnvelope: async () => ({
+      ok: true,
+      registry: "openclaw-cloud-consciousness-provider-request-envelope-v0",
+      envelope: {
+        id: "cloud-provider-request",
+        contentHash: "hash-provider-request",
+        sourceHandoff: {
+          recordId: "cloud-context-handoff-record",
+          contentHash: "hash-cloud-handoff",
+          packageId: "cloud-context-package",
+        },
+        governance: {
+          networkCall: false,
+          providerCredentialIncluded: false,
+          transmitsExternally: false,
+        },
+      },
+      summary: {
+        ready: true,
+        providerCredentialIncluded: false,
+        transmitsExternally: false,
+      },
+    }),
     SYSTEMD_REPAIR_EXECUTION_TASK_REGISTRY: "openclaw-systemd-repair-execution-task-v0",
     SYSTEMD_NEXT_REPAIR_TASK_SHELL_REGISTRY: "openclaw-systemd-next-repair-task-shell-v0",
     SYSTEMD_NEXT_REPAIR_REAL_EXECUTION_REGISTRY: "openclaw-systemd-next-repair-real-execution-v0",
@@ -194,6 +225,8 @@ function createTaskLifecycleHarness(overrides = {}) {
     CLOUD_CONSCIOUSNESS_HANDOFF_FILE_DISPLAY_PATH: ".artifacts/openclaw-cloud-consciousness/context-handoff.jsonl",
     CLOUD_CONSCIOUSNESS_PROVIDER_DRY_RUN_TASK_REGISTRY: "openclaw-cloud-consciousness-provider-dry-run-task-v0",
     CLOUD_CONSCIOUSNESS_PROVIDER_DRY_RUN_FILE_DISPLAY_PATH: ".artifacts/openclaw-cloud-consciousness/provider-dry-run.jsonl",
+    CLOUD_CONSCIOUSNESS_PROVIDER_CALL_REHEARSAL_TASK_REGISTRY: "openclaw-cloud-consciousness-real-provider-call-task-v0",
+    CLOUD_CONSCIOUSNESS_PROVIDER_RESPONSE_FILE_DISPLAY_PATH: ".artifacts/openclaw-cloud-consciousness/provider-response-rehearsal.jsonl",
     ...overrides.deps,
   };
 
@@ -565,6 +598,106 @@ test("cloud consciousness provider dry-run builders execute approved dry-runs wi
     assert.equal(calls.some((call) => call.name === "setTaskPhase" && call.phase === "cloud_consciousness_provider_dry_run_write"), true);
     assert.equal(calls.at(-1).name, "completeTask");
     assert.equal(events.at(-1).name, "cloud_consciousness.provider_dry_run_written");
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("cloud consciousness provider call rehearsal builders preserve no-network preflight contracts", async () => {
+  const { deps } = createTaskLifecycleHarness();
+  const builders = createCloudConsciousnessProviderCallRehearsalBuilders(deps);
+
+  const plan = await builders.buildCloudConsciousnessRealProviderCallPlan();
+  const preflight = await builders.buildCloudConsciousnessProviderCredentialPreflight();
+  const routeReview = await builders.buildCloudConsciousnessRealProviderCallRouteReview();
+
+  assert.equal(plan.registry, "openclaw-cloud-consciousness-real-provider-call-plan-v0");
+  assert.equal(plan.summary.ready, true);
+  assert.equal(preflight.summary.providerCredentialRead, false);
+  assert.equal(preflight.preflight.credentialValueRead, false);
+  assert.equal(routeReview.decision.selectedSlice, "openclaw-cloud-consciousness-real-provider-call-task");
+  assert.equal(routeReview.decision.canCallCloudProviderNow, false);
+});
+
+test("cloud consciousness provider call rehearsal builders create approval-gated tasks", async () => {
+  const { deps, calls, events } = createTaskLifecycleHarness();
+  const builders = createCloudConsciousnessProviderCallRehearsalBuilders(deps);
+
+  await assert.rejects(
+    () => builders.createCloudConsciousnessProviderCallRehearsalTask({ confirm: false }),
+    /requires confirm=true/,
+  );
+
+  const result = await builders.createCloudConsciousnessProviderCallRehearsalTask({ confirm: true });
+
+  assert.equal(result.registry, "openclaw-cloud-consciousness-real-provider-call-task-v0");
+  assert.equal(result.task.type, "cloud_consciousness_provider_call_rehearsal_task");
+  assert.equal(result.task.cloudConsciousnessProviderCallRehearsal.artifactWritten, false);
+  assert.equal(result.task.cloudConsciousnessProviderCallRehearsal.credentialRead, false);
+  assert.equal(result.governance.createsApproval, true);
+  assert.deepEqual(
+    calls.map((call) => call.name),
+    [
+      "createTask",
+      "createApprovalRequestForTask",
+      "supersedeOtherActiveTasks",
+      "reconcileRuntimeState",
+      "persistState",
+    ],
+  );
+  assert.deepEqual(
+    events.map((event) => event.name),
+    ["task.created", "approval.pending", "task.planned", "task.phase_changed"],
+  );
+});
+
+test("cloud consciousness provider call rehearsal builders execute approved rehearsals without credentials or network", async () => {
+  const tempDir = mkdtempSync(path.join(tmpdir(), "openclaw-provider-call-rehearsal-test-"));
+  const responseFile = path.join(tempDir, "provider-response-rehearsal.jsonl");
+  const { deps, calls, events } = createTaskLifecycleHarness({
+    deps: {
+      CLOUD_CONSCIOUSNESS_PROVIDER_RESPONSE_FILE_DISPLAY_PATH: responseFile,
+    },
+    postJson: (url, body) => ({
+      ok: true,
+      mode: "append_text",
+      path: body.path,
+      root: tempDir,
+      created: true,
+      createIfMissing: body.createIfMissing,
+      contentBytes: Buffer.byteLength(body.content, "utf8"),
+      previousBytes: 0,
+      totalBytes: Buffer.byteLength(body.content, "utf8"),
+    }),
+  });
+  const builders = createCloudConsciousnessProviderCallRehearsalBuilders(deps);
+  const task = {
+    id: "task-provider-call-rehearsal",
+    type: "cloud_consciousness_provider_call_rehearsal_task",
+    status: "queued",
+    approval: { requestId: "approval-provider-call-rehearsal", status: "approved" },
+    cloudConsciousnessProviderCallRehearsal: {
+      registry: "openclaw-cloud-consciousness-real-provider-call-task-v0",
+    },
+  };
+
+  try {
+    assert.equal(builders.isCloudConsciousnessProviderCallRehearsalTask(task), true);
+
+    const result = await builders.executeCloudConsciousnessProviderCallRehearsalTask(task);
+
+    assert.equal(result.execution.registry, "openclaw-cloud-consciousness-approved-provider-call-rehearsal-v0");
+    assert.equal(result.execution.hostMutation, true);
+    assert.equal(result.execution.transmittedExternally, false);
+    assert.equal(result.execution.cloudCallExecuted, false);
+    assert.equal(result.execution.providerSdkLoaded, false);
+    assert.equal(result.execution.credentialRead, false);
+    assert.equal(result.task.cloudConsciousnessProviderCallRehearsal.artifactWritten, true);
+    assert.equal(result.task.cloudConsciousnessProviderCallRehearsal.credentialRead, false);
+    assert.equal(calls.find((call) => call.name === "postJson")?.url, "http://127.0.0.1:4106/system/files/append-text");
+    assert.equal(calls.some((call) => call.name === "setTaskPhase" && call.phase === "cloud_consciousness_provider_response_rehearsal_write"), true);
+    assert.equal(calls.at(-1).name, "completeTask");
+    assert.equal(events.at(-1).name, "cloud_consciousness.provider_call_rehearsal_written");
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
