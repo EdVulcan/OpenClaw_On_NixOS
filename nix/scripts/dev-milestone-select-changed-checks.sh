@@ -403,6 +403,21 @@ function isResultEnvelopeRouteExtractionOnly(file) {
   });
 }
 
+function isCloudLiveProviderLateRuntimeCompositionExtraction(file) {
+  if (file === "services/openclaw-core/src/cloud-live-provider-runtime-credential-local-read-late-builders.mjs") {
+    return true;
+  }
+  if (file !== "services/openclaw-core/src/cloud-live-provider-runtime-implementation.mjs") {
+    return false;
+  }
+
+  const changedLines = readDiffChangedLines(file);
+  if (!changedLines || changedLines.length === 0) return false;
+  const changedText = changedLines.map(({ text }) => text).join("\n");
+  return changedText.includes("cloud-live-provider-runtime-credential-local-read-late-builders.mjs")
+    && changedText.includes("credentialLocalReadLateBuilders");
+}
+
 function isAllowedHttpJsonHelperExtractionAddition(text) {
   return text === ""
     || /^OPENCLAW_POST_JSON_FAILURE="(allow|fail-with-body)"$/.test(text)
@@ -544,6 +559,14 @@ function selectSourceHeuristics(file) {
   }
 
   if (file.startsWith("services/openclaw-core/src/cloud-live-provider-runtime")) {
+    if (isCloudLiveProviderLateRuntimeCompositionExtraction(file)) {
+      selectName("openclaw-core-service-unit-tests");
+      selectName(credentialValueLocalReadAttemptManifestCheck);
+      selectName(resultEnvelopeManifestCheck);
+      selectName("openclaw-live-provider-credential-value-local-read-attempt-batch-reuse");
+      selectName("openclaw-live-provider-result-envelope-batch-reuse");
+      return;
+    }
     for (const entry of entries) {
       if (entry.name.includes("cloud-consciousness-live-provider")) {
         selected.add(entry.name);
