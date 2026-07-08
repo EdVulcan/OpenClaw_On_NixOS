@@ -155,7 +155,7 @@ const milestones = readTsv(manifestFile, [
 ], "manifest").map((entry) => ({ ...entry, phaseNumber: Number.parseInt(entry.phase, 10) }));
 
 const expectedFirstPhase = 99;
-const expectedLastPhase = 118;
+const expectedLastPhase = 119;
 const expectedMilestoneRows = expectedLastPhase - expectedFirstPhase + 1;
 
 if (milestones.length !== expectedMilestoneRows) {
@@ -344,7 +344,7 @@ if (commonPrereqHelperCalls !== expectedPrereqHelperCalls) {
 if (commonAssertionHelperCalls !== milestones.length) {
   issues.push({
     file: commonAssertionsHelperPath,
-    issue: "expected every Phase 99-117 common check to use the observer assertion helper",
+    issue: `expected every Phase ${expectedFirstPhase}-${expectedLastPhase} common check to use the observer assertion helper`,
     expected: milestones.length,
     actual: commonAssertionHelperCalls,
   });
