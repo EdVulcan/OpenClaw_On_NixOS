@@ -59,6 +59,7 @@ const credentialValueLocalReadAttemptManifestCheck = "openclaw-live-provider-cre
 const credentialValueLocalReadAttemptManifestFile = path.join(scriptDir, "openclaw-live-provider-credential-value-local-read-attempt-milestones.tsv");
 const resultEnvelopeManifestCheck = "openclaw-live-provider-result-envelope-milestone-manifest";
 const resultEnvelopeScriptNeedle = "credential-value-local-read-execution-local-read-attempt-local-read-result-envelope";
+const resultEnvelopePhaseAliasPattern = /^dev-(?:observer-)?openclaw-live-provider-result-envelope-phase-\d+(?:-common)?-check\.sh$/;
 const resultEnvelopeCommonEnvHelper = "dev-openclaw-live-provider-result-envelope-common-env.sh";
 const resultEnvelopePrereqHelper = "dev-openclaw-live-provider-result-envelope-prereq.sh";
 const resultEnvelopeAssertionsHelper = "dev-openclaw-live-provider-result-envelope-assertions.sh";
@@ -331,7 +332,7 @@ function isCredentialValueLocalReadAttemptCommonPrereqExtractionOnly(file, scrip
 }
 
 function isResultEnvelopeCommonEnvExtractionOnly(file, scriptBasename) {
-  if (!scriptBasename.includes(resultEnvelopeScriptNeedle) || !scriptBasename.endsWith("-common-check.sh")) {
+  if (!isResultEnvelopeMilestoneScript(scriptBasename) || !scriptBasename.endsWith("-common-check.sh")) {
     return false;
   }
 
@@ -350,7 +351,7 @@ function isResultEnvelopeCommonEnvExtractionOnly(file, scriptBasename) {
 }
 
 function isResultEnvelopeCommonPrereqExtractionOnly(file, scriptBasename) {
-  if (!scriptBasename.includes(resultEnvelopeScriptNeedle) || !scriptBasename.endsWith("-common-check.sh")) {
+  if (!isResultEnvelopeMilestoneScript(scriptBasename) || !scriptBasename.endsWith("-common-check.sh")) {
     return false;
   }
 
@@ -383,6 +384,11 @@ function isAllowedResultEnvelopeRouteExtractionRemoval(text) {
     || text === "  }"
     || /^  if \(req\.method === "GET" && requestUrl\.pathname === "\/cloud-consciousness\/live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope/.test(text)
     || /^    sendJson\(res, 200, await buildCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelope.*\(\)\);$/.test(text);
+}
+
+function isResultEnvelopeMilestoneScript(scriptBasename) {
+  return scriptBasename.includes(resultEnvelopeScriptNeedle)
+    || resultEnvelopePhaseAliasPattern.test(scriptBasename);
 }
 
 function isResultEnvelopeRouteExtractionOnly(file) {
@@ -523,7 +529,7 @@ function selectPhasePlanChecks(file) {
   if (numericPhase >= 91 && numericPhase <= 98) {
     selectName(credentialValueLocalReadAttemptManifestCheck);
   }
-  if (numericPhase >= 99 && numericPhase <= 129) {
+  if (numericPhase >= 99 && numericPhase <= 130) {
     selectName(resultEnvelopeManifestCheck);
     selectName("openclaw-live-provider-result-envelope-batch-reuse");
     return;
@@ -747,7 +753,7 @@ for (const file of changedFiles) {
       || scriptBasename === "dev-openclaw-live-provider-result-envelope-prereq.sh"
       || scriptBasename === resultEnvelopeAssertionsHelper
       || scriptBasename === "dev-openclaw-live-provider-result-envelope-wrapper.sh"
-      || scriptBasename.includes(resultEnvelopeScriptNeedle)) {
+      || isResultEnvelopeMilestoneScript(scriptBasename)) {
       selectName(resultEnvelopeManifestCheck);
       if (scriptBasename === "dev-openclaw-live-provider-result-envelope-prereq.sh"
         || scriptBasename === resultEnvelopeAssertionsHelper) {
@@ -761,7 +767,7 @@ for (const file of changedFiles) {
       || scriptBasename === "dev-openclaw-live-provider-result-envelope-wrapper.sh") {
       continue;
     }
-    if (scriptBasename.includes(resultEnvelopeScriptNeedle)) {
+    if (isResultEnvelopeMilestoneScript(scriptBasename)) {
       if (scriptBasename.endsWith("-batch-check.sh") && byScript.has(scriptBasename)) {
         selected.add(byScript.get(scriptBasename).name);
         continue;

@@ -23,6 +23,7 @@ const { execFileSync } = require("node:child_process");
 
 const [scriptDir, repoRoot, registryFile, registrySourceFile, manifestFile, summaryFile] = process.argv.slice(2);
 const issues = [];
+const hardScriptFilenameLimit = 240;
 
 function readTsv(file, columns, label) {
   const text = fs.readFileSync(file, "utf8").replace(/^\uFEFF/, "");
@@ -82,6 +83,32 @@ function stateArtifactFilenamesForMilestone(milestone) {
     `openclaw-core-phase-${milestone.phase}-${suffix}-check.json`,
     `openclaw-system-heal-phase-${milestone.phase}-${suffix}-check.json`,
   ];
+}
+
+function usesShortResultEnvelopeScriptAlias(milestone) {
+  return [
+    `dev-${milestone.slug}-check.sh`,
+    `dev-observer-${milestone.slug}-check.sh`,
+    `dev-${milestone.slug}-common-check.sh`,
+  ].some((script) => script.length >= hardScriptFilenameLimit);
+}
+
+function resultEnvelopeScriptBase(milestone) {
+  return usesShortResultEnvelopeScriptAlias(milestone)
+    ? `openclaw-live-provider-result-envelope-phase-${milestone.phase}`
+    : milestone.slug;
+}
+
+function resultEnvelopeCoreScript(milestone) {
+  return `dev-${resultEnvelopeScriptBase(milestone)}-check.sh`;
+}
+
+function resultEnvelopeObserverScript(milestone) {
+  return `dev-observer-${resultEnvelopeScriptBase(milestone)}-check.sh`;
+}
+
+function resultEnvelopeCommonScript(milestone) {
+  return `dev-${resultEnvelopeScriptBase(milestone)}-common-check.sh`;
 }
 
 function readCommonEnvForMilestone(milestone, commonEnvHelperPath) {
@@ -155,7 +182,7 @@ const milestones = readTsv(manifestFile, [
 ], "manifest").map((entry) => ({ ...entry, phaseNumber: Number.parseInt(entry.phase, 10) }));
 
 const expectedFirstPhase = 99;
-const expectedLastPhase = 129;
+const expectedLastPhase = 130;
 const expectedMilestoneRows = expectedLastPhase - expectedFirstPhase + 1;
 
 if (milestones.length !== expectedMilestoneRows) {
@@ -210,10 +237,10 @@ for (const [index, milestone] of milestones.entries()) {
     });
   }
 
-  const coreScript = `dev-${milestone.slug}-check.sh`;
-  const commonScript = `dev-${milestone.slug}-common-check.sh`;
+  const coreScript = resultEnvelopeCoreScript(milestone);
+  const commonScript = resultEnvelopeCommonScript(milestone);
   const observerName = `observer-${milestone.slug}`;
-  const observerScript = `dev-observer-${milestone.slug}-check.sh`;
+  const observerScript = resultEnvelopeObserverScript(milestone);
   const primaryRegistry = primaryRegistryForSlug(milestone.slug);
   const primaryStatusMarkers = primaryStatusMarkersForSlug(milestone.slug);
   const stateArtifactFilenames = stateArtifactFilenamesForMilestone(milestone);

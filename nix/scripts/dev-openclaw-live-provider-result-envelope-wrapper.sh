@@ -20,7 +20,13 @@ slug="$(
 
 phase_env="PHASE${PHASE}"
 port_base=$((14900 + (PHASE * 100)))
-common_script="$SCRIPT_DIR/dev-${slug}-common-check.sh"
+core_script="dev-${slug}-check.sh"
+observer_script="dev-observer-${slug}-check.sh"
+common_script_name="dev-${slug}-common-check.sh"
+if (( ${#core_script} >= 240 || ${#observer_script} >= 240 || ${#common_script_name} >= 240 )); then
+  common_script_name="dev-openclaw-live-provider-result-envelope-phase-${PHASE}-common-check.sh"
+fi
+common_script="$SCRIPT_DIR/$common_script_name"
 
 if [[ ! -f "$common_script" ]]; then
   echo "Common milestone check not found for Phase $PHASE: $common_script" >&2

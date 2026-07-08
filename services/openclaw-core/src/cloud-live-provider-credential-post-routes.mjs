@@ -128,6 +128,11 @@ const CREDENTIAL_POST_ROUTES = new Map([
     rawPreflightFields,
   ),
   postRoute(
+    "/cloud-consciousness/live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-creation-execution-final-readiness-preflight",
+    "recordCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationExecutionFinalReadinessPreflight",
+    rawPreflightFields,
+  ),
+  postRoute(
     "/cloud-consciousness/live-provider-credential-value-local-read-tasks",
     "createCloudConsciousnessLiveProviderCredentialValueLocalReadTask",
     taskRouteFields,
