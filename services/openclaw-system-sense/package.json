@@ -4,8 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "build": "node --check src/server.mjs",
+    "build": "npm run typecheck && npm test",
     "start": "node src/server.mjs",
-    "typecheck": "node --check src/server.mjs"
+    "test": "node --test test/*.test.mjs",
+    "typecheck": "node --check src/server.mjs && node --check src/system-file-operations.mjs"
   }
 }
