@@ -120,6 +120,100 @@ async function invokeRoute(deps, method, path, body = null) {
   };
 }
 
+test("core infrastructure health route preserves service configuration readback", async () => {
+  const deps = createBaseDeps();
+
+  const response = await invokeRoute(deps, "GET", "/health");
+
+  assert.equal(response.statusCode, 200, JSON.stringify(response.body));
+  assert.equal(response.body.ok, true);
+  assert.equal(response.body.service, "openclaw-core");
+  assert.equal(response.body.stage, "active");
+  assert.equal(response.body.host, "127.0.0.1");
+  assert.equal(response.body.port, 4100);
+  assert.equal(response.body.autonomyMode, "guardian");
+  assert.equal(response.body.sessionManagerUrl, "http://127.0.0.1:4102");
+  assert.equal(response.body.systemHealUrl, "http://127.0.0.1:4107");
+});
+
+test("core infrastructure proxy route forwards JSON bodies to configured services", async () => {
+  let observed = null;
+  const deps = createBaseDeps({
+    client: {
+      postJson: async (url, body) => {
+        observed = { url, body };
+        return { ok: true, proxied: true };
+      },
+    },
+  });
+
+  const response = await invokeRoute(deps, "POST", "/proxy/session-manager/work-view/prepare", { url: "https://example.test" });
+
+  assert.equal(response.statusCode, 200, JSON.stringify(response.body));
+  assert.deepEqual(observed, {
+    url: "http://127.0.0.1:4102/work-view/prepare",
+    body: { url: "https://example.test" },
+  });
+  assert.deepEqual(response.body, { ok: true, proxied: true });
+});
+
+test("core runtime read route reconciles and serialises current task", async () => {
+  const task = { id: "task-current", status: "running" };
+  let reconciled = false;
+  const deps = createBaseDeps({
+    state: {
+      tasks: new Map([[task.id, task]]),
+      runtimeState: { currentTaskId: task.id },
+    },
+    taskManager: {
+      reconcileRuntimeState: () => {
+        reconciled = true;
+      },
+      getTaskById: (taskId) => (taskId === task.id ? task : null),
+      serialiseTask: (item) => ({ id: item.id, status: item.status, serialised: true }),
+    },
+  });
+
+  const response = await invokeRoute(deps, "GET", "/state/runtime");
+
+  assert.equal(response.statusCode, 200, JSON.stringify(response.body));
+  assert.equal(reconciled, true);
+  assert.equal(response.body.taskCount, 1);
+  assert.deepEqual(response.body.currentTask, {
+    id: "task-current",
+    status: "running",
+    serialised: true,
+  });
+});
+
+test("systemd draft route forwards unit aliases and execute flag", async () => {
+  let observedInput = null;
+  const deps = createBaseDeps({
+    planBuilder: {
+      buildSystemdRepairExecutionTaskDraft: async (input) => {
+        observedInput = input;
+        return {
+          registry: "openclaw-systemd-repair-execution-task-draft-v0",
+          task: { type: "systemd_repair_execution" },
+        };
+      },
+    },
+  });
+
+  const response = await invokeRoute(deps, "GET", "/system/systemd/repair-execution-task-draft?target=openclaw-core.service&execute=true");
+
+  assert.equal(response.statusCode, 200, JSON.stringify(response.body));
+  assert.deepEqual(observedInput, {
+    unit: "openclaw-core.service",
+    execute: true,
+  });
+  assert.deepEqual(response.body, {
+    ok: true,
+    registry: "openclaw-systemd-repair-execution-task-draft-v0",
+    task: { type: "systemd_repair_execution" },
+  });
+});
+
 test("executor-backed transcript route clamps limits and returns the public read model", async () => {
   let observedLimit = null;
   const deps = createBaseDeps({
