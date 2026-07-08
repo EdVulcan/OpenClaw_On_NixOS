@@ -58,6 +58,7 @@ const registryEntries = readTsv(registryFile, ["name", "script", "description"],
 const registryByName = new Map(registryEntries.map((entry) => [entry.name, entry]));
 const registrySource = readIfExists(registrySourceFile, "source registry");
 const batchScript = readIfExists(path.join(scriptDir, "dev-openclaw-live-provider-pre-credential-pair-batch-reuse-check.sh"), "pre-credential pair batch script");
+const diagnosticsScript = readIfExists(path.join(scriptDir, "dev-openclaw-live-provider-pre-credential-pair-batch-diagnostics-check.sh"), "pre-credential pair batch diagnostics script");
 const rows = readTsv(manifestFile, [
   "label",
   "phase",
@@ -79,12 +80,18 @@ if (rows[0]?.label !== "phase24" || rows.at(-1)?.label !== "phase57") {
 
 requireContains(registrySource, "openclaw-live-provider-pre-credential-pair-milestone-manifest", { file: registrySourceFile });
 requireContains(registrySource, "openclaw-live-provider-pre-credential-pair-batch-reuse", { file: registrySourceFile });
+requireContains(registrySource, "openclaw-live-provider-pre-credential-pair-batch-diagnostics", { file: registrySourceFile });
 requireContains(batchScript, "openclaw-live-provider-pre-credential-pair-milestones.tsv", { file: "dev-openclaw-live-provider-pre-credential-pair-batch-reuse-check.sh" });
+requireContains(batchScript, "OPENCLAW_LIVE_PROVIDER_PRE_CREDENTIAL_PAIR_BATCH_GROUPS", { file: "dev-openclaw-live-provider-pre-credential-pair-batch-reuse-check.sh" });
 requireContains(batchScript, "OPENCLAW_DEV_SERVICES_ALREADY_UP", { file: "dev-openclaw-live-provider-pre-credential-pair-batch-reuse-check.sh" });
 requireContains(batchScript, "OPENCLAW_CORE_STATE_FILE", { file: "dev-openclaw-live-provider-pre-credential-pair-batch-reuse-check.sh" });
 requireContains(batchScript, "PAIR_GROUPS", { file: "dev-openclaw-live-provider-pre-credential-pair-batch-reuse-check.sh" });
 requireContains(batchScript, "groupCount", { file: "dev-openclaw-live-provider-pre-credential-pair-batch-reuse-check.sh" });
+requireContains(batchScript, "durationSeconds", { file: "dev-openclaw-live-provider-pre-credential-pair-batch-reuse-check.sh" });
+requireContains(batchScript, "slowestChecks", { file: "dev-openclaw-live-provider-pre-credential-pair-batch-reuse-check.sh" });
 requireContains(batchScript, "openclawLiveProviderPreCredentialPairBatchReuse", { file: "dev-openclaw-live-provider-pre-credential-pair-batch-reuse-check.sh" });
+requireContains(diagnosticsScript, "OPENCLAW_LIVE_PROVIDER_PRE_CREDENTIAL_PAIR_BATCH_GROUPS", { file: "dev-openclaw-live-provider-pre-credential-pair-batch-diagnostics-check.sh" });
+requireContains(diagnosticsScript, "runtime-adapter-module", { file: "dev-openclaw-live-provider-pre-credential-pair-batch-diagnostics-check.sh" });
 
 const groups = new Set();
 for (const row of rows) {

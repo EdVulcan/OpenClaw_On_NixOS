@@ -51,6 +51,7 @@ const httpJsonHelperCheck = "openclaw-http-json-helper";
 const waitHelperCheck = "openclaw-wait-helper";
 const preCredentialPairManifestCheck = "openclaw-live-provider-pre-credential-pair-milestone-manifest";
 const preCredentialPairBatchCheck = "openclaw-live-provider-pre-credential-pair-batch-reuse";
+const preCredentialPairBatchDiagnosticsCheck = "openclaw-live-provider-pre-credential-pair-batch-diagnostics";
 const preCredentialPairManifestFile = path.join(scriptDir, "openclaw-live-provider-pre-credential-pair-milestones.tsv");
 const credentialValueLocalReadManifestCheck = "openclaw-live-provider-credential-value-local-read-milestone-manifest";
 const credentialValueLocalReadManifestFile = path.join(scriptDir, "openclaw-live-provider-credential-value-local-read-milestones.tsv");
@@ -93,6 +94,7 @@ const preCredentialPairHelperScripts = new Set([
   "openclaw-live-provider-pre-credential-pair-milestones.tsv",
   "dev-openclaw-live-provider-pre-credential-pair-milestone-manifest-check.sh",
   "dev-openclaw-live-provider-pre-credential-pair-batch-reuse-check.sh",
+  "dev-openclaw-live-provider-pre-credential-pair-batch-diagnostics-check.sh",
 ]);
 
 function selectPreCredentialPairRowsForCommon(scriptBasename) {
@@ -640,7 +642,13 @@ for (const file of changedFiles) {
     if (preCredentialPairHelperScripts.has(scriptBasename)
       || scriptBasename === "dev-openclaw-core-observer-pair-runner.sh") {
       selectName(preCredentialPairManifestCheck);
-      selectName(preCredentialPairBatchCheck);
+      if (scriptBasename === "dev-openclaw-live-provider-pre-credential-pair-milestone-manifest-check.sh"
+        || scriptBasename === "dev-openclaw-live-provider-pre-credential-pair-batch-reuse-check.sh"
+        || scriptBasename === "dev-openclaw-live-provider-pre-credential-pair-batch-diagnostics-check.sh") {
+        selectName(preCredentialPairBatchDiagnosticsCheck);
+      } else {
+        selectName(preCredentialPairBatchCheck);
+      }
       continue;
     }
     if (preCredentialPairWrapperScripts.has(scriptBasename)) {
