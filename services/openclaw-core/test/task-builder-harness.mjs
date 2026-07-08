@@ -65,12 +65,26 @@ export function createTaskLifecycleHarness(overrides = {}) {
         },
       };
     },
+    appendTaskPhase: (task, phase, details) => {
+      calls.push({ name: "appendTaskPhase", taskId: task.id, phase, details });
+      task.phase = phase;
+      task.phaseHistory = [
+        ...(task.phaseHistory ?? []),
+        { phase, details },
+      ];
+      return task;
+    },
     publishEvent: async (name, body) => {
       events.push({ name, body });
     },
     publishTaskApprovalIfPending: async (task) => {
       events.push({ name: "approval.pending", body: { taskId: task.id } });
     },
+    serialiseApproval: (approval) => ({
+      id: approval.id,
+      status: approval.status,
+      updatedAt: approval.updatedAt ?? null,
+    }),
     serialiseTask: (task) => ({
       id: task.id,
       type: task.type,
@@ -87,6 +101,7 @@ export function createTaskLifecycleHarness(overrides = {}) {
       cloudConsciousnessProviderCallRehearsal: task.cloudConsciousnessProviderCallRehearsal ?? null,
       cloudConsciousnessLiveProviderRunbook: task.cloudConsciousnessLiveProviderRunbook ?? null,
       cloudConsciousnessLiveProviderExecutionPlan: task.cloudConsciousnessLiveProviderExecutionPlan ?? null,
+      cloudConsciousnessLiveProviderRuntimeAdapter: task.cloudConsciousnessLiveProviderRuntimeAdapter ?? null,
       bodyEvidenceLedgerDirectory: task.bodyEvidenceLedgerDirectory ?? null,
       bodyEvidenceLedgerFirstRecord: task.bodyEvidenceLedgerFirstRecord ?? null,
       bodyEvidenceLedgerFollowupRecord: task.bodyEvidenceLedgerFollowupRecord ?? null,
@@ -98,6 +113,10 @@ export function createTaskLifecycleHarness(overrides = {}) {
       task.status = patch.status ?? task.status;
     },
     isTaskPolicyApproved: (task) => task.approval?.status === "approved",
+    approvals: new Map(),
+    profiler: {
+      measure: (_name, fn) => fn(),
+    },
     buildPhase6Exit: async () => ({
       ok: true,
       registry: "openclaw-phase-6-exit-v0",
@@ -236,6 +255,81 @@ export function createTaskLifecycleHarness(overrides = {}) {
         liveProviderCallEnabled: false,
       },
     }),
+    buildCloudConsciousnessLiveProviderCallExecutionPlanExit: async () => ({
+      ok: true,
+      registry: "openclaw-cloud-consciousness-live-provider-call-execution-plan-exit-v0",
+      summary: {
+        complete: true,
+        ready: true,
+        callsCloudModel: false,
+        transmitsExternally: false,
+        providerSdkLoaded: false,
+        providerCredentialRead: false,
+        liveProviderCallEnabled: false,
+      },
+    }),
+    buildCloudConsciousnessLiveProviderFinalAuthorizationReview: async () => ({
+      ok: true,
+      registry: "openclaw-cloud-consciousness-live-provider-final-authorization-review-v0",
+      summary: {
+        ready: true,
+        liveProviderCallEnabled: false,
+        providerCredentialRead: false,
+        credentialValueRead: false,
+        endpointContacted: false,
+      },
+    }),
+    buildCloudConsciousnessLiveProviderCallExecutionPlan: async () => ({
+      ok: true,
+      registry: "openclaw-cloud-consciousness-live-provider-call-execution-plan-v0",
+      summary: {
+        ready: true,
+        callsCloudModel: false,
+        transmitsExternally: false,
+        liveProviderCallEnabled: false,
+      },
+    }),
+    buildCloudConsciousnessLiveProviderEndpointCredentialBinding: async () => ({
+      ok: true,
+      registry: "openclaw-cloud-consciousness-live-provider-endpoint-credential-binding-v0",
+      summary: {
+        ready: true,
+        endpointContacted: false,
+        providerCredentialRead: false,
+        credentialValueRead: false,
+      },
+    }),
+    buildCloudConsciousnessLiveProviderExecutionPlanReadback: () => ({
+      ok: true,
+      registry: "openclaw-cloud-consciousness-live-provider-execution-plan-readback-v0",
+      summary: {
+        ready: true,
+        recordCount: 1,
+        latestRecordId: "cloud-live-provider-execution-plan",
+        latestContentHash: "hash-live-provider-execution-plan",
+        callsCloudModel: false,
+        transmitsExternally: false,
+        providerSdkLoaded: false,
+        providerCredentialRead: false,
+        liveProviderCallEnabled: false,
+      },
+    }),
+    buildCloudConsciousnessLiveProviderExecutionTranscriptSchema: async () => ({
+      ok: true,
+      registry: "openclaw-cloud-consciousness-live-provider-execution-transcript-schema-v0",
+      summary: {
+        ready: true,
+        requiredFieldCount: 12,
+        callsCloudModel: false,
+        transmitsExternally: false,
+      },
+    }),
+    phase12EvidenceRef: (evidence) => ({
+      registry: evidence?.registry ?? null,
+      status: evidence?.status ?? null,
+      ready: evidence?.summary?.ready ?? evidence?.summary?.complete ?? null,
+      completionPercent: evidence?.summary?.completionPercent ?? null,
+    }),
     SYSTEMD_REPAIR_EXECUTION_TASK_REGISTRY: "openclaw-systemd-repair-execution-task-v0",
     SYSTEMD_NEXT_REPAIR_TASK_SHELL_REGISTRY: "openclaw-systemd-next-repair-task-shell-v0",
     SYSTEMD_NEXT_REPAIR_REAL_EXECUTION_REGISTRY: "openclaw-systemd-next-repair-real-execution-v0",
@@ -255,6 +349,7 @@ export function createTaskLifecycleHarness(overrides = {}) {
     CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_RUNBOOK_FILE_DISPLAY_PATH: ".artifacts/openclaw-cloud-consciousness/live-provider-call-runbook.jsonl",
     CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_EXECUTION_PLAN_TASK_REGISTRY: "openclaw-cloud-consciousness-live-provider-execution-plan-task-v0",
     CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_EXECUTION_PLAN_FILE_DISPLAY_PATH: ".artifacts/openclaw-cloud-consciousness/live-provider-call-execution-plan.jsonl",
+    CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_RUNTIME_ADAPTER_TASK_REGISTRY: "openclaw-cloud-consciousness-live-provider-runtime-adapter-task-v0",
     ...overrides.deps,
   };
 
