@@ -86,6 +86,7 @@ export function createTaskLifecycleHarness(overrides = {}) {
       cloudConsciousnessProviderDryRun: task.cloudConsciousnessProviderDryRun ?? null,
       cloudConsciousnessProviderCallRehearsal: task.cloudConsciousnessProviderCallRehearsal ?? null,
       cloudConsciousnessLiveProviderRunbook: task.cloudConsciousnessLiveProviderRunbook ?? null,
+      cloudConsciousnessLiveProviderExecutionPlan: task.cloudConsciousnessLiveProviderExecutionPlan ?? null,
       bodyEvidenceLedgerDirectory: task.bodyEvidenceLedgerDirectory ?? null,
       bodyEvidenceLedgerFirstRecord: task.bodyEvidenceLedgerFirstRecord ?? null,
       bodyEvidenceLedgerFollowupRecord: task.bodyEvidenceLedgerFollowupRecord ?? null,
@@ -220,6 +221,21 @@ export function createTaskLifecycleHarness(overrides = {}) {
         providerCredentialRead: false,
       },
     }),
+    buildCloudConsciousnessLiveProviderRunbookReadback: () => ({
+      ok: true,
+      registry: "openclaw-cloud-consciousness-live-provider-runbook-readback-v0",
+      summary: {
+        ready: true,
+        recordCount: 1,
+        latestRecordId: "cloud-live-provider-runbook",
+        latestContentHash: "hash-live-provider-runbook",
+        callsCloudModel: false,
+        transmitsExternally: false,
+        providerSdkLoaded: false,
+        providerCredentialRead: false,
+        liveProviderCallEnabled: false,
+      },
+    }),
     SYSTEMD_REPAIR_EXECUTION_TASK_REGISTRY: "openclaw-systemd-repair-execution-task-v0",
     SYSTEMD_NEXT_REPAIR_TASK_SHELL_REGISTRY: "openclaw-systemd-next-repair-task-shell-v0",
     SYSTEMD_NEXT_REPAIR_REAL_EXECUTION_REGISTRY: "openclaw-systemd-next-repair-real-execution-v0",
@@ -237,6 +253,8 @@ export function createTaskLifecycleHarness(overrides = {}) {
     CLOUD_CONSCIOUSNESS_PROVIDER_RESPONSE_FILE_DISPLAY_PATH: ".artifacts/openclaw-cloud-consciousness/provider-response-rehearsal.jsonl",
     CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_RUNBOOK_TASK_REGISTRY: "openclaw-cloud-consciousness-live-provider-call-runbook-task-v0",
     CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_RUNBOOK_FILE_DISPLAY_PATH: ".artifacts/openclaw-cloud-consciousness/live-provider-call-runbook.jsonl",
+    CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_EXECUTION_PLAN_TASK_REGISTRY: "openclaw-cloud-consciousness-live-provider-execution-plan-task-v0",
+    CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_EXECUTION_PLAN_FILE_DISPLAY_PATH: ".artifacts/openclaw-cloud-consciousness/live-provider-call-execution-plan.jsonl",
     ...overrides.deps,
   };
 

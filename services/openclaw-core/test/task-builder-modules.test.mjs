@@ -6,6 +6,7 @@ import path from "node:path";
 
 import { createBodyEvidenceTaskBuilders } from "../src/body-evidence-task-builders.mjs";
 import { createCloudConsciousnessHandoffBuilders } from "../src/cloud-consciousness-handoff-builders.mjs";
+import { createCloudConsciousnessLiveProviderExecutionPlanBuilders } from "../src/cloud-consciousness-live-provider-execution-plan-builders.mjs";
 import { createCloudConsciousnessLiveProviderRunbookBuilders } from "../src/cloud-consciousness-live-provider-runbook-builders.mjs";
 import { createCloudConsciousnessProviderCallRehearsalBuilders } from "../src/cloud-consciousness-provider-call-rehearsal-builders.mjs";
 import { createCloudConsciousnessProviderDryRunBuilders } from "../src/cloud-consciousness-provider-dry-run-builders.mjs";
@@ -559,6 +560,107 @@ test("cloud consciousness live provider runbook builders execute approved runboo
     assert.equal(calls.some((call) => call.name === "setTaskPhase" && call.phase === "cloud_consciousness_live_provider_runbook_write"), true);
     assert.equal(calls.at(-1).name, "completeTask");
     assert.equal(events.at(-1).name, "cloud_consciousness.live_provider_runbook_written");
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("cloud consciousness live provider execution-plan builders preserve non-egress route contracts", async () => {
+  const { deps } = createTaskLifecycleHarness();
+  const builders = createCloudConsciousnessLiveProviderExecutionPlanBuilders(deps);
+
+  const plan = await builders.buildCloudConsciousnessLiveProviderCallExecutionPlan();
+  const binding = await builders.buildCloudConsciousnessLiveProviderEndpointCredentialBinding();
+  const routeReview = await builders.buildCloudConsciousnessLiveProviderExecutionRouteReview();
+
+  assert.equal(plan.registry, "openclaw-cloud-consciousness-live-provider-call-execution-plan-v0");
+  assert.equal(plan.summary.ready, true);
+  assert.equal(binding.summary.endpointContacted, false);
+  assert.equal(binding.summary.credentialValueRead, false);
+  assert.equal(routeReview.decision.selectedSlice, "openclaw-cloud-consciousness-live-provider-execution-plan-task");
+  assert.equal(routeReview.decision.canCallCloudProviderNow, false);
+});
+
+test("cloud consciousness live provider execution-plan builders create approval-gated tasks", async () => {
+  const { deps, calls, events } = createTaskLifecycleHarness();
+  const builders = createCloudConsciousnessLiveProviderExecutionPlanBuilders(deps);
+
+  await assert.rejects(
+    () => builders.createCloudConsciousnessLiveProviderExecutionPlanTask({ confirm: false }),
+    /requires confirm=true/,
+  );
+
+  const result = await builders.createCloudConsciousnessLiveProviderExecutionPlanTask({ confirm: true });
+
+  assert.equal(result.registry, "openclaw-cloud-consciousness-live-provider-execution-plan-task-v0");
+  assert.equal(result.task.type, "cloud_consciousness_live_provider_execution_plan_task");
+  assert.equal(result.task.cloudConsciousnessLiveProviderExecutionPlan.artifactWritten, false);
+  assert.equal(result.task.cloudConsciousnessLiveProviderExecutionPlan.liveProviderCallEnabled, false);
+  assert.equal(result.governance.createsApproval, true);
+  assert.deepEqual(
+    calls.map((call) => call.name),
+    [
+      "createTask",
+      "createApprovalRequestForTask",
+      "supersedeOtherActiveTasks",
+      "reconcileRuntimeState",
+      "persistState",
+    ],
+  );
+  assert.deepEqual(
+    events.map((event) => event.name),
+    ["task.created", "approval.pending", "task.planned", "task.phase_changed"],
+  );
+});
+
+test("cloud consciousness live provider execution-plan builders execute approved plans without live egress", async () => {
+  const tempDir = mkdtempSync(path.join(tmpdir(), "openclaw-live-provider-execution-plan-test-"));
+  const executionPlanFile = path.join(tempDir, "live-provider-call-execution-plan.jsonl");
+  const { deps, calls, events } = createTaskLifecycleHarness({
+    deps: {
+      CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_EXECUTION_PLAN_FILE_DISPLAY_PATH: executionPlanFile,
+    },
+    postJson: (url, body) => ({
+      ok: true,
+      mode: "append_text",
+      path: body.path,
+      root: tempDir,
+      created: true,
+      createIfMissing: body.createIfMissing,
+      contentBytes: Buffer.byteLength(body.content, "utf8"),
+      previousBytes: 0,
+      totalBytes: Buffer.byteLength(body.content, "utf8"),
+    }),
+  });
+  const builders = createCloudConsciousnessLiveProviderExecutionPlanBuilders(deps);
+  const task = {
+    id: "task-live-provider-execution-plan",
+    type: "cloud_consciousness_live_provider_execution_plan_task",
+    status: "queued",
+    approval: { requestId: "approval-live-provider-execution-plan", status: "approved" },
+    cloudConsciousnessLiveProviderExecutionPlan: {
+      registry: "openclaw-cloud-consciousness-live-provider-execution-plan-task-v0",
+    },
+  };
+
+  try {
+    assert.equal(builders.isCloudConsciousnessLiveProviderExecutionPlanTask(task), true);
+
+    const result = await builders.executeCloudConsciousnessLiveProviderExecutionPlanTask(task);
+
+    assert.equal(result.execution.registry, "openclaw-cloud-consciousness-approved-live-provider-execution-plan-v0");
+    assert.equal(result.execution.hostMutation, true);
+    assert.equal(result.execution.transmittedExternally, false);
+    assert.equal(result.execution.cloudCallExecuted, false);
+    assert.equal(result.execution.providerSdkLoaded, false);
+    assert.equal(result.execution.credentialRead, false);
+    assert.equal(result.execution.liveProviderCallEnabled, false);
+    assert.equal(result.task.cloudConsciousnessLiveProviderExecutionPlan.artifactWritten, true);
+    assert.equal(result.task.cloudConsciousnessLiveProviderExecutionPlan.liveProviderCallEnabled, false);
+    assert.equal(calls.find((call) => call.name === "postJson")?.url, "http://127.0.0.1:4106/system/files/append-text");
+    assert.equal(calls.some((call) => call.name === "setTaskPhase" && call.phase === "cloud_consciousness_live_provider_execution_plan_write"), true);
+    assert.equal(calls.at(-1).name, "completeTask");
+    assert.equal(events.at(-1).name, "cloud_consciousness.live_provider_execution_plan_written");
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
