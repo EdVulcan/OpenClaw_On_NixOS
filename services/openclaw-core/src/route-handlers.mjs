@@ -8,6 +8,7 @@ import { handleNativeAdapterPluginRoute } from "./native-adapter-plugin-routes.m
 import { handleNativePluginRuntimeRoute } from "./native-plugin-runtime-routes.mjs";
 import { handleObserverReadModelRoute } from "./observer-read-model-routes.mjs";
 import { handleOperatorControlRoute } from "./operator-control-routes.mjs";
+import { handlePhaseMemoryReadRoute } from "./phase-memory-read-routes.mjs";
 import { handlePolicyCapabilityRoute } from "./policy-capability-routes.mjs";
 import { handleTaskRoute } from "./task-routes.mjs";
 import { handleWorkspaceNativeOpsRoute } from "./workspace-native-ops-routes.mjs";
@@ -20,7 +21,7 @@ export function registerRoutes(deps) {
   const { fetchJson, postJson, readJsonFileIfPresent, buildSystemSenseUrl } = client;
   const { serialiseApproval, buildApprovalSummary, createApprovalRequestForTask, markApprovalExpired, reconcileApprovalExpirations, findExistingApprovalForTask } = approvalEngine;
   const { getTaskById, buildTaskSummary, serialiseTask, reconcileRuntimeState } = taskManager;
-  const { buildSystemdRepairExecutionTaskDraft, serialisePlanForPublic, buildRulePlan, shouldBuildPlan, updatePlanForPhase, buildMvpRouteAlignment, buildPhase2RepairDemoStatus, buildPhase2NextRepairDemoStatus, buildBodyEvidenceLedgerFollowupRecordReadiness, buildBodyEvidenceLedgerFollowupRecordAppendRouteReview, buildBodyEvidenceLedgerFollowupRecordAppendReadiness, buildPhase2NextCapabilityRouteReview, buildPhase2DemoControlRoom, buildPhase2DemoWalkthrough, buildPhase2DemoReadinessExit, buildPhase2CompletionReadiness, buildPhase2Exit, buildPhase3Plan, buildPhase3BackgroundWorkView, buildPhase3OperatorInterruptControls, buildPhase3CompletionReadiness, buildPhase3Exit, buildPhase4Plan, buildPhase4SelfHealLoop, buildPhase4HealHistoryEvidence, buildPhase4CompletionReadiness, buildPhase4Exit, buildPhase5Plan, buildPhase5DeploymentInventory, buildPhase5RollbackReadiness, buildPhase5ReleaseControlReadiness, buildPhase5Exit, buildMvpFinalReadiness, buildPostMvpPlan, buildPhase6Plan, buildPhase6MemorySubstrateInventory, buildPhase6ConsciousnessContextEnvelope, buildPhase6TaskOrchestrationRecords, buildPhase6MemoryWriteRouteReview, buildPhase6Exit, buildLongTermMemoryWritePlan, buildLongTermMemorySchema, buildLongTermMemoryProposal, buildLongTermMemoryWriteRouteReview, buildLongTermMemoryReadback, buildLongTermMemoryExit } = planBuilder;
+  const { buildSystemdRepairExecutionTaskDraft, serialisePlanForPublic, buildRulePlan, shouldBuildPlan, updatePlanForPhase } = planBuilder;
   const {
     buildCloudConsciousnessContextReview,
     buildCloudConsciousnessEnvelopeSchema,
@@ -170,211 +171,7 @@ export function registerRoutes(deps) {
     return;
   }
 
-  if (req.method === "GET" && requestUrl.pathname === "/mvp/route") {
-    sendJson(res, 200, buildMvpRouteAlignment());
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/phase-2/repair-demo-status") {
-    sendJson(res, 200, buildPhase2RepairDemoStatus());
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/phase-2/next-repair-demo-status") {
-    sendJson(res, 200, buildPhase2NextRepairDemoStatus());
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/phase-2/body-evidence-ledger-followup-record-readiness") {
-    sendJson(res, 200, buildBodyEvidenceLedgerFollowupRecordReadiness());
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/phase-2/body-evidence-ledger-followup-record-append-route-review") {
-    sendJson(res, 200, await buildBodyEvidenceLedgerFollowupRecordAppendRouteReview());
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/phase-2/body-evidence-ledger-followup-record-append-readiness") {
-    sendJson(res, 200, buildBodyEvidenceLedgerFollowupRecordAppendReadiness());
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/phase-2/demo-control-room") {
-    sendJson(res, 200, await buildPhase2DemoControlRoom());
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/phase-2/demo-walkthrough") {
-    sendJson(res, 200, await buildPhase2DemoWalkthrough());
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/phase-2/demo-readiness-exit") {
-    sendJson(res, 200, await buildPhase2DemoReadinessExit());
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/phase-2/next-capability-route-review") {
-    sendJson(res, 200, await buildPhase2NextCapabilityRouteReview({
-      ledgerDemoStatusCheckpointComplete: requestUrl.searchParams.get("afterLedgerDemoStatus") === "true",
-      repairCandidateDemoCheckpointComplete: requestUrl.searchParams.get("afterRepairCandidateDemoStatus") === "true",
-    }));
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/phase-2/completion-readiness") {
-    sendJson(res, 200, await buildPhase2CompletionReadiness());
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/phase-2/exit") {
-    sendJson(res, 200, await buildPhase2Exit());
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/phase-3/plan") {
-    sendJson(res, 200, await buildPhase3Plan());
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/phase-3/background-work-view") {
-    sendJson(res, 200, await buildPhase3BackgroundWorkView());
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/phase-3/operator-interrupt-controls") {
-    sendJson(res, 200, await buildPhase3OperatorInterruptControls());
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/phase-3/completion-readiness") {
-    sendJson(res, 200, await buildPhase3CompletionReadiness());
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/phase-3/exit") {
-    sendJson(res, 200, await buildPhase3Exit());
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/phase-4/plan") {
-    sendJson(res, 200, await buildPhase4Plan());
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/phase-4/self-heal-loop") {
-    sendJson(res, 200, await buildPhase4SelfHealLoop());
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/phase-4/heal-history-evidence") {
-    sendJson(res, 200, await buildPhase4HealHistoryEvidence());
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/phase-4/completion-readiness") {
-    sendJson(res, 200, await buildPhase4CompletionReadiness());
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/phase-4/exit") {
-    sendJson(res, 200, await buildPhase4Exit());
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/phase-5/plan") {
-    sendJson(res, 200, await buildPhase5Plan());
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/phase-5/deployment-inventory") {
-    sendJson(res, 200, await buildPhase5DeploymentInventory());
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/phase-5/rollback-readiness") {
-    sendJson(res, 200, await buildPhase5RollbackReadiness());
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/phase-5/release-control-readiness") {
-    sendJson(res, 200, await buildPhase5ReleaseControlReadiness());
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/phase-5/exit") {
-    sendJson(res, 200, await buildPhase5Exit());
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/mvp/final-readiness") {
-    sendJson(res, 200, await buildMvpFinalReadiness());
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/post-mvp/plan") {
-    sendJson(res, 200, await buildPostMvpPlan());
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/phase-6/plan") {
-    sendJson(res, 200, await buildPhase6Plan());
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/phase-6/memory-substrate-inventory") {
-    sendJson(res, 200, await buildPhase6MemorySubstrateInventory());
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/phase-6/consciousness-context-envelope") {
-    sendJson(res, 200, await buildPhase6ConsciousnessContextEnvelope());
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/phase-6/task-orchestration-records") {
-    sendJson(res, 200, await buildPhase6TaskOrchestrationRecords());
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/phase-6/memory-write-route-review") {
-    sendJson(res, 200, await buildPhase6MemoryWriteRouteReview());
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/phase-6/exit") {
-    sendJson(res, 200, await buildPhase6Exit());
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/long-term-memory/write-plan") {
-    sendJson(res, 200, await buildLongTermMemoryWritePlan());
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/long-term-memory/schema") {
-    sendJson(res, 200, await buildLongTermMemorySchema());
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/long-term-memory/proposal") {
-    sendJson(res, 200, await buildLongTermMemoryProposal());
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/long-term-memory/write-route-review") {
-    sendJson(res, 200, await buildLongTermMemoryWriteRouteReview());
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/long-term-memory/readback") {
-    sendJson(res, 200, buildLongTermMemoryReadback());
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/long-term-memory/exit") {
-    sendJson(res, 200, await buildLongTermMemoryExit());
+  if (await handlePhaseMemoryReadRoute({ req, res, requestUrl, planBuilder })) {
     return;
   }
 
