@@ -4,6 +4,7 @@ import { execFile } from "node:child_process";
 import path from "node:path";
 import { promisify } from "node:util";
 import { createSystemBodyEvidence } from "./system-body-evidence.mjs";
+import { handleSystemBodyEvidenceRoutes } from "./system-body-evidence-routes.mjs";
 import { handleSystemCommandRoutes } from "./system-command-routes.mjs";
 import { createSystemCommandOperations } from "./system-command-operations.mjs";
 import { handleSystemFileRoutes } from "./system-file-routes.mjs";
@@ -403,6 +404,21 @@ const {
   },
 });
 
+const bodyEvidenceRouteBuilders = {
+  buildBodyEvidenceTimeline,
+  buildBodyEvidenceTimelineReadiness,
+  buildBodyEvidenceLedgerPlan,
+  buildBodyEvidenceLedgerRouteReview,
+  buildBodyEvidenceLedgerStorageRootPlan,
+  buildBodyEvidenceLedgerStorageRootRouteReview,
+  buildBodyEvidenceLedgerFirstRecordPlan,
+  buildBodyEvidenceLedgerFirstRecordRouteReview,
+  buildBodyEvidenceLedgerReadiness,
+  buildBodyEvidenceLedgerDemoStatus,
+  buildBodyEvidenceLedgerFollowupRecordPlan,
+  buildBodyEvidenceLedgerFollowupRecordRouteReview,
+};
+
 const {
   buildSystemdNextRepairScopeReview,
   buildSystemdNextRepairPlan,
@@ -564,75 +580,12 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  if (req.method === "GET" && requestUrl.pathname === "/system/route/body-evidence-timeline") {
-    const timeline = await buildBodyEvidenceTimeline();
-    sendJson(res, 200, timeline);
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/system/route/body-evidence-timeline-readiness") {
-    const readiness = await buildBodyEvidenceTimelineReadiness();
-    sendJson(res, 200, readiness);
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/system/route/body-evidence-ledger-plan") {
-    const plan = await buildBodyEvidenceLedgerPlan();
-    sendJson(res, 200, plan);
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/system/route/body-evidence-ledger-route-review") {
-    const review = await buildBodyEvidenceLedgerRouteReview();
-    sendJson(res, 200, review);
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/system/route/body-evidence-ledger-storage-root-plan") {
-    const plan = await buildBodyEvidenceLedgerStorageRootPlan();
-    sendJson(res, 200, plan);
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/system/route/body-evidence-ledger-storage-root-route-review") {
-    const review = await buildBodyEvidenceLedgerStorageRootRouteReview();
-    sendJson(res, 200, review);
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/system/route/body-evidence-ledger-first-record-plan") {
-    const plan = await buildBodyEvidenceLedgerFirstRecordPlan();
-    sendJson(res, 200, plan);
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/system/route/body-evidence-ledger-first-record-route-review") {
-    const review = await buildBodyEvidenceLedgerFirstRecordRouteReview();
-    sendJson(res, 200, review);
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/system/route/body-evidence-ledger-readiness") {
-    const readiness = await buildBodyEvidenceLedgerReadiness();
-    sendJson(res, 200, readiness);
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/system/route/body-evidence-ledger-demo-status") {
-    const status = await buildBodyEvidenceLedgerDemoStatus();
-    sendJson(res, 200, status);
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/system/route/body-evidence-ledger-followup-record-plan") {
-    const plan = await buildBodyEvidenceLedgerFollowupRecordPlan();
-    sendJson(res, 200, plan);
-    return;
-  }
-
-  if (req.method === "GET" && requestUrl.pathname === "/system/route/body-evidence-ledger-followup-record-route-review") {
-    const review = await buildBodyEvidenceLedgerFollowupRecordRouteReview();
-    sendJson(res, 200, review);
+  if (await handleSystemBodyEvidenceRoutes({
+    req,
+    res,
+    requestUrl,
+    builders: bodyEvidenceRouteBuilders,
+  })) {
     return;
   }
 
