@@ -4,6 +4,7 @@ import { createCredentialLocalReadResultEnvelopeRuntime } from "./cloud-live-pro
 import { createCredentialLocalReadResultEnvelopeCreationRuntime } from "./cloud-live-provider-runtime-credential-local-read-result-envelope-creation.mjs";
 import { createCredentialLocalReadResultEnvelopeCreationExecutionAttemptLocalReadRuntime } from "./cloud-live-provider-runtime-credential-local-read-result-envelope-creation-execution-attempt-local-read.mjs";
 import { createCredentialLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeRuntime } from "./cloud-live-provider-runtime-credential-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope.mjs";
+import { createCredentialLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationRuntime } from "./cloud-live-provider-runtime-credential-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-creation.mjs";
 import { createCredentialLocalReadResultEnvelopeCreationExecutionAttemptRuntime } from "./cloud-live-provider-runtime-credential-local-read-result-envelope-creation-execution-attempt.mjs";
 import { createCredentialLocalReadResultEnvelopeCreationExecutionRuntime } from "./cloud-live-provider-runtime-credential-local-read-result-envelope-creation-execution.mjs";
 
@@ -91,6 +92,11 @@ export function createCloudLiveProviderRuntimeCredentialLocalReadLateBuilders(co
         resultEnvelopeCreationExecutionAttemptLocalReadRuntime.buildCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadFinalReadinessPreflight,
       ...taskRuntimeContext,
     });
+  const resultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationRuntime =
+    createCredentialLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationRuntime({
+      buildCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeFinalReadinessPreflight:
+        resultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeRuntime.buildCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeFinalReadinessPreflight,
+    });
 
   return {
     ...attemptRuntime,
@@ -101,5 +107,6 @@ export function createCloudLiveProviderRuntimeCredentialLocalReadLateBuilders(co
     ...resultEnvelopeCreationExecutionAttemptRuntime,
     ...resultEnvelopeCreationExecutionAttemptLocalReadRuntime,
     ...resultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeRuntime,
+    ...resultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationRuntime,
   };
 }
