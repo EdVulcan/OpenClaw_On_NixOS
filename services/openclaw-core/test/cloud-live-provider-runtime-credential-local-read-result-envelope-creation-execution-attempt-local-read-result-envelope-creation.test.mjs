@@ -12,6 +12,8 @@ const CREATION_TASK_REGISTRY =
   "openclaw-cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-creation-task-v0";
 const CREATION_APPROVED_DEFERRED_REGISTRY =
   "openclaw-cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-creation-approved-deferred-v0";
+const CREATION_FINAL_READINESS_PREFLIGHT_REGISTRY =
+  "openclaw-cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-creation-final-readiness-preflight-v0";
 
 function deferredCredentialFlags() {
   return {
@@ -208,4 +210,45 @@ test("credential local-read result-envelope creation approved deferred readback 
   assert.equal(readback.summary.liveProviderCallEnabled, false);
   assert.equal(readback.evidence.approvedDeferredTask.cloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreation.registry, CREATION_TASK_REGISTRY);
   assert.equal(readback.next.recommendedSlice, "openclaw-cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-creation-final-readiness-preflight");
+});
+
+test("credential local-read result-envelope creation final readiness preflight records Phase 126 without creating envelopes", async () => {
+  const sourceTask = createApprovedDeferredCreationTask();
+  const { deps, calls, events } = createRouteHarness({ tasks: [sourceTask] });
+  const builders = createCredentialLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationRuntime(deps);
+
+  const before = await builders.buildCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationFinalReadinessPreflight();
+  const recorded = await builders.recordCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationFinalReadinessPreflight({ confirm: true });
+  const after = recorded.preflight;
+  const approvedAfter = await builders.buildCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationApprovedDeferred();
+
+  assert.equal(before.registry, CREATION_FINAL_READINESS_PREFLIGHT_REGISTRY);
+  assert.equal(before.status, "credential_value_local_read_execution_local_read_attempt_local_read_result_envelope_creation_execution_attempt_local_read_result_envelope_creation_final_readiness_preflight_ready_deferred");
+  assert.equal(before.summary.ready, true);
+  assert.equal(before.summary.sourceRegistry, CREATION_APPROVED_DEFERRED_REGISTRY);
+  assert.equal(before.summary.credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationFinalReadinessPreflightRecorded, false);
+  assert.equal(before.summary.credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreated, false);
+  assert.equal(before.summary.credentialValueRead, false);
+  assert.equal(before.summary.networkEgress, false);
+  assert.equal(recorded.registry, CREATION_FINAL_READINESS_PREFLIGHT_REGISTRY);
+  assert.equal(recorded.status, "credential_value_local_read_execution_local_read_attempt_local_read_result_envelope_creation_execution_attempt_local_read_result_envelope_creation_final_readiness_preflight_recorded_deferred");
+  assert.equal(recorded.task.cloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreation.credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationFinalReadinessPreflightRecorded, true);
+  assert.equal(after.summary.credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationFinalReadinessPreflightRecorded, true);
+  assert.equal(after.summary.credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreated, false);
+  assert.equal(after.summary.credentialValueRead, false);
+  assert.equal(after.summary.providerCredentialRead, false);
+  assert.equal(after.summary.endpointContacted, false);
+  assert.equal(after.summary.networkEgress, false);
+  assert.equal(after.summary.providerResponseCreated, false);
+  assert.equal(after.summary.rollbackExecuted, false);
+  assert.equal(after.summary.hostMutation, false);
+  assert.equal(after.summary.liveProviderCallEnabled, false);
+  assert.equal(after.summary.launchExecuted, false);
+  assert.equal(after.next.recommendedSlice, "openclaw-cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-creation-execution-route");
+  assert.equal(approvedAfter.summary.ready, true);
+  assert.equal(approvedAfter.summary.credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationTaskApproved, true);
+  assert.equal(approvedAfter.summary.credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreated, false);
+  assert.equal(calls.filter((call) => call.name === "appendTaskPhase").length, 1);
+  assert.equal(calls.filter((call) => call.name === "persistState").length, 1);
+  assert.equal(events.filter((event) => event.name === "task.phase_changed").length, 1);
 });
