@@ -496,6 +496,14 @@ Audit sources used for this revision:
     `/system/alerts`, `/system/refresh`, and route-governance read-model
     dispatch while the server injects state refresh, state snapshots, event
     publication, and governance builders.
+76. Extracted pure workspace patch/diff utilities from
+    `services/openclaw-core/src/workspace-ops.mjs` into
+    `services/openclaw-core/src/workspace-patch-utils.mjs`. The utility module
+    now owns bounded edit normalization, non-overlap validation, line/text
+    replacement application, bounded diff preview construction, and preview
+    validation while `workspace-ops.mjs` keeps workspace target selection,
+    draft/task materialization, approval creation, persistence, and event
+    publication.
 
 These slices reduced live-provider runtime and milestone orchestration coupling
 while preserving the public runtime API and existing milestone entry names.
@@ -516,7 +524,7 @@ while preserving the public runtime API and existing milestone entry names.
 | P1 | `nix/scripts` milestone script taxonomy | The runner registry is externalized, but common/core/observer scripts still grow by hand and include long filenames, unregistered helper checks, and repeated shell wiring. | Use the `milestone-script-audit` artifact as the baseline, then add metadata-generated shims for the repeated Phase 99-116 live-provider chain before deleting or renaming legacy scripts. |
 | P2 | `apps/observer-ui/src/client-script-runtime-actions.mjs` | Runtime/system/body/systemd refreshers are extracted into `client-script-refreshers-runtime.mjs`, and the served client script was proven byte-for-byte identical after assembly. Remaining coupling is action/button registration, event stream refresh fan-out, task focus state, work-view helpers, and repeated post-action refresh sequences. | Extract event-to-refresh and button-action descriptor tables while preserving global function names and byte-for-byte or token-equivalent served output where feasible. |
 | P2 | `apps/observer-ui/src/client-script-refreshers-cloud.mjs` | Cloud/live-provider refreshers are now split into context/provider rehearsal, live runbook/runtime adapter, real launch/credential authorization, local-read, and result-envelope chunks, and startup refresh registration is descriptor-backed. Remaining coupling is the repeated endpoint-to-DOM rendering pattern inside each phase-family chunk. | Introduce descriptor-backed endpoint/DOM rendering for one cloud lane only after preserving global function names and served `/client.js` token compatibility. |
-| P2 | `services/openclaw-core/src/workspace-ops.mjs` | Target resolution, patch parsing, diff preview, proposals, source-derived proposals, policy metadata, task creation, approval, and event publication share one operational surface. | Split pure patch/diff/proposal builders from task materializers. Keep registry strings and task payload shape unchanged. |
+| P2 | `services/openclaw-core/src/workspace-ops.mjs` | Target resolution, proposals, source-derived proposals, policy metadata, task creation, approval, and event publication still share one operational surface, but pure patch edit normalization, patch application, and diff preview validation now live in `workspace-patch-utils.mjs` with direct unit coverage. | Continue by splitting source-derived proposal bundle builders from task materializers, then separate command plan drafts from approval-gated task creation while preserving registry strings and task payload shape. |
 | P2 | Shared plugin contract (`packages/shared-types/src/plugin-registry.mjs`, `plugin-contract.mjs`) | Native capability IDs and validators are small but drive plan-builder capability mapping, plugin review, workspace ops, route behavior, executor handling, and milestone assertions. | Move capability descriptors into a data module while preserving `createOpenClawNativePluginRegistry` and exact capability IDs. |
 
 ## Deprioritized By Coupling
