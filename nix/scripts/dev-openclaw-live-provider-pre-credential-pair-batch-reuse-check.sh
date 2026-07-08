@@ -258,6 +258,7 @@ console.log(JSON.stringify({
     batchShape: "manifest-driven-compatible-pre-credential-pairs",
     durationSeconds: Number.parseInt(batchDurationRaw, 10),
     runId,
+    runtimeProfileFile: process.env.OPENCLAW_RUNTIME_PROFILE_FILE || null,
     groups,
     groupTimings,
     slowestGroups,

@@ -26,6 +26,7 @@ The expert review items are considered complete only when each item has code-lev
 | Observer mirror test duplication T2 | Observer checks duplicate core setup. | Partial, reusable pair/group runners expanded | Result-envelope batch milestone covers core and Observer in one live service lifecycle; `dev-openclaw-core-observer-pair-runner.sh` lets compatible core/Observer pairs reuse one service lifecycle while preserving real Observer HTML/client checks; the grouped pre-credential batch covers Phase 24-57 core and Observer pairs by adjacent capability group; the pair batch covers Phase 58-72 compatible pairs; Phase 73-90 local-read and Phase 91-98 local-read-attempt batches now run core and Observer assertions in one service lifecycle. Legacy standalone Observer scripts remain for compatibility. |
 | Fixed sleeps T4 | Scripts use fixed sleeps instead of polling. | Complete | `dev-openclaw-wait-helper.sh` replaces fixed numeric sleeps with bounded polling; audit has no `sleep N` matches under `nix/scripts`; `openclaw-wait-helper` and `@changed` passed. |
 | State reuse P1/T5 | Heavy prerequisite chains are replayed. | Partial, Phase 4/body-evidence/credential-value-local-read/result-envelope reuse complete | Fast prerequisite helper exists for live-provider result-envelope chain; Phase 4 system-heal prerequisite state can be reused by downstream Phase 6 checks; body-evidence demo-status core state and ledger JSONL can be reused by all current follow-up/Observer/Phase 2 completion consumers in explicit fast mode; Phase 73-90 credential-value local-read and Phase 91-98 local-read-attempt common checks can reuse manifest-validated persisted predecessor state in explicit fast mode while preserving default full-chain fallback. Broader non-body-evidence common prerequisite migration remains pending. |
+| Runtime profiling for slow live-provider lanes | Phase 24-57 pre-credential batch remained slow after service lifecycle reuse. | Complete diagnostic layer | Opt-in `OPENCLAW_RUNTIME_PROFILE` JSONL profiling now instruments the Phase 14-17 / 20 / 24 / 25 live-provider builder path used by the diagnostic batch. Profiling is disabled by default and enabled only by `openclaw-live-provider-pre-credential-pair-batch-diagnostics`. |
 
 ## Current Slice Exit Evidence
 
@@ -59,6 +60,14 @@ The expert review items are considered complete only when each item has code-lev
 - `OPENCLAW_MILESTONE_CHECKS=openclaw-wait-helper bash nix/scripts/dev-milestone-check.sh` passed.
 - `OPENCLAW_MILESTONE_CHECKS=@changed bash nix/scripts/dev-milestone-check.sh` passed and selected structural checks plus representative real service checks: `openclaw-service-lifecycle-scope`, `openclaw-live-provider-result-envelope-batch-reuse`, `state-settling`, `openclaw-ai-work-view-capture`, and `openclaw-workspace-command-hardening`.
 - `bash -n` passed for all changed shell scripts and `git diff --check` passed.
+
+## Runtime Profiling Evidence
+
+- `runtime-diagnostics.mjs` adds an opt-in JSONL profiler. Normal core runtime behavior is unchanged unless `OPENCLAW_RUNTIME_PROFILE=true` or `1`.
+- `openclaw-live-provider-pre-credential-pair-batch-diagnostics` enables profiling and records `runtimeProfileFile` in the batch summary artifact.
+- `OPENCLAW_MILESTONE_CHECKS=openclaw-live-provider-pre-credential-pair-batch-diagnostics bash nix/scripts/dev-milestone-check.sh` passed in 234s with real Phase 24-27 core and Observer assertions.
+- The diagnostic profile shows the remaining slow path is repeated live-provider builder graph reconstruction, not service lifecycle startup: Phase 17 runtime implementation plan, Phase 16 operator launch review, and Phase 15 final authorization dependencies each consumed about 223s total across 11 calls, with Phase 14 and local module-contract builders only taking milliseconds.
+- A generic cache was deferred deliberately. These builders mix dynamic timestamps, local artifact readbacks, and runtime state; safe speedup should come from a persisted/manifest-backed evidence read-model or an explicit invalidation boundary, not from process-wide memoization without proof.
 
 ## Core/Observer Pair Reuse Evidence
 
