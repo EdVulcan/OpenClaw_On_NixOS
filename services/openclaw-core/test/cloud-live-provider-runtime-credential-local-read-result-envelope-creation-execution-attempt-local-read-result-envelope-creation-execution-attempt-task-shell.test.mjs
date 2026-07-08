@@ -8,8 +8,14 @@ const EXECUTION_ATTEMPT_ROUTE_REGISTRY =
   "openclaw-cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-creation-execution-attempt-route-v0";
 const EXECUTION_ATTEMPT_TASK_REGISTRY =
   "openclaw-cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-creation-execution-attempt-task-v0";
+const EXECUTION_ATTEMPT_APPROVED_DEFERRED_REGISTRY =
+  "openclaw-cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-creation-execution-attempt-approved-deferred-v0";
+const EXECUTION_ATTEMPT_TASK_TYPE =
+  "cloud_consciousness_live_provider_credential_value_local_read_execution_local_read_attempt_local_read_result_envelope_creation_execution_attempt_local_read_result_envelope_creation_execution_attempt_task";
 const EXECUTION_ATTEMPT_TASK_SHELL_SLUG =
   "openclaw-cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-creation-execution-attempt-task-shell";
+const EXECUTION_ATTEMPT_FINAL_READINESS_PREFLIGHT_SLUG =
+  "openclaw-cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-creation-execution-attempt-final-readiness-preflight";
 const EXECUTION_ATTEMPT_TASK_FIELD =
   "cloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationExecutionAttempt";
 const EXECUTION_FINAL_READINESS_RECORDED_FIELD =
@@ -22,6 +28,13 @@ const EXECUTION_ATTEMPT_TASK_DEFERRED_FIELD =
   "credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationExecutionAttemptDeferred";
 
 function createExecutionAttemptRouteHarness(extraDeps = {}) {
+  const taskStore = new Map();
+  if (Array.isArray(extraDeps.tasks)) {
+    for (const task of extraDeps.tasks) {
+      taskStore.set(task.id, task);
+    }
+  }
+  const { tasks: _tasks, ...deps } = extraDeps;
   return createTaskLifecycleHarness({
     deps: {
       buildCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationExecutionAttemptRoute: async () => ({
@@ -56,9 +69,63 @@ function createExecutionAttemptRouteHarness(extraDeps = {}) {
           recommendedSlice: EXECUTION_ATTEMPT_TASK_SHELL_SLUG,
         },
       }),
-      ...extraDeps,
+      getTaskById: (id) => taskStore.get(id) ?? null,
+      listTasks: () => [...taskStore.values()],
+      ...deps,
     },
   });
+}
+
+function deferredCredentialFlags() {
+  return {
+    credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreated: false,
+    credentialValueIncluded: false,
+    credentialValueRead: false,
+    credentialValueExposed: false,
+    providerCredentialRead: false,
+    endpointNetworkEgressAuthorized: false,
+    endpointNetworkEgressDenied: true,
+    endpointContacted: false,
+    networkEgress: false,
+    providerResponseCreated: false,
+    rollbackExecuted: false,
+    rollbackCommandCreated: false,
+    hostMutation: false,
+    transmitsExternally: false,
+    liveProviderCallEnabled: false,
+    launchAuthorized: false,
+    launchExecuted: false,
+  };
+}
+
+function createApprovedDeferredExecutionAttemptTask({ shell = {} } = {}) {
+  return {
+    id: "task-result-envelope-creation-execution-attempt-local-read-result-envelope-creation-execution-attempt",
+    type: EXECUTION_ATTEMPT_TASK_TYPE,
+    status: "completed",
+    updatedAt: "2026-07-09T09:00:00.000Z",
+    approval: {
+      requestId: "approval-result-envelope-creation-execution-attempt-local-read-result-envelope-creation-execution-attempt",
+      status: "approved",
+    },
+    outcome: {
+      details: {
+        phase: "cloud_consciousness_live_provider_credential_value_local_read_execution_local_read_attempt_local_read_result_envelope_creation_execution_attempt_local_read_result_envelope_creation_execution_attempt_task_shell_deferred",
+      },
+    },
+    [EXECUTION_ATTEMPT_TASK_FIELD]: {
+      registry: EXECUTION_ATTEMPT_TASK_REGISTRY,
+      sourceRegistry: EXECUTION_ATTEMPT_ROUTE_REGISTRY,
+      implementationStatus: "deferred_after_approval",
+      credentialReference: "openclaw://credential/provider/live-provider-fixture",
+      [EXECUTION_FINAL_READINESS_RECORDED_FIELD]: true,
+      [EXECUTION_ATTEMPT_TASK_CREATED_FIELD]: true,
+      [EXECUTION_ATTEMPT_TASK_APPROVED_FIELD]: true,
+      [EXECUTION_ATTEMPT_TASK_DEFERRED_FIELD]: true,
+      ...deferredCredentialFlags(),
+      ...shell,
+    },
+  };
 }
 
 test("credential local-read result-envelope creation execution attempt task shell stays approval gated and deferred", async () => {
@@ -128,4 +195,37 @@ test("credential local-read result-envelope creation execution attempt task shel
   assert.equal(executedShell.endpointContacted, false);
   assert.equal(executedShell.networkEgress, false);
   assert.equal(executed.task.phase, "cloud_consciousness_live_provider_credential_value_local_read_execution_local_read_attempt_local_read_result_envelope_creation_execution_attempt_local_read_result_envelope_creation_execution_attempt_task_shell_deferred");
+});
+
+test("credential local-read result-envelope creation execution attempt approved deferred readback preserves Phase 133 boundary", async () => {
+  const sourceTask = createApprovedDeferredExecutionAttemptTask();
+  const { deps } = createExecutionAttemptRouteHarness({ tasks: [sourceTask] });
+  const builders = createCredentialLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationExecutionAttemptTaskShellRuntime(deps);
+
+  const readback = await builders.buildCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationExecutionAttemptApprovedDeferred();
+
+  assert.equal(readback.registry, EXECUTION_ATTEMPT_APPROVED_DEFERRED_REGISTRY);
+  assert.equal(readback.status, "credential_value_local_read_execution_local_read_attempt_local_read_result_envelope_creation_execution_attempt_local_read_result_envelope_creation_execution_attempt_approved_deferred_ready");
+  assert.equal(readback.summary.ready, true);
+  assert.equal(readback.summary.sourceRegistry, EXECUTION_ATTEMPT_TASK_REGISTRY);
+  assert.equal(readback.summary[EXECUTION_ATTEMPT_TASK_CREATED_FIELD], true);
+  assert.equal(readback.summary[EXECUTION_ATTEMPT_TASK_APPROVED_FIELD], true);
+  assert.equal(readback.summary[EXECUTION_ATTEMPT_TASK_DEFERRED_FIELD], true);
+  assert.equal(readback.summary.credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreated, false);
+  assert.equal(readback.summary.credentialValueRead, false);
+  assert.equal(readback.summary.credentialValueIncluded, false);
+  assert.equal(readback.summary.credentialValueExposed, false);
+  assert.equal(readback.summary.providerCredentialRead, false);
+  assert.equal(readback.summary.endpointContacted, false);
+  assert.equal(readback.summary.networkEgress, false);
+  assert.equal(readback.summary.providerResponseCreated, false);
+  assert.equal(readback.summary.rollbackExecuted, false);
+  assert.equal(readback.summary.rollbackCommandCreated, false);
+  assert.equal(readback.summary.hostMutation, false);
+  assert.equal(readback.summary.transmitsExternally, false);
+  assert.equal(readback.summary.liveProviderCallEnabled, false);
+  assert.equal(readback.summary.launchAuthorized, false);
+  assert.equal(readback.summary.launchExecuted, false);
+  assert.equal(readback.evidence.approvedDeferredTask[EXECUTION_ATTEMPT_TASK_FIELD].registry, EXECUTION_ATTEMPT_TASK_REGISTRY);
+  assert.equal(readback.next.recommendedSlice, EXECUTION_ATTEMPT_FINAL_READINESS_PREFLIGHT_SLUG);
 });
