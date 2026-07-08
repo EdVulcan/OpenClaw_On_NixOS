@@ -2,42 +2,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { createTaskExecutor } from "../src/task-executor.mjs";
+import { DELEGATED_PLAN_TASK_HANDLER_DESCRIPTORS } from "../src/task-executor-delegated-plan-handlers.mjs";
 
-const DELEGATED_NON_RECOVERABLE_TASK_HANDLERS = [
-  ["long-term-memory-write", "isLongTermMemoryWriteTask", "executeLongTermMemoryWriteTask"],
-  ["cloud-consciousness-handoff", "isCloudConsciousnessHandoffTask", "executeCloudConsciousnessHandoffTask"],
-  ["cloud-consciousness-provider-dry-run", "isCloudConsciousnessProviderDryRunTask", "executeCloudConsciousnessProviderDryRunTask"],
-  ["cloud-consciousness-provider-call-rehearsal", "isCloudConsciousnessProviderCallRehearsalTask", "executeCloudConsciousnessProviderCallRehearsalTask"],
-  ["cloud-consciousness-live-provider-runbook", "isCloudConsciousnessLiveProviderRunbookTask", "executeCloudConsciousnessLiveProviderRunbookTask"],
-  ["cloud-consciousness-live-provider-execution-plan", "isCloudConsciousnessLiveProviderExecutionPlanTask", "executeCloudConsciousnessLiveProviderExecutionPlanTask"],
-  ["cloud-consciousness-live-provider-runtime-adapter", "isCloudConsciousnessLiveProviderRuntimeAdapterTask", "executeCloudConsciousnessLiveProviderRuntimeAdapterTask"],
-  ["cloud-consciousness-live-provider-runtime-implementation", "isCloudConsciousnessLiveProviderRuntimeImplementationTask", "executeCloudConsciousnessLiveProviderRuntimeImplementationTask"],
-  ["cloud-consciousness-live-provider-runtime-adapter-implementation", "isCloudConsciousnessLiveProviderRuntimeAdapterImplementationTask", "executeCloudConsciousnessLiveProviderRuntimeAdapterImplementationTask"],
-  ["cloud-consciousness-live-provider-runtime-adapter-module", "isCloudConsciousnessLiveProviderRuntimeAdapterModuleTask", "executeCloudConsciousnessLiveProviderRuntimeAdapterModuleTask"],
-  ["cloud-consciousness-live-provider-request-builder", "isCloudConsciousnessLiveProviderRequestBuilderTask", "executeCloudConsciousnessLiveProviderRequestBuilderTask"],
-  ["cloud-consciousness-live-provider-credential-reference-resolver", "isCloudConsciousnessLiveProviderCredentialReferenceResolverTask", "executeCloudConsciousnessLiveProviderCredentialReferenceResolverTask"],
-  ["cloud-consciousness-live-provider-no-network-sender", "isCloudConsciousnessLiveProviderNoNetworkSenderTask", "executeCloudConsciousnessLiveProviderNoNetworkSenderTask"],
-  ["cloud-consciousness-live-provider-egress-transcript-recorder", "isCloudConsciousnessLiveProviderEgressTranscriptRecorderTask", "executeCloudConsciousnessLiveProviderEgressTranscriptRecorderTask"],
-  ["cloud-consciousness-live-provider-response-verifier", "isCloudConsciousnessLiveProviderResponseVerifierTask", "executeCloudConsciousnessLiveProviderResponseVerifierTask"],
-  ["cloud-consciousness-live-provider-rollback-note", "isCloudConsciousnessLiveProviderRollbackNoteTask", "executeCloudConsciousnessLiveProviderRollbackNoteTask"],
-  ["cloud-consciousness-live-provider-runtime-adapter-closure", "isCloudConsciousnessLiveProviderRuntimeAdapterClosureTask", "executeCloudConsciousnessLiveProviderRuntimeAdapterClosureTask"],
-  ["cloud-consciousness-live-provider-real-launch", "isCloudConsciousnessLiveProviderRealLaunchTask", "executeCloudConsciousnessLiveProviderRealLaunchTask"],
-  ["cloud-consciousness-live-provider-egress-execution", "isCloudConsciousnessLiveProviderEgressExecutionTask", "executeCloudConsciousnessLiveProviderEgressExecutionTask"],
-  ["cloud-consciousness-live-provider-credential-value-authorization", "isCloudConsciousnessLiveProviderCredentialValueAuthorizationTask", "executeCloudConsciousnessLiveProviderCredentialValueAuthorizationTask"],
-  ["cloud-consciousness-live-provider-credential-value-read", "isCloudConsciousnessLiveProviderCredentialValueReadTask", "executeCloudConsciousnessLiveProviderCredentialValueReadTask"],
-  ["cloud-consciousness-live-provider-credential-value-access-authorization", "isCloudConsciousnessLiveProviderCredentialValueAccessAuthorizationTask", "executeCloudConsciousnessLiveProviderCredentialValueAccessAuthorizationTask"],
-  ["cloud-consciousness-live-provider-credential-value-access-authorization-decision", "isCloudConsciousnessLiveProviderCredentialValueAccessAuthorizationDecisionTask", "executeCloudConsciousnessLiveProviderCredentialValueAccessAuthorizationDecisionTask"],
-  ["cloud-consciousness-live-provider-credential-value-local-read", "isCloudConsciousnessLiveProviderCredentialValueLocalReadTask", "executeCloudConsciousnessLiveProviderCredentialValueLocalReadTask"],
-  ["cloud-consciousness-live-provider-credential-value-local-read-execution", "isCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionTask", "executeCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionTask"],
-  ["cloud-consciousness-live-provider-credential-value-local-read-execution-local-read", "isCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadTask", "executeCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadTask"],
-  ["cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt", "isCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptTask", "executeCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptTask"],
-  ["cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read", "isCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadTask", "executeCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadTask"],
-  ["cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope", "isCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeTask", "executeCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeTask"],
-  ["cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation", "isCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationTask", "executeCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationTask"],
-  ["cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution", "isCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionTask", "executeCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionTask"],
-  ["cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt", "isCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptTask", "executeCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptTask"],
-  ["cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt-local-read", "isCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadTask", "executeCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadTask"],
-];
+const DELEGATED_NON_RECOVERABLE_TASK_HANDLERS = DELEGATED_PLAN_TASK_HANDLER_DESCRIPTORS.map(
+  ({ name, predicate, execute }) => [name, predicate, execute],
+);
 
 const INTERNAL_DEFERRED_TASK_CASES = [
   {

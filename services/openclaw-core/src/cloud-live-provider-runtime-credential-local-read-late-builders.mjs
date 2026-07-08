@@ -89,6 +89,7 @@ export function createCloudLiveProviderRuntimeCredentialLocalReadLateBuilders(co
     createCredentialLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeRuntime({
       buildCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadFinalReadinessPreflight:
         resultEnvelopeCreationExecutionAttemptLocalReadRuntime.buildCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadFinalReadinessPreflight,
+      ...taskRuntimeContext,
     });
 
   return {

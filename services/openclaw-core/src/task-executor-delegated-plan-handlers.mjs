@@ -1,4 +1,4 @@
-const DELEGATED_PLAN_TASK_HANDLER_DESCRIPTORS = [
+export const DELEGATED_PLAN_TASK_HANDLER_DESCRIPTORS = [
   { name: "long-term-memory-write", predicate: "isLongTermMemoryWriteTask", execute: "executeLongTermMemoryWriteTask" },
   { name: "cloud-consciousness-handoff", predicate: "isCloudConsciousnessHandoffTask", execute: "executeCloudConsciousnessHandoffTask" },
   { name: "cloud-consciousness-provider-dry-run", predicate: "isCloudConsciousnessProviderDryRunTask", execute: "executeCloudConsciousnessProviderDryRunTask" },
@@ -32,6 +32,7 @@ const DELEGATED_PLAN_TASK_HANDLER_DESCRIPTORS = [
   { name: "cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution", predicate: "isCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionTask", execute: "executeCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionTask" },
   { name: "cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt", predicate: "isCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptTask", execute: "executeCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptTask" },
   { name: "cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt-local-read", predicate: "isCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadTask", execute: "executeCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadTask" },
+  { name: "cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope", predicate: "isCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeTask", execute: "executeCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeTask" },
 ];
 
 export function createDelegatedPlanTaskHandlers(planBuilder) {
