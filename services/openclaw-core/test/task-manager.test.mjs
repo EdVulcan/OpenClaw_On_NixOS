@@ -79,6 +79,7 @@ test("task manager centralizes extension field creation and serialization", () =
   assert.equal(serialized.bodyEvidenceLedgerDirectory, null);
   assert.equal(serialized.cloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalRead, null);
   assert.equal(serialized.cloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelope, null);
+  assert.equal(serialized.cloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreation, null);
 
   task.bodyEvidenceLedgerDirectory = {
     registry: "openclaw-body-evidence-ledger-directory-task-v0",
@@ -86,11 +87,17 @@ test("task manager centralizes extension field creation and serialization", () =
   task.cloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelope = {
     registry: "openclaw-cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-task-v0",
   };
+  task.cloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreation = {
+    registry: "openclaw-cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-creation-task-v0",
+  };
   serialized = manager.serialiseTask(task);
   assert.deepEqual(serialized.bodyEvidenceLedgerDirectory, {
     registry: "openclaw-body-evidence-ledger-directory-task-v0",
   });
   assert.deepEqual(serialized.cloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelope, {
     registry: "openclaw-cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-task-v0",
+  });
+  assert.deepEqual(serialized.cloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreation, {
+    registry: "openclaw-cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-creation-task-v0",
   });
 });

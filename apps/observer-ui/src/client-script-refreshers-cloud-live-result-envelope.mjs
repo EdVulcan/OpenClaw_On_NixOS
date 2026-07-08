@@ -693,6 +693,31 @@ const liveProviderResultEnvelopePilotDescriptors = {
       "Next: " + (data.next?.recommendedSlice ?? "openclaw-cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-creation-task-shell"),
     ],
   },
+  creationExecutionAttemptLocalReadResultEnvelopeCreationTaskShell: {
+    requestPath: "/cloud-consciousness/live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-creation-route",
+    catchNextFallback: "openclaw-cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-creation-task-shell",
+    errorMessage: "Unable to read live provider credential value local read execution local read attempt local read result envelope creation execution attempt local read result envelope creation task shell readiness.",
+    elements: () => ({
+      ready: cloudLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationTaskShellReady,
+      approval: cloudLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationTaskShellApproval,
+      credential: cloudLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationTaskShellCredential,
+      next: cloudLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationTaskShellNext,
+      json: cloudLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationTaskShellJson,
+    }),
+    nextText: () => "openclaw-cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-creation-approved-deferred",
+    jsonLines: (data, summary) => [
+      "Task Registry: openclaw-cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-creation-task-v0",
+      "Source Registry: " + (summary.sourceRegistry ?? "openclaw-cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-creation-route-v0"),
+      "Source Task: " + (summary.sourceTaskId ?? "none"),
+      "Ready: " + Boolean(summary.ready),
+      "Approval required: true",
+      "Task Endpoint: /cloud-consciousness/live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-creation-tasks",
+      "Result envelope creation task created on demand: false",
+      "Result envelope created: " + Boolean(summary.credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreated),
+      ...liveProviderResultEnvelopeNoEgressLines(summary, false),
+      "Next: openclaw-cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-creation-approved-deferred",
+    ],
+  },
 };
 
 async function refreshCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeRoute() {
@@ -793,6 +818,10 @@ async function refreshCloudConsciousnessLiveProviderCredentialValueLocalReadExec
 
 async function refreshCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationRoute() {
   await refreshLiveProviderResultEnvelopeDescriptor(liveProviderResultEnvelopePilotDescriptors.creationExecutionAttemptLocalReadResultEnvelopeCreationRoute);
+}
+
+async function refreshCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationTaskShell() {
+  await refreshLiveProviderResultEnvelopeDescriptor(liveProviderResultEnvelopePilotDescriptors.creationExecutionAttemptLocalReadResultEnvelopeCreationTaskShell);
 }
 
 `;

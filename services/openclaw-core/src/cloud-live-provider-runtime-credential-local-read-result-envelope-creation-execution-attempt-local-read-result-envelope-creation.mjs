@@ -4,10 +4,24 @@ const CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CREDENTIAL_VALUE_LOCAL_READ_EXECUTION_LO
   "openclaw-cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-final-readiness-preflight-v0";
 const CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CREDENTIAL_VALUE_LOCAL_READ_EXECUTION_LOCAL_READ_ATTEMPT_LOCAL_READ_RESULT_ENVELOPE_CREATION_EXECUTION_ATTEMPT_LOCAL_READ_RESULT_ENVELOPE_CREATION_ROUTE_REGISTRY =
   "openclaw-cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-creation-route-v0";
+const CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CREDENTIAL_VALUE_LOCAL_READ_EXECUTION_LOCAL_READ_ATTEMPT_LOCAL_READ_RESULT_ENVELOPE_CREATION_EXECUTION_ATTEMPT_LOCAL_READ_RESULT_ENVELOPE_CREATION_TASK_REGISTRY =
+  "openclaw-cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-creation-task-v0";
 
 export function createCredentialLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationRuntime(context) {
   const {
     buildCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeFinalReadinessPreflight,
+    createTask,
+    createApprovalRequestForTask,
+    evaluatePolicyIntent,
+    publishEvent,
+    publishTaskApprovalIfPending,
+    supersedeOtherActiveTasks,
+    reconcileRuntimeState,
+    persistState,
+    serialiseTask,
+    appendTaskPhase,
+    completeTask,
+    approvals,
   } = context;
 
   async function buildCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationRoute() {
@@ -124,7 +138,255 @@ export function createCredentialLocalReadResultEnvelopeCreationExecutionAttemptL
     };
   }
 
+  async function createCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationTask({ confirm = false } = {}) {
+    if (confirm !== true) {
+      throw new Error("Cloud consciousness live provider credential value local read execution local-read attempt local-read result envelope creation execution attempt local-read result envelope creation task creation requires confirm=true.");
+    }
+
+    const route = await buildCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationRoute();
+    if (route.summary?.ready !== true
+      || route.next?.recommendedSlice !== "openclaw-cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-creation-task-shell") {
+      throw new Error("Cloud consciousness live provider credential value local read execution local-read attempt local-read result envelope creation execution attempt local-read result envelope creation task requires a ready Phase 123 result envelope creation route.");
+    }
+
+    const policyRequest = {
+      intent: "cloud_consciousness.live_provider_call.credential_value_local_read_execution_local_read_attempt_local_read_result_envelope_creation_execution_attempt_local_read_result_envelope_creation_task",
+      domain: "cross_boundary",
+      risk: "high",
+      requiresApproval: true,
+      audit: true,
+      tags: ["cloud_consciousness", "live_provider_call", "credential_value_local_read_execution_local_read_attempt_local_read_result_envelope_creation_execution_attempt_local_read_result_envelope_creation", "operator_reviewed"],
+    };
+    const goal = "Prepare approval-gated credential value local read result envelope creation task shell without reading credential values or creating envelopes";
+    const policyDecision = evaluatePolicyIntent({
+      type: "cloud_consciousness_live_provider_credential_value_local_read_execution_local_read_attempt_local_read_result_envelope_creation_execution_attempt_local_read_result_envelope_creation_task",
+      goal,
+      policy: policyRequest,
+    }, {
+      stage: "cloud_consciousness.live_provider_credential_value_local_read_execution_local_read_attempt_local_read_result_envelope_creation_execution_attempt_local_read_result_envelope_creation_task.draft",
+      type: "cloud_consciousness_live_provider_credential_value_local_read_execution_local_read_attempt_local_read_result_envelope_creation_execution_attempt_local_read_result_envelope_creation_task",
+      goal,
+    });
+
+    const task = createTask({
+      goal,
+      type: "cloud_consciousness_live_provider_credential_value_local_read_execution_local_read_attempt_local_read_result_envelope_creation_execution_attempt_local_read_result_envelope_creation_task",
+      workViewStrategy: "cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-creation",
+      policy: policyRequest,
+      plan: {
+        planner: "cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-creation-task-v0",
+        strategy: "approval-gated-cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-creation-shell",
+        summary: "Create an approval-gated credential value local read result envelope creation task shell while keeping credential values unread, result envelopes uncreated, and endpoint/network activity disabled.",
+        governance: liveProviderPhaseGovernance.phase124Governance({
+          createsTask: true,
+          createsApproval: true,
+          credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationTaskCreated: true,
+        }),
+        steps: [
+          {
+            id: "review-credential-value-local-read-result-envelope-creation-route",
+            phase: "review_live_provider_credential_value_local_read_result_envelope_creation_route",
+            title: "Review Phase 123 credential value local read result envelope creation route",
+            status: "pending",
+            requiresApproval: false,
+          },
+          {
+            id: "operator-approval",
+            phase: "waiting_for_approval",
+            title: "Wait for operator approval before credential value local read result envelope creation shell can be recorded",
+            status: "pending",
+            capabilityId: "act.system.command.dry_run",
+            requiresApproval: true,
+            risk: "high",
+          },
+          {
+            id: "defer-credential-value-local-read-result-envelope-creation",
+            phase: "cloud_consciousness_live_provider_credential_value_local_read_execution_local_read_attempt_local_read_result_envelope_creation_execution_attempt_local_read_result_envelope_creation_task_shell_deferred",
+            title: "Record local read result envelope creation task shell and defer credential value reads and envelope creation",
+            status: "pending",
+            requiresApproval: true,
+            executesNow: false,
+          },
+        ],
+      },
+    }, { skipInitialPolicy: true });
+
+    task.policy = {
+      request: policyRequest,
+      decision: policyDecision,
+    };
+    task.cloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreation = {
+      registry: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CREDENTIAL_VALUE_LOCAL_READ_EXECUTION_LOCAL_READ_ATTEMPT_LOCAL_READ_RESULT_ENVELOPE_CREATION_EXECUTION_ATTEMPT_LOCAL_READ_RESULT_ENVELOPE_CREATION_TASK_REGISTRY,
+      sourceRegistry: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CREDENTIAL_VALUE_LOCAL_READ_EXECUTION_LOCAL_READ_ATTEMPT_LOCAL_READ_RESULT_ENVELOPE_CREATION_EXECUTION_ATTEMPT_LOCAL_READ_RESULT_ENVELOPE_CREATION_ROUTE_REGISTRY,
+      sourceTaskId: route.summary?.sourceTaskId ?? null,
+      implementationStatus: "task_shell_only",
+      credentialReference: route.decision?.credentialReference ?? "openclaw://credential/provider/live-provider-fixture",
+      credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeFinalReadinessPreflightRecorded:
+        route.summary?.credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeFinalReadinessPreflightRecorded === true,
+      credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationTaskCreated: true,
+      credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationTaskApproved: false,
+      credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationDeferred: true,
+      credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreated: false,
+      credentialValueRead: false,
+      credentialValueIncluded: false,
+      credentialValueExposed: false,
+      providerCredentialRead: false,
+      endpointNetworkEgressAuthorized: false,
+      endpointNetworkEgressDenied: true,
+      endpointContacted: false,
+      networkEgress: false,
+      providerResponseCreated: false,
+      rollbackExecuted: false,
+      rollbackCommandCreated: false,
+      hostMutation: false,
+      transmitsExternally: false,
+      liveProviderCallEnabled: false,
+      launchAuthorized: false,
+      launchExecuted: false,
+    };
+
+    const approval = createApprovalRequestForTask(task, policyDecision);
+    const reclaimedTasks = supersedeOtherActiveTasks(task.id);
+    reconcileRuntimeState();
+    persistState();
+
+    await publishEvent("task.created", {
+      task: serialiseTask(task),
+      planner: "cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-creation-task-v0",
+    });
+    await publishTaskApprovalIfPending(task);
+    await publishEvent("task.planned", {
+      task: serialiseTask(task),
+      plan: task.plan,
+    });
+    await Promise.all(reclaimedTasks.map((reclaimedTask) => publishEvent("task.phase_changed", {
+      task: serialiseTask(reclaimedTask),
+    })));
+
+    return {
+      ok: true,
+      registry: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CREDENTIAL_VALUE_LOCAL_READ_EXECUTION_LOCAL_READ_ATTEMPT_LOCAL_READ_RESULT_ENVELOPE_CREATION_EXECUTION_ATTEMPT_LOCAL_READ_RESULT_ENVELOPE_CREATION_TASK_REGISTRY,
+      mode: "approval-gated-cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-creation-task",
+      generatedAt: new Date().toISOString(),
+      sourceRegistry: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CREDENTIAL_VALUE_LOCAL_READ_EXECUTION_LOCAL_READ_ATTEMPT_LOCAL_READ_RESULT_ENVELOPE_CREATION_EXECUTION_ATTEMPT_LOCAL_READ_RESULT_ENVELOPE_CREATION_ROUTE_REGISTRY,
+      route,
+      task,
+      approval,
+      governance: liveProviderPhaseGovernance.phase124Governance({
+        createsTask: true,
+        createsApproval: true,
+        credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationTaskCreated: true,
+      }),
+    };
+  }
+
+  function isCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationTask(task) {
+    return task?.type === "cloud_consciousness_live_provider_credential_value_local_read_execution_local_read_attempt_local_read_result_envelope_creation_execution_attempt_local_read_result_envelope_creation_task"
+      && task?.cloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreation?.registry
+        === CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CREDENTIAL_VALUE_LOCAL_READ_EXECUTION_LOCAL_READ_ATTEMPT_LOCAL_READ_RESULT_ENVELOPE_CREATION_EXECUTION_ATTEMPT_LOCAL_READ_RESULT_ENVELOPE_CREATION_TASK_REGISTRY;
+  }
+
+  async function executeCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationTask(task) {
+    const approval = task.approval?.requestId ? approvals.get(task.approval.requestId) : null;
+    if (approval?.status !== "approved") {
+      return {
+        blocked: true,
+        reason: "approval_required",
+        task,
+        approval: approval ? { ...approval } : null,
+      };
+    }
+
+    const recordedAt = new Date().toISOString();
+    task.cloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreation = {
+      ...(task.cloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreation ?? {}),
+      implementationStatus: "deferred_after_approval",
+      approvedAt: approval.updatedAt,
+      credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationTaskCreated: true,
+      credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationTaskApproved: true,
+      credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationDeferred: true,
+      credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreated: false,
+      credentialValueRead: false,
+      credentialValueIncluded: false,
+      credentialValueExposed: false,
+      providerCredentialRead: false,
+      endpointNetworkEgressAuthorized: false,
+      endpointNetworkEgressDenied: true,
+      endpointContacted: false,
+      networkEgress: false,
+      providerResponseCreated: false,
+      rollbackExecuted: false,
+      rollbackCommandCreated: false,
+      hostMutation: false,
+      transmitsExternally: false,
+      liveProviderCallEnabled: false,
+      launchAuthorized: false,
+      launchExecuted: false,
+    };
+    appendTaskPhase(task, "cloud_consciousness_live_provider_credential_value_local_read_execution_local_read_attempt_local_read_result_envelope_creation_execution_attempt_local_read_result_envelope_creation_task_shell_deferred", {
+      taskRegistry: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CREDENTIAL_VALUE_LOCAL_READ_EXECUTION_LOCAL_READ_ATTEMPT_LOCAL_READ_RESULT_ENVELOPE_CREATION_EXECUTION_ATTEMPT_LOCAL_READ_RESULT_ENVELOPE_CREATION_TASK_REGISTRY,
+      recordedAt,
+      sourcePhase: "cloud_consciousness_live_provider_credential_value_local_read_execution_local_read_attempt_local_read_result_envelope_creation_execution_attempt_local_read_result_envelope_creation_route",
+      deferredSlice: "openclaw-cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-creation-approved-deferred",
+      reason: "credential value local read result envelope creation task shell approved; credential value read and result envelope creation remain deferred",
+      credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationTaskCreated: true,
+      credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationTaskApproved: true,
+      credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationDeferred: true,
+      credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreated: false,
+      credentialValueRead: false,
+      endpointContacted: false,
+      networkEgress: false,
+      liveProviderCallEnabled: false,
+    });
+    completeTask(task, {
+      summary: "Approved credential value local read result envelope creation task shell recorded; credential values remain unread and result envelopes remain uncreated.",
+      taskRegistry: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CREDENTIAL_VALUE_LOCAL_READ_EXECUTION_LOCAL_READ_ATTEMPT_LOCAL_READ_RESULT_ENVELOPE_CREATION_EXECUTION_ATTEMPT_LOCAL_READ_RESULT_ENVELOPE_CREATION_TASK_REGISTRY,
+      phase: "cloud_consciousness_live_provider_credential_value_local_read_execution_local_read_attempt_local_read_result_envelope_creation_execution_attempt_local_read_result_envelope_creation_task_shell_deferred",
+      credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationTaskCreated: true,
+      credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationTaskApproved: true,
+      credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationDeferred: true,
+      credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreated: false,
+      credentialValueRead: false,
+      endpointContacted: false,
+      networkEgress: false,
+      liveProviderCallEnabled: false,
+    });
+    reconcileRuntimeState();
+    persistState();
+    await publishEvent("task.phase_changed", { task: serialiseTask(task) });
+
+    return {
+      ok: true,
+      executor: "cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-creation-task-v0",
+      status: "credential_value_local_read_execution_local_read_attempt_local_read_result_envelope_creation_execution_attempt_local_read_result_envelope_creation_task_shell_deferred_after_approval",
+      task,
+      governance: liveProviderPhaseGovernance.phase124Governance({
+        createsTask: true,
+        createsApproval: true,
+        credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationTaskCreated: true,
+        credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationTaskApproved: true,
+      }),
+      summary: {
+        ready: true,
+        implementationStatus: "deferred_after_approval",
+        credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationTaskCreated: true,
+        credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationTaskApproved: true,
+        credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationDeferred: true,
+        credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreated: false,
+        credentialValueIncluded: false,
+        credentialValueRead: false,
+        credentialValueExposed: false,
+        endpointContacted: false,
+        networkEgress: false,
+        liveProviderCallEnabled: false,
+      },
+    };
+  }
+
   return {
     buildCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationRoute,
+    createCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationTask,
+    isCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationTask,
+    executeCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationTask,
   };
 }

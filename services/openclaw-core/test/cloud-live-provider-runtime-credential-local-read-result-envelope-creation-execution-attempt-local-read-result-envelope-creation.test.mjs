@@ -8,6 +8,8 @@ const FINAL_READINESS_PREFLIGHT_REGISTRY =
   "openclaw-cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-final-readiness-preflight-v0";
 const CREATION_ROUTE_REGISTRY =
   "openclaw-cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-creation-route-v0";
+const CREATION_TASK_REGISTRY =
+  "openclaw-cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-creation-task-v0";
 
 function deferredCredentialFlags() {
   return {
@@ -77,4 +79,63 @@ test("credential local-read result-envelope creation route preserves Phase 123 r
   assert.equal(route.summary.liveProviderCallEnabled, false);
   assert.equal(route.summary.launchExecuted, false);
   assert.equal(route.next.recommendedSlice, "openclaw-cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-creation-task-shell");
+});
+
+test("credential local-read result-envelope creation task shell stays approval gated and deferred", async () => {
+  const { deps, calls, events } = createRouteHarness();
+  const builders = createCredentialLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationRuntime(deps);
+
+  const taskShell = await builders.createCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationTask({ confirm: true });
+
+  assert.equal(taskShell.registry, CREATION_TASK_REGISTRY);
+  assert.equal(taskShell.sourceRegistry, CREATION_ROUTE_REGISTRY);
+  assert.equal(taskShell.approval.status, "pending");
+  const shell = taskShell.task.cloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreation;
+  assert.equal(shell.registry, CREATION_TASK_REGISTRY);
+  assert.equal(shell.sourceRegistry, CREATION_ROUTE_REGISTRY);
+  assert.equal(shell.implementationStatus, "task_shell_only");
+  assert.equal(shell.credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationTaskCreated, true);
+  assert.equal(shell.credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationTaskApproved, false);
+  assert.equal(shell.credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationDeferred, true);
+  assert.equal(shell.credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreated, false);
+  assert.equal(shell.credentialValueRead, false);
+  assert.equal(shell.credentialValueIncluded, false);
+  assert.equal(shell.credentialValueExposed, false);
+  assert.equal(shell.providerCredentialRead, false);
+  assert.equal(shell.endpointContacted, false);
+  assert.equal(shell.networkEgress, false);
+  assert.equal(shell.providerResponseCreated, false);
+  assert.equal(shell.rollbackExecuted, false);
+  assert.equal(shell.hostMutation, false);
+  assert.equal(shell.liveProviderCallEnabled, false);
+  assert.equal(calls.filter((call) => call.name === "createTask").length, 1);
+  assert.equal(calls.filter((call) => call.name === "createApprovalRequestForTask").length, 1);
+  assert.equal(events.filter((event) => event.name === "task.created").length, 1);
+  assert.equal(builders.isCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationTask(taskShell.task), true);
+
+  taskShell.task.approval = { requestId: taskShell.approval.id, status: "pending" };
+  const blocked = await builders.executeCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationTask(taskShell.task);
+  assert.equal(blocked.blocked, true);
+  assert.equal(blocked.reason, "approval_required");
+
+  deps.approvals.set(taskShell.approval.id, {
+    id: taskShell.approval.id,
+    status: "approved",
+    updatedAt: "2026-07-09T00:00:00.000Z",
+  });
+  const executed = await builders.executeCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationTask(taskShell.task);
+
+  assert.equal(executed.status, "credential_value_local_read_execution_local_read_attempt_local_read_result_envelope_creation_execution_attempt_local_read_result_envelope_creation_task_shell_deferred_after_approval");
+  assert.equal(executed.summary.credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationTaskCreated, true);
+  assert.equal(executed.summary.credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationTaskApproved, true);
+  assert.equal(executed.summary.credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationDeferred, true);
+  assert.equal(executed.summary.credentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreated, false);
+  assert.equal(executed.summary.credentialValueRead, false);
+  assert.equal(executed.summary.credentialValueIncluded, false);
+  assert.equal(executed.summary.credentialValueExposed, false);
+  assert.equal(executed.summary.endpointContacted, false);
+  assert.equal(executed.summary.networkEgress, false);
+  assert.equal(executed.summary.liveProviderCallEnabled, false);
+  assert.equal(executed.task.cloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreation.implementationStatus, "deferred_after_approval");
+  assert.equal(executed.task.phase, "cloud_consciousness_live_provider_credential_value_local_read_execution_local_read_attempt_local_read_result_envelope_creation_execution_attempt_local_read_result_envelope_creation_task_shell_deferred");
 });
