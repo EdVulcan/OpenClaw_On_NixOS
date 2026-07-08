@@ -676,6 +676,18 @@ Audit sources used for this revision:
     readiness quartet. The attempt final-readiness descriptor keeps the
     approved-deferred-found line and recorded DOM behavior in metadata instead
     of a bespoke refresher body.
+100. Completed the Observer result-envelope descriptor table through the Phase
+    115-117 final local-read route/task-shell/approved-deferred sequence. The
+    final three refresh functions now use the same endpoint-to-DOM descriptor
+    helper while preserving their global function names, DOM ids, registry
+    tokens, JSON lines, fallback text, and served `/client.js` syntax checks.
+101. Extracted native plugin SDK capability descriptors from
+    `packages/plugin-runtime/src/plugin-registry.mjs` into
+    `plugin-capability-descriptors.mjs`. The registry factory now composes the
+    plugin identity, governance descriptor, and capability data from one
+    focused module while preserving `createOpenClawNativePluginRegistry()`, the
+    exact capability id order, shared-types runtime shims, and native plugin
+    milestone checks.
 
 These slices reduced live-provider runtime and milestone orchestration coupling
 while preserving the public runtime API and existing milestone entry names.
@@ -698,9 +710,9 @@ while preserving the public runtime API and existing milestone entry names.
 | P2 | `apps/observer-ui/src/client-script-renderers.mjs` | Workspace/source/native-adapter renderers now live in `client-script-renderers-workspace-source.mjs`, leaving the main renderer chunk focused on shared formatting, task/policy/capability/ledger renderers, native plugin runtime renderers, and the operator panel. The served client script was proven byte-for-byte identical after extraction. | Treat as largely reduced unless the remaining native plugin runtime renderer group grows; next higher-ROI Observer hotspots are `client-script-refreshers-runtime.mjs` and `client-script-config-dom.mjs`. |
 | P2 | `apps/observer-ui/src/client-script-refreshers-app.mjs` | Workspace/source/native-adapter refreshers now live in `client-script-refreshers-workspace-source.mjs`; MVP/Phase 2-5 refreshers live in `client-script-refreshers-mvp-phases.mjs`; Phase 6 and long-term-memory refreshers live in `client-script-refreshers-memory-phases.mjs`. The main app refresher chunk is now focused on core operator, policy, approval, capability, ledger, health, task summary, fetch, and event helpers. The assembled `/client.js` output was proven byte-for-byte identical. | Treat as largely reduced; keep future phase refreshers in phase-family modules rather than growing the core app refresher chunk. |
 | P2 | `apps/observer-ui/src/client-script-refreshers-runtime.mjs` | Body governance/body-evidence refreshers now live in `client-script-refreshers-body-evidence.mjs`, and systemd repair refreshers now live in `client-script-refreshers-systemd.mjs`. The runtime refresher chunk is now focused on core runtime, task list/history, work-view, screen/action, system state, heal, maintenance, and audit refreshers. The assembled `/client.js` output was proven byte-for-byte identical. | Treat as largely reduced; route future body-evidence and systemd refreshers into their domain chunks rather than growing the core runtime refresher chunk. |
-| P2 | `apps/observer-ui/src/client-script-refreshers-cloud.mjs` | Cloud/live-provider refreshers are now split into context/provider rehearsal, live runbook/runtime adapter, real launch/credential authorization, local-read, and result-envelope chunks, and startup refresh registration is descriptor-backed. The Phase 99-114 result-envelope route/task-shell/approved/final-readiness quartets now use a descriptor-backed endpoint-to-DOM helper. Remaining coupling is the repeated endpoint-to-DOM rendering pattern in the final local-read route/task/approved sequence and other phase-family chunks. | Extend the proven result-envelope descriptor pattern through Phase 115-117 while preserving global function names and served `/client.js` token compatibility. |
+| P2 | `apps/observer-ui/src/client-script-refreshers-cloud.mjs` | Cloud/live-provider refreshers are now split into context/provider rehearsal, live runbook/runtime adapter, real launch/credential authorization, local-read, and result-envelope chunks, and startup refresh registration is descriptor-backed. The Phase 99-117 result-envelope route/task-shell/approved/final-readiness/local-read sequence now uses a descriptor-backed endpoint-to-DOM helper while preserving global refresh names and served `/client.js` token compatibility. Remaining coupling is other phase-family chunks that still coordinate HTML ids, DOM constants, refresh implementations, and milestone tokens manually. | Introduce descriptor-backed DOM/read-model binding for one next cloud or system/body lane only when it removes HTML/id/refresher drift and can preserve served client token compatibility. |
 | P2 | `services/openclaw-core/src/workspace-ops.mjs` | Target resolution, source signal collection, task creation, approval, and event publication still share one operational surface, but pure patch edit/diff utilities now live in `workspace-patch-utils.mjs`, proposal/rationale/check/risk bundle construction now lives in `workspace-proposal-utils.mjs`, and workspace/source command plan-only builders now live in `workspace-command-plan-builders.mjs` with direct unit coverage. | Treat as substantially reduced for now. Next split should target source-authored edit orchestration only if it grows, or separate approval-gated task materializers if future native workspace work touches this file heavily. |
-| P2 | Shared plugin contract (`packages/shared-types/src/plugin-registry.mjs`, `plugin-contract.mjs`) | Native capability IDs and validators are small but drive plan-builder capability mapping, plugin review, workspace ops, route behavior, executor handling, and milestone assertions. | Move capability descriptors into a data module while preserving `createOpenClawNativePluginRegistry` and exact capability IDs. |
+| P2 | Shared plugin contract (`packages/plugin-runtime/src/plugin-registry.mjs`, `packages/shared-types/src/plugin-registry.mjs`, `plugin-contract.mjs`) | Native capability IDs now live in `plugin-capability-descriptors.mjs` with direct package tests preserving the exact id order, while `createOpenClawNativePluginRegistry()` and shared-types runtime shims remain stable. Remaining coupling is contract validation/default primitive ownership across plugin runtime and shared type definitions. | Centralize remaining duplicated policy/risk/event primitives only when it removes a real caller-facing duplicate or unlocks typed shared-package validation. |
 
 ## Deprioritized By Coupling
 
@@ -713,19 +725,16 @@ while preserving the public runtime API and existing milestone entry names.
 
 1. Finish reducing active live-provider lane coupling while it remains the
    current development surface.
-2. Extend the Observer result-envelope descriptor pilot across the remaining
-   Phase 115-117 final local-read sequence, preserving global refresh names,
-   DOM ids, route tokens, and served `/client.js` compatibility.
-3. Continue splitting `route-handlers.mjs` by domain so future phases do not
+2. Continue splitting `route-handlers.mjs` by domain so future phases do not
    keep editing one router chain.
-4. Split `task-executor.mjs` handler groups only after the current route
+3. Split `task-executor.mjs` handler groups only after the current route
    extraction work, since the global branch chain has already been replaced by
    a registry table.
-5. Add Observer startup/panel/selector descriptors to stop HTML/DOM/refresher/startup
+4. Add Observer startup/panel/selector descriptors to stop HTML/DOM/refresher/startup
    drift.
-6. Add broader milestone phase descriptors and shared assertion helpers to reduce slow,
+5. Add broader milestone phase descriptors and shared assertion helpers to reduce slow,
    recursive, hand-written validation scripts.
-7. Continue splitting remaining `openclaw-system-sense` route registration
+6. Continue splitting remaining `openclaw-system-sense` route registration
    groups, then return to the highest-coupling
    core/Observer hotspots that still force broad edits.
 

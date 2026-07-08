@@ -9,6 +9,7 @@ import {
   createOpenClawNativePluginRegistry,
   validateOpenClawNativePluginRegistry,
 } from "../src/plugin-registry.mjs";
+import { OPENCLAW_NATIVE_PLUGIN_CAPABILITY_IDS } from "../src/plugin-capability-descriptors.mjs";
 
 test("creates and validates a governed native plugin contract", () => {
   const contract = createOpenClawNativePluginContract({
@@ -50,4 +51,26 @@ test("creates a valid native plugin registry envelope", () => {
   assert.equal(validateOpenClawNativePluginRegistry(registry).ok, true);
   assert.equal(registry.runtimeOwner, "openclaw_on_nixos");
   assert.equal(registry.items.length, 1);
+});
+
+test("preserves the native plugin capability id surface", () => {
+  const registry = createOpenClawNativePluginRegistry({
+    generatedAt: "2026-07-08T00:00:00.000Z",
+  });
+  const capabilityIds = registry.items[0].contract.capabilities.map((capability) => capability.id);
+
+  assert.deepEqual(capabilityIds, [
+    "sense.plugin.manifest_profile",
+    "sense.openclaw.tool_catalog",
+    "sense.openclaw.workspace_semantic_index",
+    "sense.openclaw.workspace_symbol_lookup",
+    "sense.openclaw.workspace_edit_target_select",
+    "act.openclaw.workspace_text_write",
+    "act.openclaw.workspace_patch_apply",
+    "sense.openclaw.prompt_pack",
+    "sense.openclaw.plugin_manifest_map",
+    "plan.openclaw.plugin_capability",
+    "act.plugin.capability.invoke",
+  ]);
+  assert.deepEqual(capabilityIds, [...OPENCLAW_NATIVE_PLUGIN_CAPABILITY_IDS]);
 });

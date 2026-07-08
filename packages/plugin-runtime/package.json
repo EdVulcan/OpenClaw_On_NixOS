@@ -9,7 +9,7 @@
   },
   "scripts": {
     "build": "npm run typecheck && npm test",
-    "typecheck": "node --check src/plugin-contract.mjs && node --check src/plugin-registry.mjs",
+    "typecheck": "node --check src/plugin-contract.mjs && node --check src/plugin-capability-descriptors.mjs && node --check src/plugin-registry.mjs",
     "test": "node --test test/*.test.mjs"
   }
 }

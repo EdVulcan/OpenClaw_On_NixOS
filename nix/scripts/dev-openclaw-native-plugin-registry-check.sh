@@ -4,6 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
+node --check "$REPO_ROOT/packages/plugin-runtime/src/plugin-capability-descriptors.mjs" >/dev/null
 node --check "$REPO_ROOT/packages/plugin-runtime/src/plugin-registry.mjs" >/dev/null
 
 node --input-type=module - <<'EOF' "$REPO_ROOT"

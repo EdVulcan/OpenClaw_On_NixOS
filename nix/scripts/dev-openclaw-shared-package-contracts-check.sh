@@ -21,6 +21,7 @@ tsc -p packages/shared-client/tsconfig.json --noEmit
 tsc -p packages/shared-utils/tsconfig.json --noEmit
 
 node --check packages/plugin-runtime/src/plugin-contract.mjs
+node --check packages/plugin-runtime/src/plugin-capability-descriptors.mjs
 node --check packages/plugin-runtime/src/plugin-registry.mjs
 node --check packages/shared-types/src/plugin-contract.mjs
 node --check packages/shared-types/src/plugin-registry.mjs
