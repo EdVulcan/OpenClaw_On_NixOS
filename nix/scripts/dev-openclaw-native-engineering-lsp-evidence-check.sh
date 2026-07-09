@@ -127,6 +127,7 @@ cleanup() {
     "${SOURCE_TRANSFER_STEP_FILE:-}" \
     "${SOURCE_TRANSFER_TASK_READBACK_FILE:-}" \
     "${SOURCE_TRANSFER_STATE_FILE:-}" \
+    "${SYMBOL_REQUEST_FILE:-}" \
     "${EVENTS_FILE:-}"
   "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 }
@@ -179,6 +180,7 @@ SOURCE_TRANSFER_APPROVED_FILE="$(mktemp)"
 SOURCE_TRANSFER_STEP_FILE="$(mktemp)"
 SOURCE_TRANSFER_TASK_READBACK_FILE="$(mktemp)"
 SOURCE_TRANSFER_STATE_FILE="$(mktemp)"
+SYMBOL_REQUEST_FILE="$(mktemp)"
 EVENTS_FILE="$(mktemp)"
 
 curl --silent --fail "$CORE_URL/plugins/native-adapter/engineering-lsp/evidence?action=check&language=typescript&limit=200" > "$CHECK_FILE"
@@ -361,6 +363,7 @@ post_json "$CORE_URL/approvals/$source_transfer_approval_id/approve" '{"approved
 post_json "$CORE_URL/operator/step" '{}' > "$SOURCE_TRANSFER_STEP_FILE"
 curl --silent --fail "$CORE_URL/tasks/$source_transfer_task_id" > "$SOURCE_TRANSFER_TASK_READBACK_FILE"
 curl --silent --fail "$CORE_URL/plugins/native-adapter/engineering-lsp/lifecycle-state?language=typescript&limit=10" > "$SOURCE_TRANSFER_STATE_FILE"
+curl --silent --fail "$CORE_URL/plugins/native-adapter/engineering-lsp/symbol-request-proposal?language=typescript&action=definition&relativePath=src/app.ts&line=2&character=14" > "$SYMBOL_REQUEST_FILE"
 curl --silent --fail "$EVENT_HUB_URL/events/audit?limit=120" > "$EVENTS_FILE"
 
 node - <<'EOF' \
@@ -406,7 +409,8 @@ node - <<'EOF' \
   "$SOURCE_TRANSFER_APPROVED_FILE" \
   "$SOURCE_TRANSFER_STEP_FILE" \
   "$SOURCE_TRANSFER_TASK_READBACK_FILE" \
-  "$SOURCE_TRANSFER_STATE_FILE"
+  "$SOURCE_TRANSFER_STATE_FILE" \
+  "$SYMBOL_REQUEST_FILE"
 const fs = require("node:fs");
 const readJson = (index) => JSON.parse(fs.readFileSync(process.argv[index], "utf8"));
 
@@ -453,7 +457,8 @@ const sourceTransferApproved = readJson(41);
 const sourceTransferStep = readJson(42);
 const sourceTransferTaskReadback = readJson(43);
 const sourceTransferState = readJson(44);
-const raw = JSON.stringify({ check, position, bad, draft, sourceTransfer, sourceTransferTaskResponse, sourceTransferBlockedStep, sourceTransferApproved, sourceTransferStep, sourceTransferTaskReadback, sourceTransferState, adapter, taskResponse, blockedStep, approved, execStep, taskReadback, processTaskResponse, processBlockedStep, processApproved, processStep, processTaskReadback, lifecycleStateAfterProcess, stopTaskResponse, stopBlockedStep, stopApproved, stopStep, stopTaskReadback, lifecycleStateAfterStop, restartTaskResponse, restartBlockedStep, restartApproved, restartStep, restartTaskReadback, lifecycleState, handshakeTaskResponse, handshakeBlockedStep, handshakeApproved, handshakeStep, handshakeTaskReadback, handshakeState, events });
+const symbolRequest = readJson(45);
+const raw = JSON.stringify({ check, position, bad, draft, sourceTransfer, sourceTransferTaskResponse, sourceTransferBlockedStep, sourceTransferApproved, sourceTransferStep, sourceTransferTaskReadback, sourceTransferState, symbolRequest, adapter, taskResponse, blockedStep, approved, execStep, taskReadback, processTaskResponse, processBlockedStep, processApproved, processStep, processTaskReadback, lifecycleStateAfterProcess, stopTaskResponse, stopBlockedStep, stopApproved, stopStep, stopTaskReadback, lifecycleStateAfterStop, restartTaskResponse, restartBlockedStep, restartApproved, restartStep, restartTaskReadback, lifecycleState, handshakeTaskResponse, handshakeBlockedStep, handshakeApproved, handshakeStep, handshakeTaskReadback, handshakeState, events });
 
 if (
   !check.ok
@@ -576,12 +581,14 @@ if (
   || !adapter.implementedCapabilities?.includes("sense.openclaw.engineering_tool.lsp_lifecycle_state")
   || !adapter.implementedCapabilities?.includes("plan.openclaw.engineering_tool.lsp_source_transfer")
   || !adapter.implementedCapabilities?.includes("act.openclaw.engineering_tool.lsp_source_transfer_task")
+  || !adapter.implementedCapabilities?.includes("plan.openclaw.engineering_tool.lsp_symbol_request")
   || adapter.summary?.canReadEngineeringLspEvidence !== true
   || adapter.summary?.canDraftEngineeringLspLifecycleAction !== true
   || adapter.summary?.canCreateApprovalGatedEngineeringLspLifecycleTasks !== true
   || adapter.summary?.canReadEngineeringLspLifecycleState !== true
   || adapter.summary?.canDraftEngineeringLspSourceTransferProposal !== true
   || adapter.summary?.canCreateApprovalGatedEngineeringLspSourceTransferTasks !== true
+  || adapter.summary?.canDraftEngineeringLspSymbolRequestProposal !== true
 ) {
   throw new Error(`native adapter missing LSP evidence/lifecycle capability: ${JSON.stringify(adapter)}`);
 }
@@ -868,6 +875,24 @@ if (
 ) {
   throw new Error(`LSP lifecycle state should record didOpen source transfer: ${JSON.stringify({ sourceTransferTaskReadback, sourceTransferState })}`);
 }
+if (
+  !symbolRequest.ok
+  || symbolRequest.registry !== "openclaw-native-engineering-lsp-symbol-request-proposal-v0"
+  || symbolRequest.mode !== "lsp-symbol-request-proposal-only"
+  || symbolRequest.prerequisite?.found !== true
+  || symbolRequest.prerequisite?.sourceTaskId !== sourceTransferTask.id
+  || symbolRequest.proposedJsonRpc?.method !== "textDocument/definition"
+  || symbolRequest.proposedJsonRpc?.sent !== false
+  || symbolRequest.proposedJsonRpc?.params?.textDocument?.uri !== sourceTransferExecution.processSupervision?.protocolHandshake?.sourceTransfer?.uri
+  || symbolRequest.proposedJsonRpc?.params?.position?.line !== 1
+  || symbolRequest.proposedJsonRpc?.params?.position?.character !== 14
+  || symbolRequest.governance?.canSendSymbolRequest !== false
+  || symbolRequest.governance?.futureSymbolRequestRequiresApproval !== true
+  || symbolRequest.bounds?.noSymbolRequestSent !== true
+  || symbolRequest.summary?.symbolRequestSent !== false
+) {
+  throw new Error(`LSP symbol request proposal mismatch: ${JSON.stringify(symbolRequest)}`);
+}
 const eventTypes = new Set((events.items ?? events.events ?? []).map((event) => event.type));
 for (const type of ["approval.created", "approval.approved", "policy.evaluated"]) {
   if (!eventTypes.has(type)) {
@@ -884,6 +909,7 @@ for (const token of [
   "lsp-didopen-source-transfer-proposal-only",
   "approval-gated-lsp-source-transfer-didopen",
   "didopen_source_transfer_completed_symbol_requests_deferred",
+  "lsp-symbol-request-proposal-only",
   "no textDocument/didOpen notification sent",
   "approval-gated-lsp-lifecycle-binary-gate",
   "approved-lsp-lifecycle-binary-gate",
@@ -921,6 +947,8 @@ console.log(JSON.stringify({
     sourceTransferTaskStatus: sourceTransferTask.status,
     approvedSourceTransferDidOpenSent: sourceTransferExecution.server.didOpenSent,
     approvedSourceTransferState: sourceTransferExecution.result.state,
+    symbolRequestRegistry: symbolRequest.registry,
+    symbolRequestMethod: symbolRequest.proposedJsonRpc.method,
     serverStatus: check.serverReadiness.status,
     lifecycleTaskStatus: lifecycleTask.status,
     binaryFound: execution.server.binaryFound,

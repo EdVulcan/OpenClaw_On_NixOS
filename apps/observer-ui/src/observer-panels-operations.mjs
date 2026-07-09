@@ -395,7 +395,7 @@ export function observerOperationsPanels() {
           <pre id="engineering-read-search-json">Loading native engineering read/search evidence...</pre>
         </section>
         <section class="panel">
-          <h2>OpenClaw Engineering LSP Evidence / Lifecycle / Source Transfer</h2>
+          <h2>OpenClaw Engineering LSP Evidence / Lifecycle / Source / Symbol</h2>
           <div class="metric"><span>Registry</span><span id="engineering-lsp-registry">openclaw-native-engineering-lsp-evidence-v0</span></div>
           <div class="metric"><span>Languages</span><span id="engineering-lsp-languages">none</span></div>
           <div class="metric"><span>Server</span><span id="engineering-lsp-server">not_checked</span></div>

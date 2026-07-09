@@ -286,6 +286,32 @@ test("native adapter engineering LSP source-transfer proposal route preserves bo
   assert.equal(response.body.registry, "openclaw-native-engineering-lsp-source-transfer-proposal-v0");
 });
 
+test("native adapter engineering LSP symbol request proposal route preserves request inputs", async () => {
+  let observedInput = null;
+  const response = await invokeNativeAdapterPluginRoute({
+    buildNativeEngineeringLspSymbolRequestProposal: (input) => {
+      observedInput = input;
+      return {
+        ok: true,
+        registry: "openclaw-native-engineering-lsp-symbol-request-proposal-v0",
+        mode: "lsp-symbol-request-proposal-only",
+      };
+    },
+  }, "GET", "/plugins/native-adapter/engineering-lsp/symbol-request-proposal?workspacePath=/tmp/openclaw&language=typescript&action=definition&path=src/app.ts&line=2&character=14");
+
+  assert.equal(response.handled, true);
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(observedInput, {
+    workspacePath: "/tmp/openclaw",
+    language: "typescript",
+    action: "definition",
+    relativePath: "src/app.ts",
+    line: "2",
+    character: "14",
+  });
+  assert.equal(response.body.registry, "openclaw-native-engineering-lsp-symbol-request-proposal-v0");
+});
+
 test("native adapter engineering write proposal route preserves bounded proposal inputs", async () => {
   let observedInput = null;
   const response = await invokeNativeAdapterPluginRoute({

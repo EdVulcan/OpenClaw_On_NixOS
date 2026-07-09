@@ -106,16 +106,22 @@ The approval-gated didOpen task follow-up was completed as:
 OPENCLAW_NATIVE_ENGINEERING_LSP_SOURCE_TRANSFER_TASK_PLAN.md
 ```
 
+The symbol request proposal follow-up was completed as:
+
+```text
+OPENCLAW_NATIVE_ENGINEERING_LSP_SYMBOL_REQUEST_PROPOSAL_PLAN.md
+```
+
 ## Next Slice
 
 Do not jump to full definition/references/hover. The next meaningful LSP step
 is:
 
 ```text
-governed LSP symbol request proposal and approval boundary
+approval-gated LSP symbol request task
 ```
 
-That follow-up should draft the exact symbol request that would be sent after a
-completed approved `didOpen`, require explicit approval before sending any
-operational symbol request, and keep long-lived process pools, provider egress,
-and root/system daemon work deferred.
+That follow-up should create a task from an inspected proposal, require explicit
+approval before sending any operational symbol request, record bounded response
+metadata, and keep long-lived process pools, provider egress, and root/system
+daemon work deferred.

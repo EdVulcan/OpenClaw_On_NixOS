@@ -93,16 +93,27 @@ openclaw-native-engineering-lsp-evidence
 observer-openclaw-native-engineering-lsp-evidence
 ```
 
-## Next Slice
+## Follow-up Completed
 
-Do not jump straight to definition/references/hover execution. The next
-smallest real capability is:
+The next proposal boundary was completed as:
 
 ```text
-governed LSP symbol request proposal and approval boundary
+OPENCLAW_NATIVE_ENGINEERING_LSP_SYMBOL_REQUEST_PROPOSAL_PLAN.md
 ```
 
-That follow-up should draft the exact symbol request that would be sent after a
-completed approved `didOpen`, require explicit approval before sending any
-operational symbol request, and keep long-lived pools, provider egress, package
-installation, root/system daemon work, and automatic retries deferred.
+It drafts definition/references/hover JSON-RPC metadata over approved didOpen
+state without sending an operational symbol request.
+
+## Next Slice
+
+The next smallest real capability is:
+
+```text
+approval-gated LSP symbol request task
+```
+
+That follow-up should create a task from an inspected proposal, require explicit
+approval, send only the selected operational symbol request to a bounded
+short-lived process after approved didOpen setup, record bounded response
+metadata, and keep long-lived pools, provider egress, package installation,
+root/system daemon work, and automatic retries deferred.

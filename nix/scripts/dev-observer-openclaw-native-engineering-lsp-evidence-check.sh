@@ -56,7 +56,8 @@ cleanup() {
     "${CLIENT_FILE:-}" \
     "${EVIDENCE_FILE:-}" \
     "${DRAFT_FILE:-}" \
-    "${SOURCE_TRANSFER_FILE:-}"
+    "${SOURCE_TRANSFER_FILE:-}" \
+    "${SYMBOL_REQUEST_FILE:-}"
   "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -68,14 +69,16 @@ CLIENT_FILE="$(mktemp)"
 EVIDENCE_FILE="$(mktemp)"
 DRAFT_FILE="$(mktemp)"
 SOURCE_TRANSFER_FILE="$(mktemp)"
+SYMBOL_REQUEST_FILE="$(mktemp)"
 
 curl --silent --fail "$OBSERVER_URL/" > "$HTML_FILE"
 curl --silent --fail "$OBSERVER_URL/client-v5.js" > "$CLIENT_FILE"
 curl --silent --fail "$CORE_URL/plugins/native-adapter/engineering-lsp/evidence?action=check&language=typescript&limit=200" > "$EVIDENCE_FILE"
 curl --silent --fail "$CORE_URL/plugins/native-adapter/engineering-lsp/lifecycle-draft?language=typescript&lifecycleAction=start&limit=200" > "$DRAFT_FILE"
 curl --silent --fail "$CORE_URL/plugins/native-adapter/engineering-lsp/source-transfer-proposal?language=typescript&relativePath=src/app.ts&maxPreviewChars=1200" > "$SOURCE_TRANSFER_FILE"
+curl --silent --fail "$CORE_URL/plugins/native-adapter/engineering-lsp/symbol-request-proposal?language=typescript&action=definition&relativePath=src/app.ts&line=2&character=14" > "$SYMBOL_REQUEST_FILE"
 
-node - <<'EOF' "$HTML_FILE" "$CLIENT_FILE" "$EVIDENCE_FILE" "$DRAFT_FILE" "$SOURCE_TRANSFER_FILE"
+node - <<'EOF' "$HTML_FILE" "$CLIENT_FILE" "$EVIDENCE_FILE" "$DRAFT_FILE" "$SOURCE_TRANSFER_FILE" "$SYMBOL_REQUEST_FILE"
 const fs = require("node:fs");
 const readText = (index) => fs.readFileSync(process.argv[index], "utf8");
 const readJson = (index) => JSON.parse(readText(index));
@@ -85,10 +88,11 @@ const client = readText(3);
 const evidence = readJson(4);
 const draft = readJson(5);
 const sourceTransfer = readJson(6);
-const raw = JSON.stringify({ evidence, draft, sourceTransfer });
+const symbolRequest = readJson(7);
+const raw = JSON.stringify({ evidence, draft, sourceTransfer, symbolRequest });
 
 for (const token of [
-  "OpenClaw Engineering LSP Evidence / Lifecycle / Source Transfer",
+  "OpenClaw Engineering LSP Evidence / Lifecycle / Source / Symbol",
   "engineering-lsp-registry",
   "engineering-lsp-languages",
   "engineering-lsp-server",
@@ -107,6 +111,7 @@ for (const token of [
   "/plugins/native-adapter/engineering-lsp/evidence",
   "/plugins/native-adapter/engineering-lsp/lifecycle-draft",
   "/plugins/native-adapter/engineering-lsp/source-transfer-proposal",
+  "/plugins/native-adapter/engineering-lsp/symbol-request-proposal",
   "/plugins/native-adapter/engineering-lsp/lifecycle-tasks",
   "/tasks/",
   "refreshEngineeringLspEvidence",
@@ -129,6 +134,8 @@ for (const token of [
   "lsp-lifecycle-readiness-draft-only",
   "Lifecycle draft",
   "Source transfer proposal",
+  "Symbol request proposal",
+  "lsp-symbol-request-proposal-only",
   "send didOpen",
 ]) {
   if (!client.includes(token)) {
@@ -194,6 +201,23 @@ if (
 ) {
   throw new Error(`Observer LSP source-transfer proposal mismatch: ${JSON.stringify(sourceTransfer)}`);
 }
+if (
+  !symbolRequest.ok
+  || symbolRequest.registry !== "openclaw-native-engineering-lsp-symbol-request-proposal-v0"
+  || symbolRequest.mode !== "lsp-symbol-request-proposal-only"
+  || symbolRequest.summary?.action !== "definition"
+  || symbolRequest.prerequisite?.found !== false
+  || symbolRequest.proposedJsonRpc?.method !== "textDocument/definition"
+  || symbolRequest.proposedJsonRpc?.sent !== false
+  || symbolRequest.proposedJsonRpc?.params !== null
+  || symbolRequest.governance?.canDraftSymbolRequest !== true
+  || symbolRequest.governance?.canSendSymbolRequest !== false
+  || symbolRequest.governance?.futureSymbolRequestRequiresApproval !== true
+  || symbolRequest.governance?.readyForApprovalTask !== false
+  || symbolRequest.bounds?.noSymbolRequestSent !== true
+) {
+  throw new Error(`Observer LSP symbol request proposal mismatch: ${JSON.stringify(symbolRequest)}`);
+}
 for (const secret of [
   "OBSERVER_ENGINEERING_LSP_EVIDENCE_NODE_MODULES_SECRET",
   "OBSERVER_ENGINEERING_LSP_EVIDENCE_CACHE_SECRET",
@@ -211,6 +235,7 @@ console.log(JSON.stringify({
     registry: evidence.registry,
     lifecycleRegistry: draft.registry,
     sourceTransferRegistry: sourceTransfer.registry,
+    symbolRequestRegistry: symbolRequest.registry,
     languages: evidence.summary.detectedLanguages,
     lifecycleAction: draft.summary.lifecycleAction,
     sourceTransferPath: sourceTransfer.file.relativePath,

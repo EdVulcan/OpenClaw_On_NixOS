@@ -20,6 +20,10 @@ import {
   createNativeEngineeringLspSourceTransferProposalBuilders,
   NATIVE_ENGINEERING_LSP_SOURCE_TRANSFER_PROPOSAL_REGISTRY,
 } from "../src/native-engineering-lsp-source-transfer-proposal-builders.mjs";
+import {
+  createNativeEngineeringLspSymbolRequestProposalBuilders,
+  NATIVE_ENGINEERING_LSP_SYMBOL_REQUEST_PROPOSAL_REGISTRY,
+} from "../src/native-engineering-lsp-symbol-request-proposal-builders.mjs";
 
 function safeStat(filePath) {
   try {
@@ -71,6 +75,19 @@ function createSourceTransferHarness(root) {
         id: "fixture",
         name: "LSP Fixture",
         path: root,
+      },
+    }),
+  });
+}
+
+function createSymbolRequestHarness(records) {
+  return createNativeEngineeringLspSymbolRequestProposalBuilders({
+    records,
+    selectOpenClawToolCatalogWorkspace: ({ workspacePath }) => ({
+      item: {
+        id: "fixture",
+        name: "LSP Fixture",
+        path: workspacePath,
       },
     }),
   });
@@ -294,4 +311,75 @@ test("native engineering LSP source-transfer proposal enforces workspace, skip, 
     }),
     /maxFileSizeBytes/i,
   );
+});
+
+test("native engineering LSP symbol request proposal requires approved didOpen state and does not send JSON-RPC", () => {
+  const records = new Map([[
+    "typescript::fixture",
+    {
+      status: "didopen_source_transfer_completed",
+      updatedAt: "2026-07-10T00:00:00.000Z",
+      workspace: { id: "fixture", name: "LSP Fixture", path: "/tmp/openclaw" },
+      language: "typescript",
+      sourceTaskId: "task-didopen",
+      sourceApprovalId: "approval-didopen",
+      boundaries: {
+        sourceContentTransferred: true,
+        jsonRpcOperationalRequestsEnabled: false,
+      },
+      process: {
+        protocolHandshake: {
+          sourceTransfer: {
+            relativePath: "src/app.ts",
+            uri: "file:///tmp/openclaw/src/app.ts",
+            languageId: "typescript",
+            textBytes: 32,
+            textSha256: "a".repeat(64),
+          },
+        },
+      },
+    },
+  ]]);
+  const builders = createSymbolRequestHarness(records);
+
+  const proposal = builders.buildNativeEngineeringLspSymbolRequestProposal({
+    workspacePath: "/tmp/openclaw",
+    language: "typescript",
+    action: "definition",
+    relativePath: "src/app.ts",
+    line: 2,
+    character: 14,
+  });
+
+  assert.equal(proposal.ok, true);
+  assert.equal(proposal.registry, NATIVE_ENGINEERING_LSP_SYMBOL_REQUEST_PROPOSAL_REGISTRY);
+  assert.equal(proposal.mode, "lsp-symbol-request-proposal-only");
+  assert.equal(proposal.capability.id, "plan.openclaw.engineering_tool.lsp_symbol_request");
+  assert.equal(proposal.prerequisite.found, true);
+  assert.equal(proposal.prerequisite.sourceTaskId, "task-didopen");
+  assert.equal(proposal.proposedJsonRpc.method, "textDocument/definition");
+  assert.equal(proposal.proposedJsonRpc.sent, false);
+  assert.equal(proposal.proposedJsonRpc.params.textDocument.uri, "file:///tmp/openclaw/src/app.ts");
+  assert.deepEqual(proposal.proposedJsonRpc.params.position, { line: 1, character: 14 });
+  assert.equal(proposal.governance.canSendSymbolRequest, false);
+  assert.equal(proposal.governance.futureSymbolRequestRequiresApproval, true);
+  assert.equal(proposal.bounds.noSymbolRequestSent, true);
+  assert.equal(proposal.summary.symbolRequestSent, false);
+});
+
+test("native engineering LSP symbol request proposal stays blocked without didOpen state", () => {
+  const builders = createSymbolRequestHarness(new Map());
+
+  const proposal = builders.buildNativeEngineeringLspSymbolRequestProposal({
+    language: "hover",
+    action: "hover",
+    relativePath: "src/app.ts",
+  });
+
+  assert.equal(proposal.ok, true);
+  assert.equal(proposal.registry, NATIVE_ENGINEERING_LSP_SYMBOL_REQUEST_PROPOSAL_REGISTRY);
+  assert.equal(proposal.prerequisite.found, false);
+  assert.equal(proposal.proposedJsonRpc.params, null);
+  assert.equal(proposal.governance.readyForApprovalTask, false);
+  assert.equal(proposal.governance.canSendSymbolRequest, false);
 });

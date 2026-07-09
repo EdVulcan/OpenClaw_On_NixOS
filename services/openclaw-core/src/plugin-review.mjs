@@ -12,6 +12,7 @@ import { createNativeEngineeringWriteProposalBuilders } from "./native-engineeri
 import { createNativeEngineeringLspEvidenceBuilders } from "./native-engineering-lsp-evidence-builders.mjs";
 import { createNativeEngineeringLspLifecycleStateBuilders } from "./native-engineering-lsp-lifecycle-state.mjs";
 import { createNativeEngineeringLspSourceTransferProposalBuilders } from "./native-engineering-lsp-source-transfer-proposal-builders.mjs";
+import { createNativeEngineeringLspSymbolRequestProposalBuilders } from "./native-engineering-lsp-symbol-request-proposal-builders.mjs";
 import {
   createPluginReviewWorkspaceDiscovery,
   safeStat,
@@ -142,6 +143,12 @@ export function createPluginReview(deps) {
     buildNativeEngineeringLspSourceTransferProposal,
   } = createNativeEngineeringLspSourceTransferProposalBuilders({
     safeStat,
+    selectOpenClawToolCatalogWorkspace,
+  });
+  const {
+    buildNativeEngineeringLspSymbolRequestProposal,
+  } = createNativeEngineeringLspSymbolRequestProposalBuilders({
+    records: nativeEngineeringLspLifecycleRecords,
     selectOpenClawToolCatalogWorkspace,
   });
   const {
@@ -306,6 +313,7 @@ function buildOpenClawNativePluginAdapterStatus() {
       "sense.openclaw.engineering_tool.lsp_lifecycle_state",
       "plan.openclaw.engineering_tool.lsp_source_transfer",
       "act.openclaw.engineering_tool.lsp_source_transfer_task",
+      "plan.openclaw.engineering_tool.lsp_symbol_request",
       "sense.openclaw.engineering_tool.verify_evidence",
       "sense.openclaw.engineering_tool.recovery_evidence",
       "sense.openclaw.engineering_context.microcompact_evidence",
@@ -324,7 +332,7 @@ function buildOpenClawNativePluginAdapterStatus() {
     ],
     pendingCapabilities: ["act.plugin.capability.invoke"],
     summary: {
-      implemented: 35,
+      implemented: 36,
       pending: 1,
       canReadManifestMetadata: true,
       canReadToolCatalogMetadata: true,
@@ -343,6 +351,7 @@ function buildOpenClawNativePluginAdapterStatus() {
       canReadEngineeringLspLifecycleState: true,
       canDraftEngineeringLspSourceTransferProposal: true,
       canCreateApprovalGatedEngineeringLspSourceTransferTasks: true,
+      canDraftEngineeringLspSymbolRequestProposal: true,
       canReadEngineeringVerificationEvidence: true,
       canReadEngineeringRecoveryEvidence: true,
       canReadEngineeringMicrocompactEvidence: true,
@@ -391,6 +400,7 @@ function buildOpenClawNativePluginAdapterStatus() {
       "engineering LSP lifecycle tasks create approval-gated binary-gate tasks; approved execution may check server binary availability but still does not start processes or send JSON-RPC",
       "engineering LSP source-transfer proposals read one bounded workspace source file, report the future didOpen payload metadata and hash, and do not send didOpen or transfer content into a server process",
       "engineering LSP source-transfer tasks require approval, re-read and hash-check the bounded workspace file after approval, send initialize plus didOpen to a short-lived user-space process, and keep symbol requests and long-lived pools disabled",
+      "engineering LSP symbol request proposals read approved didOpen lifecycle state and draft definition/references/hover JSON-RPC metadata without sending operational requests",
       "engineering recovery evidence reads failed verification/task outcomes and recommends governed recovery review without creating tasks, approvals, retries, mutations, or provider calls",
       "engineering microcompact evidence calculates context-budget savings from historical command transcripts without returning raw output or mutating runtime messages or persisted logs",
       "engineering plan/todo evidence reads visible task/workbench planning state without hidden agent mode switches or .openclaw/cc-todo.md writes",
@@ -454,5 +464,6 @@ function buildOpenClawNativePluginAdapterStatus() {
     buildNativeEngineeringLspLifecycleDraft,
     buildNativeEngineeringLspLifecycleState,
     buildNativeEngineeringLspSourceTransferProposal,
+    buildNativeEngineeringLspSymbolRequestProposal,
   };
 }

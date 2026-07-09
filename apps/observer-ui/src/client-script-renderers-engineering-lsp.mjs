@@ -2,6 +2,7 @@ export const observerClientEngineeringLspRenderersScript = `function renderEngin
   const data = payload?.evidence ?? payload ?? {};
   const lifecycleDraft = payload?.lifecycleDraft ?? null;
   const sourceTransferProposal = payload?.sourceTransferProposal ?? null;
+  const symbolRequestProposal = payload?.symbolRequestProposal ?? null;
   const summary = data?.summary ?? {};
   const governance = data?.governance ?? {};
   const server = data?.serverReadiness ?? {};
@@ -12,11 +13,15 @@ export const observerClientEngineeringLspRenderersScript = `function renderEngin
   const sourceFile = sourceTransferProposal?.file ?? {};
   const sourceGovernance = sourceTransferProposal?.governance ?? {};
   const proposedDidOpen = sourceTransferProposal?.proposedDidOpen ?? {};
+  const symbolSummary = symbolRequestProposal?.summary ?? {};
+  const symbolGovernance = symbolRequestProposal?.governance ?? {};
+  const proposedSymbolRequest = symbolRequestProposal?.proposedJsonRpc ?? {};
   const detected = Array.isArray(summary.detectedLanguages) ? summary.detectedLanguages : [];
   const deferred = Array.isArray(data?.deferredExecutionBoundaries) ? data.deferredExecutionBoundaries : [];
   const draftGates = Array.isArray(lifecycleDraft?.readinessGates) ? lifecycleDraft.readinessGates : [];
   const draftDeferred = Array.isArray(lifecycleDraft?.deferredExecutionBoundaries) ? lifecycleDraft.deferredExecutionBoundaries : [];
   const sourceDeferred = Array.isArray(sourceTransferProposal?.deferredExecutionBoundaries) ? sourceTransferProposal.deferredExecutionBoundaries : [];
+  const symbolDeferred = Array.isArray(symbolRequestProposal?.deferredExecutionBoundaries) ? symbolRequestProposal.deferredExecutionBoundaries : [];
   engineeringLspRegistry.textContent = data?.registry ?? "openclaw-native-engineering-lsp-evidence-v0";
   engineeringLspLanguages.textContent = detected.length ? detected.join(",") : "none";
   engineeringLspServer.textContent = server.status ?? "not_checked";
@@ -25,11 +30,13 @@ export const observerClientEngineeringLspRenderersScript = `function renderEngin
     data?.mode ?? "lsp-contract-and-availability-evidence-only",
     lifecycleDraft ? lifecycleDraft.mode ?? "lsp-lifecycle-readiness-draft-only" : null,
     sourceTransferProposal ? sourceTransferProposal.mode ?? "lsp-didopen-source-transfer-proposal-only" : null,
+    symbolRequestProposal ? symbolRequestProposal.mode ?? "lsp-symbol-request-proposal-only" : null,
   ].filter(Boolean).join(" + ");
 
   engineeringLspJson.textContent = [
-    "Native engineering LSP evidence: maps cc_lsp check, definition, references, hover, lifecycle readiness, and source-transfer proposal into governed OpenClaw evidence.",
-    "The source-transfer proposal reads one bounded workspace source file locally for preview/hash only. It does not start language servers, send didOpen, send symbol requests, mutate files, create tasks, create approvals, or call providers.",
+    "Native engineering LSP evidence: maps cc_lsp check, definition, references, hover, lifecycle readiness, source transfer, and symbol request proposal into governed OpenClaw evidence.",
+    "The source-transfer proposal reads one bounded workspace source file locally for preview/hash only. The symbol-request proposal reads approved didOpen state only. These proposal endpoints do not start language servers, send symbol requests, mutate files, create tasks, create approvals, or call providers.",
+    "Approved source-transfer tasks may send didOpen only after explicit approval; symbol-request proposals still keep operational requests unsent.",
     \`Registry: \${data?.registry ?? "openclaw-native-engineering-lsp-evidence-v0"}\`,
     \`Mode: \${data?.mode ?? "lsp-contract-and-availability-evidence-only"}\`,
     \`Identity: \${data?.identityLevel ?? "Level 1: stable user-space control plane"}\`,
@@ -50,6 +57,10 @@ export const observerClientEngineeringLspRenderersScript = `function renderEngin
     sourceTransferProposal ? \`Source file: bytes=\${sourceSummary.textBytes ?? 0} lines=\${sourceSummary.lineCount ?? 0} sha256=\${sourceSummary.textSha256 ?? "missing"} previewChars=\${sourceSummary.previewChars ?? 0} truncated=\${Boolean(sourceSummary.previewTruncated)}\` : null,
     sourceTransferProposal ? \`Proposed didOpen: method=\${proposedDidOpen.method ?? "textDocument/didOpen"} sent=\${Boolean(proposedDidOpen.sent)} uri=\${sourceFile.uri ?? "missing"}\` : null,
     sourceTransferProposal ? \`Source governance: localRead=\${Boolean(sourceGovernance.canReadWorkspaceSourceForProposal)} transfer=\${Boolean(sourceGovernance.canTransferSourceContentToLsp)} didOpen=\${Boolean(sourceGovernance.canSendDidOpen)} symbols=\${Boolean(sourceGovernance.canSendSymbolRequests)} start=\${Boolean(sourceGovernance.canStartLspServer)} futureApproval=\${Boolean(sourceGovernance.futureSourceTransferRequiresApproval)}\` : null,
+    symbolRequestProposal ? "" : null,
+    symbolRequestProposal ? \`Symbol request proposal: registry=\${symbolRequestProposal.registry ?? "unknown"} mode=\${symbolRequestProposal.mode ?? "unknown"} action=\${symbolSummary.action ?? "definition"} ready=\${Boolean(symbolSummary.sourceTransferStateFound)}\` : null,
+    symbolRequestProposal ? \`Proposed symbol JSON-RPC: method=\${proposedSymbolRequest.method ?? "textDocument/definition"} sent=\${Boolean(proposedSymbolRequest.sent)} approval=\${Boolean(symbolSummary.approvalRequiredBeforeSymbolRequest)}\` : null,
+    symbolRequestProposal ? \`Symbol governance: draft=\${Boolean(symbolGovernance.canDraftSymbolRequest)} send=\${Boolean(symbolGovernance.canSendSymbolRequest)} start=\${Boolean(symbolGovernance.canStartLspServer)} futureApproval=\${Boolean(symbolGovernance.futureSymbolRequestRequiresApproval)} readyTask=\${Boolean(symbolGovernance.readyForApprovalTask)}\` : null,
     "",
     ...(data?.actionContracts ?? []).map((contract) => \`\${contract.action}: \${contract.operationClass} boundary=\${contract.nativeBoundary}\`),
     lifecycleDraft ? "" : null,
@@ -58,6 +69,7 @@ export const observerClientEngineeringLspRenderersScript = `function renderEngin
     ...deferred.map((boundary) => \`deferred: \${boundary}\`),
     ...draftDeferred.map((boundary) => \`lifecycle deferred: \${boundary}\`),
     ...sourceDeferred.map((boundary) => \`source-transfer deferred: \${boundary}\`),
+    ...symbolDeferred.map((boundary) => \`symbol-request deferred: \${boundary}\`),
   ].filter((line) => line !== null).join("\\n");
 }
 

@@ -134,6 +134,17 @@ function engineeringLspSourceTransferProposalInput(requestUrl) {
   };
 }
 
+function engineeringLspSymbolRequestProposalInput(requestUrl) {
+  return {
+    workspacePath: requestUrl.searchParams.get("workspacePath"),
+    language: requestUrl.searchParams.get("language") ?? "typescript",
+    action: requestUrl.searchParams.get("action") ?? "definition",
+    relativePath: queryOrAlias(requestUrl, "relativePath", "path", "src/app.ts"),
+    line: requestUrl.searchParams.get("line"),
+    character: requestUrl.searchParams.get("character"),
+  };
+}
+
 const GET_ROUTES = new Map([
   [
     "/plugins/native-adapter/manifest-profile",
@@ -236,6 +247,14 @@ const GET_ROUTES = new Map([
       builder: "buildNativeEngineeringLspSourceTransferProposal",
       errorStatus: 400,
       input: engineeringLspSourceTransferProposalInput,
+    },
+  ],
+  [
+    "/plugins/native-adapter/engineering-lsp/symbol-request-proposal",
+    {
+      builder: "buildNativeEngineeringLspSymbolRequestProposal",
+      errorStatus: 400,
+      input: engineeringLspSymbolRequestProposalInput,
     },
   ],
   [
