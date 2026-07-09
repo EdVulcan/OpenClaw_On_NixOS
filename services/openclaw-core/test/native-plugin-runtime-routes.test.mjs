@@ -96,6 +96,26 @@ test("native plugin runtime GET routes preserve defaults, wrappers, and error st
 
   assert.equal(preflightFailure.statusCode, 400);
   assert.deepEqual(preflightFailure.body, { ok: false, error: "runtime blocked" });
+
+  let observedRefreshInput = null;
+  const refreshEvidence = await invokeNativePluginRuntimeRoute({
+    buildNativePluginRuntimeRefreshEvidence: (input) => {
+      observedRefreshInput = input;
+      return {
+        ok: true,
+        registry: "openclaw-native-plugin-runtime-refresh-evidence-v0",
+        mode: "governed-runtime-refresh-evidence-only",
+        summary: { readModelRefreshed: true, canImportModule: false },
+      };
+    },
+  }, "GET", "/plugins/native-adapter/runtime-refresh-evidence?packagePath=/tmp/plugin&capabilityId=act.plugin.capability.invoke");
+
+  assert.equal(refreshEvidence.statusCode, 200);
+  assert.deepEqual(observedRefreshInput, {
+    packagePath: "/tmp/plugin",
+    capabilityId: "act.plugin.capability.invoke",
+  });
+  assert.equal(refreshEvidence.body.registry, "openclaw-native-plugin-runtime-refresh-evidence-v0");
 });
 
 test("native plugin runtime POST routes preserve strict body coercion and route-specific envelopes", async () => {

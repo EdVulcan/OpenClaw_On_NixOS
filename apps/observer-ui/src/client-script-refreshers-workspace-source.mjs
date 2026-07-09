@@ -499,6 +499,20 @@ async function refreshNativePluginActivationPlan() {
   }
 }
 
+async function refreshNativePluginRuntimeRefreshEvidence() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/runtime-refresh-evidence\`);
+    renderNativePluginRuntimeRefreshEvidence(data);
+  } catch {
+    nativePluginRuntimeRefreshRegistry.textContent = "offline";
+    nativePluginRuntimeRefreshState.textContent = "unknown";
+    nativePluginRuntimeRefreshBlocked.textContent = "0";
+    nativePluginRuntimeRefreshRuntime.textContent = "unknown";
+    nativePluginRuntimeRefreshMode.textContent = "unknown";
+    nativePluginRuntimeRefreshJson.textContent = "Unable to read native plugin runtime refresh evidence.";
+  }
+}
+
 async function refreshNativePluginRuntimeAdapterContract() {
   try {
     const data = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/runtime-adapter-contract\`);

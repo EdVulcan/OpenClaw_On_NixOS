@@ -3,6 +3,7 @@ import { observerClientEngineeringEditRenderersScript } from "./client-script-re
 import { observerClientEngineeringMicrocompactRenderersScript } from "./client-script-renderers-engineering-microcompact.mjs";
 import { observerClientEngineeringRecoveryRenderersScript } from "./client-script-renderers-engineering-recovery.mjs";
 import { observerClientEngineeringVerificationRenderersScript } from "./client-script-renderers-engineering-verification.mjs";
+import { observerClientNativeRuntimeRefreshRenderersScript } from "./client-script-renderers-native-runtime-refresh.mjs";
 export const observerClientRenderersScript = `function setHealthPill(target, ok, text) {
   target.textContent = text;
   target.className = ok ? "status-pill" : "status-pill warn";
@@ -364,7 +365,7 @@ function renderFilesystemReadLedger(data) {
   ].join("\\n");
 }
 
-${observerClientWorkspaceSourceRenderersScript}${observerClientEngineeringEditRenderersScript}${observerClientEngineeringVerificationRenderersScript}${observerClientEngineeringRecoveryRenderersScript}${observerClientEngineeringMicrocompactRenderersScript}function renderNativePluginContract(data) {
+${observerClientWorkspaceSourceRenderersScript}${observerClientEngineeringEditRenderersScript}${observerClientEngineeringVerificationRenderersScript}${observerClientEngineeringRecoveryRenderersScript}${observerClientEngineeringMicrocompactRenderersScript}${observerClientNativeRuntimeRefreshRenderersScript}function renderNativePluginContract(data) {
   const summary = data?.summary ?? {};
   const contract = data?.contract ?? {};
   const governance = summary.governance ?? contract.governance ?? {};

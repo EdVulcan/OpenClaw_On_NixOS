@@ -32,6 +32,7 @@ test("native plugin plan builders preserve runtime preflight and adapter contrac
   const plan = builders.buildNativePluginCapabilityInvokePlan();
   const preflight = builders.buildNativePluginRuntimePreflight();
   const activationPlan = builders.buildNativePluginRuntimeActivationPlan();
+  const refreshEvidence = builders.buildNativePluginRuntimeRefreshEvidence();
   const adapterContract = builders.buildNativePluginRuntimeAdapterContract();
   const adapterDraft = builders.buildNativePluginRuntimeAdapterTaskDraft();
   const activationDraft = builders.buildNativePluginRuntimeActivationTaskDraft();
@@ -40,6 +41,10 @@ test("native plugin plan builders preserve runtime preflight and adapter contrac
   assert.equal(plan.capability.id, "act.plugin.capability.invoke");
   assert.equal(preflight.governance.canExecutePluginCode, false);
   assert.equal(activationPlan.summary.activationReady, false);
+  assert.equal(refreshEvidence.registry, "openclaw-native-plugin-runtime-refresh-evidence-v0");
+  assert.equal(refreshEvidence.summary.readModelRefreshed, true);
+  assert.equal(refreshEvidence.governance.canImportModule, false);
+  assert.equal(refreshEvidence.governance.canActivateRuntime, false);
   assert.equal(adapterContract.runtimeContract.execution.canImportModule, false);
   assert.equal(adapterContract.summary.canExecutePluginCode, false);
   assert.equal(adapterDraft.registry, "openclaw-native-plugin-runtime-adapter-task-draft-v0");

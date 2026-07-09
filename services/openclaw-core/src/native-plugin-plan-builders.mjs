@@ -1,6 +1,7 @@
 import { createOpenClawNativePluginRegistry } from "../../../packages/plugin-runtime/src/plugin-registry.mjs";
 import { createEventName } from "../../../packages/shared-events/src/event-factory.mjs";
 import { randomUUID } from "node:crypto";
+import { buildNativePluginRuntimeRefreshEvidence as buildNativePluginRuntimeRefreshEvidenceEnvelope } from "./native-plugin-runtime-refresh-evidence-builders.mjs";
 
 export function createNativePluginPlanBuilders(deps) {
   const {
@@ -544,6 +545,13 @@ function buildNativePluginRuntimeAdapterContract({ packagePath = null, capabilit
       requiresRuntimeAdapterBeforeExecution: true,
     },
   };
+}
+
+function buildNativePluginRuntimeRefreshEvidence({ packagePath = null, capabilityId = "act.plugin.capability.invoke" } = {}) {
+  return buildNativePluginRuntimeRefreshEvidenceEnvelope({
+    activationPlan: buildNativePluginRuntimeActivationPlan({ packagePath, capabilityId }),
+    nativeRegistry: createOpenClawNativePluginRegistry(),
+  });
 }
 
 function buildNativePluginRuntimeAdapterTaskDraft({ packagePath = null, capabilityId = "act.plugin.capability.invoke" } = {}) {
@@ -1153,6 +1161,7 @@ async function createNativePluginInvokeTask({ packagePath = null, capabilityId =
     buildNativePluginCapabilityInvokePlan,
     buildNativePluginRuntimePreflight,
     buildNativePluginRuntimeActivationPlan,
+    buildNativePluginRuntimeRefreshEvidence,
     buildNativePluginRuntimeAdapterContract,
     buildNativePluginRuntimeAdapterTaskDraft,
     buildNativePluginRuntimeActivationTaskDraft,

@@ -56,6 +56,7 @@ directive.
 | [OPENCLAW_NATIVE_ENGINEERING_VERIFICATION_EVIDENCE_PLAN.md](./plans/OPENCLAW_NATIVE_ENGINEERING_VERIFICATION_EVIDENCE_PLAN.md) | Active verification evidence route for `cc_verify` over governed command transcripts. |
 | [OPENCLAW_NATIVE_ENGINEERING_RECOVERY_EVIDENCE_PLAN.md](./plans/OPENCLAW_NATIVE_ENGINEERING_RECOVERY_EVIDENCE_PLAN.md) | Active Observer recovery evidence route for failed native engineering verification/source-command outcomes. |
 | [OPENCLAW_NATIVE_ENGINEERING_MICROCOMPACT_EVIDENCE_PLAN.md](./plans/OPENCLAW_NATIVE_ENGINEERING_MICROCOMPACT_EVIDENCE_PLAN.md) | Active context-management evidence route for `microcompact` without hidden transcript mutation. |
+| [OPENCLAW_NATIVE_PLUGIN_RUNTIME_REFRESH_EVIDENCE_PLAN.md](./plans/OPENCLAW_NATIVE_PLUGIN_RUNTIME_REFRESH_EVIDENCE_PLAN.md) | Active native plugin runtime refresh evidence route without module loading or activation. |
 | [OPENCLAW_MONOLITH_REDUCTION_PLAN.md](./plans/OPENCLAW_MONOLITH_REDUCTION_PLAN.md) | Tracks current coupling reduction and milestone-batch improvements. |
 | [OPENCLAW_EXPERT_REVIEW_OPTIMIZATION_PLAN.md](./plans/OPENCLAW_EXPERT_REVIEW_OPTIMIZATION_PLAN.md) | Tracks expert-review fixes around test lifecycle, shared packages, helpers, batching, and profiling. |
 | [OPENCLAW_SOURCE_INTEGRATION_STAGE_PLAN.md](./plans/OPENCLAW_SOURCE_INTEGRATION_STAGE_PLAN.md) | Historical source-integration stage log; use with the enhanced migration brief, not as the sole roadmap. |

@@ -476,6 +476,15 @@ export function observerOperationsPanels() {
           <pre id="native-plugin-activation-json">Loading native plugin runtime activation plan...</pre>
         </section>
         <section class="panel">
+          <h2>OpenClaw Native Runtime Refresh</h2>
+          <div class="metric"><span>Registry</span><span id="native-plugin-runtime-refresh-registry">openclaw-native-plugin-runtime-refresh-evidence-v0</span></div>
+          <div class="metric"><span>State</span><span id="native-plugin-runtime-refresh-state">unknown</span></div>
+          <div class="metric"><span>Blocked</span><span id="native-plugin-runtime-refresh-blocked">0</span></div>
+          <div class="metric"><span>Runtime</span><span id="native-plugin-runtime-refresh-runtime">blocked</span></div>
+          <div class="metric"><span>Mode</span><span id="native-plugin-runtime-refresh-mode">governed-runtime-refresh-evidence-only</span></div>
+          <pre id="native-plugin-runtime-refresh-json">Loading native plugin runtime refresh evidence...</pre>
+        </section>
+        <section class="panel">
           <h2>OpenClaw Native Runtime Adapter Contract</h2>
           <div class="metric"><span>Registry</span><span id="native-plugin-runtime-contract-registry">openclaw-native-plugin-runtime-adapter-contract-v0</span></div>
           <div class="metric"><span>Status</span><span id="native-plugin-runtime-contract-status">unknown</span></div>

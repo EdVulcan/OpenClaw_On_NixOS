@@ -97,14 +97,16 @@ OPENCLAW_MILESTONE_CHECKS=openclaw-native-engineering-microcompact-evidence,obse
 OPENCLAW_MILESTONE_CHECKS=milestone-registry,milestone-script-audit bash nix/scripts/dev-milestone-check.sh
 ```
 
-## Next Slice
+## Follow-On Slice
 
-The next recommended real capability is:
+The direct follow-on slice is:
 
 ```text
 Live plugin runtime refresh as a governed lifecycle action
 ```
 
-That slice should transfer the enhanced-source runtime refresh idea into
-OpenClaw-native lifecycle evidence and controls. It must stay operator-visible,
-auditable, recoverable, and must not load or execute unreviewed plugin modules.
+It is tracked in:
+
+```text
+OPENCLAW_NATIVE_PLUGIN_RUNTIME_REFRESH_EVIDENCE_PLAN.md
+```

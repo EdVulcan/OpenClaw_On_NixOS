@@ -126,7 +126,7 @@ enhanced `openclaw` modules.
 | `cc_verify` | absorbed as evidence | `sense.openclaw.engineering_tool.verify_evidence` reads approval-gated command transcripts, capability invocations, and completed task outcomes to produce bounded verification evidence with checks, output budgets, retry-policy metadata, audit evidence, and Observer visibility. `sense.openclaw.engineering_tool.recovery_evidence` adds read-only failed-evidence recovery recommendations. | Keep actual command execution on the existing approval-gated source/workspace command task path. Do not add ungoverned shell execution or automatic retries. | Level 1 |
 | `cc_plan_enter`, `cc_plan_exit`, `cc_todo_write` | partially absorbed | Core tasks, plans, approvals, and recovery exist; no lightweight planning mode or `.openclaw/cc-todo.md` equivalent is native. | Treat as plan-state evidence, not hidden agent mode. Integrate with task/workbench state if migrated. | Level 1 |
 | `microcompact` | absorbed as evidence | `sense.openclaw.engineering_context.microcompact_evidence` reads command transcript metadata, protects recent engineering evidence by default, and estimates reclaimable context budget without returning raw output or mutating logs. | Keep actual runtime-message compaction deferred until the evidence surface is stable and governed. Do not silently mutate persisted transcript or hide current verification/recovery evidence. | Level 1 |
-| Live plugin runtime refresh | requires source transfer | Main has runtime activation tasks and deferred gates, but not live in-process refresh after install/enable/disable. | Transfer the refresh semantics into a governed lifecycle action with cache invalidation, status, recovery, and Observer evidence. | Level 1 |
+| Live plugin runtime refresh | absorbed as evidence | `sense.openclaw.plugin_runtime.refresh_evidence` recomputes the native plugin registry read model, reports activation gates, cache invalidation intent, and blocked module-load/runtime-activation boundaries with Observer evidence. | Keep actual module-loader cache invalidation and live activation deferred until a governed loader exists. | Level 1 |
 | ACPX/Codex bridge compatibility | requires source transfer | No ACPX/Codex bridge implementation exists in this repo. | Transfer compatibility lessons only where useful for OpenClaw's NixOS body and ACP bridge model. Do not center Windows wrapper behavior. | Level 1 |
 | Runtime persistence tests | partially absorbed | Main has many task/approval/recovery persistence milestones; enhanced ACPX/runtime persistence tests are not migrated. | Reuse the persistence discipline, and add native tests only when adopting ACPX or live runtime refresh behavior. | Level 1 |
 | Engineering prompt semantics | partially absorbed | Project docs and Codex skills encode evidence-first, precise edits, low coupling, and scoped validation; no product runtime prompt-pack enforcement exists. | Convert useful semantics into Observer-verifiable work standards, not a monolithic prompt wall. | Level 1 |
@@ -337,14 +337,18 @@ Current OpenClaw:
 - Native plugin runtime activation, denial recovery, hardening, persistence, and
   adapter contracts exist, but many remain explicitly deferred before actual
   module loading or execution.
+- `sense.openclaw.plugin_runtime.refresh_evidence` now recomputes the native
+  plugin registry read model, reports activation gates and cache invalidation
+  intent, and keeps module import, plugin execution, activation, cache mutation,
+  task creation, and approval creation disabled.
 
-Classification: requires source transfer.
+Classification: absorbed as evidence.
 
 Recommendation:
 
-- Migrate as a governed lifecycle action: operator initiated or policy-approved,
-  cache invalidation recorded, runtime state visible, failure recoverable, and
-  no hidden activation during registration.
+- Keep using the evidence route until a governed loader exists. The next step
+  is not hidden refresh execution; it is planning/todo evidence or a governed
+  loader design that can preserve approval, audit, and recovery boundaries.
 
 ### ACPX/Codex Bridge Compatibility
 
@@ -472,8 +476,8 @@ Deferred:
   evidence attach cleanly to task records.
 - Actual microcompact runtime-message transformation until the evidence route
   proves safe context boundaries.
-- Live plugin runtime refresh until runtime lifecycle state, cache invalidation,
-  and recovery are visible.
+- Actual live plugin module-loader refresh until a governed loader exists and
+  cache invalidation can be approved, audited, and recovered.
 - ACPX/Codex bridge work until it is scoped to OpenClaw's NixOS body and ACP
   compatibility needs.
 
@@ -499,17 +503,17 @@ Native governed engineering tool surface
 Next smallest real capability:
 
 ```text
-Live plugin runtime refresh as a governed lifecycle action
+Planning/todo evidence surface
 ```
 
 This should produce:
 
-- An explicit OpenClaw runtime refresh evidence/control surface that reports
-  current plugin runtime state, refresh preconditions, cache invalidation intent,
-  and recovery boundaries.
-- Observer-visible lifecycle state for install/enable/disable refresh decisions.
-- No unreviewed plugin module load, no provider call, no network egress, no
-  hidden enhanced-source import, and no automatic activation.
+- An explicit task/workbench evidence surface for `cc_plan_enter`,
+  `cc_plan_exit`, and `cc_todo_write` semantics.
+- Observer-visible active plan, todo state, completion transitions, and recovery
+  links without hidden agent mode or uncontrolled `.openclaw` file mutation.
+- No raw file mutation, no provider call, no hidden enhanced-source import, and
+  no automatic activation.
 - Evidence through focused unit tests plus a targeted local milestone if an
   endpoint or Observer surface is added.
 
@@ -518,9 +522,9 @@ Why this is real progress:
 - It advances Level 1, the stable user-space control plane.
 - It makes OpenClaw better at governing its own engineering work rather than
   adding another cloud/provider safety shell.
-- It sets up the next executable slice after context evidence: planning/todo
-  evidence or ACP/Codex bridge compatibility, depending on the route documents
-  after runtime refresh evidence lands.
+- It sets up the next executable slice after planning/todo evidence: ACP/Codex
+  bridge compatibility or governed loader design, depending on the route
+  documents after plan evidence lands.
 
 Required answer for every following slice:
 

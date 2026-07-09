@@ -242,6 +242,7 @@ export const OBSERVER_STARTUP_REFRESH_GROUPS = [
       "refreshNativePluginAdapter",
       "refreshNativePluginPreflight",
       "refreshNativePluginActivationPlan",
+      "refreshNativePluginRuntimeRefreshEvidence",
       "refreshNativePluginRuntimeAdapterContract",
       "refreshNativePluginInvokePlan",
       "refreshWorkspaceCommandProposals",

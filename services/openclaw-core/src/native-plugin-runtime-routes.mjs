@@ -51,6 +51,14 @@ const GET_ROUTES = new Map([
     },
   ],
   [
+    "/plugins/native-adapter/runtime-refresh-evidence",
+    {
+      builder: "buildNativePluginRuntimeRefreshEvidence",
+      errorStatus: 400,
+      response: (result) => result,
+    },
+  ],
+  [
     "/plugins/native-adapter/runtime-adapter-contract",
     {
       builder: "buildNativePluginRuntimeAdapterContract",
