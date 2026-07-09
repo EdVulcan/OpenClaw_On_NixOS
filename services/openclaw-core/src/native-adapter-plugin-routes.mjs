@@ -38,6 +38,38 @@ function workspaceIndexInput(requestUrl, fallbackQuery = null) {
   };
 }
 
+function engineeringReadInput(requestUrl) {
+  return {
+    workspacePath: requestUrl.searchParams.get("workspacePath"),
+    relativePath: queryOrAlias(requestUrl, "relativePath", "path", "package.json"),
+    startLine: queryOrAlias(requestUrl, "startLine", "start_line", "1"),
+    endLine: queryOrAlias(requestUrl, "endLine", "end_line"),
+    maxOutputChars: requestUrl.searchParams.get("maxOutputChars"),
+    maxFileSizeBytes: requestUrl.searchParams.get("maxFileSizeBytes"),
+  };
+}
+
+function engineeringGlobInput(requestUrl) {
+  return {
+    workspacePath: requestUrl.searchParams.get("workspacePath"),
+    pattern: requestUrl.searchParams.get("pattern") ?? "**/*",
+    limit: requestUrl.searchParams.get("limit"),
+  };
+}
+
+function engineeringGrepInput(requestUrl) {
+  return {
+    workspacePath: requestUrl.searchParams.get("workspacePath"),
+    query: queryOrAlias(requestUrl, "query", "q", "openclaw"),
+    literal: requestUrl.searchParams.get("literal") ?? "true",
+    caseSensitive: queryOrAlias(requestUrl, "caseSensitive", "case_sensitive", "false"),
+    include: requestUrl.searchParams.get("include") ?? "**/*",
+    limit: requestUrl.searchParams.get("limit"),
+    maxOutputChars: requestUrl.searchParams.get("maxOutputChars"),
+    maxFileSizeBytes: requestUrl.searchParams.get("maxFileSizeBytes"),
+  };
+}
+
 const GET_ROUTES = new Map([
   [
     "/plugins/native-adapter/manifest-profile",
@@ -68,6 +100,30 @@ const GET_ROUTES = new Map([
       input: (requestUrl) => ({
         workspacePath: requestUrl.searchParams.get("workspacePath"),
       }),
+    },
+  ],
+  [
+    "/plugins/native-adapter/engineering-read-search/read",
+    {
+      builder: "buildNativeEngineeringReadFile",
+      errorStatus: 400,
+      input: engineeringReadInput,
+    },
+  ],
+  [
+    "/plugins/native-adapter/engineering-read-search/glob",
+    {
+      builder: "buildNativeEngineeringGlob",
+      errorStatus: 400,
+      input: engineeringGlobInput,
+    },
+  ],
+  [
+    "/plugins/native-adapter/engineering-read-search/grep",
+    {
+      builder: "buildNativeEngineeringGrep",
+      errorStatus: 400,
+      input: engineeringGrepInput,
     },
   ],
   [

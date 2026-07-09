@@ -294,6 +294,24 @@ async function refreshEngineeringToolSurface() {
   }
 }
 
+async function refreshEngineeringReadSearch() {
+  try {
+    const [read, glob, grep] = await Promise.all([
+      fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/engineering-read-search/read?relativePath=package.json&maxOutputChars=2000\`),
+      fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/engineering-read-search/glob?pattern=**/*.ts&limit=20\`),
+      fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/engineering-read-search/grep?query=openclaw&literal=true&include=**/*&limit=10&maxOutputChars=4000\`),
+    ]);
+    renderEngineeringReadSearch({ read, glob, grep });
+  } catch {
+    engineeringReadSearchRegistry.textContent = "offline";
+    engineeringReadSearchRead.textContent = "0";
+    engineeringReadSearchGlob.textContent = "0";
+    engineeringReadSearchGrep.textContent = "0";
+    engineeringReadSearchBounds.textContent = "unknown";
+    engineeringReadSearchJson.textContent = "Unable to read native engineering read/search evidence.";
+  }
+}
+
 async function refreshSemanticIndex() {
   try {
     const data = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/workspace-semantic-index?scope=tools&limit=24\`);

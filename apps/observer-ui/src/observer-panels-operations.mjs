@@ -312,6 +312,15 @@ export function observerOperationsPanels() {
           <pre id="engineering-tool-surface-json">Loading native engineering tool surface inventory...</pre>
         </section>
         <section class="panel">
+          <h2>OpenClaw Engineering Read/Search</h2>
+          <div class="metric"><span>Registry</span><span id="engineering-read-search-registry">openclaw-native-engineering-read-search-v0</span></div>
+          <div class="metric"><span>Read</span><span id="engineering-read-search-read">0</span></div>
+          <div class="metric"><span>Glob</span><span id="engineering-read-search-glob">0</span></div>
+          <div class="metric"><span>Grep</span><span id="engineering-read-search-grep">0</span></div>
+          <div class="metric"><span>Bounds</span><span id="engineering-read-search-bounds">active</span></div>
+          <pre id="engineering-read-search-json">Loading native engineering read/search evidence...</pre>
+        </section>
+        <section class="panel">
           <h2>OpenClaw Semantic Index</h2>
           <div class="metric"><span>Registry</span><span id="semantic-index-registry">openclaw-native-plugin-adapter-v0</span></div>
           <div class="metric"><span>Files</span><span id="semantic-index-files">0</span></div>

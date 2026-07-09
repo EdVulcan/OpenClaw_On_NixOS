@@ -554,6 +554,36 @@ function renderEngineeringToolSurface(data) {
   ].join("\\n");
 }
 
+function renderEngineeringReadSearch(data) {
+  const read = data?.read ?? {};
+  const glob = data?.glob ?? {};
+  const grep = data?.grep ?? {};
+  const readSummary = read.summary ?? {};
+  const globSummary = glob.summary ?? {};
+  const grepSummary = grep.summary ?? {};
+  const governance = grep.governance ?? read.governance ?? glob.governance ?? {};
+  const bounds = grep.bounds ?? read.bounds ?? glob.bounds ?? {};
+  engineeringReadSearchRegistry.textContent = read.registry ?? glob.registry ?? grep.registry ?? "openclaw-native-engineering-read-search-v0";
+  engineeringReadSearchRead.textContent = read.ok ? String(readSummary.lineCount ?? 0) : "blocked";
+  engineeringReadSearchGlob.textContent = String(globSummary.matchedResults ?? 0);
+  engineeringReadSearchGrep.textContent = String(grepSummary.matchedResults ?? 0);
+  engineeringReadSearchBounds.textContent = bounds.workspaceRootConstrained ? "active" : "unknown";
+
+  engineeringReadSearchJson.textContent = [
+    "Native governed read/search surface: bounded workspace read, glob, and grep mapped from cc_read, cc_glob, and cc_grep.",
+    "This executes only OpenClaw-native read/search logic. It does not import cc-tools, mutate files, create tasks/approvals, run shell commands, start LSP, or call providers.",
+    \`Registry: \${read.registry ?? glob.registry ?? grep.registry ?? "openclaw-native-engineering-read-search-v0"}\`,
+    \`Read: ok=\${Boolean(read.ok)} path=\${read.target?.relativePath ?? "package.json"} lines=\${readSummary.lineCount ?? 0} chars=\${readSummary.charsReturned ?? 0} blocked=\${Boolean(read.blocked)} reason=\${read.target?.blockedReason ?? "none"} audit=\${read.auditEvidence?.evidenceKind ?? "missing"}\`,
+    \`Glob: ok=\${Boolean(glob.ok)} pattern=\${glob.query?.pattern ?? "**/*.ts"} matches=\${globSummary.matchedResults ?? 0} truncated=\${Boolean(globSummary.resultsTruncated)} dirsSkipped=\${globSummary.directoriesSkipped ?? 0} audit=\${glob.auditEvidence?.evidenceKind ?? "missing"}\`,
+    \`Grep: ok=\${Boolean(grep.ok)} query=\${grep.query?.text ?? "openclaw"} matches=\${grepSummary.matchedResults ?? 0} filesRead=\${grepSummary.filesRead ?? 0} binarySkipped=\${grepSummary.binaryFilesSkipped ?? 0} outputChars=\${grepSummary.outputChars ?? 0} audit=\${grep.auditEvidence?.evidenceKind ?? "missing"}\`,
+    \`Bounds: root=\${Boolean(bounds.workspaceRootConstrained)} traversal=\${Boolean(bounds.pathTraversalProtection)} maxFile=\${bounds.maxFileSizeBytes ?? "n/a"} maxResults=\${bounds.maxResults ?? "n/a"} maxOutput=\${bounds.maxOutputChars ?? "n/a"} binarySkip=\${Boolean(bounds.binaryFileSkip)} policy=\${bounds.skippedDirectoryPolicy?.mode ?? "unknown"}\`,
+    \`Governance: workspaceContent=\${Boolean(governance.canReadWorkspaceContent)} arbitrarySystemPath=\${Boolean(governance.canReadArbitrarySystemPath)} importModule=\${Boolean(governance.canImportModule)} executeTool=\${Boolean(governance.canExecuteToolCode)} verify=\${Boolean(governance.canRunVerification)} lsp=\${Boolean(governance.canStartLsp)} mutate=\${Boolean(governance.canMutate)} task=\${Boolean(governance.createsTask)} approval=\${Boolean(governance.createsApproval)}\`,
+    "",
+    ...(glob.matches ?? []).slice(0, 8).map((match) => \`glob \${match.relativePath ?? "unknown"} size=\${match.sizeBytes ?? 0}\`),
+    ...(grep.matches ?? []).slice(0, 8).map((match) => \`grep \${match.relativePath ?? "unknown"}:\${match.lineNumber ?? "?"} \${match.text ?? ""}\`),
+  ].join("\\n");
+}
+
 function renderSemanticIndex(data) {
   const summary = data?.summary ?? {};
   const governance = data?.governance ?? {};

@@ -125,6 +125,67 @@ test("native adapter engineering tool surface route preserves workspace path", a
   assert.equal(response.body.registry, "openclaw-native-engineering-tool-surface-inventory-v0");
 });
 
+test("native adapter engineering read/search routes preserve bounded query inputs", async () => {
+  const observed = {};
+  const pluginReview = {
+    buildNativeEngineeringReadFile: (input) => {
+      observed.read = input;
+      return { ok: true, registry: "openclaw-native-engineering-read-search-v0", operation: "read" };
+    },
+    buildNativeEngineeringGlob: (input) => {
+      observed.glob = input;
+      return { ok: true, registry: "openclaw-native-engineering-read-search-v0", operation: "glob" };
+    },
+    buildNativeEngineeringGrep: (input) => {
+      observed.grep = input;
+      return { ok: true, registry: "openclaw-native-engineering-read-search-v0", operation: "grep" };
+    },
+  };
+
+  const read = await invokeNativeAdapterPluginRoute(
+    pluginReview,
+    "GET",
+    "/plugins/native-adapter/engineering-read-search/read?workspacePath=/tmp/openclaw&path=src/app.ts&start_line=2&end_line=4&maxOutputChars=500",
+  );
+  const glob = await invokeNativeAdapterPluginRoute(
+    pluginReview,
+    "GET",
+    "/plugins/native-adapter/engineering-read-search/glob?pattern=src/**/*.ts&limit=3",
+  );
+  const grep = await invokeNativeAdapterPluginRoute(
+    pluginReview,
+    "GET",
+    "/plugins/native-adapter/engineering-read-search/grep?q=OpenClawNeedle&include=src/**/*.ts&literal=true&case_sensitive=true&limit=2&maxFileSizeBytes=1024",
+  );
+
+  assert.equal(read.statusCode, 200);
+  assert.equal(glob.statusCode, 200);
+  assert.equal(grep.statusCode, 200);
+  assert.deepEqual(observed.read, {
+    workspacePath: "/tmp/openclaw",
+    relativePath: "src/app.ts",
+    startLine: "2",
+    endLine: "4",
+    maxOutputChars: "500",
+    maxFileSizeBytes: null,
+  });
+  assert.deepEqual(observed.glob, {
+    workspacePath: null,
+    pattern: "src/**/*.ts",
+    limit: "3",
+  });
+  assert.deepEqual(observed.grep, {
+    workspacePath: null,
+    query: "OpenClawNeedle",
+    literal: "true",
+    caseSensitive: "true",
+    include: "src/**/*.ts",
+    limit: "2",
+    maxOutputChars: null,
+    maxFileSizeBytes: "1024",
+  });
+});
+
 test("native adapter plugin task route preserves raw body values and serializes task approval", async () => {
   let observedInput = null;
   const response = await invokeNativeAdapterPluginRoute({
