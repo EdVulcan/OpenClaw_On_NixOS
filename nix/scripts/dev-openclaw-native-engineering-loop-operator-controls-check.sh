@@ -59,6 +59,7 @@ cleanup() {
     "${EDIT_APPROVE_FILE:-}" \
     "${EDIT_STEP_FILE:-}" \
     "${EDIT_EVIDENCE_FILE:-}" \
+    "${PLAN_TODO_WORKBENCH_FILE:-}" \
     "${FAIL_TASK_FILE:-}" \
     "${FAIL_APPROVE_FILE:-}" \
     "${FAIL_STEP_FILE:-}" \
@@ -90,6 +91,7 @@ APPROVALS_FILE="$(mktemp)"
 EDIT_APPROVE_FILE="$(mktemp)"
 EDIT_STEP_FILE="$(mktemp)"
 EDIT_EVIDENCE_FILE="$(mktemp)"
+PLAN_TODO_WORKBENCH_FILE="$(mktemp)"
 FAIL_TASK_FILE="$(mktemp)"
 FAIL_APPROVE_FILE="$(mktemp)"
 FAIL_STEP_FILE="$(mktemp)"
@@ -158,6 +160,9 @@ for (const token of [
   "engineering-recovery-draft-button",
   "engineering-recovery-task-button",
   "engineering-recovery-action-json",
+  "engineering-plan-todo-workbench",
+  "engineering-plan-todo-bridge-button",
+  "engineering-plan-todo-workbench-json",
 ]) {
   if (!html.includes(token)) {
     throw new Error(`Observer HTML missing engineering loop operator control/input: ${token}`);
@@ -183,6 +188,12 @@ for (const token of [
   "approve recovered task if pending, then run operator step",
   "Rerun Evidence:",
   "verificationRoute",
+  "latestEngineeringPlanTodoWorkbenchState",
+  "buildEngineeringPlanTodoWorkbenchState",
+  "renderEngineeringPlanTodoWorkbenchState",
+  "bridgeEngineeringPlanningWorkbenchState",
+  "operator-visible-planning-workbench-state",
+  "planning-workbench",
   "readback only; no approval, execution, retry, recovery task, mutation, provider call, or result envelope",
   "approve pending approval, then run operator step",
   "createEngineeringEditLoopApprovalTask",
@@ -239,6 +250,43 @@ const task = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
 process.stdout.write(`${task.approval.id} ${task.task.id}\n`);
 EOF
 )
+
+curl --silent --fail "$CORE_URL/plugins/native-adapter/engineering-plan-todo/evidence?taskId=$edit_task_id&limit=8" > "$PLAN_TODO_WORKBENCH_FILE"
+
+node - <<'EOF' "$PLAN_TODO_WORKBENCH_FILE" "$edit_task_id"
+const fs = require("node:fs");
+const evidence = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+const editTaskId = process.argv[3];
+const todoCounts = evidence.summary?.evidenceTodoCounts ?? {};
+
+if (
+  !evidence.ok
+  || evidence.registry !== "openclaw-native-engineering-plan-todo-evidence-v0"
+  || evidence.taskPlanEvidence?.selectedTaskId !== editTaskId
+  || evidence.summary?.taskPlanCount !== 1
+  || evidence.taskPlanEvidence?.items?.[0]?.taskId !== editTaskId
+  || evidence.taskPlanEvidence?.items?.[0]?.taskStatus !== "queued"
+  || evidence.taskPlanEvidence?.items?.[0]?.plan?.visibleTodoCount < 1
+  || todoCounts.total < 1
+  || evidence.governance?.canSwitchHiddenAgentMode !== false
+  || evidence.governance?.canWriteTodoFile !== false
+  || evidence.governance?.canMutateTaskState !== false
+  || evidence.governance?.canExecuteCommand !== false
+  || evidence.bounds?.noTodoFileWrite !== true
+) {
+  throw new Error(`engineering planning workbench state bridge evidence mismatch: ${JSON.stringify(evidence)}`);
+}
+
+console.log(JSON.stringify({
+  openclawNativeEngineeringPlanningWorkbenchStateBridge: {
+    taskId: editTaskId,
+    todos: todoCounts.total,
+    source: evidence.summary.todoSource,
+    hiddenModeCreated: evidence.governance.canSwitchHiddenAgentMode,
+    todoFileWritten: evidence.governance.canWriteTodoFile,
+  },
+}, null, 2));
+EOF
 
 post_json "$CORE_URL/approvals/$edit_approval_id/approve" '{"approvedBy":"dev-openclaw-native-engineering-loop-operator-controls-check","reason":"approve operator-control edit readback fixture"}' > "$EDIT_APPROVE_FILE"
 post_json "$CORE_URL/operator/step" '{}' > "$EDIT_STEP_FILE"

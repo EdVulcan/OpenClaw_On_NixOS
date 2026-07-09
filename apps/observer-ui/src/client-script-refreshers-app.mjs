@@ -138,6 +138,8 @@ async function refreshEngineeringPlanTodoEvidence() {
     engineeringPlanTodoTodos.textContent = "0";
     engineeringPlanTodoDone.textContent = "0";
     engineeringPlanTodoMutation.textContent = "unknown";
+    engineeringPlanTodoWorkbench.textContent = "none";
+    engineeringPlanTodoWorkbenchJson.textContent = "Unable to bridge native engineering planning workbench state.";
     engineeringPlanTodoJson.textContent = "Unable to read native engineering plan/todo evidence.";
   }
 }

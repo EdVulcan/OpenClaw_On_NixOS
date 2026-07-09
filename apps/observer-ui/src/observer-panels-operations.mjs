@@ -188,6 +188,11 @@ export function observerOperationsPanels() {
           <div class="metric"><span>Todos</span><span id="engineering-plan-todo-todos">0</span></div>
           <div class="metric"><span>Done</span><span id="engineering-plan-todo-done">0</span></div>
           <div class="metric"><span>Mutation</span><span id="engineering-plan-todo-mutation">blocked</span></div>
+          <div class="metric"><span>Workbench</span><span id="engineering-plan-todo-workbench">none</span></div>
+          <div class="actions tight">
+            <button id="engineering-plan-todo-bridge-button" class="secondary" type="button">Bridge Workbench State</button>
+          </div>
+          <pre id="engineering-plan-todo-workbench-json">No engineering planning workbench state bridged yet.</pre>
           <pre id="engineering-plan-todo-json">Loading native engineering plan/todo evidence...</pre>
         </section>
         <section class="panel">

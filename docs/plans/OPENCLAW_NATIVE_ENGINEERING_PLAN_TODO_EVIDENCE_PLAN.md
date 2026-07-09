@@ -106,6 +106,12 @@ That slice migrated `cc_lsp` only as governed availability and contract
 evidence. It still does not start language servers, check server binaries,
 open source files in LSP, or send JSON-RPC.
 
-The next recommended real capability is native governed source write proposal
-evidence for `cc_write`, as a create/overwrite proposal with diff/metadata
-preview only.
+The planning workbench bridge follow-up was completed as:
+
+```text
+OPENCLAW_NATIVE_ENGINEERING_PLANNING_WORKBENCH_STATE_BRIDGE_PLAN.md
+```
+
+That slice connects this evidence to the Engineering Loop State as
+operator-visible workbench state while keeping hidden planning mode, todo-file
+write, and task mutation deferred.

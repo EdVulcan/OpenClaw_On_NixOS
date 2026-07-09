@@ -143,12 +143,22 @@ The engineering loop now covers failed verification recovery through explicit
 recovery task creation, manual approval, operator rerun, recovered-task
 verification evidence, and source recovery readback.
 
+The planning workbench state bridge follow-up was completed as:
+
+```text
+OPENCLAW_NATIVE_ENGINEERING_PLANNING_WORKBENCH_STATE_BRIDGE_PLAN.md
+```
+
+It turns existing plan/todo evidence into operator-visible Engineering Loop
+State for selected engineering tasks without hidden planning modes, todo-file
+writes, or task mutation.
+
 The current next smallest real capability is:
 
 ```text
-Native governed engineering planning workbench state bridge
+Native governed engineering workbench state restoration
 ```
 
-That slice should turn existing plan/todo evidence into operator-visible
-workbench state for engineering tasks without hidden planning modes or
-filesystem todo mutation.
+That slice should rebuild the latest engineering loop state from core
+task/approval/evidence history after Observer reload, without relying only on
+browser-local state and without creating new execution paths.

@@ -77,6 +77,26 @@ async function refreshEngineeringLoopCompletionReadback() {
     throw new Error("Create an engineering loop task first.");
   }
   const evidence = await fetchJson(\`\${observerConfig.coreUrl}\${latestEngineeringLoopControlState.evidenceRoute}\`);
+  if (latestEngineeringLoopControlState.kind === "planning-workbench") {
+    renderEngineeringPlanTodoEvidence(evidence);
+    const state = latestEngineeringPlanTodoWorkbenchState;
+    if (!state) {
+      throw new Error("No planning workbench state available for the selected engineering task.");
+    }
+    engineeringLoopStateCompletion.textContent = \`todos=\${state.counts.total} done=\${state.counts.done} pending=\${state.counts.pending}\`;
+    engineeringLoopStateJson.textContent = [
+      "Kind: planning-workbench",
+      \`Task: \${state.taskId ?? latestEngineeringLoopControlState.taskId}\`,
+      \`Evidence: \${latestEngineeringLoopControlState.evidenceRoute}\`,
+      \`Todos: total=\${state.counts.total} done=\${state.counts.done} inProgress=\${state.counts.inProgress} pending=\${state.counts.pending}\`,
+      \`Current: \${state.currentTodo?.id ?? "none"} \${state.currentTodo?.status ?? "none"}\`,
+      \`Registry: \${state.registry}\`,
+      "Boundary: readback only; no hidden planning mode, todo file write, task mutation, command execution, or provider call.",
+    ].join("\\n");
+    setControlMessage(\`Refreshed engineering planning workbench state for \${state.taskId ?? "selected task"}.\`);
+    await refreshEngineeringLoopControlSurfaces();
+    return;
+  }
   if (latestEngineeringLoopControlState.kind === "recovery" || latestEngineeringLoopControlState.kind === "recovery-draft") {
     const summary = evidence?.summary ?? {};
     const failures = summary.totalFailures ?? 0;
@@ -204,6 +224,48 @@ async function createEngineeringRecoveryLoopTask() {
   focusEngineeringLoopTask(result);
   renderEngineeringRecoveryLoopTaskState(draft, result);
   setControlMessage(\`Created recovery task \${result.task?.id ?? "unknown"} from failed engineering task \${draft.sourceTaskId}; approval and operator step are still required.\`);
+  await refreshEngineeringLoopControlSurfaces();
+}
+
+function selectedEngineeringPlanningTaskId() {
+  return latestEngineeringLoopControlState?.taskId
+    ?? getSelectedHistoryTaskId()
+    ?? currentTaskState?.id
+    ?? null;
+}
+
+async function bridgeEngineeringPlanningWorkbenchState() {
+  const taskId = selectedEngineeringPlanningTaskId();
+  const taskQuery = taskId ? \`?taskId=\${encodeURIComponent(taskId)}&limit=8\` : "?limit=8";
+  const evidenceRoute = \`/plugins/native-adapter/engineering-plan-todo/evidence\${taskQuery}\`;
+  const data = await fetchJson(\`\${observerConfig.coreUrl}\${evidenceRoute}\`);
+  renderEngineeringPlanTodoEvidence(data);
+  if (!latestEngineeringPlanTodoWorkbenchState) {
+    throw new Error("No engineering planning workbench state is available to bridge.");
+  }
+  const state = latestEngineeringPlanTodoWorkbenchState;
+  latestEngineeringLoopControlState = {
+    kind: "planning-workbench",
+    taskId: state.taskId ?? taskId,
+    approvalId: null,
+    evidenceRoute,
+  };
+  engineeringLoopStateKind.textContent = "planning-workbench";
+  engineeringLoopStateTask.textContent = state.taskId ? state.taskId.slice(0, 8) : "none";
+  engineeringLoopStateApproval.textContent = "none";
+  engineeringLoopStateNext.textContent = "use visible todo state to guide next governed action";
+  engineeringLoopStateEvidence.textContent = evidenceRoute;
+  engineeringLoopStateCompletion.textContent = \`todos=\${state.counts.total} pending=\${state.counts.pending}\`;
+  engineeringLoopStateJson.textContent = [
+    "Kind: planning-workbench",
+    \`Task: \${state.taskId ?? "none"}\`,
+    \`Todo Source: \${state.todoSource}\`,
+    \`Todos: total=\${state.counts.total} done=\${state.counts.done} inProgress=\${state.counts.inProgress} pending=\${state.counts.pending}\`,
+    \`Current: \${state.currentTodo?.id ?? "none"} \${state.currentTodo?.status ?? "none"}\`,
+    \`Evidence: \${evidenceRoute}\`,
+    "Boundary: Observer workbench bridge only; no hidden planning mode, todo file write, task mutation, approval, command execution, provider call, or result envelope.",
+  ].join("\\n");
+  setControlMessage(\`Bridged engineering planning workbench state for \${state.taskId ?? "selected task"}.\`);
   await refreshEngineeringLoopControlSurfaces();
 }
 

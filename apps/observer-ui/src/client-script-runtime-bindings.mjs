@@ -58,6 +58,12 @@ engineeringRecoveryTaskButton.addEventListener("click", () => {
   });
 });
 
+engineeringPlanTodoBridgeButton.addEventListener("click", () => {
+  bridgeEngineeringPlanningWorkbenchState().catch((error) => {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  });
+});
+
 nativePluginInvokeTaskButton.addEventListener("click", () => {
   createNativePluginInvokeApprovalTask().catch((error) => {
     setControlMessage(\`Request failed: \${formatError(error)}\`);
