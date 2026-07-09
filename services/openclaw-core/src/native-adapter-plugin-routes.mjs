@@ -185,6 +185,14 @@ function acpxCodexBridgeWrapperDraftInput(requestUrl) {
   };
 }
 
+function acpxCodexBridgeWrapperWriteProposalInput(requestUrl) {
+  return {
+    sessionKey: requestUrl.searchParams.get("sessionKey"),
+    command: requestUrl.searchParams.get("command"),
+    wrapperName: requestUrl.searchParams.get("wrapperName"),
+  };
+}
+
 function acpxCodexSessionInput(body) {
   return {
     sessionKey: body.sessionKey,
@@ -472,6 +480,14 @@ const GET_ROUTES = new Map([
       builder: "buildNativeAcpxCodexBridgeWrapperDraft",
       errorStatus: 400,
       input: acpxCodexBridgeWrapperDraftInput,
+    },
+  ],
+  [
+    "/plugins/native-adapter/acpx-codex-bridge-wrapper-write-proposal",
+    {
+      builder: "buildNativeAcpxCodexBridgeWrapperWriteProposal",
+      errorStatus: 400,
+      input: acpxCodexBridgeWrapperWriteProposalInput,
     },
   ],
 ]);

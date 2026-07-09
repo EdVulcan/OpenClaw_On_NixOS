@@ -126,6 +126,53 @@ test("native ACPX/Codex wrapper draft depends on persisted session metadata with
   assert.equal(draft.governance.futureProcessSpawnRequiresApproval, true);
 });
 
+test("native ACPX/Codex wrapper write proposal previews content without writing or reading auth", async () => {
+  const { builders } = createHarness();
+
+  const blocked = builders.buildNativeAcpxCodexBridgeWrapperWriteProposal({
+    sessionKey: "agent:codex:missing",
+  });
+  assert.equal(blocked.registry, "openclaw-native-acpx-codex-bridge-wrapper-write-proposal-v0");
+  assert.equal(blocked.summary.readyForWriteApproval, false);
+  assert.equal(blocked.proposal.status, "blocked_missing_session_metadata");
+  assert.equal(blocked.proposal.wrapper.wrapperWritten, false);
+  assert.equal(blocked.proposal.writeBoundary.writeTaskCreated, false);
+  assert.equal(blocked.governance.createsTask, false);
+  assert.equal(blocked.governance.createsApproval, false);
+
+  await builders.recordNativeAcpxCodexSession({
+    sessionKey: "agent:codex:ready",
+    recordId: "record-ready",
+    metadata: { purpose: "wrapper-write", authToken: "must-not-leak" },
+    confirm: true,
+  });
+  const proposal = builders.buildNativeAcpxCodexBridgeWrapperWriteProposal({
+    sessionKey: "agent:codex:ready",
+    command: "npx.cmd",
+    wrapperName: "codex-acp-ready",
+  });
+  const raw = JSON.stringify(proposal);
+
+  assert.equal(proposal.summary.readyForWriteApproval, true);
+  assert.equal(proposal.proposal.status, "ready_for_write_approval");
+  assert.equal(proposal.proposal.wrapper.relativePath, ".openclaw/acpx/codex-bridge/codex-acp-ready.sh");
+  assert.match(proposal.proposal.wrapper.contentHash, /^sha256:[a-f0-9]{64}$/);
+  assert.match(proposal.proposal.wrapper.contentPreview, /^#!\/usr\/bin\/env node/);
+  assert.match(proposal.proposal.wrapper.contentPreview, /__OPENCLAW_APPROVED_CODEX_HOME__/);
+  assert.match(proposal.proposal.wrapper.contentPreview, /@zed-industries\/codex-acp@\^0\.11\.1/);
+  assert.equal(proposal.proposal.authIsolation.credentialValueRead, false);
+  assert.equal(proposal.proposal.authIsolation.authMaterialCopied, false);
+  assert.equal(proposal.proposal.wrapper.wrapperWritten, false);
+  assert.equal(proposal.proposal.wrapper.directoryCreated, false);
+  assert.equal(proposal.proposal.wrapper.chmodApplied, false);
+  assert.equal(proposal.proposal.command.commandExecuted, false);
+  assert.equal(proposal.proposal.command.processSpawned, false);
+  assert.equal(proposal.proposal.writeBoundary.futureWriteCapabilityId, "act.openclaw.workspace_text_write");
+  assert.equal(proposal.governance.canWriteWrapper, false);
+  assert.equal(proposal.governance.futureWrapperWriteUsesWorkspaceTextWrite, true);
+  assert.equal(raw.includes("must-not-leak"), false);
+});
+
 test("native ACPX/Codex session metadata rejects traversal-like keys", async () => {
   const { builders } = createHarness();
 
@@ -138,6 +185,13 @@ test("native ACPX/Codex session metadata rejects traversal-like keys", async () 
   );
   assert.throws(
     () => builders.buildNativeAcpxCodexBridgeWrapperDraft({
+      sessionKey: "agent:codex:one",
+      wrapperName: "../codex-acp",
+    }),
+    /wrapperName/,
+  );
+  assert.throws(
+    () => builders.buildNativeAcpxCodexBridgeWrapperWriteProposal({
       sessionKey: "agent:codex:one",
       wrapperName: "../codex-acp",
     }),

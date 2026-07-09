@@ -4,6 +4,7 @@ import { createEventName } from "../../../packages/shared-events/src/event-facto
 export const NATIVE_ACPX_CODEX_BRIDGE_COMPATIBILITY_REGISTRY = "openclaw-native-acpx-codex-bridge-compatibility-v0";
 export const NATIVE_ACPX_CODEX_SESSION_PERSISTENCE_REGISTRY = "openclaw-native-acpx-codex-session-persistence-v0";
 export const NATIVE_ACPX_CODEX_BRIDGE_WRAPPER_DRAFT_REGISTRY = "openclaw-native-acpx-codex-bridge-wrapper-draft-v0";
+export const NATIVE_ACPX_CODEX_BRIDGE_WRAPPER_WRITE_PROPOSAL_REGISTRY = "openclaw-native-acpx-codex-bridge-wrapper-write-proposal-v0";
 
 const SESSION_KEY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$/;
 const COMMAND_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/;
@@ -59,6 +60,67 @@ function normaliseWrapperName(value, sessionKey = null) {
     throw new Error("ACPX/Codex bridge wrapperName must be a simple filename stem, optionally ending in .sh.");
   }
   return wrapperName.endsWith(".sh") ? wrapperName : `${wrapperName}.sh`;
+}
+
+function compactWrapperDraft(draft) {
+  return {
+    registry: draft?.registry ?? null,
+    mode: draft?.mode ?? null,
+    proposalId: draft?.proposal?.id ?? null,
+    status: draft?.proposal?.status ?? null,
+    readyForApprovalBridge: draft?.summary?.readyForApprovalBridge === true,
+    wrapperRelativePath: draft?.proposal?.wrapper?.relativePath ?? null,
+    command: draft?.proposal?.command?.command ?? null,
+    commandArgs: draft?.proposal?.command?.args ?? [],
+  };
+}
+
+function wrapperCommandForPlatform(commandName) {
+  if (commandName === "npx" || commandName === "npx.cmd") {
+    return {
+      commandExpression: 'process.platform === "win32" ? "npx.cmd" : "npx"',
+      args: ["@zed-industries/codex-acp@^0.11.1"],
+      sourcePackage: "@zed-industries/codex-acp@^0.11.1",
+    };
+  }
+  return {
+    commandExpression: JSON.stringify(commandName),
+    args: ["acp"],
+    sourcePackage: null,
+  };
+}
+
+function buildWrapperContentPreview({ commandName, clearEnv = [] }) {
+  const command = wrapperCommandForPlatform(commandName);
+  const clearEnvKeys = Array.isArray(clearEnv) ? clearEnv.filter((key) => typeof key === "string") : [];
+  return `#!/usr/bin/env node
+import { spawn } from "node:child_process";
+
+const OPENCLAW_APPROVED_CODEX_HOME = "__OPENCLAW_APPROVED_CODEX_HOME__";
+const env = { ...process.env, CODEX_HOME: OPENCLAW_APPROVED_CODEX_HOME };
+for (const key of ${JSON.stringify(clearEnvKeys)}) {
+  delete env[key];
+}
+
+const child = spawn(${command.commandExpression}, ${JSON.stringify(command.args)}, {
+  stdio: "inherit",
+  env,
+  shell: true,
+});
+
+child.on("exit", (code, signal) => {
+  if (signal) {
+    process.kill(process.pid, signal);
+    return;
+  }
+  process.exit(code ?? 1);
+});
+
+child.on("error", (error) => {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exit(1);
+});
+`;
 }
 
 function sanitiseMetadata(metadata) {
@@ -144,6 +206,7 @@ export function createNativeAcpxCodexBridgeBuilders({
         windowsCommandLesson: "npx.cmd",
         commandOverrideSupportedByContract: true,
         wrapperCommandDrafted: false,
+        wrapperWriteProposalReady: false,
         wrapperWritten: false,
         codexAcpProcessSpawned: false,
       },
@@ -172,6 +235,7 @@ export function createNativeAcpxCodexBridgeBuilders({
         mode: "native_acpx_codex_bridge_compatibility",
         runtimeOwner: "openclaw_on_nixos",
         canPersistSessionMetadata: true,
+        canBuildWrapperWriteProposal: true,
         canReadCredentialValue: false,
         canCopyAuthMaterial: false,
         canWriteWrapper: false,
@@ -340,6 +404,158 @@ export function createNativeAcpxCodexBridgeBuilders({
     };
   }
 
+  function buildNativeAcpxCodexBridgeWrapperWriteProposal({
+    sessionKey = null,
+    command = null,
+    wrapperName = null,
+  } = {}) {
+    const draft = buildNativeAcpxCodexBridgeWrapperDraft({ sessionKey, command, wrapperName });
+    const commandName = draft.proposal?.command?.command ?? normaliseCommandName(command);
+    const wrapperRelativePath = draft.proposal?.wrapper?.relativePath ?? `.openclaw/acpx/codex-bridge/${normaliseWrapperName(wrapperName, sessionKey)}`;
+    const contentPreview = buildWrapperContentPreview({ commandName });
+    const contentHash = `sha256:${sha256(contentPreview)}`;
+    const generatedAt = nowIso();
+    const readyForWriteApproval = draft.summary?.readyForApprovalBridge === true;
+    const commandShape = wrapperCommandForPlatform(commandName);
+
+    return {
+      ok: true,
+      registry: NATIVE_ACPX_CODEX_BRIDGE_WRAPPER_WRITE_PROPOSAL_REGISTRY,
+      mode: "proposal-only-acpx-codex-bridge-wrapper-write-preview",
+      generatedAt,
+      identityLevel: "Level 1: stable user-space control plane",
+      sourceCapability: {
+        sourceFiles: [
+          "extensions/acpx/src/codex-auth-bridge.ts",
+          "extensions/acpx/src/codex-auth-bridge.test.ts",
+        ],
+        migrationMode: "native_wrapper_write_proposal_without_auth_copy_or_file_write",
+      },
+      sourceDraft: compactWrapperDraft(draft),
+      proposal: {
+        id: `acpx-codex-wrapper-write-${sha256(`${draft.proposal?.id ?? "none"}:${contentHash}`).slice(0, 12)}`,
+        capabilityId: "plan.openclaw.acpx_codex_bridge.wrapper_write",
+        status: readyForWriteApproval ? "ready_for_write_approval" : "blocked_missing_session_metadata",
+        wrapper: {
+          relativePath: wrapperRelativePath,
+          directoryRelativePath: wrapperRelativePath.split("/").slice(0, -1).join("/"),
+          fileMode: "0700",
+          directoryMode: "0700",
+          contentPreview,
+          contentHash,
+          contentPreviewBytes: Buffer.byteLength(contentPreview, "utf8"),
+          contentPreviewExposed: true,
+          wrapperWritten: false,
+          chmodApplied: false,
+          directoryCreated: false,
+        },
+        command: {
+          command: commandName,
+          spawnCommandExpression: commandShape.commandExpression,
+          args: commandShape.args,
+          sourcePackage: commandShape.sourcePackage,
+          commandExecuted: false,
+          processSpawned: false,
+        },
+        authIsolation: {
+          approvedCodexHomePlaceholder: "__OPENCLAW_APPROVED_CODEX_HOME__",
+          codexHomeRead: false,
+          authJsonRead: false,
+          configTomlRead: false,
+          authMaterialCopied: false,
+          credentialValueRead: false,
+          secretValuesEmbeddedInWrapper: false,
+          clearEnvKeysMaterialized: false,
+        },
+        writeBoundary: {
+          futureWriteCapabilityId: "act.openclaw.workspace_text_write",
+          futureApprovalRequired: true,
+          writeTaskCreated: false,
+          approvalCreated: false,
+          ledgerExpectedAfterWrite: true,
+          workspaceRootRequired: true,
+          traversalProtectedByWorkspaceTextWrite: true,
+        },
+      },
+      readinessGates: [
+        {
+          id: "source-wrapper-draft",
+          status: readyForWriteApproval ? "passed" : "blocked",
+          evidence: draft.proposal?.status ?? "missing",
+        },
+        {
+          id: "content-preview",
+          status: "passed",
+          contentHash,
+          secretValuesEmbeddedInWrapper: false,
+        },
+        {
+          id: "workspace-write-approval",
+          status: "deferred",
+          futureCapabilityId: "act.openclaw.workspace_text_write",
+          writeTaskCreated: false,
+          approvalCreated: false,
+        },
+        {
+          id: "runtime-execution",
+          status: "deferred",
+          commandExecuted: false,
+          processSpawned: false,
+        },
+      ],
+      summary: {
+        readyForWriteApproval,
+        contentPreviewReady: true,
+        contentHash,
+        wrapperWritten: false,
+        directoryCreated: false,
+        chmodApplied: false,
+        credentialValueRead: false,
+        authMaterialCopied: false,
+        commandExecuted: false,
+        processSpawned: false,
+        providerCalled: false,
+        networkUsed: false,
+      },
+      governance: {
+        canBuildWrapperWriteProposal: true,
+        createsTask: false,
+        createsApproval: false,
+        canReadCredentialValue: false,
+        canCopyAuthMaterial: false,
+        canWriteWrapper: false,
+        canExecuteWrapper: false,
+        canSpawnCodexAcp: false,
+        canCallProvider: false,
+        canUseNetwork: false,
+        futureWrapperWriteRequiresApproval: true,
+        futureWrapperWriteUsesWorkspaceTextWrite: true,
+        futureProcessSpawnRequiresApproval: true,
+        observerVisible: true,
+      },
+      auditEvidence: {
+        operation: "acpx_codex_bridge_wrapper_write_proposal",
+        capabilityId: "plan.openclaw.acpx_codex_bridge.wrapper_write",
+        generatedAt,
+        persisted: false,
+        evidenceKind: "proposal_embedded_audit_evidence",
+      },
+      deferredExecutionBoundaries: [
+        "no CODEX_HOME read",
+        "no auth.json or config.toml read",
+        "no auth material copy",
+        "no wrapper directory creation",
+        "no wrapper file write",
+        "no chmod",
+        "no npx or npx.cmd execution",
+        "no ACP/Codex process spawn",
+        "no provider call",
+        "no network egress",
+        "no task or approval creation in this proposal route",
+      ],
+    };
+  }
+
   async function recordNativeAcpxCodexSession({
     sessionKey,
     agentId = "codex",
@@ -413,6 +629,7 @@ export function createNativeAcpxCodexBridgeBuilders({
   return {
     buildNativeAcpxCodexBridgeCompatibility,
     buildNativeAcpxCodexBridgeWrapperDraft,
+    buildNativeAcpxCodexBridgeWrapperWriteProposal,
     recordNativeAcpxCodexSession,
   };
 }

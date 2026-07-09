@@ -7,10 +7,14 @@ export const observerClientAcpxCodexBridgeRenderersScript = `function renderAcpx
   const draftSummary = wrapperDraft?.summary ?? {};
   const draftProposal = wrapperDraft?.proposal ?? {};
   const draftGovernance = wrapperDraft?.governance ?? {};
+  const wrapperWriteProposal = data?.wrapperWriteProposal ?? null;
+  const writeProposal = wrapperWriteProposal?.proposal ?? {};
+  const writeGovernance = wrapperWriteProposal?.governance ?? {};
   const records = Array.isArray(persistence.records) ? persistence.records : [];
   const selected = persistence.selectedRecord ?? null;
   const deferred = Array.isArray(data?.deferredExecutionBoundaries) ? data.deferredExecutionBoundaries : [];
   const draftDeferred = Array.isArray(wrapperDraft?.deferredExecutionBoundaries) ? wrapperDraft.deferredExecutionBoundaries : [];
+  const writeDeferred = Array.isArray(wrapperWriteProposal?.deferredExecutionBoundaries) ? wrapperWriteProposal.deferredExecutionBoundaries : [];
 
   acpxCodexBridgeRegistry.textContent = data?.registry ?? "openclaw-native-acpx-codex-bridge-compatibility-v0";
   acpxCodexBridgeSessions.textContent = String(persistence.totalRecords ?? records.length);
@@ -34,12 +38,16 @@ export const observerClientAcpxCodexBridgeRenderersScript = `function renderAcpx
     wrapperDraft ? \`Wrapper capability: \${wrapperDraft.auditEvidence?.capabilityId ?? "plan.openclaw.acpx_codex_bridge.wrapper_action"}\` : null,
     wrapperDraft ? \`Wrapper draft: registry=\${wrapperDraft.registry ?? "unknown"} status=\${draftProposal.status ?? "unknown"} ready=\${Boolean(draftSummary.readyForApprovalBridge)} path=\${draftProposal.wrapper?.relativePath ?? "none"} command=\${draftProposal.command?.command ?? "npx"} args=\${(draftProposal.command?.args ?? []).join(" ")}\` : null,
     wrapperDraft ? \`Wrapper governance: draft=\${Boolean(draftGovernance.canDraftWrapperAction)} task=\${Boolean(draftGovernance.createsTask)} approval=\${Boolean(draftGovernance.createsApproval)} credentialRead=\${Boolean(draftGovernance.canReadCredentialValue)} authCopy=\${Boolean(draftGovernance.canCopyAuthMaterial)} write=\${Boolean(draftGovernance.canWriteWrapper)} exec=\${Boolean(draftGovernance.canExecuteWrapper)} spawn=\${Boolean(draftGovernance.canSpawnCodexAcp)} provider=\${Boolean(draftGovernance.canCallProvider)} network=\${Boolean(draftGovernance.canUseNetwork)}\` : null,
+    wrapperWriteProposal ? \`Wrapper write capability: \${wrapperWriteProposal.auditEvidence?.capabilityId ?? "plan.openclaw.acpx_codex_bridge.wrapper_write"}\` : null,
+    wrapperWriteProposal ? \`Wrapper write proposal: registry=\${wrapperWriteProposal.registry ?? "unknown"} status=\${writeProposal.status ?? "unknown"} path=\${writeProposal.wrapper?.relativePath ?? "none"} hash=\${writeProposal.wrapper?.contentHash ?? "none"} bytes=\${writeProposal.wrapper?.contentPreviewBytes ?? 0} futureWrite=\${writeProposal.writeBoundary?.futureWriteCapabilityId ?? "none"}\` : null,
+    wrapperWriteProposal ? \`Wrapper write governance: proposal=\${Boolean(writeGovernance.canBuildWrapperWriteProposal)} task=\${Boolean(writeGovernance.createsTask)} approval=\${Boolean(writeGovernance.createsApproval)} credentialRead=\${Boolean(writeGovernance.canReadCredentialValue)} authCopy=\${Boolean(writeGovernance.canCopyAuthMaterial)} write=\${Boolean(writeGovernance.canWriteWrapper)} exec=\${Boolean(writeGovernance.canExecuteWrapper)} spawn=\${Boolean(writeGovernance.canSpawnCodexAcp)} provider=\${Boolean(writeGovernance.canCallProvider)} network=\${Boolean(writeGovernance.canUseNetwork)}\` : null,
     \`Audit: operation=\${data?.auditEvidence?.operation ?? "acpx_codex_bridge_compatibility_read"} evidence=\${data?.auditEvidence?.evidenceKind ?? "missing"} persisted=\${Boolean(data?.auditEvidence?.persisted)}\`,
     "",
     ...records.slice(0, 8).map((record) => \`\${record.sessionKey ?? "session"} agent=\${record.agentId ?? "unknown"} record=\${record.acpxRecordId ?? "unknown"} revision=\${record.revision ?? 0} credentialRead=\${Boolean(record.credentialValueRead)} copied=\${Boolean(record.authMaterialCopied)} wrapper=\${Boolean(record.wrapperWritten)} spawn=\${Boolean(record.processSpawned)}\`),
     "",
     ...deferred.map((boundary) => \`deferred: \${boundary}\`),
     ...draftDeferred.map((boundary) => \`draft deferred: \${boundary}\`),
+    ...writeDeferred.map((boundary) => \`write proposal deferred: \${boundary}\`),
   ].filter(Boolean).join("\\n");
 }
 

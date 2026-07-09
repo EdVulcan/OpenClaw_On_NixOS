@@ -5,8 +5,8 @@ Updated: 2026-07-10
 ## Active Slice
 
 ACPX/Codex bridge compatibility, runtime persistence evidence, Observer
-visibility, wrapper/action proposal draft, and approval-gated wrapper action
-task bridge.
+visibility, wrapper/action proposal draft, approval-gated wrapper action task
+bridge, and wrapper write proposal/preview.
 
 This slice migrates the useful enhanced-source ACPX/Codex bridge lessons into
 OpenClaw-native Level 1 behavior:
@@ -15,6 +15,7 @@ OpenClaw-native Level 1 behavior:
 GET /plugins/native-adapter/acpx-codex-bridge-compatibility
 POST /plugins/native-adapter/acpx-codex-session-records
 GET /plugins/native-adapter/acpx-codex-bridge-wrapper-draft
+GET /plugins/native-adapter/acpx-codex-bridge-wrapper-write-proposal
 POST /plugins/native-adapter/acpx-codex-bridge-wrapper-tasks
 Observer panel: OpenClaw ACPX/Codex Bridge
 ```
@@ -62,6 +63,14 @@ no wrapper file was written, no credential value was read, no auth material was
 copied, no `npx` command was executed, no ACP/Codex process was spawned, and no
 network/provider egress occurred.
 
+The wrapper write proposal route derives the planned wrapper-relative path,
+Node wrapper content preview, content hash, file/directory mode expectations,
+and future `act.openclaw.workspace_text_write` boundary. It uses an explicit
+`__OPENCLAW_APPROVED_CODEX_HOME__` placeholder and does not read real
+`CODEX_HOME`, read `auth.json` or `config.toml`, copy auth material, create
+directories, write the wrapper file, run `chmod`, execute `npx`, spawn ACP/Codex,
+call providers, or use network.
+
 ## Governance
 
 Capability mapping:
@@ -71,6 +80,7 @@ ACPX/Codex bridge compatibility -> sense.openclaw.acpx_codex_bridge.compatibilit
 ACPX runtime persistence tests -> state.openclaw.acpx_codex_bridge.session_metadata
 ACPX/Codex wrapper/action draft -> plan.openclaw.acpx_codex_bridge.wrapper_action
 ACPX/Codex wrapper/action task -> act.openclaw.acpx_codex_bridge.wrapper_action
+ACPX/Codex wrapper write proposal -> plan.openclaw.acpx_codex_bridge.wrapper_write
 ```
 
 This is intentionally not a live bridge execution path. It creates a native
@@ -130,6 +140,7 @@ CODEX_HOME read
 auth.json/config.toml read
 auth material copy
 wrapper file write
+wrapper directory creation or chmod
 npx/npx.cmd execution
 ACP/Codex process spawn
 provider calls
@@ -142,10 +153,12 @@ root/system daemon work
 The next smallest useful bridge follow-up is:
 
 ```text
-ACPX/Codex bridge wrapper write proposal/preview
+ACPX/Codex bridge governed wrapper write approval bridge
 ```
 
-That should define the exact user-space wrapper file content and filesystem
-write boundary as a proposal/preview first. It must still avoid reading real
-Codex credential values, copying auth material, executing `npx`, spawning an
-ACP/Codex process, calling providers, or using network egress.
+That should connect the wrapper write proposal to the existing
+approval-gated `act.openclaw.workspace_text_write` path, write only the
+previewed user-space wrapper file after explicit approval, and attach ledger
+evidence. It must still avoid reading real Codex credential values, copying
+auth material, executing `npx`, spawning an ACP/Codex process, calling
+providers, or using network egress.

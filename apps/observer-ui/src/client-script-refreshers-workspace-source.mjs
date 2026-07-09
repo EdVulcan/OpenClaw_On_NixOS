@@ -571,7 +571,11 @@ async function refreshAcpxCodexBridgeCompatibility() {
       ? \`\${observerConfig.coreUrl}/plugins/native-adapter/acpx-codex-bridge-wrapper-draft?sessionKey=\${encodeURIComponent(selectedSessionKey)}\`
       : \`\${observerConfig.coreUrl}/plugins/native-adapter/acpx-codex-bridge-wrapper-draft\`;
     const wrapperDraft = await fetchJson(draftUrl);
-    renderAcpxCodexBridgeCompatibility({ ...data, wrapperDraft });
+    const writeProposalUrl = selectedSessionKey
+      ? \`\${observerConfig.coreUrl}/plugins/native-adapter/acpx-codex-bridge-wrapper-write-proposal?sessionKey=\${encodeURIComponent(selectedSessionKey)}\`
+      : \`\${observerConfig.coreUrl}/plugins/native-adapter/acpx-codex-bridge-wrapper-write-proposal\`;
+    const wrapperWriteProposal = await fetchJson(writeProposalUrl);
+    renderAcpxCodexBridgeCompatibility({ ...data, wrapperDraft, wrapperWriteProposal });
   } catch {
     acpxCodexBridgeRegistry.textContent = "offline";
     acpxCodexBridgeSessions.textContent = "0";

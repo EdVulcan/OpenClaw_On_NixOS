@@ -497,6 +497,26 @@ test("native adapter ACPX/Codex bridge routes preserve query and persistence bod
   });
   assert.equal(draftResponse.body.registry, "openclaw-native-acpx-codex-bridge-wrapper-draft-v0");
 
+  const writeProposalResponse = await invokeNativeAdapterPluginRoute({
+    buildNativeAcpxCodexBridgeWrapperWriteProposal: (input) => {
+      observed.writeProposal = input;
+      return {
+        ok: true,
+        registry: "openclaw-native-acpx-codex-bridge-wrapper-write-proposal-v0",
+        proposal: { status: "ready_for_write_approval" },
+      };
+    },
+  }, "GET", "/plugins/native-adapter/acpx-codex-bridge-wrapper-write-proposal?sessionKey=agent:codex:test&command=npx.cmd&wrapperName=codex-acp-test");
+
+  assert.equal(writeProposalResponse.handled, true);
+  assert.equal(writeProposalResponse.statusCode, 200);
+  assert.deepEqual(observed.writeProposal, {
+    sessionKey: "agent:codex:test",
+    command: "npx.cmd",
+    wrapperName: "codex-acp-test",
+  });
+  assert.equal(writeProposalResponse.body.registry, "openclaw-native-acpx-codex-bridge-wrapper-write-proposal-v0");
+
   const postResponse = await invokeNativeAdapterPluginRoute({
     recordNativeAcpxCodexSession: async (input) => {
       observed.post = input;

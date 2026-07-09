@@ -52,6 +52,7 @@ cleanup() {
     "${OVERWRITE_FILE:-}" \
     "${BEFORE_RESTART_FILE:-}" \
     "${DRAFT_FILE:-}" \
+    "${WRITE_PROPOSAL_FILE:-}" \
     "${TASK_FILE:-}" \
     "${BLOCKED_FILE:-}" \
     "${APPROVED_FILE:-}" \
@@ -70,6 +71,7 @@ SECOND_FILE="$(mktemp)"
 OVERWRITE_FILE="$(mktemp)"
 BEFORE_RESTART_FILE="$(mktemp)"
 DRAFT_FILE="$(mktemp)"
+WRITE_PROPOSAL_FILE="$(mktemp)"
 TASK_FILE="$(mktemp)"
 BLOCKED_FILE="$(mktemp)"
 APPROVED_FILE="$(mktemp)"
@@ -83,8 +85,9 @@ post_json "$CORE_URL/plugins/native-adapter/acpx-codex-session-records" '{"sessi
 post_json "$CORE_URL/plugins/native-adapter/acpx-codex-session-records" '{"sessionKey":"agent:codex:one","agentId":"codex","recordId":"record-one-updated","metadata":{"purpose":"updated","password":"ACPX_CODEX_SECRET_PASSWORD_SHOULD_NOT_LEAK"},"confirm":true}' > "$OVERWRITE_FILE"
 curl --silent --fail "$CORE_URL/plugins/native-adapter/acpx-codex-bridge-compatibility?sessionKey=agent:codex:one" > "$BEFORE_RESTART_FILE"
 curl --silent --fail "$CORE_URL/plugins/native-adapter/acpx-codex-bridge-wrapper-draft?sessionKey=agent:codex:one&command=npx.cmd&wrapperName=codex-acp-one" > "$DRAFT_FILE"
+curl --silent --fail "$CORE_URL/plugins/native-adapter/acpx-codex-bridge-wrapper-write-proposal?sessionKey=agent:codex:one&command=npx.cmd&wrapperName=codex-acp-one" > "$WRITE_PROPOSAL_FILE"
 
-node - <<'EOF' "$INITIAL_FILE" "$FIRST_FILE" "$SECOND_FILE" "$OVERWRITE_FILE" "$BEFORE_RESTART_FILE" "$DRAFT_FILE"
+node - <<'EOF' "$INITIAL_FILE" "$FIRST_FILE" "$SECOND_FILE" "$OVERWRITE_FILE" "$BEFORE_RESTART_FILE" "$DRAFT_FILE" "$WRITE_PROPOSAL_FILE"
 const fs = require("node:fs");
 const readJson = (index) => JSON.parse(fs.readFileSync(process.argv[index], "utf8"));
 
@@ -94,7 +97,8 @@ const second = readJson(4);
 const overwrite = readJson(5);
 const before = readJson(6);
 const draft = readJson(7);
-const raw = JSON.stringify({ initial, first, second, overwrite, before, draft });
+const writeProposal = readJson(8);
+const raw = JSON.stringify({ initial, first, second, overwrite, before, draft, writeProposal });
 
 if (
   !initial.ok
@@ -161,6 +165,37 @@ if (
   || draft.governance?.futureProcessSpawnRequiresApproval !== true
 ) {
   throw new Error(`ACPX/Codex wrapper draft mismatch: ${JSON.stringify(draft)}`);
+}
+if (
+  !writeProposal.ok
+  || writeProposal.registry !== "openclaw-native-acpx-codex-bridge-wrapper-write-proposal-v0"
+  || writeProposal.proposal?.status !== "ready_for_write_approval"
+  || writeProposal.summary?.readyForWriteApproval !== true
+  || writeProposal.proposal?.wrapper?.relativePath !== ".openclaw/acpx/codex-bridge/codex-acp-one.sh"
+  || !/^sha256:[a-f0-9]{64}$/.test(writeProposal.proposal?.wrapper?.contentHash ?? "")
+  || !String(writeProposal.proposal?.wrapper?.contentPreview ?? "").includes("__OPENCLAW_APPROVED_CODEX_HOME__")
+  || !String(writeProposal.proposal?.wrapper?.contentPreview ?? "").includes("@zed-industries/codex-acp@^0.11.1")
+  || writeProposal.proposal?.authIsolation?.credentialValueRead !== false
+  || writeProposal.proposal?.authIsolation?.authMaterialCopied !== false
+  || writeProposal.proposal?.wrapper?.wrapperWritten !== false
+  || writeProposal.proposal?.wrapper?.directoryCreated !== false
+  || writeProposal.proposal?.wrapper?.chmodApplied !== false
+  || writeProposal.proposal?.command?.commandExecuted !== false
+  || writeProposal.proposal?.command?.processSpawned !== false
+  || writeProposal.proposal?.writeBoundary?.futureWriteCapabilityId !== "act.openclaw.workspace_text_write"
+  || writeProposal.proposal?.writeBoundary?.writeTaskCreated !== false
+  || writeProposal.governance?.createsTask !== false
+  || writeProposal.governance?.createsApproval !== false
+  || writeProposal.governance?.canReadCredentialValue !== false
+  || writeProposal.governance?.canCopyAuthMaterial !== false
+  || writeProposal.governance?.canWriteWrapper !== false
+  || writeProposal.governance?.canExecuteWrapper !== false
+  || writeProposal.governance?.canSpawnCodexAcp !== false
+  || writeProposal.governance?.canCallProvider !== false
+  || writeProposal.governance?.canUseNetwork !== false
+  || writeProposal.governance?.futureWrapperWriteUsesWorkspaceTextWrite !== true
+) {
+  throw new Error(`ACPX/Codex wrapper write proposal mismatch: ${JSON.stringify(writeProposal)}`);
 }
 for (const secret of [
   "ACPX_CODEX_SECRET_TOKEN_SHOULD_NOT_LEAK",
