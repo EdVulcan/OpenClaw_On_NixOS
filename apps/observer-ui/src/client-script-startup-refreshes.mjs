@@ -203,6 +203,7 @@ export const OBSERVER_STARTUP_REFRESH_GROUPS = [
       "refreshEngineeringVerificationEvidence",
       "refreshEngineeringRecoveryEvidence",
       "refreshEngineeringMicrocompactEvidence",
+      "refreshEngineeringPlanTodoEvidence",
       "refreshFilesystemLedger",
       "refreshFilesystemReadLedger",
     ],

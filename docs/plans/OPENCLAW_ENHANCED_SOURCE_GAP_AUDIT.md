@@ -96,6 +96,11 @@ governed surfaces:
   `sense.openclaw.engineering_context.microcompact_evidence` estimates
   context-budget savings from historical command transcripts without returning
   raw output or mutating runtime messages or persisted logs.
+- Native engineering plan/todo evidence:
+  `sense.openclaw.engineering_context.plan_todo_evidence` maps
+  `cc_plan_enter`, `cc_plan_exit`, and `cc_todo_write` into visible
+  task/workbench planning evidence without hidden mode switches, task mutation,
+  or `.openclaw/cc-todo.md` writes.
 - Approval-gated workspace mutation:
   `act.openclaw.workspace_text_write` and
   `act.openclaw.workspace_patch_apply`.
@@ -124,7 +129,7 @@ enhanced `openclaw` modules.
 | `cc_grep` | absorbed | `sense.openclaw.engineering_tool.grep` performs bounded workspace text search with literal/regex mode, include filters, result/output caps, binary skips, audit, and Observer evidence. | Continue native bounded search; do not execute enhanced `GrepTool.ts`. | Level 1 |
 | `cc_lsp` | requires source transfer | `sense.openclaw.workspace_symbol_lookup` approximates navigation but does not start or manage LSP servers. | Transfer the LSP manager idea, rewritten as an optional governed workspace service with lifecycle evidence. | Level 1 now, Level 2 later |
 | `cc_verify` | absorbed as evidence | `sense.openclaw.engineering_tool.verify_evidence` reads approval-gated command transcripts, capability invocations, and completed task outcomes to produce bounded verification evidence with checks, output budgets, retry-policy metadata, audit evidence, and Observer visibility. `sense.openclaw.engineering_tool.recovery_evidence` adds read-only failed-evidence recovery recommendations. | Keep actual command execution on the existing approval-gated source/workspace command task path. Do not add ungoverned shell execution or automatic retries. | Level 1 |
-| `cc_plan_enter`, `cc_plan_exit`, `cc_todo_write` | partially absorbed | Core tasks, plans, approvals, and recovery exist; no lightweight planning mode or `.openclaw/cc-todo.md` equivalent is native. | Treat as plan-state evidence, not hidden agent mode. Integrate with task/workbench state if migrated. | Level 1 |
+| `cc_plan_enter`, `cc_plan_exit`, `cc_todo_write` | absorbed as evidence | `sense.openclaw.engineering_context.plan_todo_evidence` reads visible task/workbench plan state, maps planning/todo tool semantics, reports todo counts, and exposes Observer evidence without hidden mode switches, task mutation, or `.openclaw/cc-todo.md` writes. | Keep hidden mode and todo-file persistence deferred until governed workbench storage exists. | Level 1 |
 | `microcompact` | absorbed as evidence | `sense.openclaw.engineering_context.microcompact_evidence` reads command transcript metadata, protects recent engineering evidence by default, and estimates reclaimable context budget without returning raw output or mutating logs. | Keep actual runtime-message compaction deferred until the evidence surface is stable and governed. Do not silently mutate persisted transcript or hide current verification/recovery evidence. | Level 1 |
 | Live plugin runtime refresh | absorbed as evidence | `sense.openclaw.plugin_runtime.refresh_evidence` recomputes the native plugin registry read model, reports activation gates, cache invalidation intent, and blocked module-load/runtime-activation boundaries with Observer evidence. | Keep actual module-loader cache invalidation and live activation deferred until a governed loader exists. | Level 1 |
 | ACPX/Codex bridge compatibility | requires source transfer | No ACPX/Codex bridge implementation exists in this repo. | Transfer compatibility lessons only where useful for OpenClaw's NixOS body and ACP bridge model. Do not center Windows wrapper behavior. | Level 1 |
@@ -288,15 +293,17 @@ Enhanced source:
 Current OpenClaw:
 
 - Core already has tasks, plans, approvals, recovery, and state persistence.
-- There is no equivalent lightweight planning-mode artifact that the Observer
-  can show as the agent's current engineering plan.
+- `sense.openclaw.engineering_context.plan_todo_evidence` now exposes
+  planning/todo evidence from visible task/workbench state and bounded query
+  fixtures. It reports the `.openclaw/cc-todo.md` target only as a deferred
+  boundary and does not write it.
 
-Classification: partially absorbed.
+Classification: absorbed as evidence.
 
 Recommendation:
 
-- If migrated, represent this as task/workbench evidence. Avoid hidden agent
-  state that cannot be observed or recovered.
+- Keep this evidence-only until a governed workbench storage model exists.
+  Avoid hidden agent state that cannot be observed or recovered.
 
 ### Microcompact
 

@@ -126,6 +126,20 @@ async function refreshEngineeringMicrocompactEvidence() {
   }
 }
 
+async function refreshEngineeringPlanTodoEvidence() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/engineering-plan-todo/evidence?limit=8\`);
+    renderEngineeringPlanTodoEvidence(data);
+  } catch {
+    engineeringPlanTodoRegistry.textContent = "offline";
+    engineeringPlanTodoTasks.textContent = "0";
+    engineeringPlanTodoTodos.textContent = "0";
+    engineeringPlanTodoDone.textContent = "0";
+    engineeringPlanTodoMutation.textContent = "unknown";
+    engineeringPlanTodoJson.textContent = "Unable to read native engineering plan/todo evidence.";
+  }
+}
+
 async function refreshFilesystemLedger() {
   try {
     const data = await fetchJson(\`\${observerConfig.coreUrl}/filesystem/changes?limit=8\`);

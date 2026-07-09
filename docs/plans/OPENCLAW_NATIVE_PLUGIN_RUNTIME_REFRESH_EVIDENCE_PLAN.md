@@ -101,14 +101,20 @@ OPENCLAW_MILESTONE_CHECKS=openclaw-native-plugin-runtime-refresh-evidence,observ
 OPENCLAW_MILESTONE_CHECKS=milestone-registry,milestone-script-audit bash nix/scripts/dev-milestone-check.sh
 ```
 
-## Next Slice
+## Follow-Up Slice
 
-The next recommended real capability is:
+Completed next recommended real capability:
 
 ```text
 Planning/todo evidence surface
 ```
 
-That slice should migrate `cc_plan_enter`, `cc_plan_exit`, and `cc_todo_write`
-as explicit task/workbench evidence, not hidden agent mode or uncontrolled file
+`cc_plan_enter`, `cc_plan_exit`, and `cc_todo_write` are now represented as
+explicit task/workbench evidence, not hidden agent mode or uncontrolled file
 mutation.
+
+The next smallest real capability is:
+
+```text
+Native governed LSP availability and contract evidence
+```

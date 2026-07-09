@@ -490,6 +490,61 @@ test("native engineering microcompact evidence route previews context budget wit
   assert.equal(response.body.bounds.noRawOutputText, true);
 });
 
+test("native engineering plan/todo evidence route reads task workbench state without mutation", async () => {
+  const task = {
+    id: "task-plan-todo-1",
+    type: "system_task",
+    status: "running",
+    goal: "Expose planning evidence",
+    plan: {
+      planner: "rule-v1",
+      strategy: "native-engineering-plan-todo-evidence",
+      status: "running",
+      summary: "Expose current planning state.",
+      steps: [
+        { id: "read", title: "Inspect planning source", status: "completed", phase: "analysis" },
+        { id: "route", title: "Wire evidence route", status: "running", phase: "implementation" },
+        { id: "verify", title: "Validate milestone", status: "planned", phase: "validation" },
+      ],
+    },
+  };
+  const todosJson = encodeURIComponent(JSON.stringify([
+    { id: "query-read", description: "Review plan mode migration", status: "done" },
+    { id: "query-wire", description: "Expose task/workbench evidence", status: "in_progress" },
+  ]));
+  const deps = createBaseDeps({
+    state: {
+      tasks: new Map([[task.id, task]]),
+      runtimeState: { currentTaskId: task.id },
+    },
+  });
+
+  const response = await invokeRoute(
+    deps,
+    "GET",
+    `/plugins/native-adapter/engineering-plan-todo/evidence?taskId=${task.id}&limit=999&planSummary=bounded-plan&confirmedPlan=bounded-confirmed-plan&todosJson=${todosJson}`,
+  );
+
+  assert.equal(response.statusCode, 200, JSON.stringify(response.body));
+  assert.equal(response.body.registry, "openclaw-native-engineering-plan-todo-evidence-v0");
+  assert.equal(response.body.capability.id, "sense.openclaw.engineering_context.plan_todo_evidence");
+  assert.equal(response.body.query.limit, 50);
+  assert.equal(response.body.summary.taskPlanCount, 1);
+  assert.equal(response.body.summary.queryTodoCount, 2);
+  assert.equal(response.body.summary.evidenceTodoCounts.done, 1);
+  assert.equal(response.body.summary.evidenceTodoCounts.in_progress, 1);
+  assert.equal(response.body.taskPlanEvidence.selectedTaskId, task.id);
+  assert.equal(response.body.taskPlanEvidence.items[0].plan.stepCount, 3);
+  assert.equal(response.body.planningEvidence.enter.hiddenModeCreated, false);
+  assert.equal(response.body.planningEvidence.exit.executionTransitionCreated, false);
+  assert.equal(response.body.planningEvidence.todoWrite.todoPathWritten, false);
+  assert.equal(response.body.governance.canSwitchHiddenAgentMode, false);
+  assert.equal(response.body.governance.canWriteTodoFile, false);
+  assert.equal(response.body.governance.canMutateTaskState, false);
+  assert.equal(response.body.governance.canExecuteCommand, false);
+  assert.equal(response.body.bounds.noTaskMutation, true);
+});
+
 test("capability invocation route preserves fallback limit and summary contract", async () => {
   let observedQuery = null;
   const deps = createBaseDeps({

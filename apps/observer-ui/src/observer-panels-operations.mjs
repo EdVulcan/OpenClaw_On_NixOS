@@ -150,6 +150,15 @@ export function observerOperationsPanels() {
           <pre id="engineering-microcompact-json">Loading native engineering microcompact evidence...</pre>
         </section>
         <section class="panel">
+          <h2>Engineering Plan/Todo Evidence</h2>
+          <div class="metric"><span>Registry</span><span id="engineering-plan-todo-registry">openclaw-native-engineering-plan-todo-evidence-v0</span></div>
+          <div class="metric"><span>Tasks</span><span id="engineering-plan-todo-tasks">0</span></div>
+          <div class="metric"><span>Todos</span><span id="engineering-plan-todo-todos">0</span></div>
+          <div class="metric"><span>Done</span><span id="engineering-plan-todo-done">0</span></div>
+          <div class="metric"><span>Mutation</span><span id="engineering-plan-todo-mutation">blocked</span></div>
+          <pre id="engineering-plan-todo-json">Loading native engineering plan/todo evidence...</pre>
+        </section>
+        <section class="panel">
           <h2>Filesystem Ledger</h2>
           <div class="metric"><span>Total</span><span id="filesystem-ledger-total">0</span></div>
           <div class="metric"><span>Mkdir</span><span id="filesystem-ledger-mkdir">0</span></div>

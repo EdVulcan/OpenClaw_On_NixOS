@@ -114,7 +114,7 @@ surgical edit proposal execution and patch apply
 full file write proposal execution
 LSP lifecycle startup and request handling
 verification command execution and task-completion attachment
-planning mode and todo state mutation
+planning/todo evidence is absorbed; hidden planning mode and todo state mutation remain deferred
 provider calls, network egress, and result envelopes
 ```
 

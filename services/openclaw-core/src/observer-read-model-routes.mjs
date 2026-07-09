@@ -1,5 +1,6 @@
 import { sendJson } from "../../../packages/shared-utils/src/http.mjs";
 import { buildNativeEngineeringMicrocompactEvidence } from "./native-engineering-microcompact-evidence-builders.mjs";
+import { buildNativeEngineeringPlanTodoEvidence } from "./native-engineering-plan-todo-evidence-builders.mjs";
 import { buildNativeEngineeringRecoveryEvidence } from "./native-engineering-recovery-evidence-builders.mjs";
 import { buildNativeEngineeringVerificationEvidence } from "./native-engineering-verification-evidence-builders.mjs";
 
@@ -149,6 +150,20 @@ export async function handleObserverReadModelRoute({ req, res, requestUrl, state
       limit: safeLimit,
       thresholdChars: requestUrl.searchParams.get("thresholdChars"),
       protectRecentItems: requestUrl.searchParams.get("protectRecentItems"),
+    }));
+    return true;
+  }
+
+  if (requestUrl.pathname === "/plugins/native-adapter/engineering-plan-todo/evidence") {
+    const safeLimit = clampLedgerLimit(parseLimit(requestUrl.searchParams));
+    sendJson(res, 200, buildNativeEngineeringPlanTodoEvidence({
+      tasks: state.tasks,
+      runtimeState: state.runtimeState,
+      taskId: requestUrl.searchParams.get("taskId"),
+      planSummary: requestUrl.searchParams.get("planSummary"),
+      confirmedPlan: requestUrl.searchParams.get("confirmedPlan"),
+      todosJson: requestUrl.searchParams.get("todosJson"),
+      limit: safeLimit,
     }));
     return true;
   }

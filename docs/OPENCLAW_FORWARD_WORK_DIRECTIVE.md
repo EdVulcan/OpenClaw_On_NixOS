@@ -205,6 +205,8 @@ The first slices should move in this order:
 5. Observer visibility and recovery evidence.
 6. Microcompact as context-management evidence, not hidden transcript mutation.
 7. Live plugin runtime refresh as a governed lifecycle action.
+8. Planning/todo evidence as visible task/workbench state, not hidden mode.
+9. LSP availability and lifecycle evidence before starting language servers.
 
 Only after these are proven should the project continue deeper cloud-provider
 execution work.
