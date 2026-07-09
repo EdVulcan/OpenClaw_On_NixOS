@@ -125,9 +125,10 @@ provider calls, network egress, and result envelopes
 The current next smallest real capability is:
 
 ```text
-Native governed edit execution evidence
+Native governed engineering edit closed-loop proof
 ```
 
-That slice should prove approved `cc_edit`-derived patch execution through the
-existing workspace_patch_apply task path while preserving proposal, approval,
-execution, evidence, and recovery separation.
+That slice may add a thin `cc_edit` execution-evidence readback if needed, but
+it should aim at the full loop: read/search -> proposal -> approval-gated
+workspace_patch_apply -> ledger -> Observer -> verification/recovery, not a
+new readiness chain.

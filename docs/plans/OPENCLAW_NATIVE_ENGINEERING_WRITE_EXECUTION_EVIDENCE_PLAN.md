@@ -57,8 +57,10 @@ automatic recovery task creation
 provider calls, network egress, result envelopes
 ```
 
-Future follow-up should attach targeted verification evidence and recovery
-recommendations to completed engineering write tasks without auto-approval.
+Future follow-up should prefer closed-loop proof over another evidence-only
+slice: bounded read/search, proposal, approval, write execution, filesystem
+ledger, Observer visibility, approved verification command, and recovery
+readback without auto-approval.
 
 ## Evidence
 
@@ -91,6 +93,15 @@ observer-openclaw-native-engineering-write-execution-evidence
 
 ## Follow-Up Status
 
+The recommended closed-loop proof follow-up is tracked as:
+
+```text
+OPENCLAW_NATIVE_ENGINEERING_WRITE_CLOSED_LOOP_PLAN.md
+```
+
+That slice proves the full existing product loop without adding another
+endpoint or readiness chain.
+
 The recommended edit approval bridge follow-up was completed as:
 
 ```text
@@ -102,12 +113,12 @@ approval-gated patch apply task path without approving or executing it.
 
 ## Next Slice
 
-The next recommended real capability is:
+The next recommended real capability after write closed-loop proof is:
 
 ```text
-Native governed edit execution evidence
+Native governed engineering edit closed-loop proof
 ```
 
-That slice should prove approved edit execution through the existing
-workspace_patch_apply task path and read completed task/filesystem ledger
-evidence without auto-approval or bypassing operator approval.
+That slice may include a thin edit execution evidence readback if needed, but
+should target the full loop: read/search -> edit proposal -> approval-gated
+workspace_patch_apply -> ledger -> Observer -> verification/recovery.

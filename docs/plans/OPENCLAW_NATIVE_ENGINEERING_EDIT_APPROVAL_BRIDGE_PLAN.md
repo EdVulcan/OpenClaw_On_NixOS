@@ -98,9 +98,11 @@ observer-openclaw-native-engineering-edit-approval-bridge
 The next recommended real capability is:
 
 ```text
-Native governed edit execution evidence
+Native governed engineering edit closed-loop proof
 ```
 
-That slice should prove approved edit execution through the existing
-workspace_patch_apply task path and read the completed task/filesystem ledger as
-evidence. It should not auto-approve or bypass operator approval.
+That slice may include a thin edit execution evidence readback, but it should
+prove the full path: bounded read/search, edit proposal, approval-gated
+workspace_patch_apply, filesystem ledger, Observer visibility, verification
+command evidence, and recovery recommendation. It should not auto-approve or
+bypass operator approval.

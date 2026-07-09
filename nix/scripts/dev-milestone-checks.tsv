@@ -334,6 +334,7 @@ openclaw-native-engineering-edit-approval-bridge	dev-openclaw-native-engineering
 openclaw-native-engineering-write-proposal	dev-openclaw-native-engineering-write-proposal-check.sh	Native governed source write proposal evidence without file mutation
 openclaw-native-engineering-write-approval-bridge	dev-openclaw-native-engineering-write-approval-bridge-check.sh	Native governed bridge from engineering write proposals to approval-gated workspace text write tasks
 openclaw-native-engineering-write-execution-evidence	dev-openclaw-native-engineering-write-execution-evidence-check.sh	Native governed execution evidence for approved engineering write proposal tasks
+openclaw-native-engineering-write-closed-loop	dev-openclaw-native-engineering-write-closed-loop-check.sh	Native governed engineering write closed loop from read/search to verification and recovery
 openclaw-native-engineering-verification-evidence	dev-openclaw-native-engineering-verification-evidence-check.sh	Native governed verification evidence from completed command transcripts
 openclaw-native-engineering-recovery-evidence	dev-openclaw-native-engineering-recovery-evidence-check.sh	Native governed recovery evidence from failed engineering verification outcomes
 openclaw-native-engineering-microcompact-evidence	dev-openclaw-native-engineering-microcompact-evidence-check.sh	Native governed microcompact context-management evidence from command transcripts

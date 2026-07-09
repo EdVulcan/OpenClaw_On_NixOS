@@ -101,3 +101,13 @@ OPENCLAW_NATIVE_ENGINEERING_WRITE_EXECUTION_EVIDENCE_PLAN.md
 That slice proves approved write execution through the existing
 workspace_text_write task path and reads the completed task/filesystem ledger as
 evidence. It still does not auto-approve or bypass operator approval.
+
+The closed-loop proof follow-up is tracked as:
+
+```text
+OPENCLAW_NATIVE_ENGINEERING_WRITE_CLOSED_LOOP_PLAN.md
+```
+
+That proof uses existing read/search, proposal, approval, write execution,
+ledger, Observer, verification, and recovery surfaces without adding another
+endpoint or readiness chain.
