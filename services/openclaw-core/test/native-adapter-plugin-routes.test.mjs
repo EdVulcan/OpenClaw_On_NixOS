@@ -525,6 +525,39 @@ test("native adapter ACPX/Codex bridge routes preserve query and persistence bod
   });
   assert.equal(postResponse.body.registry, "openclaw-native-acpx-codex-session-persistence-v0");
   assert.equal(postResponse.body.session.sessionKey, "agent:codex:test");
+
+  const taskResponse = await invokeNativeAdapterPluginRoute({
+    createNativeAcpxCodexBridgeWrapperTask: async (input) => {
+      observed.task = input;
+      return {
+        ok: true,
+        registry: "openclaw-native-acpx-codex-bridge-wrapper-task-v0",
+        mode: "approval-gated-acpx-codex-bridge-wrapper-task",
+        generatedAt: "2026-07-10T00:00:00.000Z",
+        sourceRegistry: "openclaw-native-acpx-codex-bridge-wrapper-task-draft-v0",
+        task: { id: "task-acpx", status: "pending" },
+        approval: { id: "approval-acpx", status: "pending" },
+        governance: { createsTask: true, createsApproval: true, canWriteWrapper: false },
+      };
+    },
+  }, "POST", "/plugins/native-adapter/acpx-codex-bridge-wrapper-tasks", {
+    sessionKey: "agent:codex:test",
+    command: "npx.cmd",
+    wrapperName: "codex-acp-test",
+    confirm: true,
+  });
+
+  assert.equal(taskResponse.handled, true);
+  assert.equal(taskResponse.statusCode, 201);
+  assert.deepEqual(observed.task, {
+    sessionKey: "agent:codex:test",
+    command: "npx.cmd",
+    wrapperName: "codex-acp-test",
+    confirm: true,
+  });
+  assert.equal(taskResponse.body.registry, "openclaw-native-acpx-codex-bridge-wrapper-task-v0");
+  assert.deepEqual(taskResponse.body.task, { id: "task-acpx", status: "pending" });
+  assert.deepEqual(taskResponse.body.approval, { id: "approval-acpx", status: "pending" });
 });
 
 test("native adapter plugin route reports misses without writing a response", async () => {

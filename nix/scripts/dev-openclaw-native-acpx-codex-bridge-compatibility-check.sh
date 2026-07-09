@@ -52,6 +52,11 @@ cleanup() {
     "${OVERWRITE_FILE:-}" \
     "${BEFORE_RESTART_FILE:-}" \
     "${DRAFT_FILE:-}" \
+    "${TASK_FILE:-}" \
+    "${BLOCKED_FILE:-}" \
+    "${APPROVED_FILE:-}" \
+    "${STEP_FILE:-}" \
+    "${TASK_STATE_FILE:-}" \
     "${AFTER_RESTART_FILE:-}"
   "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 }
@@ -65,6 +70,11 @@ SECOND_FILE="$(mktemp)"
 OVERWRITE_FILE="$(mktemp)"
 BEFORE_RESTART_FILE="$(mktemp)"
 DRAFT_FILE="$(mktemp)"
+TASK_FILE="$(mktemp)"
+BLOCKED_FILE="$(mktemp)"
+APPROVED_FILE="$(mktemp)"
+STEP_FILE="$(mktemp)"
+TASK_STATE_FILE="$(mktemp)"
 AFTER_RESTART_FILE="$(mktemp)"
 
 curl --silent --fail "$CORE_URL/plugins/native-adapter/acpx-codex-bridge-compatibility?sessionKey=agent:codex:missing" > "$INITIAL_FILE"
@@ -159,6 +169,85 @@ for (const secret of [
   if (raw.includes(secret)) {
     throw new Error(`ACPX/Codex bridge leaked secret-like metadata: ${secret}`);
   }
+}
+EOF
+
+post_json "$CORE_URL/plugins/native-adapter/acpx-codex-bridge-wrapper-tasks" '{"sessionKey":"agent:codex:one","command":"npx.cmd","wrapperName":"codex-acp-one","confirm":true}' > "$TASK_FILE"
+post_json "$CORE_URL/operator/step" '{}' > "$BLOCKED_FILE"
+
+approval_id="$(node - <<'EOF' "$TASK_FILE" "$BLOCKED_FILE"
+const fs = require("node:fs");
+const taskResponse = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+const blocked = JSON.parse(fs.readFileSync(process.argv[3], "utf8"));
+if (
+  !taskResponse.ok
+  || taskResponse.registry !== "openclaw-native-acpx-codex-bridge-wrapper-task-v0"
+  || taskResponse.task?.type !== "native_acpx_codex_bridge_wrapper_action"
+  || taskResponse.governance?.createsTask !== true
+  || taskResponse.governance?.createsApproval !== true
+  || taskResponse.governance?.canWriteWrapper !== false
+  || taskResponse.governance?.canSpawnCodexAcp !== false
+) {
+  throw new Error(`ACPX/Codex wrapper task response mismatch: ${JSON.stringify(taskResponse)}`);
+}
+if (
+  !blocked.ok
+  || blocked.ran !== false
+  || blocked.blocked !== true
+  || blocked.reason !== "policy_requires_approval"
+  || blocked.approval?.id !== taskResponse.approval?.id
+) {
+  throw new Error(`ACPX/Codex wrapper task should block before approval: ${JSON.stringify(blocked)}`);
+}
+process.stdout.write(blocked.approval.id);
+EOF
+)"
+
+task_id="$(node - <<'EOF' "$TASK_FILE"
+const fs = require("node:fs");
+const taskResponse = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+process.stdout.write(taskResponse.task.id);
+EOF
+)"
+
+post_json "$CORE_URL/approvals/$approval_id/approve" '{"approvedBy":"dev-openclaw-native-acpx-codex-bridge-compatibility-check","reason":"Approve ACPX/Codex wrapper boundary without writing or spawning."}' > "$APPROVED_FILE"
+post_json "$CORE_URL/operator/step" '{}' > "$STEP_FILE"
+curl --silent --fail "$CORE_URL/tasks/$task_id" > "$TASK_STATE_FILE"
+
+node - <<'EOF' "$TASK_FILE" "$APPROVED_FILE" "$STEP_FILE" "$TASK_STATE_FILE" "$WORKSPACE_DIR"
+const fs = require("node:fs");
+const path = require("node:path");
+const readJson = (index) => JSON.parse(fs.readFileSync(process.argv[index], "utf8"));
+const taskResponse = readJson(2);
+const approved = readJson(3);
+const step = readJson(4);
+const taskState = readJson(5);
+const workspaceDir = process.argv[6];
+const execution = taskState.task?.nativeAcpxCodexBridgeWrapper?.execution;
+const wrapperPath = path.join(workspaceDir, ".openclaw/acpx/codex-bridge/codex-acp-one.sh");
+if (approved.approval?.status !== "approved" || approved.task?.policy?.decision?.decision !== "audit_only") {
+  throw new Error(`ACPX/Codex wrapper approval should be approved and audited: ${JSON.stringify(approved)}`);
+}
+if (!step.ok || step.ran !== true || step.blocked !== false || step.task?.status !== "completed") {
+  throw new Error(`approved ACPX/Codex wrapper task should complete as deferred: ${JSON.stringify(step)}`);
+}
+if (
+  taskState.task?.id !== taskResponse.task?.id
+  || taskState.task?.status !== "completed"
+  || execution?.registry !== "openclaw-native-acpx-codex-bridge-wrapper-task-execution-v0"
+  || execution.approved !== true
+  || execution.wrapper?.wrapperWritten !== false
+  || execution.command?.commandExecuted !== false
+  || execution.command?.processSpawned !== false
+  || execution.governance?.canReadCredentialValue !== false
+  || execution.governance?.canCopyAuthMaterial !== false
+  || execution.governance?.canWriteWrapper !== false
+  || execution.governance?.canExecuteWrapper !== false
+  || execution.governance?.canSpawnCodexAcp !== false
+  || execution.governance?.canUseNetwork !== false
+  || fs.existsSync(wrapperPath)
+) {
+  throw new Error(`ACPX/Codex wrapper task execution mismatch: ${JSON.stringify({ taskState, wrapperPathExists: fs.existsSync(wrapperPath) })}`);
 }
 EOF
 

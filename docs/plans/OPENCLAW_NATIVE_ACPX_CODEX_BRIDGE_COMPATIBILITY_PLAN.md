@@ -5,7 +5,8 @@ Updated: 2026-07-10
 ## Active Slice
 
 ACPX/Codex bridge compatibility, runtime persistence evidence, Observer
-visibility, and wrapper/action proposal draft.
+visibility, wrapper/action proposal draft, and approval-gated wrapper action
+task bridge.
 
 This slice migrates the useful enhanced-source ACPX/Codex bridge lessons into
 OpenClaw-native Level 1 behavior:
@@ -14,6 +15,7 @@ OpenClaw-native Level 1 behavior:
 GET /plugins/native-adapter/acpx-codex-bridge-compatibility
 POST /plugins/native-adapter/acpx-codex-session-records
 GET /plugins/native-adapter/acpx-codex-bridge-wrapper-draft
+POST /plugins/native-adapter/acpx-codex-bridge-wrapper-tasks
 Observer panel: OpenClaw ACPX/Codex Bridge
 ```
 
@@ -53,6 +55,13 @@ selected persisted session. It records the planned wrapper-relative path,
 command shape, auth-isolation boundary, readiness gates, and future approval
 requirements without creating a task or approval.
 
+The wrapper action task route creates an approval-gated task from a reviewed
+draft. Operator execution blocks before approval. After approval, the executor
+records an approved-deferred boundary and completes with explicit evidence that
+no wrapper file was written, no credential value was read, no auth material was
+copied, no `npx` command was executed, no ACP/Codex process was spawned, and no
+network/provider egress occurred.
+
 ## Governance
 
 Capability mapping:
@@ -61,6 +70,7 @@ Capability mapping:
 ACPX/Codex bridge compatibility -> sense.openclaw.acpx_codex_bridge.compatibility
 ACPX runtime persistence tests -> state.openclaw.acpx_codex_bridge.session_metadata
 ACPX/Codex wrapper/action draft -> plan.openclaw.acpx_codex_bridge.wrapper_action
+ACPX/Codex wrapper/action task -> act.openclaw.acpx_codex_bridge.wrapper_action
 ```
 
 This is intentionally not a live bridge execution path. It creates a native
@@ -73,6 +83,8 @@ Core builder:
 
 ```text
 services/openclaw-core/src/native-acpx-codex-bridge-builders.mjs
+services/openclaw-core/src/native-acpx-codex-bridge-task-builders.mjs
+services/openclaw-core/src/task-executor-native-acpx-codex-bridge-handlers.mjs
 ```
 
 State persistence:
@@ -102,7 +114,9 @@ Validation target:
 
 ```text
 services/openclaw-core/test/native-acpx-codex-bridge-builders.test.mjs
+services/openclaw-core/test/native-acpx-codex-bridge-task-builders.test.mjs
 services/openclaw-core/test/native-adapter-plugin-routes.test.mjs
+services/openclaw-core/test/task-executor.test.mjs
 openclaw-native-acpx-codex-bridge-compatibility
 observer-openclaw-native-acpx-codex-bridge-compatibility
 ```
@@ -116,7 +130,6 @@ CODEX_HOME read
 auth.json/config.toml read
 auth material copy
 wrapper file write
-task or approval creation for wrapper/action draft
 npx/npx.cmd execution
 ACP/Codex process spawn
 provider calls
@@ -129,10 +142,10 @@ root/system daemon work
 The next smallest useful bridge follow-up is:
 
 ```text
-ACPX/Codex bridge wrapper/action approval bridge
+ACPX/Codex bridge wrapper write proposal/preview
 ```
 
-That bridge should create an approval-gated task from a reviewed draft but still
-keep actual wrapper file writes, auth material copy, `npx` execution, ACP/Codex
-process spawn, provider calls, and network egress deferred until those execution
-boundaries are explicitly selected and governed.
+That should define the exact user-space wrapper file content and filesystem
+write boundary as a proposal/preview first. It must still avoid reading real
+Codex credential values, copying auth material, executing `npx`, spawning an
+ACP/Codex process, calling providers, or using network egress.

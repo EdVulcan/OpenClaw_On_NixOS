@@ -32,6 +32,11 @@ export function isNativePluginRuntimeRefreshTask(task) {
     && task?.plan?.strategy === "native-plugin-runtime-refresh-v0";
 }
 
+export function isNativeAcpxCodexBridgeWrapperTask(task) {
+  return task?.type === "native_acpx_codex_bridge_wrapper_action"
+    && task?.plan?.strategy === "acpx-codex-bridge-wrapper-action-v0";
+}
+
 export function isOpenClawSearchWebAdapterTask(task) {
   return task?.type === "openclaw_search_web_adapter_invocation"
     && task?.plan?.strategy === "openclaw-search-web-adapter-v0";

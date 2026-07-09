@@ -130,6 +130,12 @@ nativePluginRuntimeAdapterTaskButton.addEventListener("click", () => {
   });
 });
 
+acpxCodexBridgeWrapperTaskButton.addEventListener("click", () => {
+  createAcpxCodexBridgeWrapperApprovalTask().catch((error) => {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  });
+});
+
 pluginSearchWebTaskButton.addEventListener("click", () => {
   createPluginSearchWebApprovalTask().catch((error) => {
     setControlMessage(\`Request failed: \${formatError(error)}\`);

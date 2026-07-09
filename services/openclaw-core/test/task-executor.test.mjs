@@ -626,6 +626,120 @@ test("approved native plugin runtime refresh task completes with read-model evid
   assert(events.some((event) => event.name === "task.completed"));
 });
 
+test("ACPX/Codex bridge wrapper task waits for approval before deferred execution", async () => {
+  const { executor, state, events } = createExecutorHarness();
+  state.approvals.set("approval-acpx-wrapper", {
+    id: "approval-acpx-wrapper",
+    status: "pending",
+    taskId: "acpx-wrapper-waiting",
+  });
+  const task = {
+    id: "acpx-wrapper-waiting",
+    type: "native_acpx_codex_bridge_wrapper_action",
+    goal: "Approve ACPX/Codex wrapper boundary",
+    status: "queued",
+    approval: {
+      requestId: "approval-acpx-wrapper",
+      status: "pending",
+      required: true,
+    },
+    policy: {
+      request: { intent: "acpx_codex_bridge.wrapper_action", requiresApproval: true },
+      decision: { decision: "require_approval", approved: false, reason: "approval_required" },
+    },
+    plan: {
+      strategy: "acpx-codex-bridge-wrapper-action-v0",
+    },
+    nativeAcpxCodexBridgeWrapper: {
+      registry: "openclaw-native-acpx-codex-bridge-wrapper-task-v0",
+      sessionKey: "agent:codex:one",
+    },
+  };
+
+  const result = await executor.executeTaskWithRecovery(task);
+
+  assert.equal(result.finalExecution.blocked, true);
+  assert.equal(result.finalExecution.reason, "policy_requires_approval");
+  assert.equal(result.finalExecution.task.status, "queued");
+  assert.equal(result.finalExecution.governance.mode, "acpx_codex_bridge_wrapper_waiting_for_approval");
+  assert.equal(result.finalExecution.governance.canWriteWrapper, false);
+  assert.equal(result.finalExecution.governance.canSpawnCodexAcp, false);
+  assert(events.some((event) => event.name === "task.blocked"));
+});
+
+test("approved ACPX/Codex bridge wrapper task records deferred boundary without wrapper write or spawn", async () => {
+  const { executor, state, events } = createExecutorHarness({
+    planBuilder: {
+      buildNativeAcpxCodexBridgeWrapperDraft: () => ({
+        ok: true,
+        registry: "openclaw-native-acpx-codex-bridge-wrapper-draft-v0",
+        mode: "proposal-only-acpx-codex-bridge-wrapper-action-draft",
+        proposal: {
+          id: "acpx-draft-one",
+          status: "ready_for_approval_bridge",
+          wrapper: {
+            relativePath: ".openclaw/acpx/codex-bridge/codex-acp-one.sh",
+          },
+          command: {
+            command: "npx.cmd",
+            args: ["@openai/codex", "acp"],
+          },
+        },
+        summary: {
+          readyForApprovalBridge: true,
+        },
+      }),
+    },
+  });
+  state.approvals.set("approval-acpx-wrapper-approved", {
+    id: "approval-acpx-wrapper-approved",
+    status: "approved",
+    taskId: "acpx-wrapper-approved",
+  });
+  const task = {
+    id: "acpx-wrapper-approved",
+    type: "native_acpx_codex_bridge_wrapper_action",
+    goal: "Approve ACPX/Codex wrapper boundary",
+    status: "queued",
+    approval: {
+      requestId: "approval-acpx-wrapper-approved",
+      status: "approved",
+      required: false,
+    },
+    policy: {
+      request: { intent: "acpx_codex_bridge.wrapper_action", requiresApproval: true, approved: true },
+      decision: { decision: "audit_only", approved: true, reason: "approved_unit_test" },
+    },
+    plan: {
+      strategy: "acpx-codex-bridge-wrapper-action-v0",
+    },
+    nativeAcpxCodexBridgeWrapper: {
+      registry: "openclaw-native-acpx-codex-bridge-wrapper-task-v0",
+      sessionKey: "agent:codex:one",
+      command: "npx.cmd",
+      wrapperName: "codex-acp-one",
+    },
+  };
+
+  const result = await executor.executeTaskWithRecovery(task);
+  const execution = result.finalExecution.execution;
+
+  assert.equal(result.finalExecution.blocked, false);
+  assert.equal(result.finalExecution.task.status, "completed");
+  assert.equal(execution.registry, "openclaw-native-acpx-codex-bridge-wrapper-task-execution-v0");
+  assert.equal(execution.approved, true);
+  assert.equal(execution.wrapper.wrapperWritten, false);
+  assert.equal(execution.command.commandExecuted, false);
+  assert.equal(execution.command.processSpawned, false);
+  assert.equal(execution.governance.canReadCredentialValue, false);
+  assert.equal(execution.governance.canCopyAuthMaterial, false);
+  assert.equal(execution.governance.canWriteWrapper, false);
+  assert.equal(execution.governance.canUseNetwork, false);
+  assert.equal(result.finalExecution.task.nativeAcpxCodexBridgeWrapper.execution.registry, execution.registry);
+  assert.equal(result.finalExecution.task.outcome.details.verification.ok, true);
+  assert(events.some((event) => event.name === "task.completed"));
+});
+
 test("capability plan task dispatches to capability invocation handler", async () => {
   const invocationBodies = [];
   const { executor, events } = createExecutorHarness({

@@ -90,6 +90,7 @@ export function createPlanBuilder(deps) {
     buildNativeOpenClawPromptSemanticsProfile,
     buildOpenClawPluginManifestMap,
     buildOpenClawPluginCapabilityPlan,
+    buildNativeAcpxCodexBridgeWrapperDraft,
   } = pluginReview;
 
   const capabilityRuntime = createCapabilityRuntime({
@@ -749,6 +750,7 @@ function compactCloudConsciousnessEvidenceRef(evidence) {
     buildCloudConsciousnessLiveProviderCallFinalAuthorization,
     buildCloudConsciousnessLiveProviderCallOperatorLaunchReview,
     buildCloudConsciousnessLiveProviderCallRuntimeImplementationPlan,
+    buildNativeAcpxCodexBridgeWrapperDraft,
     ...cloudLiveProviderRuntimeImplementation,
   };
 }

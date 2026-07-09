@@ -608,6 +608,9 @@ export function observerOperationsPanels() {
           <div class="metric"><span>Auth</span><span id="acpx-codex-bridge-auth">isolated</span></div>
           <div class="metric"><span>Runtime</span><span id="acpx-codex-bridge-runtime">blocked</span></div>
           <div class="metric"><span>Mode</span><span id="acpx-codex-bridge-mode">compatibility-and-persistence-evidence</span></div>
+          <div class="actions tight">
+            <button id="acpx-codex-bridge-wrapper-task-button" type="button">Create Wrapper Task</button>
+          </div>
           <pre id="acpx-codex-bridge-json">Loading ACPX/Codex bridge compatibility evidence...</pre>
         </section>
         <section class="panel">

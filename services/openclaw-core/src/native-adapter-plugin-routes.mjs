@@ -195,6 +195,15 @@ function acpxCodexSessionInput(body) {
   };
 }
 
+function acpxCodexBridgeWrapperTaskInput(body) {
+  return {
+    sessionKey: body.sessionKey,
+    command: body.command,
+    wrapperName: body.wrapperName,
+    confirm: body.confirm,
+  };
+}
+
 const GET_ROUTES = new Map([
   [
     "/plugins/native-adapter/manifest-profile",
@@ -490,6 +499,13 @@ const POST_TASK_ROUTES = new Map([
     "/plugins/native-adapter/plugin-search-web-adapter-provider-runtime-sandbox-tasks",
     "createOpenClawPluginSearchWebAdapterProviderRuntimeSandboxTask",
   ],
+  [
+    "/plugins/native-adapter/acpx-codex-bridge-wrapper-tasks",
+    {
+      builder: "createNativeAcpxCodexBridgeWrapperTask",
+      input: acpxCodexBridgeWrapperTaskInput,
+    },
+  ],
 ]);
 
 function searchWebTaskInput(body) {
@@ -537,13 +553,15 @@ export async function handleNativeAdapterPluginRoute({
       return true;
     }
 
-    const builderName = POST_TASK_ROUTES.get(requestUrl.pathname);
-    if (!builderName) {
+    const taskRoute = POST_TASK_ROUTES.get(requestUrl.pathname);
+    if (!taskRoute) {
       return false;
     }
     try {
       const body = await readJsonBody(req);
-      const result = await pluginReview[builderName](searchWebTaskInput(body));
+      const builderName = typeof taskRoute === "string" ? taskRoute : taskRoute.builder;
+      const input = typeof taskRoute === "string" ? searchWebTaskInput(body) : taskRoute.input(body);
+      const result = await pluginReview[builderName](input);
       sendJson(res, 201, {
         ...result,
         task: serialiseTask(result.task),

@@ -89,6 +89,7 @@ for (const token of [
   "acpx-codex-bridge-auth",
   "acpx-codex-bridge-runtime",
   "acpx-codex-bridge-mode",
+  "acpx-codex-bridge-wrapper-task-button",
   "acpx-codex-bridge-json",
 ]) {
   if (!html.includes(token)) {
@@ -98,8 +99,10 @@ for (const token of [
 for (const token of [
   "/plugins/native-adapter/acpx-codex-bridge-compatibility",
   "/plugins/native-adapter/acpx-codex-bridge-wrapper-draft",
+  "/plugins/native-adapter/acpx-codex-bridge-wrapper-tasks",
   "refreshAcpxCodexBridgeCompatibility",
   "renderAcpxCodexBridgeCompatibility",
+  "createAcpxCodexBridgeWrapperApprovalTask",
   "ACPX/Codex bridge compatibility",
   "Wrapper draft",
   "sense.openclaw.acpx_codex_bridge.compatibility",

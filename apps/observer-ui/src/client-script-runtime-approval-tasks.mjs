@@ -114,6 +114,35 @@ async function createNativePluginRuntimeAdapterApprovalTask() {
   await refreshNativePluginRuntimeAdapterContract();
 }
 
+async function createAcpxCodexBridgeWrapperApprovalTask() {
+  const bridge = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/acpx-codex-bridge-compatibility\`);
+  const sessionKey = bridge?.persistence?.records?.[0]?.sessionKey ?? null;
+  if (!sessionKey) {
+    throw new Error("No ACPX/Codex bridge session metadata is available for a wrapper task.");
+  }
+  const result = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/acpx-codex-bridge-wrapper-tasks\`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      sessionKey,
+      command: "npx",
+      confirm: true,
+    }),
+  });
+
+  taskHistoryFocus = "selected-task";
+  selectedHistoryTaskId = result.task?.id ?? null;
+  taskDetailIdInput.value = result.task?.id ?? "";
+  renderPlanPanel(result.task);
+  setControlMessage(\`Created approval-gated ACPX/Codex bridge wrapper task \${result.task?.id ?? "unknown"}; wrapper write and ACP spawn remain deferred.\`);
+  await refreshRuntime();
+  await refreshTaskList();
+  await refreshTaskHistoryDetail();
+  await refreshApprovalState();
+  await refreshOperatorState();
+  await refreshAcpxCodexBridgeCompatibility();
+}
+
 async function createPluginSearchWebApprovalTask() {
   const result = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/plugin-search-web-adapter-tasks\`, {
     method: "POST",

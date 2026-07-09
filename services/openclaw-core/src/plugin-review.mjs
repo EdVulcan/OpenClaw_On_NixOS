@@ -15,6 +15,7 @@ import { createNativeEngineeringLspSourceTransferProposalBuilders } from "./nati
 import { createNativeEngineeringLspSymbolRequestProposalBuilders } from "./native-engineering-lsp-symbol-request-proposal-builders.mjs";
 import { createNativeEngineeringLspSelectedTargetReadBridgeBuilders } from "./native-engineering-lsp-selected-target-read-bridge-builders.mjs";
 import { createNativeAcpxCodexBridgeBuilders } from "./native-acpx-codex-bridge-builders.mjs";
+import { createNativeAcpxCodexBridgeTaskBuilders } from "./native-acpx-codex-bridge-task-builders.mjs";
 import {
   createPluginReviewWorkspaceDiscovery,
   safeStat,
@@ -169,6 +170,22 @@ export function createPluginReview(deps) {
   } = createNativeAcpxCodexBridgeBuilders({
     state,
     publishEvent,
+  });
+  const {
+    buildNativeAcpxCodexBridgeWrapperTaskDraft,
+    createNativeAcpxCodexBridgeWrapperTask,
+  } = createNativeAcpxCodexBridgeTaskBuilders({
+    buildNativeAcpxCodexBridgeWrapperDraft,
+    autonomyMode,
+    createTask,
+    createApprovalRequestForTask,
+    supersedeOtherActiveTasks,
+    reconcileRuntimeState,
+    persistState,
+    publishEvent,
+    publishTaskApprovalIfPending,
+    serialiseTask,
+    serialisePlanForPublic,
   });
   const {
     buildOpenClawPluginSearchWebAdapterContract,
@@ -345,6 +362,7 @@ function buildOpenClawNativePluginAdapterStatus() {
       "sense.openclaw.acpx_codex_bridge.compatibility",
       "state.openclaw.acpx_codex_bridge.session_metadata",
       "plan.openclaw.acpx_codex_bridge.wrapper_action",
+      "act.openclaw.acpx_codex_bridge.wrapper_action",
       "sense.openclaw.prompt_pack",
       "sense.openclaw.plugin_manifest_map",
       "plan.openclaw.plugin_capability",
@@ -358,7 +376,7 @@ function buildOpenClawNativePluginAdapterStatus() {
     ],
     pendingCapabilities: ["act.plugin.capability.invoke"],
     summary: {
-      implemented: 43,
+      implemented: 44,
       pending: 1,
       canReadManifestMetadata: true,
       canReadToolCatalogMetadata: true,
@@ -390,6 +408,7 @@ function buildOpenClawNativePluginAdapterStatus() {
       canReadAcpxCodexBridgeCompatibility: true,
       canPersistAcpxCodexSessionMetadata: true,
       canDraftAcpxCodexWrapperActions: true,
+      canCreateApprovalGatedAcpxCodexWrapperActionTasks: true,
       canReadPluginManifestMapMetadata: true,
       canPlanPluginCapabilityAbsorption: true,
       canPlanSearchWebAdapterContract: true,
@@ -442,6 +461,7 @@ function buildOpenClawNativePluginAdapterStatus() {
       "native plugin runtime refresh tasks require explicit approval before recomputing read-model evidence and still do not import modules, execute plugin code, activate runtime, or mutate caches",
       "ACPX/Codex bridge compatibility maps command/auth isolation lessons and persists bounded session metadata without reading Codex credentials, writing wrappers, spawning ACP processes, or using network",
       "ACPX/Codex bridge wrapper actions are proposal-only until a governed wrapper write and process-spawn boundary is selected",
+      "ACPX/Codex bridge wrapper action tasks require explicit approval and still only record an approved deferred boundary",
       "runtime preflight builds a governed execution envelope without loading plugin modules",
       "source contents, README text, script bodies, dependency versions, plugin code execution, and runtime activation remain blocked",
       "mutating plugin invocation remains pending explicit adapter design and approval gates",
@@ -506,6 +526,8 @@ function buildOpenClawNativePluginAdapterStatus() {
     buildNativeEngineeringLspSelectedTargetEditProposalSeed,
     buildNativeAcpxCodexBridgeCompatibility,
     buildNativeAcpxCodexBridgeWrapperDraft,
+    buildNativeAcpxCodexBridgeWrapperTaskDraft,
+    createNativeAcpxCodexBridgeWrapperTask,
     recordNativeAcpxCodexSession,
   };
 }
