@@ -45,8 +45,15 @@ test("LSP symbol request handshake summarises references without raw payload", (
   assert.equal(summary.symbolResponseSummary.resultCount, 2);
   assert.equal(summary.symbolResponseSummary.uriCount, 2);
   assert.equal(summary.symbolResponseSummary.rangeCount, 2);
+  assert.equal(summary.symbolResponseSummary.targetCount, 2);
+  assert.equal(summary.symbolResponseSummary.targets.length, 2);
+  assert.deepEqual(summary.symbolResponseSummary.selectedTarget, {
+    uri: "file:///workspace/src/app.ts",
+    range: { start: { line: 1, character: 7 }, end: { line: 1, character: 26 } },
+  });
   assert.equal(summary.symbolResponseSummary.rawResultIncluded, false);
-  assert.equal(JSON.stringify(summary).includes("other.ts"), false);
+  assert.equal(summary.symbolResponseSummary.rawTargetsIncluded, false);
+  assert.equal(JSON.stringify(summary).includes("OpenClaw hover detail"), false);
 });
 
 test("LSP symbol request handshake summarises hover contents by shape and size", () => {
@@ -76,6 +83,8 @@ test("LSP symbol request handshake summarises hover contents by shape and size",
   assert.equal(summary.symbolResponseSummary.resultKind, "object");
   assert.equal(summary.symbolResponseSummary.resultCount, 1);
   assert.equal(summary.symbolResponseSummary.rangeCount, 1);
+  assert.equal(summary.symbolResponseSummary.targetCount, 0);
+  assert.equal(summary.symbolResponseSummary.selectedTarget, null);
   assert.equal(summary.symbolResponseSummary.hoverContentKind, "markdown");
   assert.equal(summary.symbolResponseSummary.hoverContentChars, 25);
   assert.equal(summary.symbolResponseSummary.rawResultIncluded, false);

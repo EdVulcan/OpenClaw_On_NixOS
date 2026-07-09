@@ -140,6 +140,8 @@ for (const token of [
   "processTerminated",
   "Lifecycle State",
   "Symbol Response",
+  "Selected Target",
+  "rawTargets",
   "Missing server binaries become recoverable task evidence",
   "Native engineering LSP evidence",
   "sense.openclaw.engineering_tool.lsp_evidence",

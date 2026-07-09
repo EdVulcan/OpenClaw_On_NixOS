@@ -69,15 +69,14 @@ services/openclaw-core/test/native-engineering-lsp-protocol-handshake.test.mjs
 observer-openclaw-native-engineering-lsp-evidence
 ```
 
-## Next Slice
+## Follow-up Completed
 
-The next smallest real capability is:
+The target selection follow-up was completed as:
 
 ```text
-governed LSP response target selection
+OPENCLAW_NATIVE_ENGINEERING_LSP_RESPONSE_TARGET_SELECTION_PLAN.md
 ```
 
-That follow-up should let the operator select one bounded definition/reference
-target from response summary metadata for a future read/search action, without
-opening a long-lived LSP pool, returning raw response payloads, or mutating the
-workspace.
+It records bounded URI/range target descriptors and a selected target from the
+approved symbol response summary without exposing raw response payloads or
+mutating the workspace.

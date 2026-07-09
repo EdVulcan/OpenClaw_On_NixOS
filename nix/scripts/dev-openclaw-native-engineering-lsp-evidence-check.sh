@@ -984,7 +984,10 @@ if (
   || symbolRequestExecution?.server?.symbolResponseSummary?.resultCount !== 1
   || symbolRequestExecution?.server?.symbolResponseSummary?.uriCount !== 1
   || symbolRequestExecution?.server?.symbolResponseSummary?.rangeCount !== 1
+  || symbolRequestExecution?.server?.symbolResponseSummary?.targetCount !== 1
+  || symbolRequestExecution?.server?.symbolResponseSummary?.selectedTarget?.uri !== "file:///openclaw/src/app.ts"
   || symbolRequestExecution?.server?.symbolResponseSummary?.rawResultIncluded !== false
+  || symbolRequestExecution?.server?.symbolResponseSummary?.rawTargetsIncluded !== false
   || symbolRequestExecution?.processSupervision?.protocolHandshake?.ok !== true
   || !symbolRequestExecution?.processSupervision?.protocolHandshake?.messagesSent?.includes("textDocument/definition")
   || symbolRequestExecution?.processSupervision?.protocolHandshake?.symbolResponseObserved !== true
@@ -1010,6 +1013,7 @@ if (
   || symbolRequestTaskReadback.task?.engineeringLspLifecycle?.server?.symbolRequestSent !== true
   || symbolRequestTaskReadback.task?.engineeringLspLifecycle?.server?.symbolRequestMethod !== "textDocument/definition"
   || symbolRequestTaskReadback.task?.engineeringLspLifecycle?.server?.symbolResponseSummary?.rangeCount !== 1
+  || symbolRequestTaskReadback.task?.engineeringLspLifecycle?.server?.symbolResponseSummary?.targetCount !== 1
   || symbolRequestState.registry !== "openclaw-native-engineering-lsp-lifecycle-state-v0"
   || symbolRequestState.summary?.jsonRpcEnabled !== true
   || symbolRequestState.summary?.jsonRpcOperationalRequestsEnabled !== true
@@ -1021,6 +1025,7 @@ if (
   || symbolRequestStateItem?.server?.symbolRequestSent !== true
   || symbolRequestStateItem?.server?.symbolRequestMethod !== "textDocument/definition"
   || symbolRequestStateItem?.server?.symbolResponseSummary?.resultCount !== 1
+  || symbolRequestStateItem?.server?.symbolResponseSummary?.selectedTarget?.range?.start?.line !== 1
   || symbolRequestStateItem?.process?.protocolHandshake?.symbolRequestsSent !== true
   || symbolRequestStateItem?.boundaries?.jsonRpcOperationalRequestsEnabled !== true
   || symbolRequestStateItem?.boundaries?.sourceContentTransferred !== true
@@ -1094,6 +1099,7 @@ console.log(JSON.stringify({
     approvedSymbolRequestState: symbolRequestExecution.result.state,
     approvedSymbolRequestMethod: symbolRequestExecution.server.symbolRequestMethod,
     approvedSymbolResponseResults: symbolRequestExecution.server.symbolResponseSummary.resultCount,
+    approvedSymbolResponseTargets: symbolRequestExecution.server.symbolResponseSummary.targetCount,
     serverStatus: check.serverReadiness.status,
     lifecycleTaskStatus: lifecycleTask.status,
     binaryFound: execution.server.binaryFound,

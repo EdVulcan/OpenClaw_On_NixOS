@@ -287,12 +287,21 @@ OPENCLAW_NATIVE_ENGINEERING_LSP_VARIANT_REQUESTS_PLAN.md
 That slice proves `definition`, `references`, and `hover` use the same
 approval-gated single-request path and bounded response summary.
 
+The response target selection follow-up was completed as:
+
+```text
+OPENCLAW_NATIVE_ENGINEERING_LSP_RESPONSE_TARGET_SELECTION_PLAN.md
+```
+
+That slice records bounded URI/range target descriptors and a selected target
+from approved symbol responses without exposing raw response payloads.
+
 The current next smallest real capability is:
 
 ```text
-governed LSP response target selection
+LSP selected-target read bridge
 ```
 
-That slice should let the operator select one bounded definition/reference
-target for a future read/search action without opening a long-lived LSP pool,
-returning raw response payloads, or mutating the workspace.
+That slice should propose a bounded native read/search follow-up from the
+selected target without automatic task creation, long-lived LSP pools, provider
+egress, or workspace mutation.

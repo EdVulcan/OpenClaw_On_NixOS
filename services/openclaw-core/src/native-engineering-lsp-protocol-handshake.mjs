@@ -72,6 +72,64 @@ function collectSymbolResponseLocations(value, counters = { uriCount: 0, rangeCo
   return counters;
 }
 
+function boundedPosition(position) {
+  return {
+    line: Number.isInteger(position?.line) ? position.line : null,
+    character: Number.isInteger(position?.character) ? position.character : null,
+  };
+}
+
+function boundedRange(range) {
+  if (!range || typeof range !== "object") {
+    return null;
+  }
+  return {
+    start: boundedPosition(range.start),
+    end: boundedPosition(range.end),
+  };
+}
+
+function targetFromLocation(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  const uri = typeof value.uri === "string"
+    ? value.uri
+    : typeof value.targetUri === "string"
+      ? value.targetUri
+      : null;
+  const range = boundedRange(value.range)
+    ?? boundedRange(value.targetSelectionRange)
+    ?? boundedRange(value.targetRange);
+  if (!uri || !range) {
+    return null;
+  }
+  return {
+    uri,
+    range,
+  };
+}
+
+function collectBoundedTargets(value, targets = [], { limit = 8 } = {}) {
+  if (targets.length >= limit || !value || typeof value !== "object") {
+    return targets;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectBoundedTargets(item, targets, { limit });
+      if (targets.length >= limit) {
+        break;
+      }
+    }
+    return targets;
+  }
+  const target = targetFromLocation(value);
+  if (target) {
+    targets.push(target);
+  }
+  return targets;
+}
+
 function hoverContentSummary(contents) {
   if (contents == null) {
     return { hoverContentKind: "none", hoverContentChars: 0 };
@@ -120,7 +178,13 @@ function summariseSymbolResponse({ stdoutText = "", requestId = 3, method = "tex
       rangeCount: 0,
       hoverContentKind: "none",
       hoverContentChars: 0,
+      targetCount: 0,
+      targetLimit: 8,
+      targetsTruncated: false,
+      targets: [],
+      selectedTarget: null,
       rawResultIncluded: false,
+      rawTargetsIncluded: false,
     };
   }
   if (response.error) {
@@ -137,7 +201,13 @@ function summariseSymbolResponse({ stdoutText = "", requestId = 3, method = "tex
       rangeCount: 0,
       hoverContentKind: "none",
       hoverContentChars: 0,
+      targetCount: 0,
+      targetLimit: 8,
+      targetsTruncated: false,
+      targets: [],
+      selectedTarget: null,
       rawResultIncluded: false,
+      rawTargetsIncluded: false,
     };
   }
   const result = response.result ?? null;
@@ -147,6 +217,8 @@ function summariseSymbolResponse({ stdoutText = "", requestId = 3, method = "tex
       ? []
       : [result];
   const locationCounters = collectSymbolResponseLocations(result);
+  const targetLimit = 8;
+  const targets = collectBoundedTargets(result, [], { limit: targetLimit });
   const hoverSummary = method === "textDocument/hover"
     ? hoverContentSummary(result?.contents)
     : { hoverContentKind: "none", hoverContentChars: 0 };
@@ -159,8 +231,14 @@ function summariseSymbolResponse({ stdoutText = "", requestId = 3, method = "tex
     resultCount: resultEntries.length,
     uriCount: locationCounters.uriCount,
     rangeCount: locationCounters.rangeCount,
+    targetCount: targets.length,
+    targetLimit,
+    targetsTruncated: resultEntries.length > targets.length,
+    targets,
+    selectedTarget: targets[0] ?? null,
     ...hoverSummary,
     rawResultIncluded: false,
+    rawTargetsIncluded: false,
   };
 }
 

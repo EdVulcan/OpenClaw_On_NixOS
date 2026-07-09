@@ -780,15 +780,28 @@ It produces:
 - Continued deferral of raw response payloads, long-lived LSP pools,
   auto-approval, provider calls, and root/system daemon work.
 
+Latest LSP response target selection completed:
+
+```text
+OPENCLAW_NATIVE_ENGINEERING_LSP_RESPONSE_TARGET_SELECTION_PLAN.md
+```
+
+It produces:
+
+- Capped target descriptors with URI and range only.
+- A selected target in task and lifecycle readback.
+- Observer readback for selected target metadata.
+- No raw source body, raw response payload, automatic follow-up read/search,
+  provider call, network egress, mutation, or long-lived LSP pool.
+
 Next smallest real capability:
 
 ```text
-governed LSP response target selection
+LSP selected-target read bridge
 ```
 
-That should let the operator select one bounded definition/reference target for
-a future read/search action without adding another readiness marker or opening a
-long-lived LSP pool.
+That should propose a bounded native read/search follow-up from the selected
+target without adding another readiness marker or opening a long-lived LSP pool.
 
 Required answer for every following slice:
 

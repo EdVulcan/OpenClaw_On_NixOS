@@ -146,7 +146,10 @@ async function refreshEngineeringLoopCompletionReadback() {
       \`Action: \${lifecycle.lifecycleAction ?? execution.lifecycleAction ?? "start"} language=\${lifecycle.language ?? execution.language ?? "typescript"}\`,
       \`Server: \${lifecycle.server?.serverBinary ?? execution.server?.serverBinary ?? "unknown"} binaryFound=\${Boolean(execution.server?.binaryFound)} processStarted=\${Boolean(execution.server?.processStarted)} aliveAtProbe=\${Boolean(execution.server?.processAliveAtProbe)} terminated=\${Boolean(execution.server?.processTerminated)} jsonRpc=\${Boolean(execution.server?.jsonRpcHandshakeSent)} symbol=\${Boolean(execution.server?.symbolRequestSent)}\`,
       lifecycle.lifecycleAction === "symbol_request"
-        ? \`Symbol Response: observed=\${Boolean(symbolResponse.observed)} kind=\${symbolResponse.resultKind ?? "missing"} results=\${symbolResponse.resultCount ?? 0} uris=\${symbolResponse.uriCount ?? 0} ranges=\${symbolResponse.rangeCount ?? 0} raw=\${Boolean(symbolResponse.rawResultIncluded)}\`
+        ? \`Symbol Response: observed=\${Boolean(symbolResponse.observed)} kind=\${symbolResponse.resultKind ?? "missing"} results=\${symbolResponse.resultCount ?? 0} uris=\${symbolResponse.uriCount ?? 0} ranges=\${symbolResponse.rangeCount ?? 0} targets=\${symbolResponse.targetCount ?? 0} raw=\${Boolean(symbolResponse.rawResultIncluded)} rawTargets=\${Boolean(symbolResponse.rawTargetsIncluded)}\`
+        : null,
+      lifecycle.lifecycleAction === "symbol_request" && symbolResponse.selectedTarget
+        ? \`Selected Target: uri=\${symbolResponse.selectedTarget.uri} start=\${symbolResponse.selectedTarget.range?.start?.line ?? "n/a"}:\${symbolResponse.selectedTarget.range?.start?.character ?? "n/a"} end=\${symbolResponse.selectedTarget.range?.end?.line ?? "n/a"}:\${symbolResponse.selectedTarget.range?.end?.character ?? "n/a"}\`
         : null,
       \`Lifecycle State: \${lifecycleState.status ?? "pending"} active=\${Boolean(lifecycleState.process?.longLivedProcessActive)} jsonRpc=\${Boolean(lifecycleState.boundaries?.jsonRpcEnabled)}\`,
       \`Result: \${execution.result?.state ?? task?.outcome?.kind ?? "pending"}\`,

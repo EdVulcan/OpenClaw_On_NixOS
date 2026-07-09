@@ -1091,7 +1091,21 @@ setTimeout(() => process.exit(3), 5000);
       rangeCount: 1,
       hoverContentKind: "none",
       hoverContentChars: 0,
+      targetCount: 1,
+      targetLimit: 8,
+      targetsTruncated: false,
+      targets: [
+        {
+          uri: "file:///workspace/src/app.ts",
+          range: { start: { line: 0, character: 13 }, end: { line: 0, character: 34 } },
+        },
+      ],
+      selectedTarget: {
+        uri: "file:///workspace/src/app.ts",
+        range: { start: { line: 0, character: 13 }, end: { line: 0, character: 34 } },
+      },
       rawResultIncluded: false,
+      rawTargetsIncluded: false,
     });
     assert.equal(execution.lifecycleState.status, "symbol_request_completed");
     assert.equal(execution.lifecycleState.server.symbolResponseObserved, true);
