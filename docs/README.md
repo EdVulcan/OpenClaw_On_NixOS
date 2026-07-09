@@ -17,6 +17,7 @@
 | :--- | :--- |
 | 📄 [**DECOUPLING_REPORT.md**](./architecture/DECOUPLING_REPORT.md) | **微服务解耦与重构总结报告**：记录了对 `openclaw-core` 超 25k 行单体代码进行彻底服务拆分、消除循环依赖与旁路直连的实施细节，以及团队协作与微服务扩容开发规范。 |
 | 📄 [**coupling_analysis.md**](./architecture/coupling_analysis.md) | **服务耦合性深度审查报告 (V3)**：全方位审计重构后项目的耦合状态，包含前后期指标对比、动态服务发现原理以及内部跨服务 Trace 调用链流转规范。 |
+| 📄 [**KERNEL_LEVEL_EVOLUTION_WHITEPAPER.md**](./architecture/KERNEL_LEVEL_EVOLUTION_WHITEPAPER.md) | **内核级常驻数字身体演进白皮书**：深度探讨了项目向内核级（eBPF）演进的混合架构、Stage 1/2 引导阶段融合、以及 NixOS 声明式自我重构循环设计。 |
 | 📄 [**ARCHITECTURE.md**](./architecture/ARCHITECTURE.md) | **系统架构纲要**：OpenClaw 系统的基础模块架构与多级调度逻辑大纲。 |
 | 📄 [**AI_WORK_VIEW_CAPTURE_STRATEGY.md**](./architecture/AI_WORK_VIEW_CAPTURE_STRATEGY.md) | **AI 工作视图捕获策略**：设计并规定了 AI 在图形界面级进行工作区观测的视图获取逻辑与网络通信优化。 |
 | 📄 [**DESKTOP_CAPTURE_CONTRACT_V1.md**](./architecture/DESKTOP_CAPTURE_CONTRACT_V1.md) | **桌面捕获协议契约 V1**：屏幕感知模块（`screen-sense`）的接口协议、事件流数据结构与图像抓取交互协议规范。 |
