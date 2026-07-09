@@ -82,16 +82,28 @@ async function refreshEngineeringLoopCompletionReadback() {
     const failures = summary.totalFailures ?? 0;
     const recoverable = summary.recoverableFailures ?? 0;
     const recovered = summary.alreadyRecovered ?? 0;
-    engineeringLoopStateCompletion.textContent = \`failures=\${failures} recoverable=\${recoverable} recovered=\${recovered}\`;
+    const verificationRoute = latestEngineeringLoopControlState.verificationRoute ?? null;
+    const verificationEvidence = verificationRoute
+      ? await fetchJson(\`\${observerConfig.coreUrl}\${verificationRoute}\`)
+      : null;
+    const verificationSummary = verificationEvidence?.summary ?? {};
+    const rerunTotal = verificationSummary.total ?? 0;
+    const rerunPassed = verificationSummary.passed ?? 0;
+    const rerunFailed = verificationSummary.failed ?? 0;
+    engineeringLoopStateCompletion.textContent = verificationRoute
+      ? \`recovery=\${recovered} rerun=\${rerunPassed}/\${rerunTotal} failed=\${rerunFailed}\`
+      : \`failures=\${failures} recoverable=\${recoverable} recovered=\${recovered}\`;
     engineeringLoopStateJson.textContent = [
       \`Kind: \${latestEngineeringLoopControlState.kind}\`,
       \`Task: \${latestEngineeringLoopControlState.taskId}\`,
       \`Approval: \${latestEngineeringLoopControlState.approvalId ?? "none"}\`,
       \`Evidence: \${latestEngineeringLoopControlState.evidenceRoute}\`,
       \`Recovery: failures=\${failures} recoverable=\${recoverable} recovered=\${recovered}\`,
+      verificationRoute ? \`Rerun Evidence: \${verificationRoute}\` : "Rerun Evidence: not created yet",
+      verificationRoute ? \`Rerun: total=\${rerunTotal} passed=\${rerunPassed} failed=\${rerunFailed}\` : null,
       \`Registry: \${evidence?.registry ?? "unknown"}\`,
       "Boundary: readback only; no approval, execution, retry, recovery task, mutation, provider call, or result envelope.",
-    ].join("\\n");
+    ].filter(Boolean).join("\\n");
     setControlMessage(\`Refreshed engineering recovery readback for \${latestEngineeringLoopControlState.taskId}.\`);
     await refreshEngineeringLoopControlSurfaces();
     return;
@@ -118,8 +130,10 @@ function renderEngineeringRecoveryLoopDraftState(draft) {
   latestEngineeringLoopControlState = {
     kind: "recovery-draft",
     taskId: draft.sourceTaskId,
+    sourceTaskId: draft.sourceTaskId,
     approvalId: null,
     evidenceRoute: \`/plugins/native-adapter/engineering-recovery/evidence?taskId=\${draft.sourceTaskId}\`,
+    verificationRoute: null,
   };
   engineeringLoopStateKind.textContent = "recovery-draft";
   engineeringLoopStateTask.textContent = draft.sourceTaskId ? draft.sourceTaskId.slice(0, 8) : "none";
@@ -143,8 +157,13 @@ function renderEngineeringRecoveryLoopTaskState(draft, result) {
   latestEngineeringLoopControlState = {
     kind: "recovery",
     taskId: recoveredTaskId,
+    sourceTaskId: draft.sourceTaskId,
+    recoveredTaskId,
     approvalId,
     evidenceRoute: \`/plugins/native-adapter/engineering-recovery/evidence?taskId=\${draft.sourceTaskId}\`,
+    verificationRoute: recoveredTaskId
+      ? \`/plugins/native-adapter/engineering-verification/evidence?taskId=\${recoveredTaskId}&maxOutputChars=2000\`
+      : null,
   };
   engineeringLoopStateKind.textContent = "recovery";
   engineeringLoopStateTask.textContent = recoveredTaskId ? recoveredTaskId.slice(0, 8) : "none";
@@ -158,6 +177,7 @@ function renderEngineeringRecoveryLoopTaskState(draft, result) {
     \`Recovered Task: \${recoveredTaskId ?? "none"}\`,
     \`Approval: \${approvalId ?? "none"}\`,
     \`Failure: \${draft.failureKind}\`,
+    \`Rerun Evidence: \${latestEngineeringLoopControlState.verificationRoute ?? "pending recovered task"}\`,
     "Next: approval and operator step are still required before any command rerun.",
     "Boundary: created recovery task only; no auto-approval, no automatic command rerun, no mutation by the UI.",
   ].join("\\n");

@@ -133,12 +133,22 @@ can read completion evidence after manual approval/execution, and can draft and
 explicitly create a recovery task from failed verification evidence without
 automatic execution.
 
+The recovery rerun readback follow-up was completed as:
+
+```text
+OPENCLAW_NATIVE_ENGINEERING_LOOP_RECOVERY_RERUN_READBACK_PLAN.md
+```
+
+The engineering loop now covers failed verification recovery through explicit
+recovery task creation, manual approval, operator rerun, recovered-task
+verification evidence, and source recovery readback.
+
 The current next smallest real capability is:
 
 ```text
-Native governed engineering recovery rerun readback
+Native governed engineering planning workbench state bridge
 ```
 
-That slice should approve and run a recovered verification task through the
-existing approval/operator path, then attach rerun verification and recovery
-readback to the Observer loop state.
+That slice should turn existing plan/todo evidence into operator-visible
+workbench state for engineering tasks without hidden planning modes or
+filesystem todo mutation.

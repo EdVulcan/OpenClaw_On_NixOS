@@ -119,13 +119,13 @@ raw credential reads
 
 ## Next Slice
 
-The next highest-density capability slice is:
+The recovery rerun readback follow-up was completed as:
 
 ```text
-Native governed engineering recovery rerun readback
+OPENCLAW_NATIVE_ENGINEERING_LOOP_RECOVERY_RERUN_READBACK_PLAN.md
 ```
 
-That slice should approve and execute a recovered verification task through the
-existing approval/operator path, then attach the rerun verification evidence and
-recovery readback to the Observer loop state. It should not introduce a new
-shell executor or auto-approval path.
+It approves and executes a recovered verification task through the existing
+approval/operator path, then attaches rerun verification evidence and recovery
+readback to the Observer loop state without adding a shell executor or
+auto-approval path.

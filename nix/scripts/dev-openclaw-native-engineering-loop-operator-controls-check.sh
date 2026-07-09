@@ -12,6 +12,7 @@ OLD_TEXT="OpenClaw on NixOS monorepo skeleton"
 NEW_TEXT="OpenClaw on NixOS parameterized workbench skeleton"
 FAIL_SCRIPT_NAME="verify:fail"
 FAIL_OUTPUT="engineering-loop-recovery-action-failed"
+RERUN_OUTPUT="engineering-loop-recovery-rerun-ok"
 
 export OPENCLAW_CORE_PORT="${OPENCLAW_CORE_PORT:-10440}"
 export OPENCLAW_EVENT_HUB_PORT="${OPENCLAW_EVENT_HUB_PORT:-10441}"
@@ -64,7 +65,11 @@ cleanup() {
     "${RECOVERY_EVIDENCE_FILE:-}" \
     "${RECOVERED_TASK_FILE:-}" \
     "${RECOVERED_BLOCKED_FILE:-}" \
-    "${RECOVERY_AFTER_FILE:-}"
+    "${RECOVERY_AFTER_FILE:-}" \
+    "${RECOVERED_APPROVE_FILE:-}" \
+    "${RECOVERED_STEP_FILE:-}" \
+    "${RECOVERED_VERIFY_FILE:-}" \
+    "${RECOVERY_RERUN_FILE:-}"
   "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -92,6 +97,10 @@ RECOVERY_EVIDENCE_FILE="$(mktemp)"
 RECOVERED_TASK_FILE="$(mktemp)"
 RECOVERED_BLOCKED_FILE="$(mktemp)"
 RECOVERY_AFTER_FILE="$(mktemp)"
+RECOVERED_APPROVE_FILE="$(mktemp)"
+RECOVERED_STEP_FILE="$(mktemp)"
+RECOVERED_VERIFY_FILE="$(mktemp)"
+RECOVERY_RERUN_FILE="$(mktemp)"
 
 curl --silent --fail "$OBSERVER_URL/" > "$HTML_FILE"
 curl --silent --fail "$OBSERVER_URL/client-v5.js" > "$CLIENT_FILE"
@@ -172,6 +181,8 @@ for (const token of [
   "operator-confirmed-recovery-task-draft",
   "explicit operator click required before recovery task creation",
   "approve recovered task if pending, then run operator step",
+  "Rerun Evidence:",
+  "verificationRoute",
   "readback only; no approval, execution, retry, recovery task, mutation, provider call, or result envelope",
   "approve pending approval, then run operator step",
   "createEngineeringEditLoopApprovalTask",
@@ -414,6 +425,97 @@ console.log(JSON.stringify({
     recommendation: recommendation.endpoint,
     approvalGatePreserved: true,
     alreadyRecoveredReadback: recoveryAfter.summary.alreadyRecovered,
+  },
+}, null, 2));
+EOF
+
+read -r recovered_approval_id recovered_task_id < <(node - <<'EOF' "$RECOVERED_TASK_FILE"
+const fs = require("node:fs");
+const recovered = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+const approvalId = recovered.task?.approval?.requestId ?? recovered.task?.approval?.id ?? "";
+const taskId = recovered.task?.id ?? "";
+if (!approvalId || !taskId) {
+  throw new Error(`recovered task should expose approval and task ids: ${JSON.stringify(recovered)}`);
+}
+process.stdout.write(`${approvalId} ${taskId}\n`);
+EOF
+)
+
+node - <<'EOF' "$TARGET_FILE" "$FAIL_SCRIPT_NAME" "$RERUN_OUTPUT"
+const fs = require("node:fs");
+const targetFile = process.argv[2];
+const scriptName = process.argv[3];
+const output = process.argv[4];
+const pkg = JSON.parse(fs.readFileSync(targetFile, "utf8"));
+pkg.scripts = pkg.scripts ?? {};
+pkg.scripts[scriptName] = `printf ${output}`;
+fs.writeFileSync(targetFile, `${JSON.stringify(pkg, null, 2)}\n`);
+EOF
+
+post_json "$CORE_URL/approvals/$recovered_approval_id/approve" '{"approvedBy":"dev-openclaw-native-engineering-loop-operator-controls-check","reason":"approve recovered verification rerun fixture"}' > "$RECOVERED_APPROVE_FILE"
+post_json "$CORE_URL/operator/step" '{}' > "$RECOVERED_STEP_FILE"
+curl --silent --fail "$CORE_URL/plugins/native-adapter/engineering-verification/evidence?taskId=$recovered_task_id&maxOutputChars=1000" > "$RECOVERED_VERIFY_FILE"
+curl --silent --fail "$CORE_URL/plugins/native-adapter/engineering-recovery/evidence?taskId=$fail_task_id&maxOutputChars=1000" > "$RECOVERY_RERUN_FILE"
+
+node - <<'EOF' \
+  "$RECOVERED_APPROVE_FILE" \
+  "$RECOVERED_STEP_FILE" \
+  "$RECOVERED_VERIFY_FILE" \
+  "$RECOVERY_RERUN_FILE" \
+  "$RERUN_OUTPUT" \
+  "$fail_task_id" \
+  "$recovered_task_id"
+const fs = require("node:fs");
+const readJson = (index) => JSON.parse(fs.readFileSync(process.argv[index], "utf8"));
+
+const approved = readJson(2);
+const step = readJson(3);
+const verification = readJson(4);
+const recovery = readJson(5);
+const rerunOutput = process.argv[6];
+const failTaskId = process.argv[7];
+const recoveredTaskId = process.argv[8];
+
+if (approved.approval?.status !== "approved" || approved.task?.id !== recoveredTaskId) {
+  throw new Error(`recovered task approval mismatch: ${JSON.stringify(approved)}`);
+}
+if (
+  !step.ok
+  || step.ran !== true
+  || step.task?.id !== recoveredTaskId
+  || step.task?.status !== "completed"
+  || !String(step.execution?.commandTranscript?.[0]?.stdout ?? "").includes(rerunOutput)
+) {
+  throw new Error(`approved recovered task should rerun through operator path and complete: ${JSON.stringify(step)}`);
+}
+if (
+  !verification.ok
+  || verification.registry !== "openclaw-native-engineering-verification-evidence-v0"
+  || verification.summary?.total !== 1
+  || verification.summary?.passed !== 1
+  || verification.summary?.failed !== 0
+  || verification.evidence?.[0]?.taskId !== recoveredTaskId
+  || verification.evidence?.[0]?.ok !== true
+  || !String(verification.evidence?.[0]?.result?.stdout ?? "").includes(rerunOutput)
+  || verification.governance?.canExecuteCommand !== false
+) {
+  throw new Error(`recovered task verification rerun evidence mismatch: ${JSON.stringify(verification)}`);
+}
+if (
+  recovery.summary?.alreadyRecovered !== 1
+  || recovery.failures?.[0]?.taskId !== failTaskId
+  || recovery.failures?.[0]?.recoveredByTaskId !== recoveredTaskId
+) {
+  throw new Error(`source recovery readback should remain linked to completed recovered task: ${JSON.stringify(recovery)}`);
+}
+
+console.log(JSON.stringify({
+  openclawNativeEngineeringRecoveryRerunReadback: {
+    sourceTaskId: failTaskId,
+    recoveredTaskId,
+    rerunPassed: verification.summary.passed,
+    recoveryReadback: recovery.summary.alreadyRecovered,
+    approvalGatePreserved: true,
   },
 }, null, 2));
 EOF
