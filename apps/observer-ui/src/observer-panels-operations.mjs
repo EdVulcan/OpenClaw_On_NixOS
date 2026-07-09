@@ -129,6 +129,16 @@ export function observerOperationsPanels() {
           <div class="metric"><span>Failed</span><span id="engineering-verification-failed">0</span></div>
           <div class="metric"><span>Attached</span><span id="engineering-verification-attached">0</span></div>
           <div class="metric"><span>Execution</span><span id="engineering-verification-execution">blocked</span></div>
+          <div class="control-stack">
+            <div class="field">
+              <label for="engineering-verification-proposal-input">Verification Proposal</label>
+              <input id="engineering-verification-proposal-input" type="text" value="openclaw:typecheck" spellcheck="false" />
+            </div>
+            <div class="field">
+              <label for="engineering-verification-query-input">Verification Query</label>
+              <input id="engineering-verification-query-input" type="text" value="verify" spellcheck="false" />
+            </div>
+          </div>
           <div class="actions tight">
             <button id="engineering-verification-task-button" class="secondary" type="button">Create Verification Task</button>
           </div>
@@ -375,6 +385,20 @@ export function observerOperationsPanels() {
           <div class="metric"><span>Preview</span><span id="engineering-edit-proposal-preview">0 lines</span></div>
           <div class="metric"><span>Apply</span><span id="engineering-edit-proposal-apply">blocked</span></div>
           <div class="metric"><span>Audit</span><span id="engineering-edit-proposal-audit">missing</span></div>
+          <div class="control-stack">
+            <div class="field">
+              <label for="engineering-edit-path-input">Edit Path</label>
+              <input id="engineering-edit-path-input" type="text" value="package.json" spellcheck="false" />
+            </div>
+            <div class="field">
+              <label for="engineering-edit-old-input">Search Text</label>
+              <input id="engineering-edit-old-input" type="text" value="OpenClaw on NixOS monorepo skeleton" spellcheck="false" />
+            </div>
+            <div class="field">
+              <label for="engineering-edit-new-input">Replacement Text</label>
+              <input id="engineering-edit-new-input" type="text" value="OpenClaw on NixOS native agent body skeleton" spellcheck="false" />
+            </div>
+          </div>
           <div class="actions tight">
             <button id="engineering-edit-proposal-task-button" class="secondary" type="button">Create Edit Task</button>
           </div>
@@ -388,6 +412,16 @@ export function observerOperationsPanels() {
           <div class="metric"><span>Bytes</span><span id="engineering-write-proposal-bytes">0</span></div>
           <div class="metric"><span>Mutation</span><span id="engineering-write-proposal-mutation">blocked</span></div>
           <div class="metric"><span>Mode</span><span id="engineering-write-proposal-mode">source-write-proposal-diff-metadata-preview-only</span></div>
+          <div class="control-stack">
+            <div class="field">
+              <label for="engineering-write-path-input">Write Path</label>
+              <input id="engineering-write-path-input" type="text" value="scratch/observer-engineering-loop.txt" spellcheck="false" />
+            </div>
+            <div class="field">
+              <label for="engineering-write-content-input">Write Content</label>
+              <input id="engineering-write-content-input" type="text" value="OpenClaw observer engineering loop write proposal" spellcheck="false" />
+            </div>
+          </div>
           <div class="actions tight">
             <button id="engineering-write-proposal-task-button" class="secondary" type="button">Create Write Task</button>
           </div>

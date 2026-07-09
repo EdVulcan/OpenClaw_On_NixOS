@@ -85,13 +85,11 @@ raw credential reads
 
 ## Next Slice
 
-The next highest-density capability slice should remove the remaining hardcoded
-sample inputs from the Observer controls:
+The parameterized-input follow-up was completed as:
 
 ```text
-Native governed engineering loop parameterized workbench inputs
+OPENCLAW_NATIVE_ENGINEERING_LOOP_PARAMETERIZED_INPUTS_PLAN.md
 ```
 
-That slice should let an operator choose bounded edit/write/verification
-parameters from the workbench while preserving the same proposal, approval,
-ledger, verification, and recovery boundaries.
+The next slice should improve loop state guidance after task creation without
+auto-approving or auto-running tasks.

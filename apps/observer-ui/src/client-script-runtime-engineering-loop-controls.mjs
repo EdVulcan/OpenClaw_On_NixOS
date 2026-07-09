@@ -5,6 +5,33 @@ export const observerClientRuntimeEngineeringLoopControlsScript = `function focu
   renderPlanPanel(result.task);
 }
 
+function boundedEngineeringInput(input, fallback, maxChars) {
+  const value = String(input?.value ?? "").trim();
+  return (value || fallback).slice(0, maxChars);
+}
+
+function readEngineeringEditLoopInput() {
+  return {
+    relativePath: boundedEngineeringInput(engineeringEditPathInput, "package.json", 240),
+    oldString: boundedEngineeringInput(engineeringEditOldInput, "OpenClaw on NixOS monorepo skeleton", 8000),
+    newString: boundedEngineeringInput(engineeringEditNewInput, "OpenClaw on NixOS native agent body skeleton", 8000),
+  };
+}
+
+function readEngineeringWriteLoopInput() {
+  return {
+    relativePath: boundedEngineeringInput(engineeringWritePathInput, "scratch/observer-engineering-loop.txt", 240),
+    content: boundedEngineeringInput(engineeringWriteContentInput, "OpenClaw observer engineering loop write proposal", 16 * 1024),
+  };
+}
+
+function readEngineeringVerificationLoopInput() {
+  return {
+    proposalId: boundedEngineeringInput(engineeringVerificationProposalInput, "openclaw:typecheck", 240),
+    query: boundedEngineeringInput(engineeringVerificationQueryInput, "verify", 240),
+  };
+}
+
 async function refreshEngineeringLoopControlSurfaces() {
   await refreshRuntime();
   await refreshTaskList();
@@ -19,13 +46,14 @@ async function refreshEngineeringLoopControlSurfaces() {
 }
 
 async function createEngineeringEditLoopApprovalTask() {
+  const input = readEngineeringEditLoopInput();
   const result = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/engineering-edit-proposal-tasks\`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
-      relativePath: "package.json",
-      oldString: "OpenClaw on NixOS monorepo skeleton",
-      newString: "OpenClaw on NixOS native agent body skeleton",
+      relativePath: input.relativePath,
+      oldString: input.oldString,
+      newString: input.newString,
       contextLines: 1,
       maxOutputChars: 8000,
       confirm: true,
@@ -39,12 +67,13 @@ async function createEngineeringEditLoopApprovalTask() {
 }
 
 async function createEngineeringWriteLoopApprovalTask() {
+  const input = readEngineeringWriteLoopInput();
   const result = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/engineering-write-proposal-tasks\`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
-      relativePath: "scratch/observer-engineering-loop.txt",
-      content: "OpenClaw observer engineering loop write proposal\\n",
+      relativePath: input.relativePath,
+      content: \`\${input.content}\\n\`,
       overwrite: true,
       contextLines: 1,
       confirm: true,
@@ -58,12 +87,13 @@ async function createEngineeringWriteLoopApprovalTask() {
 }
 
 async function createEngineeringVerificationLoopApprovalTask() {
+  const input = readEngineeringVerificationLoopInput();
   const result = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/source-command-proposals/tasks\`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
-      proposalId: "openclaw:typecheck",
-      query: "verify",
+      proposalId: input.proposalId,
+      query: input.query,
       confirm: true,
     }),
   });

@@ -125,9 +125,10 @@ provider calls, network egress, and result envelopes
 The current next smallest real capability is:
 
 ```text
-Native governed engineering loop parameterized workbench inputs
+Native governed engineering loop state guidance
 ```
 
-The operator-control bridge is now visible in Observer. The next slice should
-replace hardcoded sample values with bounded operator-selected workbench inputs
-without bypassing approval or adding another readiness chain.
+The operator-control bridge is now visible and parameterized in Observer. The
+next slice should make post-creation approval, execution, verification, and
+recovery state easier to follow without bypassing approval or adding another
+readiness chain.

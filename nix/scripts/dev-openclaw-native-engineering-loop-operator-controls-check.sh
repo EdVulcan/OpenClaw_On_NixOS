@@ -6,9 +6,10 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 FIXTURE_DIR="$REPO_ROOT/.artifacts/openclaw-native-engineering-loop-operator-controls-fixture"
 WORKSPACE_DIR="$FIXTURE_DIR/openclaw"
 TARGET_FILE="$WORKSPACE_DIR/package.json"
-WRITE_TARGET="$WORKSPACE_DIR/scratch/observer-engineering-loop.txt"
+WRITE_RELATIVE_PATH="scratch/operator-selected-engineering-loop.txt"
+WRITE_TARGET="$WORKSPACE_DIR/$WRITE_RELATIVE_PATH"
 OLD_TEXT="OpenClaw on NixOS monorepo skeleton"
-NEW_TEXT="OpenClaw on NixOS native agent body skeleton"
+NEW_TEXT="OpenClaw on NixOS parameterized workbench skeleton"
 
 export OPENCLAW_CORE_PORT="${OPENCLAW_CORE_PORT:-10440}"
 export OPENCLAW_EVENT_HUB_PORT="${OPENCLAW_EVENT_HUB_PORT:-10441}"
@@ -74,7 +75,7 @@ curl --silent --fail "$OBSERVER_URL/" > "$HTML_FILE"
 curl --silent --fail "$OBSERVER_URL/client-v5.js" > "$CLIENT_FILE"
 
 post_json "$CORE_URL/plugins/native-adapter/engineering-edit-proposal-tasks" "{\"relativePath\":\"package.json\",\"oldString\":\"$OLD_TEXT\",\"newString\":\"$NEW_TEXT\",\"contextLines\":1,\"maxOutputChars\":8000,\"confirm\":true}" > "$EDIT_TASK_FILE"
-post_json "$CORE_URL/plugins/native-adapter/engineering-write-proposal-tasks" '{"relativePath":"scratch/observer-engineering-loop.txt","content":"OpenClaw observer engineering loop write proposal\n","overwrite":true,"contextLines":1,"confirm":true}' > "$WRITE_TASK_FILE"
+post_json "$CORE_URL/plugins/native-adapter/engineering-write-proposal-tasks" "{\"relativePath\":\"$WRITE_RELATIVE_PATH\",\"content\":\"OpenClaw operator-selected engineering loop write proposal\\n\",\"overwrite\":true,\"contextLines\":1,\"confirm\":true}" > "$WRITE_TASK_FILE"
 post_json "$CORE_URL/plugins/native-adapter/source-command-proposals/tasks" '{"proposalId":"openclaw:typecheck","query":"verify","confirm":true}' > "$VERIFY_TASK_FILE"
 post_json "$CORE_URL/operator/step" '{}' > "$OPERATOR_STEP_FILE"
 curl --silent --fail "$CORE_URL/approvals?status=pending&limit=10" > "$APPROVALS_FILE"
@@ -90,7 +91,8 @@ node - <<'EOF' \
   "$TARGET_FILE" \
   "$WRITE_TARGET" \
   "$OLD_TEXT" \
-  "$NEW_TEXT"
+  "$NEW_TEXT" \
+  "$WRITE_RELATIVE_PATH"
 const fs = require("node:fs");
 const readText = (index) => fs.readFileSync(process.argv[index], "utf8");
 const readJson = (index) => JSON.parse(readText(index));
@@ -106,19 +108,31 @@ const targetFile = process.argv[9];
 const writeTarget = process.argv[10];
 const oldText = process.argv[11];
 const newText = process.argv[12];
+const writeRelativePath = process.argv[13];
 const targetPackage = JSON.parse(fs.readFileSync(targetFile, "utf8"));
 
 for (const token of [
   "engineering-edit-proposal-task-button",
   "engineering-write-proposal-task-button",
   "engineering-verification-task-button",
+  "engineering-edit-path-input",
+  "engineering-edit-old-input",
+  "engineering-edit-new-input",
+  "engineering-write-path-input",
+  "engineering-write-content-input",
+  "engineering-verification-proposal-input",
+  "engineering-verification-query-input",
 ]) {
   if (!html.includes(token)) {
-    throw new Error(`Observer HTML missing engineering loop operator control: ${token}`);
+    throw new Error(`Observer HTML missing engineering loop operator control/input: ${token}`);
   }
 }
 
 for (const token of [
+  "boundedEngineeringInput",
+  "readEngineeringEditLoopInput",
+  "readEngineeringWriteLoopInput",
+  "readEngineeringVerificationLoopInput",
   "createEngineeringEditLoopApprovalTask",
   "createEngineeringWriteLoopApprovalTask",
   "createEngineeringVerificationLoopApprovalTask",
@@ -138,6 +152,8 @@ if (
   || editTask.task?.status !== "queued"
   || editTask.approval?.status !== "pending"
   || editTask.engineeringEditProposal?.contentExposed !== false
+  || editTask.target?.relativePath !== "package.json"
+  || editTask.engineeringEditProposal?.target?.proposedBytes <= editTask.engineeringEditProposal?.target?.originalBytes
   || editTask.workspacePatchApply?.registry !== "openclaw-native-workspace-patch-apply-task-v0"
 ) {
   throw new Error(`edit operator control task mismatch: ${JSON.stringify(editTask)}`);
@@ -148,6 +164,7 @@ if (
   || writeTask.task?.status !== "queued"
   || writeTask.approval?.status !== "pending"
   || writeTask.engineeringWriteProposal?.contentExposed !== false
+  || writeTask.target?.relativePath !== writeRelativePath
   || writeTask.workspaceTextWrite?.registry !== "openclaw-native-workspace-text-write-task-v0"
 ) {
   throw new Error(`write operator control task mismatch: ${JSON.stringify(writeTask)}`);
@@ -179,6 +196,7 @@ console.log(JSON.stringify({
     writeTaskId: writeTask.task.id,
     verificationTaskId: verifyTask.task.id,
     pendingApprovals: approvals.summary.pendingCount,
+    parameterizedInputs: true,
     approvalGatePreserved: true,
   },
 }, null, 2));
