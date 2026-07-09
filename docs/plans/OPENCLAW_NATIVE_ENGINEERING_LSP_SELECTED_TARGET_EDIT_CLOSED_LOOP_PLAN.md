@@ -81,14 +81,14 @@ nix/scripts/dev-openclaw-native-engineering-lsp-evidence-check.sh
 openclaw-native-engineering-lsp-evidence
 ```
 
-## Next Slice
+## Follow-up Completed
 
-The next smallest real capability is:
+The selected-target verification handoff follow-up was completed as:
 
 ```text
-LSP selected-target verification handoff
+OPENCLAW_NATIVE_ENGINEERING_LSP_SELECTED_TARGET_VERIFICATION_HANDOFF_PLAN.md
 ```
 
-That follow-up should attach a verification command proposal or evidence
-readback to the selected-target edit flow after manual approval/execution,
-without creating another standalone readiness chain.
+That slice attaches explicit source-command verification task creation,
+approval-gated command execution, and verification evidence readback to the
+selected-target edit flow without creating another standalone readiness chain.

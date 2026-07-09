@@ -21,6 +21,9 @@ export OPENCLAW_SYSTEM_SENSE_PORT="${OPENCLAW_SYSTEM_SENSE_PORT:-10246}"
 export OPENCLAW_SYSTEM_HEAL_PORT="${OPENCLAW_SYSTEM_HEAL_PORT:-10247}"
 export OBSERVER_UI_PORT="${OBSERVER_UI_PORT:-10248}"
 export OPENCLAW_WORKSPACE_ROOTS="$WORKSPACE_DIR"
+export OPENCLAW_SYSTEM_ALLOWED_ROOTS="$WORKSPACE_DIR"
+export OPENCLAW_SYSTEM_COMMAND_ALLOWLIST="npm"
+export OPENCLAW_SYSTEM_COMMAND_TIMEOUT_MS="15000"
 export OPENCLAW_CORE_STATE_FILE="${OPENCLAW_CORE_STATE_FILE:-$REPO_ROOT/.artifacts/openclaw-core-engineering-lsp-evidence-check.json}"
 export OPENCLAW_EVENT_LOG_FILE="${OPENCLAW_EVENT_LOG_FILE:-$REPO_ROOT/.artifacts/openclaw-engineering-lsp-evidence-check-events.jsonl}"
 
@@ -31,6 +34,16 @@ EVENT_HUB_URL="http://127.0.0.1:$OPENCLAW_EVENT_HUB_PORT"
 rm -rf "$FIXTURE_DIR"
 mkdir -p "$FIXTURE_DIR"
 prepare_engineering_read_search_fixture "$WORKSPACE_DIR" "ENGINEERING_LSP_EVIDENCE"
+node - <<'EOF' "$WORKSPACE_DIR/package.json"
+const fs = require("node:fs");
+const packagePath = process.argv[2];
+const pkg = JSON.parse(fs.readFileSync(packagePath, "utf8"));
+pkg.scripts = {
+  ...(pkg.scripts ?? {}),
+  typecheck: "grep -q 'OpenClawNeedleSelected' src/app.ts && printf lsp-selected-target-edit-verification-ok",
+};
+fs.writeFileSync(packagePath, `${JSON.stringify(pkg, null, 2)}\n`);
+EOF
 mkdir -p "$WORKSPACE_DIR/scripts" "$WORKSPACE_DIR/python" "$FAKE_BIN_DIR"
 cat > "$WORKSPACE_DIR/tsconfig.json" <<'JSON'
 {
@@ -154,6 +167,11 @@ cleanup() {
     "${SYMBOL_EDIT_LEDGER_FILE:-}" \
     "${SYMBOL_EDIT_EVIDENCE_FILE:-}" \
     "${SYMBOL_EDIT_READBACK_FILE:-}" \
+    "${SYMBOL_VERIFY_TASK_FILE:-}" \
+    "${SYMBOL_VERIFY_BLOCKED_FILE:-}" \
+    "${SYMBOL_VERIFY_APPROVED_FILE:-}" \
+    "${SYMBOL_VERIFY_STEP_FILE:-}" \
+    "${SYMBOL_VERIFY_EVIDENCE_FILE:-}" \
     "${EVENTS_FILE:-}"
   "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 }
@@ -224,6 +242,11 @@ SYMBOL_EDIT_TASK_READBACK_FILE="$(mktemp)"
 SYMBOL_EDIT_LEDGER_FILE="$(mktemp)"
 SYMBOL_EDIT_EVIDENCE_FILE="$(mktemp)"
 SYMBOL_EDIT_READBACK_FILE="$(mktemp)"
+SYMBOL_VERIFY_TASK_FILE="$(mktemp)"
+SYMBOL_VERIFY_BLOCKED_FILE="$(mktemp)"
+SYMBOL_VERIFY_APPROVED_FILE="$(mktemp)"
+SYMBOL_VERIFY_STEP_FILE="$(mktemp)"
+SYMBOL_VERIFY_EVIDENCE_FILE="$(mktemp)"
 EVENTS_FILE="$(mktemp)"
 
 curl --silent --fail "$CORE_URL/plugins/native-adapter/engineering-lsp/evidence?action=check&language=typescript&limit=200" > "$CHECK_FILE"
@@ -530,6 +553,41 @@ curl --silent --fail "$CORE_URL/tasks/$symbol_edit_task_id" > "$SYMBOL_EDIT_TASK
 curl --silent --fail "$CORE_URL/filesystem/changes?limit=30" > "$SYMBOL_EDIT_LEDGER_FILE"
 curl --silent --fail "$CORE_URL/plugins/native-adapter/engineering-edit-execution/evidence?taskId=$symbol_edit_task_id&limit=10" > "$SYMBOL_EDIT_EVIDENCE_FILE"
 curl --silent --fail "$CORE_URL/plugins/native-adapter/engineering-read-search/read?relativePath=src/app.ts&maxOutputChars=1600" > "$SYMBOL_EDIT_READBACK_FILE"
+
+post_json "$CORE_URL/plugins/native-adapter/source-command-proposals/tasks" '{"proposalId":"openclaw:typecheck","query":"verify","confirm":true}' > "$SYMBOL_VERIFY_TASK_FILE"
+post_json "$CORE_URL/operator/step" '{}' > "$SYMBOL_VERIFY_BLOCKED_FILE"
+
+read -r symbol_verify_approval_id symbol_verify_task_id < <(node - <<'EOF' "$SYMBOL_VERIFY_TASK_FILE" "$SYMBOL_VERIFY_BLOCKED_FILE"
+const fs = require("node:fs");
+const taskResponse = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+const blockedStep = JSON.parse(fs.readFileSync(process.argv[3], "utf8"));
+
+if (
+  !taskResponse.ok
+  || taskResponse.registry !== "openclaw-source-command-task-v0"
+  || taskResponse.task?.status !== "queued"
+  || taskResponse.sourceCommandProposal?.id !== "openclaw:typecheck"
+  || taskResponse.governance?.canExecuteWithoutApproval !== false
+) {
+  throw new Error(`selected-target verification task should be queued behind approval: ${JSON.stringify(taskResponse)}`);
+}
+if (
+  !blockedStep.ok
+  || blockedStep.ran !== false
+  || blockedStep.blocked !== true
+  || blockedStep.reason !== "policy_requires_approval"
+  || blockedStep.approval?.id !== taskResponse.approval?.id
+) {
+  throw new Error(`selected-target verification should block before approval: ${JSON.stringify(blockedStep)}`);
+}
+
+process.stdout.write(`${taskResponse.approval.id} ${taskResponse.task.id}\n`);
+EOF
+)
+
+post_json "$CORE_URL/approvals/$symbol_verify_approval_id/approve" '{"approvedBy":"dev-openclaw-native-engineering-lsp-evidence-check","reason":"approve selected-target edit verification handoff"}' > "$SYMBOL_VERIFY_APPROVED_FILE"
+post_json "$CORE_URL/operator/step" '{}' > "$SYMBOL_VERIFY_STEP_FILE"
+curl --silent --fail "$CORE_URL/plugins/native-adapter/engineering-verification/evidence?taskId=$symbol_verify_task_id&maxOutputChars=1000" > "$SYMBOL_VERIFY_EVIDENCE_FILE"
 curl --silent --fail "$EVENT_HUB_URL/events/audit?limit=120" > "$EVENTS_FILE"
 
 node - <<'EOF' \
@@ -593,6 +651,11 @@ node - <<'EOF' \
   "$SYMBOL_EDIT_LEDGER_FILE" \
   "$SYMBOL_EDIT_EVIDENCE_FILE" \
   "$SYMBOL_EDIT_READBACK_FILE" \
+  "$SYMBOL_VERIFY_TASK_FILE" \
+  "$SYMBOL_VERIFY_BLOCKED_FILE" \
+  "$SYMBOL_VERIFY_APPROVED_FILE" \
+  "$SYMBOL_VERIFY_STEP_FILE" \
+  "$SYMBOL_VERIFY_EVIDENCE_FILE" \
   "$WORKSPACE_DIR/src/app.ts" \
   "$SELECTED_TARGET_OLD_TEXT" \
   "$SELECTED_TARGET_NEW_TEXT"
@@ -659,11 +722,16 @@ const symbolEditTaskReadback = readJson(58);
 const symbolEditLedger = readJson(59);
 const symbolEditEvidence = readJson(60);
 const symbolEditReadback = readJson(61);
-const selectedTargetFile = process.argv[62];
-const selectedTargetOldText = process.argv[63];
-const selectedTargetNewText = process.argv[64];
+const symbolVerifyTaskResponse = readJson(62);
+const symbolVerifyBlockedStep = readJson(63);
+const symbolVerifyApproved = readJson(64);
+const symbolVerifyStep = readJson(65);
+const symbolVerifyEvidence = readJson(66);
+const selectedTargetFile = process.argv[67];
+const selectedTargetOldText = process.argv[68];
+const selectedTargetNewText = process.argv[69];
 const expectedTargetUri = process.env.OPENCLAW_FAKE_LSP_TARGET_URI;
-const raw = JSON.stringify({ check, position, bad, draft, sourceTransfer, sourceTransferTaskResponse, sourceTransferBlockedStep, sourceTransferApproved, sourceTransferStep, sourceTransferTaskReadback, sourceTransferState, symbolRequest, symbolRequestTaskResponse, symbolRequestBlockedStep, symbolRequestApproved, symbolRequestStep, symbolRequestTaskReadback, symbolRequestState, symbolTargetBridge, symbolEditSeed, symbolEditTaskResponse, symbolEditBlockedStep, symbolEditApproved, symbolEditStep, symbolEditTaskReadback, symbolEditLedger, symbolEditEvidence, symbolEditReadback, adapter, taskResponse, blockedStep, approved, execStep, taskReadback, processTaskResponse, processBlockedStep, processApproved, processStep, processTaskReadback, lifecycleStateAfterProcess, stopTaskResponse, stopBlockedStep, stopApproved, stopStep, stopTaskReadback, lifecycleStateAfterStop, restartTaskResponse, restartBlockedStep, restartApproved, restartStep, restartTaskReadback, lifecycleState, handshakeTaskResponse, handshakeBlockedStep, handshakeApproved, handshakeStep, handshakeTaskReadback, handshakeState, events });
+const raw = JSON.stringify({ check, position, bad, draft, sourceTransfer, sourceTransferTaskResponse, sourceTransferBlockedStep, sourceTransferApproved, sourceTransferStep, sourceTransferTaskReadback, sourceTransferState, symbolRequest, symbolRequestTaskResponse, symbolRequestBlockedStep, symbolRequestApproved, symbolRequestStep, symbolRequestTaskReadback, symbolRequestState, symbolTargetBridge, symbolEditSeed, symbolEditTaskResponse, symbolEditBlockedStep, symbolEditApproved, symbolEditStep, symbolEditTaskReadback, symbolEditLedger, symbolEditEvidence, symbolEditReadback, symbolVerifyTaskResponse, symbolVerifyBlockedStep, symbolVerifyApproved, symbolVerifyStep, symbolVerifyEvidence, adapter, taskResponse, blockedStep, approved, execStep, taskReadback, processTaskResponse, processBlockedStep, processApproved, processStep, processTaskReadback, lifecycleStateAfterProcess, stopTaskResponse, stopBlockedStep, stopApproved, stopStep, stopTaskReadback, lifecycleStateAfterStop, restartTaskResponse, restartBlockedStep, restartApproved, restartStep, restartTaskReadback, lifecycleState, handshakeTaskResponse, handshakeBlockedStep, handshakeApproved, handshakeStep, handshakeTaskReadback, handshakeState, events });
 
 if (
   !check.ok
@@ -1305,6 +1373,50 @@ if (
 ) {
   throw new Error(`LSP selected-target edit readback mismatch: ${JSON.stringify({ symbolEditReadback, selectedTargetFinalText })}`);
 }
+if (
+  !symbolVerifyTaskResponse.ok
+  || symbolVerifyTaskResponse.registry !== "openclaw-source-command-task-v0"
+  || symbolVerifyTaskResponse.sourceCommandProposal?.id !== "openclaw:typecheck"
+  || symbolVerifyTaskResponse.task?.status !== "queued"
+  || symbolVerifyTaskResponse.governance?.canExecuteWithoutApproval !== false
+) {
+  throw new Error(`LSP selected-target verification task mismatch: ${JSON.stringify(symbolVerifyTaskResponse)}`);
+}
+if (
+  !symbolVerifyBlockedStep.ok
+  || symbolVerifyBlockedStep.ran !== false
+  || symbolVerifyBlockedStep.blocked !== true
+  || symbolVerifyBlockedStep.reason !== "policy_requires_approval"
+  || symbolVerifyBlockedStep.approval?.id !== symbolVerifyTaskResponse.approval?.id
+) {
+  throw new Error(`LSP selected-target verification should block before approval: ${JSON.stringify(symbolVerifyBlockedStep)}`);
+}
+if (
+  symbolVerifyApproved.approval?.status !== "approved"
+  || symbolVerifyApproved.task?.policy?.decision?.decision !== "audit_only"
+) {
+  throw new Error(`LSP selected-target verification approval mismatch: ${JSON.stringify(symbolVerifyApproved)}`);
+}
+if (
+  !symbolVerifyStep.ok
+  || symbolVerifyStep.ran !== true
+  || symbolVerifyStep.task?.id !== symbolVerifyTaskResponse.task?.id
+  || symbolVerifyStep.task?.status !== "completed"
+  || !String(symbolVerifyStep.execution?.commandTranscript?.[0]?.stdout ?? "").includes("lsp-selected-target-edit-verification-ok")
+) {
+  throw new Error(`LSP selected-target verification step mismatch: ${JSON.stringify(symbolVerifyStep)}`);
+}
+if (
+  !symbolVerifyEvidence.ok
+  || symbolVerifyEvidence.registry !== "openclaw-native-engineering-verification-evidence-v0"
+  || symbolVerifyEvidence.summary?.passed !== 1
+  || symbolVerifyEvidence.summary?.attachedToCompletedTasks !== 1
+  || symbolVerifyEvidence.evidence?.[0]?.taskId !== symbolVerifyTaskResponse.task?.id
+  || symbolVerifyEvidence.evidence?.[0]?.result?.exitCode !== 0
+  || !String(symbolVerifyEvidence.evidence?.[0]?.result?.stdout ?? "").includes("lsp-selected-target-edit-verification-ok")
+) {
+  throw new Error(`LSP selected-target verification evidence mismatch: ${JSON.stringify(symbolVerifyEvidence)}`);
+}
 const eventTypes = new Set((events.items ?? events.events ?? []).map((event) => event.type));
 for (const type of ["approval.created", "approval.approved", "policy.evaluated"]) {
   if (!eventTypes.has(type)) {
@@ -1334,6 +1446,9 @@ for (const token of [
   "openclaw-native-workspace-patch-apply-task-v0",
   "openclaw-native-engineering-edit-execution-evidence-v0",
   "act.openclaw.workspace_patch_apply",
+  "openclaw-source-command-task-v0",
+  "openclaw-native-engineering-verification-evidence-v0",
+  "lsp-selected-target-edit-verification-ok",
   "no textDocument/didOpen notification sent",
   "approval-gated-lsp-lifecycle-binary-gate",
   "approved-lsp-lifecycle-binary-gate",
@@ -1388,6 +1503,9 @@ console.log(JSON.stringify({
     selectedTargetEditLedgerRecords: symbolEditLedger.summary.write_text,
     selectedTargetEditEvidencePassed: symbolEditEvidence.summary.passed,
     selectedTargetEditFinalReadContainsReplacement: String(symbolEditReadback.content ?? "").includes(selectedTargetNewText),
+    selectedTargetVerificationTaskStatus: symbolVerifyStep.task.status,
+    selectedTargetVerificationPassed: symbolVerifyEvidence.summary.passed,
+    selectedTargetVerificationAttachedToCompletedTasks: symbolVerifyEvidence.summary.attachedToCompletedTasks,
     serverStatus: check.serverReadiness.status,
     lifecycleTaskStatus: lifecycleTask.status,
     binaryFound: execution.server.binaryFound,
