@@ -64,14 +64,14 @@ npm --workspace @openclaw/observer-ui run typecheck
 observer-openclaw-native-engineering-lsp-evidence
 ```
 
-## Next Slice
+## Follow-up Completed
 
-The next smallest real capability is:
+The selected-target edit closed-loop proof follow-up was completed as:
 
 ```text
-LSP selected-target edit closed-loop proof
+OPENCLAW_NATIVE_ENGINEERING_LSP_SELECTED_TARGET_EDIT_CLOSED_LOOP_PLAN.md
 ```
 
-That follow-up should prove the operator path from selected target -> seeded
-edit inputs -> explicit edit task creation -> approval -> patch apply ->
-existing ledger/evidence readback, without adding another readiness shell.
+That slice proves the operator path from selected target -> seeded edit inputs
+-> explicit edit task creation -> approval -> patch apply -> ledger -> edit
+execution evidence -> bounded readback without adding another readiness shell.

@@ -6,6 +6,8 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 FIXTURE_DIR="$REPO_ROOT/.artifacts/openclaw-native-engineering-lsp-evidence-fixture"
 WORKSPACE_DIR="$FIXTURE_DIR/openclaw"
 FAKE_BIN_DIR="$FIXTURE_DIR/bin"
+SELECTED_TARGET_OLD_TEXT='export const needle = "OpenClawNeedle";'
+SELECTED_TARGET_NEW_TEXT='export const needle = "OpenClawNeedleSelected";'
 
 source "$SCRIPT_DIR/openclaw-engineering-read-search-fixture.sh"
 
@@ -143,6 +145,15 @@ cleanup() {
     "${SYMBOL_REQUEST_STATE_FILE:-}" \
     "${SYMBOL_TARGET_BRIDGE_FILE:-}" \
     "${SYMBOL_EDIT_SEED_FILE:-}" \
+    "${SYMBOL_EDIT_TASK_PAYLOAD_FILE:-}" \
+    "${SYMBOL_EDIT_TASK_FILE:-}" \
+    "${SYMBOL_EDIT_BLOCKED_FILE:-}" \
+    "${SYMBOL_EDIT_APPROVED_FILE:-}" \
+    "${SYMBOL_EDIT_STEP_FILE:-}" \
+    "${SYMBOL_EDIT_TASK_READBACK_FILE:-}" \
+    "${SYMBOL_EDIT_LEDGER_FILE:-}" \
+    "${SYMBOL_EDIT_EVIDENCE_FILE:-}" \
+    "${SYMBOL_EDIT_READBACK_FILE:-}" \
     "${EVENTS_FILE:-}"
   "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 }
@@ -204,6 +215,15 @@ SYMBOL_REQUEST_TASK_READBACK_FILE="$(mktemp)"
 SYMBOL_REQUEST_STATE_FILE="$(mktemp)"
 SYMBOL_TARGET_BRIDGE_FILE="$(mktemp)"
 SYMBOL_EDIT_SEED_FILE="$(mktemp)"
+SYMBOL_EDIT_TASK_PAYLOAD_FILE="$(mktemp)"
+SYMBOL_EDIT_TASK_FILE="$(mktemp)"
+SYMBOL_EDIT_BLOCKED_FILE="$(mktemp)"
+SYMBOL_EDIT_APPROVED_FILE="$(mktemp)"
+SYMBOL_EDIT_STEP_FILE="$(mktemp)"
+SYMBOL_EDIT_TASK_READBACK_FILE="$(mktemp)"
+SYMBOL_EDIT_LEDGER_FILE="$(mktemp)"
+SYMBOL_EDIT_EVIDENCE_FILE="$(mktemp)"
+SYMBOL_EDIT_READBACK_FILE="$(mktemp)"
 EVENTS_FILE="$(mktemp)"
 
 curl --silent --fail "$CORE_URL/plugins/native-adapter/engineering-lsp/evidence?action=check&language=typescript&limit=200" > "$CHECK_FILE"
@@ -426,8 +446,90 @@ curl --silent --fail --get "$CORE_URL/plugins/native-adapter/engineering-lsp/sel
   --data-urlencode "language=typescript" \
   --data-urlencode "taskId=$symbol_request_task_id" \
   --data-urlencode "contextLines=0" \
-  --data-urlencode 'newString=export const needle = "OpenClawNeedleSelected";' \
+  --data-urlencode "newString=$SELECTED_TARGET_NEW_TEXT" \
   > "$SYMBOL_EDIT_SEED_FILE"
+
+node - <<'EOF' "$SYMBOL_EDIT_SEED_FILE" "$SYMBOL_EDIT_TASK_PAYLOAD_FILE" "$SELECTED_TARGET_NEW_TEXT"
+const fs = require("node:fs");
+const seed = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+const payloadPath = process.argv[3];
+const newString = process.argv[4];
+
+if (
+  !seed.ok
+  || seed.seed?.relativePath !== "src/app.ts"
+  || typeof seed.seed?.oldString !== "string"
+  || !seed.seed.oldString.includes("OpenClawNeedle")
+) {
+  throw new Error(`selected-target edit seed cannot create closed-loop task payload: ${JSON.stringify(seed)}`);
+}
+
+fs.writeFileSync(
+  payloadPath,
+  JSON.stringify({
+    relativePath: seed.seed.relativePath,
+    oldString: seed.seed.oldString,
+    newString,
+    contextLines: 1,
+    maxOutputChars: 8000,
+    confirm: true,
+  }),
+);
+EOF
+
+OPENCLAW_POST_JSON_PAYLOAD_MODE=file post_json "$CORE_URL/plugins/native-adapter/engineering-edit-proposal-tasks" "$SYMBOL_EDIT_TASK_PAYLOAD_FILE" > "$SYMBOL_EDIT_TASK_FILE"
+post_json "$CORE_URL/operator/step" '{}' > "$SYMBOL_EDIT_BLOCKED_FILE"
+
+read -r symbol_edit_approval_id symbol_edit_task_id < <(node - <<'EOF' "$SYMBOL_EDIT_SEED_FILE" "$SYMBOL_EDIT_TASK_FILE" "$SYMBOL_EDIT_BLOCKED_FILE" "$WORKSPACE_DIR/src/app.ts" "$SELECTED_TARGET_OLD_TEXT" "$SELECTED_TARGET_NEW_TEXT"
+const fs = require("node:fs");
+const seed = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+const taskResponse = JSON.parse(fs.readFileSync(process.argv[3], "utf8"));
+const blockedStep = JSON.parse(fs.readFileSync(process.argv[4], "utf8"));
+const targetFile = process.argv[5];
+const oldText = process.argv[6];
+const newText = process.argv[7];
+const targetText = fs.readFileSync(targetFile, "utf8");
+
+if (
+  !taskResponse.ok
+  || taskResponse.registry !== "openclaw-native-engineering-edit-proposal-task-v0"
+  || taskResponse.sourceRegistry !== "openclaw-native-engineering-edit-proposal-v0"
+  || taskResponse.task?.status !== "queued"
+  || taskResponse.approval?.status !== "pending"
+  || taskResponse.engineeringEditProposal?.target?.relativePath !== seed.seed?.relativePath
+  || taskResponse.engineeringEditProposal?.contentExposed !== false
+  || taskResponse.engineeringEditProposal?.diffPreviewExposed !== true
+  || taskResponse.workspacePatchApply?.registry !== "openclaw-native-workspace-patch-apply-task-v0"
+  || taskResponse.workspacePatchApply?.contentExposed !== false
+  || taskResponse.task?.engineeringEditProposal?.approvedMutationCapabilityId !== "act.openclaw.workspace_patch_apply"
+  || taskResponse.governance?.canExecuteWithoutApproval !== false
+  || taskResponse.governance?.delegatesApprovedMutationTo !== "act.openclaw.workspace_patch_apply"
+) {
+  throw new Error(`selected-target edit task bridge mismatch: ${JSON.stringify(taskResponse)}`);
+}
+if (
+  !blockedStep.ok
+  || blockedStep.ran !== false
+  || blockedStep.blocked !== true
+  || blockedStep.reason !== "policy_requires_approval"
+  || blockedStep.approval?.id !== taskResponse.approval?.id
+) {
+  throw new Error(`selected-target edit should block before approval: ${JSON.stringify(blockedStep)}`);
+}
+if (!targetText.includes(oldText) || targetText.includes(newText)) {
+  throw new Error(`selected-target edit applied before approval: ${targetText}`);
+}
+
+process.stdout.write(`${taskResponse.approval.id} ${taskResponse.task.id}\n`);
+EOF
+)
+
+post_json "$CORE_URL/approvals/$symbol_edit_approval_id/approve" '{"approvedBy":"dev-openclaw-native-engineering-lsp-evidence-check","reason":"approve selected-target edit closed-loop proof"}' > "$SYMBOL_EDIT_APPROVED_FILE"
+post_json "$CORE_URL/operator/step" '{}' > "$SYMBOL_EDIT_STEP_FILE"
+curl --silent --fail "$CORE_URL/tasks/$symbol_edit_task_id" > "$SYMBOL_EDIT_TASK_READBACK_FILE"
+curl --silent --fail "$CORE_URL/filesystem/changes?limit=30" > "$SYMBOL_EDIT_LEDGER_FILE"
+curl --silent --fail "$CORE_URL/plugins/native-adapter/engineering-edit-execution/evidence?taskId=$symbol_edit_task_id&limit=10" > "$SYMBOL_EDIT_EVIDENCE_FILE"
+curl --silent --fail "$CORE_URL/plugins/native-adapter/engineering-read-search/read?relativePath=src/app.ts&maxOutputChars=1600" > "$SYMBOL_EDIT_READBACK_FILE"
 curl --silent --fail "$EVENT_HUB_URL/events/audit?limit=120" > "$EVENTS_FILE"
 
 node - <<'EOF' \
@@ -482,7 +584,18 @@ node - <<'EOF' \
   "$SYMBOL_REQUEST_TASK_READBACK_FILE" \
   "$SYMBOL_REQUEST_STATE_FILE" \
   "$SYMBOL_TARGET_BRIDGE_FILE" \
-  "$SYMBOL_EDIT_SEED_FILE"
+  "$SYMBOL_EDIT_SEED_FILE" \
+  "$SYMBOL_EDIT_TASK_FILE" \
+  "$SYMBOL_EDIT_BLOCKED_FILE" \
+  "$SYMBOL_EDIT_APPROVED_FILE" \
+  "$SYMBOL_EDIT_STEP_FILE" \
+  "$SYMBOL_EDIT_TASK_READBACK_FILE" \
+  "$SYMBOL_EDIT_LEDGER_FILE" \
+  "$SYMBOL_EDIT_EVIDENCE_FILE" \
+  "$SYMBOL_EDIT_READBACK_FILE" \
+  "$WORKSPACE_DIR/src/app.ts" \
+  "$SELECTED_TARGET_OLD_TEXT" \
+  "$SELECTED_TARGET_NEW_TEXT"
 const fs = require("node:fs");
 const readJson = (index) => JSON.parse(fs.readFileSync(process.argv[index], "utf8"));
 
@@ -538,8 +651,19 @@ const symbolRequestTaskReadback = readJson(50);
 const symbolRequestState = readJson(51);
 const symbolTargetBridge = readJson(52);
 const symbolEditSeed = readJson(53);
+const symbolEditTaskResponse = readJson(54);
+const symbolEditBlockedStep = readJson(55);
+const symbolEditApproved = readJson(56);
+const symbolEditStep = readJson(57);
+const symbolEditTaskReadback = readJson(58);
+const symbolEditLedger = readJson(59);
+const symbolEditEvidence = readJson(60);
+const symbolEditReadback = readJson(61);
+const selectedTargetFile = process.argv[62];
+const selectedTargetOldText = process.argv[63];
+const selectedTargetNewText = process.argv[64];
 const expectedTargetUri = process.env.OPENCLAW_FAKE_LSP_TARGET_URI;
-const raw = JSON.stringify({ check, position, bad, draft, sourceTransfer, sourceTransferTaskResponse, sourceTransferBlockedStep, sourceTransferApproved, sourceTransferStep, sourceTransferTaskReadback, sourceTransferState, symbolRequest, symbolRequestTaskResponse, symbolRequestBlockedStep, symbolRequestApproved, symbolRequestStep, symbolRequestTaskReadback, symbolRequestState, symbolTargetBridge, symbolEditSeed, adapter, taskResponse, blockedStep, approved, execStep, taskReadback, processTaskResponse, processBlockedStep, processApproved, processStep, processTaskReadback, lifecycleStateAfterProcess, stopTaskResponse, stopBlockedStep, stopApproved, stopStep, stopTaskReadback, lifecycleStateAfterStop, restartTaskResponse, restartBlockedStep, restartApproved, restartStep, restartTaskReadback, lifecycleState, handshakeTaskResponse, handshakeBlockedStep, handshakeApproved, handshakeStep, handshakeTaskReadback, handshakeState, events });
+const raw = JSON.stringify({ check, position, bad, draft, sourceTransfer, sourceTransferTaskResponse, sourceTransferBlockedStep, sourceTransferApproved, sourceTransferStep, sourceTransferTaskReadback, sourceTransferState, symbolRequest, symbolRequestTaskResponse, symbolRequestBlockedStep, symbolRequestApproved, symbolRequestStep, symbolRequestTaskReadback, symbolRequestState, symbolTargetBridge, symbolEditSeed, symbolEditTaskResponse, symbolEditBlockedStep, symbolEditApproved, symbolEditStep, symbolEditTaskReadback, symbolEditLedger, symbolEditEvidence, symbolEditReadback, adapter, taskResponse, blockedStep, approved, execStep, taskReadback, processTaskResponse, processBlockedStep, processApproved, processStep, processTaskReadback, lifecycleStateAfterProcess, stopTaskResponse, stopBlockedStep, stopApproved, stopStep, stopTaskReadback, lifecycleStateAfterStop, restartTaskResponse, restartBlockedStep, restartApproved, restartStep, restartTaskReadback, lifecycleState, handshakeTaskResponse, handshakeBlockedStep, handshakeApproved, handshakeStep, handshakeTaskReadback, handshakeState, events });
 
 if (
   !check.ok
@@ -1110,6 +1234,77 @@ if (
 ) {
   throw new Error(`LSP selected-target edit proposal seed mismatch: ${JSON.stringify(symbolEditSeed)}`);
 }
+const symbolEditTask = symbolEditStep.task;
+const selectedTargetFinalText = fs.readFileSync(selectedTargetFile, "utf8");
+if (
+  !symbolEditTaskResponse.ok
+  || symbolEditTaskResponse.registry !== "openclaw-native-engineering-edit-proposal-task-v0"
+  || symbolEditTaskResponse.sourceRegistry !== "openclaw-native-engineering-edit-proposal-v0"
+  || symbolEditTaskResponse.engineeringEditProposal?.target?.relativePath !== symbolEditSeed.seed?.relativePath
+  || symbolEditTaskResponse.engineeringEditProposal?.diffPreviewExposed !== true
+  || symbolEditTaskResponse.engineeringEditProposal?.contentExposed !== false
+  || symbolEditTaskResponse.workspacePatchApply?.registry !== "openclaw-native-workspace-patch-apply-task-v0"
+  || symbolEditTaskResponse.task?.engineeringEditProposal?.approvedMutationCapabilityId !== "act.openclaw.workspace_patch_apply"
+  || symbolEditTaskResponse.governance?.canExecuteWithoutApproval !== false
+  || symbolEditTaskResponse.governance?.delegatesApprovedMutationTo !== "act.openclaw.workspace_patch_apply"
+) {
+  throw new Error(`LSP selected-target edit task bridge mismatch: ${JSON.stringify(symbolEditTaskResponse)}`);
+}
+if (
+  !symbolEditBlockedStep.ok
+  || symbolEditBlockedStep.ran !== false
+  || symbolEditBlockedStep.blocked !== true
+  || symbolEditBlockedStep.reason !== "policy_requires_approval"
+  || symbolEditBlockedStep.approval?.id !== symbolEditTaskResponse.approval?.id
+) {
+  throw new Error(`LSP selected-target edit should block before approval: ${JSON.stringify(symbolEditBlockedStep)}`);
+}
+if (symbolEditApproved.approval?.status !== "approved" || symbolEditApproved.task?.approval?.required !== false) {
+  throw new Error(`LSP selected-target edit approval mismatch: ${JSON.stringify(symbolEditApproved)}`);
+}
+if (
+  !symbolEditStep.ok
+  || symbolEditStep.ran !== true
+  || symbolEditTask?.id !== symbolEditTaskResponse.task?.id
+  || symbolEditTask?.status !== "completed"
+  || symbolEditTask?.engineeringEditProposal?.target?.relativePath !== "src/app.ts"
+) {
+  throw new Error(`LSP selected-target edit approved step mismatch: ${JSON.stringify(symbolEditStep)}`);
+}
+if (
+  symbolEditTaskReadback.task?.id !== symbolEditTask.id
+  || symbolEditTaskReadback.task?.status !== "completed"
+  || symbolEditTaskReadback.task?.engineeringEditProposal?.approvedMutationCapabilityId !== "act.openclaw.workspace_patch_apply"
+) {
+  throw new Error(`LSP selected-target edit task readback mismatch: ${JSON.stringify(symbolEditTaskReadback)}`);
+}
+if (
+  symbolEditLedger.summary?.write_text < 1
+  || !symbolEditLedger.items?.some((entry) => entry.change === "write_text" && entry.path === selectedTargetFile && entry.taskId === symbolEditTask.id)
+) {
+  throw new Error(`LSP selected-target edit ledger mismatch: ${JSON.stringify(symbolEditLedger)}`);
+}
+if (
+  !symbolEditEvidence.ok
+  || symbolEditEvidence.registry !== "openclaw-native-engineering-edit-execution-evidence-v0"
+  || symbolEditEvidence.summary?.passed !== 1
+  || symbolEditEvidence.evidence?.[0]?.taskId !== symbolEditTask.id
+  || symbolEditEvidence.evidence?.[0]?.proposal?.approvedMutationCapabilityId !== "act.openclaw.workspace_patch_apply"
+  || symbolEditEvidence.governance?.canWriteFile !== false
+) {
+  throw new Error(`LSP selected-target edit execution evidence mismatch: ${JSON.stringify(symbolEditEvidence)}`);
+}
+if (
+  !symbolEditReadback.ok
+  || symbolEditReadback.operation !== "read"
+  || symbolEditReadback.target?.relativePath !== "src/app.ts"
+  || !String(symbolEditReadback.content ?? "").includes(selectedTargetNewText)
+  || String(symbolEditReadback.content ?? "").includes(selectedTargetOldText)
+  || !selectedTargetFinalText.includes(selectedTargetNewText)
+  || selectedTargetFinalText.includes(selectedTargetOldText)
+) {
+  throw new Error(`LSP selected-target edit readback mismatch: ${JSON.stringify({ symbolEditReadback, selectedTargetFinalText })}`);
+}
 const eventTypes = new Set((events.items ?? events.events ?? []).map((event) => event.type));
 for (const type of ["approval.created", "approval.approved", "policy.evaluated"]) {
   if (!eventTypes.has(type)) {
@@ -1135,6 +1330,10 @@ for (const token of [
   "openclaw-native-engineering-lsp-selected-target-edit-proposal-seed-v0",
   "lsp-selected-target-edit-proposal-seed",
   "plan.openclaw.engineering_tool.lsp_selected_target_edit_proposal_seed",
+  "openclaw-native-engineering-edit-proposal-task-v0",
+  "openclaw-native-workspace-patch-apply-task-v0",
+  "openclaw-native-engineering-edit-execution-evidence-v0",
+  "act.openclaw.workspace_patch_apply",
   "no textDocument/didOpen notification sent",
   "approval-gated-lsp-lifecycle-binary-gate",
   "approved-lsp-lifecycle-binary-gate",
@@ -1185,6 +1384,10 @@ console.log(JSON.stringify({
     selectedTargetReadBridgeLines: symbolTargetBridge.readResult.summary.lineCount,
     selectedTargetEditSeedRegistry: symbolEditSeed.registry,
     selectedTargetEditSeedProposal: symbolEditSeed.editProposal.registry,
+    selectedTargetEditTaskStatus: symbolEditTask.status,
+    selectedTargetEditLedgerRecords: symbolEditLedger.summary.write_text,
+    selectedTargetEditEvidencePassed: symbolEditEvidence.summary.passed,
+    selectedTargetEditFinalReadContainsReplacement: String(symbolEditReadback.content ?? "").includes(selectedTargetNewText),
     serverStatus: check.serverReadiness.status,
     lifecycleTaskStatus: lifecycleTask.status,
     binaryFound: execution.server.binaryFound,
