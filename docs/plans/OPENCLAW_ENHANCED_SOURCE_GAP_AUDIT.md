@@ -84,6 +84,10 @@ governed surfaces:
 - Native engineering proposal surface:
   `act.openclaw.engineering_tool.edit_proposal` creates exact-match surgical
   edit proposals and bounded diff previews without applying patches.
+- Native engineering edit approval bridge:
+  `openclaw-native-engineering-edit-proposal-task-v0` connects reviewed
+  `cc_edit` proposal evidence to approval-gated `workspace_patch_apply` tasks
+  without approving or executing the patch.
 - Native engineering write proposal surface:
   `act.openclaw.engineering_tool.write_proposal` maps `cc_write`
   create/overwrite intent into bounded workspace proposal evidence with redacted
@@ -140,7 +144,7 @@ enhanced `openclaw` modules.
 | Enhanced capability | Classification | Current evidence | Migration call | Identity level |
 | --- | --- | --- | --- | --- |
 | `cc_read` | absorbed | `sense.openclaw.engineering_tool.read` provides bounded workspace file read with line ranges, content budget, traversal protection, binary/size boundaries, audit, and Observer evidence. | Continue using the native read/search surface; do not import enhanced `FileReadTool.ts`. | Level 1 |
-| `cc_edit` | partially absorbed | `act.openclaw.engineering_tool.edit_proposal` creates exact-match surgical edit proposals with bounded diff previews, while `act.openclaw.workspace_patch_apply` remains the approval-gated apply path. | Keep proposal and apply separated. Do not migrate immediate raw edit execution. | Level 1 |
+| `cc_edit` | absorbed through governed proposal and approval bridge | `act.openclaw.engineering_tool.edit_proposal` creates exact-match surgical edit proposals with bounded diff previews; `openclaw-native-engineering-edit-proposal-task-v0` bridges confirmed proposals to approval-gated `workspace_patch_apply` tasks. | Keep proposal, approval, execution, and evidence separated. Do not migrate immediate raw edit execution. | Level 1 |
 | `cc_write` | absorbed through governed proposal/approval/execution evidence | `act.openclaw.engineering_tool.write_proposal` creates redacted create/overwrite proposal evidence; `openclaw-native-engineering-write-proposal-task-v0` bridges confirmed proposals to approval-gated `workspace_text_write` tasks; `sense.openclaw.engineering_tool.write_execution_evidence` reads completed write ledger evidence. | Keep proposal, approval, execution, and recovery separated. Do not migrate raw overwrite semantics as an autonomous default. | Level 1 |
 | `cc_glob` | absorbed | `sense.openclaw.engineering_tool.glob` performs bounded workspace file discovery with skipped hidden/generated/cache/dependency directories and result caps. | Continue native bounded discovery; do not execute enhanced `GlobTool.ts`. | Level 1 |
 | `cc_grep` | absorbed | `sense.openclaw.engineering_tool.grep` performs bounded workspace text search with literal/regex mode, include filters, result/output caps, binary skips, audit, and Observer evidence. | Continue native bounded search; do not execute enhanced `GrepTool.ts`. | Level 1 |
@@ -196,14 +200,18 @@ Current OpenClaw:
   and unit tests.
 - `workspace-ops.mjs` materializes mutation only through approval-gated tasks,
   `act.filesystem.write_text`, filesystem ledgering, and public redaction.
+- `openclaw-native-engineering-edit-proposal-task-v0` rebuilds proposal
+  evidence, verifies hashes against the patch task draft, and creates a queued
+  approval-gated `workspace_patch_apply` task without approving or executing it.
 
-Classification: partially absorbed.
+Classification: absorbed through governed proposal and approval bridge.
 
 Recommendation:
 
 - Do not migrate immediate edit execution. The useful part is the uniqueness
   check and surgical edit ergonomics; OpenClaw's existing approval and ledger
-  path should remain authoritative.
+  path should remain authoritative. Add read-only edit execution evidence after
+  approved patch task completion.
 
 ### `cc_write`
 
@@ -531,7 +539,8 @@ Should not migrate:
 
 - Wholesale `extensions/cc-tools` import as an ungoverned tool bundle.
 - Immediate `cc_edit`/`cc_write` mutation outside OpenClaw approval and ledger
-  paths.
+  paths; `cc_edit` execution evidence after approved patch completion remains a
+  follow-up.
 - Hidden prompt-wall replacement as the main way to enforce engineering
   behavior.
 - Raw persona or local setup notes from `SOUL.md` and `TOOLS.md` as product

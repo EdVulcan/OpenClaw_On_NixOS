@@ -15,6 +15,7 @@ export const observerClientEngineeringEditRenderersScript = `function renderEngi
   engineeringEditProposalJson.textContent = [
     "Native governed edit proposal: exact-match surgical diff preview mapped from cc_edit without applying a patch.",
     "This endpoint reads through the bounded workspace read surface and does not write, apply, create tasks, create approvals, run shell commands, start LSP, call providers, or import enhanced source code.",
+    "Approval-gated task bridge: /plugins/native-adapter/engineering-edit-proposal-tasks creates a workspace_patch_apply task only with explicit confirmation; approval is still required before mutation.",
     \`Registry: \${data?.registry ?? "openclaw-native-engineering-edit-proposal-v0"}\`,
     \`Mode: \${data?.mode ?? "surgical-edit-proposal-diff-preview-only"}\`,
     \`Identity: \${data?.identityLevel ?? "Level 1: stable user-space control plane"}\`,

@@ -107,6 +107,19 @@ function writeProposalTaskInputFromBody(body) {
   };
 }
 
+function editProposalTaskInputFromBody(body) {
+  return {
+    workspacePath: bodyString(body, "workspacePath", null),
+    relativePath: bodyString(body, "relativePath", "scratch/native-edit.txt"),
+    oldString: bodyString(body, "oldString", bodyString(body, "search", "")),
+    newString: bodyString(body, "newString", bodyString(body, "replacement", "")),
+    contextLines: bodyInteger(body, "contextLines", 1),
+    maxOutputChars: bodyInteger(body, "maxOutputChars", 24_000),
+    maxFileSizeBytes: bodyInteger(body, "maxFileSizeBytes", 128 * 1024),
+    confirm: body.confirm === true,
+  };
+}
+
 function sourceAuthoredDraftInputFromQuery(requestUrl) {
   const proposalQuery = requestUrl.searchParams.get("proposalQuery") ?? "edit";
   return {
@@ -194,6 +207,27 @@ export async function handleWorkspaceNativeOpsRoute({
         "target",
         "engineeringWriteProposal",
         "workspaceTextWrite",
+      ], { serialiseTask, serialiseApproval, buildTaskSummary }));
+    } catch (error) {
+      sendError(res, 400, error);
+    }
+    return true;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/plugins/native-adapter/engineering-edit-proposal-tasks") {
+    try {
+      const body = await readJsonBody(req);
+      const result = await workspaceOps.createNativeEngineeringEditProposalTask(editProposalTaskInputFromBody(body));
+      sendJson(res, 201, serialiseWorkspaceTaskResponse(result, [
+        "capability",
+        "workspace",
+        "target",
+        "validation",
+        "proposal",
+        "edits",
+        "diffPreview",
+        "engineeringEditProposal",
+        "workspacePatchApply",
       ], { serialiseTask, serialiseApproval, buildTaskSummary }));
     } catch (error) {
       sendError(res, 400, error);

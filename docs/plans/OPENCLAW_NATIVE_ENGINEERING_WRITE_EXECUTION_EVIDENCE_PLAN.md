@@ -89,14 +89,25 @@ openclaw-native-engineering-write-execution-evidence
 observer-openclaw-native-engineering-write-execution-evidence
 ```
 
+## Follow-Up Status
+
+The recommended edit approval bridge follow-up was completed as:
+
+```text
+OPENCLAW_NATIVE_ENGINEERING_EDIT_APPROVAL_BRIDGE_PLAN.md
+```
+
+That slice connects `cc_edit` proposal evidence to the existing
+approval-gated patch apply task path without approving or executing it.
+
 ## Next Slice
 
 The next recommended real capability is:
 
 ```text
-Native governed edit proposal approval bridge
+Native governed edit execution evidence
 ```
 
-That slice should connect `cc_edit` proposal evidence to the existing
-approval-gated patch apply task path while preserving the same proposal,
-approval, execution, evidence, and recovery separation.
+That slice should prove approved edit execution through the existing
+workspace_patch_apply task path and read completed task/filesystem ledger
+evidence without auto-approval or bypassing operator approval.

@@ -368,6 +368,131 @@ async function createNativeEngineeringWriteProposalTask({
   };
 }
 
+async function createNativeEngineeringEditProposalTask({
+  workspacePath = null,
+  relativePath = "scratch/native-edit.txt",
+  oldString = "",
+  newString = "",
+  contextLines = 1,
+  maxOutputChars = 24_000,
+  maxFileSizeBytes = 128 * 1024,
+  confirm = false,
+} = {}) {
+  if (confirm !== true) {
+    throw new Error("native engineering edit proposal task creation requires confirm=true.");
+  }
+  if (typeof deps.buildNativeEngineeringEditProposal !== "function") {
+    throw new Error("native engineering edit proposal builder is unavailable.");
+  }
+
+  const engineeringEditProposal = deps.buildNativeEngineeringEditProposal({
+    workspacePath,
+    relativePath,
+    oldString,
+    newString,
+    contextLines,
+    maxOutputChars,
+    maxFileSizeBytes,
+  });
+  if (!engineeringEditProposal.ok || engineeringEditProposal.blocked) {
+    throw new Error(`native engineering edit proposal task cannot bridge blocked proposal: ${engineeringEditProposal.target?.blockedReason ?? engineeringEditProposal.summary?.reason ?? "proposal_blocked"}`);
+  }
+
+  const taskResult = await createNativeOpenClawWorkspacePatchApplyTask({
+    workspacePath,
+    relativePath: engineeringEditProposal.target.relativePath,
+    search: oldString,
+    replacement: typeof newString === "string" ? newString : "",
+    occurrence: 1,
+    contextLines,
+    proposal: {
+      ...engineeringEditProposal.proposal,
+      source: engineeringEditProposal.registry,
+      targetContext: {
+        relativePath: engineeringEditProposal.target.relativePath,
+        fileRole: "native engineering cc_edit proposal",
+      },
+      expectedChecks: engineeringEditProposal.proposal?.expectedChecks ?? [
+        "diff-preview",
+        "unique-exact-match",
+        "approval-required-before-apply",
+      ],
+    },
+    confirm: true,
+  });
+  if (
+    taskResult.target?.originalSha256 !== engineeringEditProposal.target?.originalSha256
+    || taskResult.target?.nextSha256 !== engineeringEditProposal.target?.proposedSha256
+  ) {
+    throw new Error("native engineering edit proposal task target changed before approval task creation.");
+  }
+
+  taskResult.task.engineeringEditProposal = {
+    registry: engineeringEditProposal.registry,
+    proposalId: engineeringEditProposal.proposal.id,
+    proposalKind: engineeringEditProposal.proposal.kind,
+    sourceCapabilityId: engineeringEditProposal.capability.id,
+    approvedMutationCapabilityId: "act.openclaw.workspace_patch_apply",
+    target: engineeringEditProposal.target,
+    contentExposed: false,
+    diffPreviewExposed: true,
+  };
+  persistState();
+  const generatedAt = new Date().toISOString();
+
+  return {
+    registry: "openclaw-native-engineering-edit-proposal-task-v0",
+    mode: "approval-gated-edit-proposal-bridge",
+    generatedAt,
+    sourceRegistry: engineeringEditProposal.registry,
+    capability: engineeringEditProposal.capability,
+    workspace: engineeringEditProposal.workspace,
+    target: engineeringEditProposal.target,
+    validation: engineeringEditProposal.validation,
+    proposal: engineeringEditProposal.proposal,
+    edits: engineeringEditProposal.edits,
+    diffPreview: engineeringEditProposal.diffPreview,
+    engineeringEditProposal: {
+      registry: engineeringEditProposal.registry,
+      mode: engineeringEditProposal.mode,
+      proposal: engineeringEditProposal.proposal,
+      target: engineeringEditProposal.target,
+      summary: engineeringEditProposal.summary,
+      governance: engineeringEditProposal.governance,
+      auditEvidence: engineeringEditProposal.auditEvidence,
+      deferredExecutionBoundaries: engineeringEditProposal.deferredExecutionBoundaries,
+      contentExposed: false,
+      diffPreviewExposed: true,
+    },
+    workspacePatchApply: {
+      registry: taskResult.registry,
+      mode: taskResult.mode,
+      capability: taskResult.capability,
+      target: taskResult.target,
+      validation: taskResult.validation,
+      proposal: taskResult.proposal,
+      contentExposed: false,
+      diffPreviewExposed: true,
+    },
+    task: taskResult.task,
+    approval: taskResult.approval,
+    governance: {
+      mode: "native_engineering_edit_proposal_to_workspace_patch_apply_approval_bridge",
+      runtimeOwner: "openclaw_on_nixos",
+      createsTask: true,
+      createsApproval: true,
+      canExecuteWithoutApproval: false,
+      executed: false,
+      canMutateBeforeApproval: false,
+      delegatesApprovedMutationTo: "act.openclaw.workspace_patch_apply",
+      recordsCapabilityHistory: true,
+      recordsFilesystemLedgerAfterApproval: true,
+      exposesFullContent: false,
+      exposesDiffPreview: true,
+    },
+  };
+}
+
 function readBoundedWorkspaceTextFile(target, { maxBytes = 64 * 1024 } = {}) {
   const stats = safeStat(target.absolutePath);
   if (!stats?.isFile()) {
@@ -1046,6 +1171,7 @@ async function createOpenClawSourceCommandTask({
     resolveOpenClawWorkspaceTarget,
     buildNativeOpenClawWorkspaceTextWriteDraft,
     createNativeOpenClawWorkspaceTextWriteTask,
+    createNativeEngineeringEditProposalTask,
     createNativeEngineeringWriteProposalTask,
     readBoundedWorkspaceTextFile,
     normaliseWorkspacePatchEdits,

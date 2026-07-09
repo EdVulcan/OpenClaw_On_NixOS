@@ -58,6 +58,18 @@ provider calls, network egress, result envelopes
 Actual application remains the existing approval-gated OpenClaw patch path, not
 this proposal endpoint.
 
+## Follow-Up Status
+
+The recommended approval bridge follow-up was completed as:
+
+```text
+OPENCLAW_NATIVE_ENGINEERING_EDIT_APPROVAL_BRIDGE_PLAN.md
+```
+
+That slice creates an approval-gated `workspace_patch_apply` task from a
+confirmed `cc_edit`-style proposal while preserving the preview/apply
+separation. It still does not approve, execute, or write.
+
 ## Evidence
 
 Runtime builder:
@@ -101,9 +113,9 @@ OPENCLAW_MILESTONE_CHECKS=openclaw-native-engineering-edit-proposal,observer-ope
 The next recommended real capability is:
 
 ```text
-verification command evidence attached to task completion
+Native governed edit execution evidence
 ```
 
-That slice should migrate the `cc_verify` idea as governed command evidence with
-command shape, provenance, timeout, retry budget, exit status, output budget,
-and Observer visibility. It must not become ungoverned shell execution.
+That slice should prove approved edit execution through the existing
+workspace_patch_apply task path and read completed task/filesystem ledger
+evidence without auto-approval or bypassing operator approval.
