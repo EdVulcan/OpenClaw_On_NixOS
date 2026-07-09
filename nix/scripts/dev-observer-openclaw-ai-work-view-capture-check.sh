@@ -60,6 +60,8 @@ const requiredClient = [
   "screen.workView?.activeUrl",
   "screen.captureMetadata?.activeUrl",
   "trustedSession.identityLevel",
+  "trustedSession.helperReadiness",
+  "trustedSession.recoveryRecommendation",
   "Trusted Boundary",
 ];
 
@@ -101,7 +103,8 @@ if (!screen.snapshotText?.includes("OpenClaw browser work view")) {
 const trustedSession = screen.trustedSession ?? screen.workView?.trustedSession ?? screen.captureMetadata?.trustedSession;
 if (trustedSession?.identityLevel !== "level_2_trusted_session_work_view"
   || trustedSession?.boundary?.workViewScope !== "ai_owned_work_view_only"
-  || trustedSession?.operatorGates?.reveal !== "explicit_operator_action") {
+  || trustedSession?.operatorGates?.reveal !== "explicit_operator_action"
+  || trustedSession?.helperReadiness?.state !== "ready") {
   throw new Error(`Observer-facing screen state should expose trusted session boundary: ${JSON.stringify(trustedSession)}`);
 }
 
@@ -118,6 +121,7 @@ console.log(JSON.stringify({
       "screen.workView.activeUrl",
       "screen.captureMetadata.activeUrl",
       "trustedSession.identityLevel",
+      "trustedSession.helperReadiness",
     ],
   },
   screen: {
@@ -126,6 +130,7 @@ console.log(JSON.stringify({
     captureStrategy: screen.captureStrategy,
     activeUrl: screen.workView?.activeUrl ?? null,
     trustedSession: trustedSession.identityLevel,
+    recoveryRecommendation: trustedSession.recoveryRecommendation.action,
   },
 }, null, 2));
 EOF

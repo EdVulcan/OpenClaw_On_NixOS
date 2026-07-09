@@ -142,6 +142,8 @@ async function refreshWorkView() {
       \`Browser: \${workView.browserStatus ?? "unknown"}\`,
       \`Trusted Session: \${trustedSession.identityLevel ?? "unknown"} readiness=\${trustedSession.readiness ?? "unknown"}\`,
       \`Trusted Boundary: \${trustedSession.boundary?.workViewScope ?? "unknown"} root=\${String(Boolean(trustedSession.boundary?.rootRequired))} desktopWide=\${String(Boolean(trustedSession.boundary?.desktopWideCapture))}\`,
+      \`Helper Readiness: \${trustedSession.helperReadiness?.state ?? "unknown"} reason=\${trustedSession.helperReadiness?.reason ?? "unknown"}\`,
+      \`Recovery Recommendation: \${trustedSession.recoveryRecommendation?.action ?? "unknown"} endpoint=\${trustedSession.recoveryRecommendation?.endpoint ?? "none"}\`,
       \`Reveal Gate: \${trustedSession.operatorGates?.reveal ?? "unknown"}\`,
       \`Entry URL: \${workView.entryUrl ?? "none"}\`,
       \`Active URL: \${workView.activeUrl ?? "none"}\`,
@@ -181,6 +183,8 @@ async function refreshScreen() {
           "URL: " + (workViewSummary.url ?? "none"),
           "Trusted Session: " + (trustedSession.identityLevel ?? "unknown") + " readiness=" + (trustedSession.readiness ?? "unknown"),
           "Trusted Boundary: " + (trustedSession.boundary?.workViewScope ?? "unknown"),
+          "Helper Readiness: " + (trustedSession.helperReadiness?.state ?? "unknown"),
+          "Recovery Recommendation: " + (trustedSession.recoveryRecommendation?.action ?? "unknown"),
           "Visible Text: " + ((workViewSummary.visibleTextBlocks ?? []).join(" | ") || "none"),
           "Recent Input: " + (workViewSummary.recentInteraction?.input ?? "none"),
         ].join("\\n")

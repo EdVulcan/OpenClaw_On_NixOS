@@ -91,7 +91,9 @@ if (captureTrust?.identityLevel !== "level_2_trusted_session_work_view"
   || captureTrust?.boundary?.workViewScope !== "ai_owned_work_view_only"
   || captureTrust?.boundary?.desktopWideCapture !== false
   || captureTrust?.boundary?.rootRequired !== false
-  || captureTrust?.operatorGates?.reveal !== "explicit_operator_action") {
+  || captureTrust?.operatorGates?.reveal !== "explicit_operator_action"
+  || captureTrust?.helperReadiness?.state !== "ready"
+  || captureTrust?.recoveryRecommendation?.action !== "none") {
   throw new Error(`capture should expose trusted AI work-view boundary: ${JSON.stringify(captureTrust)}`);
 }
 if (!capture.sessionId || !capture.snapshotText?.includes("Capture Strategy: browser-runtime-backed")) {
@@ -117,7 +119,8 @@ if (screen.workView?.activeUrl !== targetUrl || screen.captureMetadata?.activeUr
 }
 const screenTrust = screen.trustedSession ?? screen.workView?.trustedSession ?? screen.captureMetadata?.trustedSession;
 if (screenTrust?.identityLevel !== "level_2_trusted_session_work_view"
-  || screenTrust?.boundary?.workViewScope !== "ai_owned_work_view_only") {
+  || screenTrust?.boundary?.workViewScope !== "ai_owned_work_view_only"
+  || screenTrust?.helperReadiness?.state !== "ready") {
   throw new Error(`screen-sense should propagate trusted work-view contract: ${JSON.stringify(screenTrust)}`);
 }
 
@@ -131,6 +134,7 @@ console.log(JSON.stringify({
     tabCount: capture.tabCount,
     mode: capture.workView?.mode ?? null,
     trustedSession: captureTrust.identityLevel,
+    helperReadiness: captureTrust.helperReadiness.state,
   },
   screenSense: {
     readiness: screen.readiness,
@@ -138,6 +142,7 @@ console.log(JSON.stringify({
     captureStrategy: screen.captureStrategy,
     activeUrl: screen.workView?.activeUrl ?? null,
     trustedSession: screenTrust.identityLevel,
+    recoveryRecommendation: screenTrust.recoveryRecommendation.action,
   },
 }, null, 2));
 EOF

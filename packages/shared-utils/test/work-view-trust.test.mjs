@@ -36,6 +36,8 @@ test("trusted work-view contract records Level 2 boundary without host takeover"
   assert.equal(contract.operatorGates.reveal, "explicit_operator_action");
   assert.equal(contract.captureProvenance.browserRuntimeBacked, true);
   assert.equal(contract.captureProvenance.activeUrl, "https://example.com/work-view");
+  assert.equal(contract.helperReadiness.state, "ready");
+  assert.equal(contract.recoveryRecommendation.action, "none");
 });
 
 test("trusted work-view contract reports degraded helper state", () => {
@@ -52,8 +54,35 @@ test("trusted work-view contract reports degraded helper state", () => {
   });
 
   assert.equal(contract.readiness, "degraded");
+  assert.equal(contract.helperReadiness.state, "degraded");
+  assert.equal(contract.recoveryRecommendation.endpoint, "/work-view/prepare");
+  assert.equal(contract.recoveryRecommendation.canRecoverWithoutRoot, true);
   assert.equal(contract.captureProvenance.visibleToObserver, true);
   assert.equal(contract.deferred.rootSessionDaemon, true);
   assert.equal(contract.deferred.graphicsStackNativeWorkspace, true);
 });
 
+test("trusted work-view contract recommends reveal for prepared hidden work view", () => {
+  const contract = buildTrustedWorkViewContract({
+    source: "session-manager",
+    session: {
+      status: "running",
+      displayTarget: "workspace-2",
+    },
+    workView: {
+      status: "prepared",
+      visibility: "hidden",
+      mode: "background",
+      captureStrategy: "browser-runtime",
+      helperStatus: "active",
+      browserStatus: "running",
+      activeUrl: "https://example.com/hidden",
+    },
+  });
+
+  assert.equal(contract.readiness, "ready");
+  assert.equal(contract.helperReadiness.state, "prepared_hidden");
+  assert.equal(contract.recoveryRecommendation.action, "reveal_work_view");
+  assert.equal(contract.recoveryRecommendation.endpoint, "/work-view/reveal");
+  assert.equal(contract.recoveryRecommendation.rootRequired, false);
+});

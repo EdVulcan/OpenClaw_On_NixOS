@@ -74,7 +74,9 @@ if (!screenResponse.screen?.snapshotText?.includes("Summary: AI work view is foc
   throw new Error("screen snapshot should include readable work view summary text.");
 }
 if (trustedSession?.identityLevel !== "level_2_trusted_session_work_view"
-  || trustedSession?.boundary?.workViewScope !== "ai_owned_work_view_only") {
+  || trustedSession?.boundary?.workViewScope !== "ai_owned_work_view_only"
+  || trustedSession?.helperReadiness?.state !== "ready"
+  || trustedSession?.recoveryRecommendation?.action !== "none") {
   throw new Error(`screen summary should carry trusted work-view contract: ${JSON.stringify(trustedSession)}`);
 }
 
@@ -91,6 +93,7 @@ console.log(JSON.stringify({
     url: screenSummary.url,
     recentInput: screenSummary.recentInteraction?.input ?? null,
     trustedSession: trustedSession.identityLevel,
+    helperReadiness: trustedSession.helperReadiness.state,
   },
 }, null, 2));
 EOF

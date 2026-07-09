@@ -59,6 +59,8 @@ const requiredClient = [
   "workViewSummary.visibleTextBlocks",
   "workViewSummary.recentInteraction?.input",
   "Trusted Session",
+  "Helper Readiness",
+  "Recovery Recommendation",
 ];
 
 for (const token of requiredHtml) {
@@ -96,7 +98,8 @@ if (!summary?.visibleTextBlocks?.includes(inputText)) {
   throw new Error(`Observer-facing summary should expose visible text blocks: ${JSON.stringify(summary?.visibleTextBlocks)}`);
 }
 if (trustedSession?.identityLevel !== "level_2_trusted_session_work_view"
-  || trustedSession?.boundary?.workViewScope !== "ai_owned_work_view_only") {
+  || trustedSession?.boundary?.workViewScope !== "ai_owned_work_view_only"
+  || trustedSession?.helperReadiness?.state !== "ready") {
   throw new Error(`Observer-facing summary should expose trusted work-view contract: ${JSON.stringify(trustedSession)}`);
 }
 
@@ -111,6 +114,7 @@ console.log(JSON.stringify({
     "visibleTextBlocks",
     "recentInteraction.input",
     "trustedSession.identityLevel",
+    "trustedSession.helperReadiness",
   ],
 },
 screenSummary: {
@@ -118,6 +122,7 @@ screenSummary: {
   url: summary.url,
   recentInput: summary.recentInteraction?.input ?? null,
   trustedSession: trustedSession.identityLevel,
+  helperReadiness: trustedSession.helperReadiness.state,
 },
 }, null, 2));
 EOF

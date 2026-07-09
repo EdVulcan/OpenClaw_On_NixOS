@@ -36,6 +36,29 @@ export type TrustedWorkViewContract = {
     capturedAt: string | null;
     visibleToObserver: boolean;
   };
+  helperReadiness: {
+    state: "ready" | "prepared_hidden" | "needs_prepare" | "degraded";
+    reason: string;
+    recommendedOperatorAction: string;
+    recoveryEndpoint: string | null;
+    approvalRequired: false;
+    rootRequired: false;
+    canRecoverWithoutRoot: true;
+    observerVisible: true;
+    availableOperatorActions: Array<{
+      id: string;
+      endpoint: string;
+      approvalRequired: false;
+    }>;
+  };
+  recoveryRecommendation: {
+    action: string;
+    endpoint: string | null;
+    reason: string;
+    approvalRequired: false;
+    rootRequired: false;
+    canRecoverWithoutRoot: true;
+  };
   evidence: {
     sessionStatus: string;
     workViewStatus: string;
@@ -54,4 +77,3 @@ export type TrustedWorkViewContract = {
 };
 
 export function buildTrustedWorkViewContract(input?: Record<string, unknown>): TrustedWorkViewContract;
-

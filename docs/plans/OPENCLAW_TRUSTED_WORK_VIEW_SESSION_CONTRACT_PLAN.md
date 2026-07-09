@@ -4,7 +4,8 @@ Updated: 2026-07-10
 
 ## Active Slice
 
-Identity-upgrade bridge: trusted AI work-view session contract.
+Identity-upgrade bridge: trusted AI work-view session contract and helper
+readiness recommendation.
 
 This slice moves OpenClaw from a plain Level 1 user-space work-view readback
 toward Level 2 trusted session/work-view behavior by making the AI-owned work
@@ -26,7 +27,15 @@ operatorGates.reveal: explicit_operator_action
 boundary.rootRequired: false
 boundary.desktopWideCapture: false
 boundary.hostMutation: false
+helperReadiness.state: ready | prepared_hidden | needs_prepare | degraded
+recoveryRecommendation.action: none | prepare_work_view | reveal_work_view
 ```
+
+The helper readiness portion makes the contract actionable without adding a new
+execution path. A visible work view reports `ready` with no recovery action. A
+prepared hidden work view recommends `/work-view/reveal`. A missing or degraded
+browser-runtime-backed work view recommends `/work-view/prepare`. All recovery
+recommendations remain user-space, Observer-visible, and root-free.
 
 The contract is emitted through:
 
@@ -87,19 +96,20 @@ root/system daemon or polkit integration
 nested compositor or graphics-stack-native workspace
 host mutation and input execution beyond existing governed user-space paths
 provider egress or credential access
+automatic recovery execution; the contract recommends existing operator actions
 ```
 
 ## Next Slice
 
-The next high-density identity-upgrade slice should make the contract actionable
-without escalating privileges:
+The next high-density identity-upgrade slice should turn helper readiness into a
+recoverable operator workflow without escalating privileges:
 
 ```text
-AI work-view trusted session helper readiness and recovery recommendation
+AI work-view helper recovery action bridge
 ```
 
 That should reuse the existing `/work-view/state`, `/screen/current`, Observer
-work-view panel, and Phase 3 readback where possible. It should only add a new
-route if the existing state cannot truthfully carry helper readiness, recovery,
-and operator takeover guidance.
-
+work-view panel, and `/work-view/prepare|reveal|hide` actions where possible.
+It should keep automatic execution deferred; the useful increment is making the
+recommended action explicit enough for Observer/operator control surfaces to
+invoke the existing governed action deliberately.

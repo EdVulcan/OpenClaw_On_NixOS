@@ -292,6 +292,7 @@ async function refreshPhase3BackgroundWorkView() {
       "Current: visibility=" + (workView.visibility ?? "unknown") + " mode=" + (workView.mode ?? "unknown") + " capture=" + (workView.captureStrategy ?? "unknown"),
       "Trusted Session: " + (trustedSession.identityLevel ?? "unknown") + " readiness=" + (trustedSession.readiness ?? "unknown"),
       "Trusted Boundary: " + (trustedSession.boundary?.workViewScope ?? "unknown") + " revealGate=" + (trustedSession.operatorGates?.reveal ?? "unknown"),
+      "Helper Readiness: " + (trustedSession.helperReadiness?.state ?? "unknown") + " recovery=" + (trustedSession.recoveryRecommendation?.action ?? "unknown"),
     ].join("\\n");
   } catch {
     phase3BackgroundReady.textContent = "false";

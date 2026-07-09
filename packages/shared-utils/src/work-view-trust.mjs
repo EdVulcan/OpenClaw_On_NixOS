@@ -36,6 +36,71 @@ function deriveReadiness({ degraded, helperStatus, sessionStatus, browserRunning
   return "warming_up";
 }
 
+function helperActions() {
+  return [
+    { id: "prepare_work_view", endpoint: "/work-view/prepare", approvalRequired: false },
+    { id: "reveal_work_view", endpoint: "/work-view/reveal", approvalRequired: false },
+    { id: "hide_work_view", endpoint: "/work-view/hide", approvalRequired: false },
+    { id: "operator_takeover", endpoint: "/control/takeover", approvalRequired: false },
+  ];
+}
+
+function deriveHelperReadiness({ readiness, helperStatus, browserStatus, browserRunning, activeUrl, visibility }) {
+  if (readiness === "degraded" || helperStatus === "degraded" || browserStatus === "unavailable") {
+    return {
+      state: "degraded",
+      reason: "helper_or_browser_runtime_degraded",
+      recommendedOperatorAction: "prepare_work_view",
+      recoveryEndpoint: "/work-view/prepare",
+      approvalRequired: false,
+      rootRequired: false,
+      canRecoverWithoutRoot: true,
+      observerVisible: true,
+      availableOperatorActions: helperActions(),
+    };
+  }
+
+  if (!activeUrl || (!browserRunning && browserStatus !== "running")) {
+    return {
+      state: "needs_prepare",
+      reason: "no_active_browser_runtime_work_view",
+      recommendedOperatorAction: "prepare_work_view",
+      recoveryEndpoint: "/work-view/prepare",
+      approvalRequired: false,
+      rootRequired: false,
+      canRecoverWithoutRoot: true,
+      observerVisible: true,
+      availableOperatorActions: helperActions(),
+    };
+  }
+
+  if (visibility === "hidden" || visibility === "background") {
+    return {
+      state: "prepared_hidden",
+      reason: "work_view_ready_but_hidden",
+      recommendedOperatorAction: "reveal_work_view",
+      recoveryEndpoint: "/work-view/reveal",
+      approvalRequired: false,
+      rootRequired: false,
+      canRecoverWithoutRoot: true,
+      observerVisible: true,
+      availableOperatorActions: helperActions(),
+    };
+  }
+
+  return {
+    state: "ready",
+    reason: "ai_owned_work_view_observable",
+    recommendedOperatorAction: "none",
+    recoveryEndpoint: null,
+    approvalRequired: false,
+    rootRequired: false,
+    canRecoverWithoutRoot: true,
+    observerVisible: true,
+    availableOperatorActions: helperActions(),
+  };
+}
+
 export function buildTrustedWorkViewContract(input = {}) {
   const session = input.session ?? {};
   const workView = input.workView ?? {};
@@ -70,6 +135,14 @@ export function buildTrustedWorkViewContract(input = {}) {
     browserRunning,
     workViewStatus: workView.status,
     activeUrl,
+  });
+  const helperReadiness = deriveHelperReadiness({
+    readiness,
+    helperStatus,
+    browserStatus,
+    browserRunning,
+    activeUrl,
+    visibility,
   });
 
   return {
@@ -108,6 +181,15 @@ export function buildTrustedWorkViewContract(input = {}) {
       capturedAt: firstString(input.capturedAt, capture.capturedAt),
       visibleToObserver: input.visibleToObserver !== false,
     },
+    helperReadiness,
+    recoveryRecommendation: {
+      action: helperReadiness.recommendedOperatorAction,
+      endpoint: helperReadiness.recoveryEndpoint,
+      reason: helperReadiness.reason,
+      approvalRequired: helperReadiness.approvalRequired,
+      rootRequired: helperReadiness.rootRequired,
+      canRecoverWithoutRoot: helperReadiness.canRecoverWithoutRoot,
+    },
     evidence: {
       sessionStatus: firstString(session.status, "unknown"),
       workViewStatus: firstString(workView.status, "unknown"),
@@ -125,4 +207,3 @@ export function buildTrustedWorkViewContract(input = {}) {
     },
   };
 }
-
