@@ -125,10 +125,10 @@ provider calls, network egress, and result envelopes
 The current next smallest real capability is:
 
 ```text
-Native governed engineering loop completion readback
+Native governed engineering loop recovery action draft
 ```
 
 The operator-control bridge is now visible, parameterized, and guided in
-Observer. The next slice should make post-approval completion outcomes easier
-to inspect from the same surface without adding automatic execution or another
-readiness chain.
+Observer, and it can read completion evidence after manual approval/execution.
+The next slice should improve failed-verification recovery ergonomics without
+adding automatic execution or another readiness chain.

@@ -68,13 +68,11 @@ raw credential reads
 
 ## Next Slice
 
-The next highest-density capability slice should make completed loop outcomes
-easier to inspect from the same operator surface:
+The completion-readback follow-up was completed as:
 
 ```text
-Native governed engineering loop completion readback
+OPENCLAW_NATIVE_ENGINEERING_LOOP_COMPLETION_READBACK_PLAN.md
 ```
 
-That slice should link the created task state to filesystem ledger,
-verification evidence, and recovery evidence after approval/operator execution,
-without introducing automatic execution.
+The next slice should improve recovery ergonomics for failed verification
+outcomes without introducing automatic execution.

@@ -1,4 +1,6 @@
-export const observerClientRuntimeEngineeringLoopControlsScript = `function focusEngineeringLoopTask(result) {
+export const observerClientRuntimeEngineeringLoopControlsScript = `let latestEngineeringLoopControlState = null;
+
+function focusEngineeringLoopTask(result) {
   taskHistoryFocus = "selected-task";
   selectedHistoryTaskId = result.task?.id ?? null;
   taskDetailIdInput.value = result.task?.id ?? "";
@@ -46,11 +48,18 @@ function renderEngineeringLoopControlState(kind, result) {
   const taskId = result.task?.id ?? "none";
   const approvalId = result.approval?.id ?? "none";
   const evidenceRoute = engineeringLoopEvidenceRoute(kind, result.task?.id ?? null);
+  latestEngineeringLoopControlState = {
+    kind,
+    taskId: result.task?.id ?? null,
+    approvalId: result.approval?.id ?? null,
+    evidenceRoute,
+  };
   engineeringLoopStateKind.textContent = kind;
   engineeringLoopStateTask.textContent = taskId === "none" ? "none" : taskId.slice(0, 8);
   engineeringLoopStateApproval.textContent = approvalId === "none" ? "none" : approvalId.slice(0, 8);
   engineeringLoopStateNext.textContent = "approve pending approval, then run operator step";
   engineeringLoopStateEvidence.textContent = evidenceRoute;
+  engineeringLoopStateCompletion.textContent = "pending approval";
   engineeringLoopStateJson.textContent = [
     \`Kind: \${kind}\`,
     \`Task: \${taskId}\`,
@@ -61,6 +70,29 @@ function renderEngineeringLoopControlState(kind, result) {
     \`Evidence: \${evidenceRoute}\`,
     "Boundary: no auto-approval, no automatic operator step, no unapproved mutation.",
   ].join("\\n");
+}
+
+async function refreshEngineeringLoopCompletionReadback() {
+  if (!latestEngineeringLoopControlState?.taskId) {
+    throw new Error("Create an engineering loop task first.");
+  }
+  const evidence = await fetchJson(\`\${observerConfig.coreUrl}\${latestEngineeringLoopControlState.evidenceRoute}\`);
+  const summary = evidence?.summary ?? {};
+  const total = summary.total ?? 0;
+  const passed = summary.passed ?? 0;
+  const failed = summary.failed ?? 0;
+  engineeringLoopStateCompletion.textContent = \`total=\${total} passed=\${passed} failed=\${failed}\`;
+  engineeringLoopStateJson.textContent = [
+    \`Kind: \${latestEngineeringLoopControlState.kind}\`,
+    \`Task: \${latestEngineeringLoopControlState.taskId}\`,
+    \`Approval: \${latestEngineeringLoopControlState.approvalId ?? "none"}\`,
+    \`Evidence: \${latestEngineeringLoopControlState.evidenceRoute}\`,
+    \`Completion: total=\${total} passed=\${passed} failed=\${failed}\`,
+    \`Registry: \${evidence?.registry ?? "unknown"}\`,
+    "Boundary: readback only; no approval, execution, retry, recovery task, mutation, provider call, or result envelope.",
+  ].join("\\n");
+  setControlMessage(\`Refreshed engineering loop completion evidence for \${latestEngineeringLoopControlState.taskId}.\`);
+  await refreshEngineeringLoopControlSurfaces();
 }
 
 async function refreshEngineeringLoopControlSurfaces() {

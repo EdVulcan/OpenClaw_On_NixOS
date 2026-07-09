@@ -129,6 +129,10 @@ export function observerOperationsPanels() {
           <div class="metric"><span>Approval</span><span id="engineering-loop-state-approval">none</span></div>
           <div class="metric"><span>Next</span><span id="engineering-loop-state-next">create task</span></div>
           <div class="metric"><span>Evidence</span><span id="engineering-loop-state-evidence">none</span></div>
+          <div class="metric"><span>Completion</span><span id="engineering-loop-state-completion">not checked</span></div>
+          <div class="actions tight">
+            <button id="engineering-loop-completion-button" class="secondary" type="button">Refresh Completion</button>
+          </div>
           <pre id="engineering-loop-state-json">No engineering loop task created from Observer controls yet.</pre>
         </section>
         <section class="panel">
