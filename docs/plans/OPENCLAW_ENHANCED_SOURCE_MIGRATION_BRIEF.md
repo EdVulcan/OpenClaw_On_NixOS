@@ -12,6 +12,19 @@ Read this file before continuing new phases that claim to improve coding
 capability, Claude Code parity, source integration, plugin runtime ergonomics, or
 agent token efficiency.
 
+Also read:
+
+```text
+docs/architecture/OPENCLAW_SYSTEM_IDENTITY_UPGRADE_PATH.md
+```
+
+That identity-upgrade route is the governing architecture lens for this work:
+enhanced `openclaw` capabilities should help OpenClaw become a stable user-space
+control plane first, then a trusted session component, then a controlled
+system-level body daemon, and finally a graphics-stack-native AI workspace. They
+should not push the project toward a crude root process or an ungoverned source
+dump.
+
 ## Source Situation
 
 Primary project repository:
@@ -231,6 +244,54 @@ Commit the enhanced openclaw work to a dedicated branch or fork, then let the VM
 agent inspect that branch as an external source reference.
 ```
 
+## Source Preservation Decision
+
+The best preservation path is to save the enhanced `openclaw` source as its own
+GitHub-visible reference, not as a direct dump into `OpenClawOnNixOS`.
+
+Recommended shape:
+
+```text
+EdVulcan/OpenClaw_On_NixOS
+  Main NixOS body project, whitepaper route, milestones, governance, docs.
+
+EdVulcan/openclaw-enhanced-source
+  Or a dedicated branch in an EdVulcan fork of openclaw.
+  Stores the concrete enhanced source implementation for inspection and
+  migration.
+```
+
+Recommended branch name if using a fork:
+
+```text
+edvulcan/enhanced-cc-tools-source-2026-07-09
+```
+
+Only preserve intentional source material:
+
+```text
+cc-tools
+microcompact
+live plugin runtime refresh
+ACPX/Codex bridge compatibility
+runtime persistence tests
+engineering prompt semantics
+operator-facing UI refinements
+```
+
+Do not preserve accidental local state in the source reference unless a human
+explicitly asks for it:
+
+```text
+.openclaw/workspace-state.json
+help.txt
+temp_test.txt
+```
+
+After the enhanced source is pushed, record its GitHub URL and commit hash in
+this brief. The VM agent should then clone or fetch that reference for source
+inspection instead of guessing from summaries.
+
 ## Integration Rules
 
 - Do not wholesale-copy the enhanced `openclaw` repo into `OpenClawOnNixOS`.
@@ -241,6 +302,11 @@ agent inspect that branch as an external source reference.
 - Every slice must name the user-visible capability, evidence artifact,
   remaining deferred boundary, and next capability step.
 - Keep code decoupled; do not recreate a giant core file.
+- Align capability migration with
+  `docs/architecture/OPENCLAW_SYSTEM_IDENTITY_UPGRADE_PATH.md`: strengthen the
+  user-space control plane and AI-owned work view first, then introduce trusted
+  sidecars or privileged daemons only when the capability requires that identity
+  level.
 
 ## Recommended Next Slice
 
