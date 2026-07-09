@@ -128,6 +128,12 @@ if (
   || evidence.summary?.total !== 1
   || evidence.summary?.passed !== 1
   || evidence.summary?.attachedToCompletedTasks !== 1
+  || evidence.summary?.workStandardsCovered !== 1
+  || evidence.workStandardsCoverage?.registry !== "openclaw-engineering-work-standards-task-coverage-v0"
+  || evidence.workStandardsCoverage?.status !== "covered"
+  || evidence.workStandardsCoverage?.score?.satisfied !== 1
+  || evidence.workStandardsCoverage?.governance?.canExecuteCommand !== false
+  || evidence.workStandardsCoverage?.governance?.canCreateTask !== false
   || evidence.governance?.canExecuteCommand !== false
   || evidence.governance?.canCreateTask !== false
   || evidence.governance?.canCreateApproval !== false
@@ -146,6 +152,9 @@ if (
   || item.result?.timedOut !== false
   || !String(item.result?.stdout ?? "").includes("engineering-verification-evidence-ok")
   || item.attachment?.attachedToTaskCompletion !== true
+  || item.workStandardsCoverage?.status !== "covered"
+  || item.workStandardsCoverage?.reportReadiness?.canReportWithEvidence !== true
+  || item.workStandardsCoverage?.reportReadiness?.commandSucceeded !== true
   || item.retryPolicy?.maxRetries !== 0
 ) {
   throw new Error(`verification evidence item mismatch: ${JSON.stringify(item)}`);
@@ -171,6 +180,7 @@ console.log(JSON.stringify({
     taskId: taskResponse.task.id,
     passed: evidence.summary.passed,
     attached: evidence.summary.attachedToCompletedTasks,
+    standardsCovered: evidence.summary.workStandardsCovered,
     command: item.commandShape.command,
   },
 }, null, 2));

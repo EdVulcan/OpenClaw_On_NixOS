@@ -119,6 +119,9 @@ for (const token of [
   "refreshEngineeringVerificationEvidence",
   "renderEngineeringVerificationEvidence",
   "Native engineering verification evidence",
+  "Work Standards Coverage:",
+  "openclaw-engineering-work-standards-task-coverage-v0",
+  "reportReady=",
   "sense.openclaw.engineering_tool.verify_evidence",
   "completed-command-transcript-verification-evidence",
 ]) {
@@ -134,6 +137,10 @@ if (
   || evidence.registry !== "openclaw-native-engineering-verification-evidence-v0"
   || evidence.summary?.passed !== 1
   || evidence.summary?.attachedToCompletedTasks !== 1
+  || evidence.summary?.workStandardsCovered !== 1
+  || evidence.workStandardsCoverage?.registry !== "openclaw-engineering-work-standards-task-coverage-v0"
+  || evidence.workStandardsCoverage?.status !== "covered"
+  || evidence.workStandardsCoverage?.governance?.canExecuteCommand !== false
   || evidence.governance?.canExecuteCommand !== false
 ) {
   throw new Error(`Observer verification evidence mismatch: ${JSON.stringify(evidence)}`);
@@ -145,6 +152,7 @@ if (
   || item.result?.exitCode !== 0
   || !String(item.result?.stdout ?? "").includes("engineering-verification-evidence-ok")
   || item.attachment?.attachedToTaskCompletion !== true
+  || item.workStandardsCoverage?.reportReadiness?.canReportWithEvidence !== true
 ) {
   throw new Error(`Observer verification evidence item mismatch: ${JSON.stringify(item)}`);
 }
@@ -161,6 +169,7 @@ console.log(JSON.stringify({
     registry: evidence.registry,
     passed: evidence.summary.passed,
     attached: evidence.summary.attachedToCompletedTasks,
+    standardsCovered: evidence.summary.workStandardsCovered,
   },
 }, null, 2));
 EOF

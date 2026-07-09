@@ -39,6 +39,7 @@ checks whether each transcript is attached to a completed task outcome
 checks exit code, timeout, and task completion state
 returns bounded stdout/stderr previews with output truncation flags
 returns retry-policy metadata without retrying commands
+returns read-only work standards coverage for verification evidence before report
 returns audit evidence and Observer-visible governance boundaries
 ```
 
@@ -77,6 +78,12 @@ Observer visibility:
 ```text
 apps/observer-ui/src/observer-panels-operations.mjs
 apps/observer-ui/src/client-script-renderers-engineering-verification.mjs
+```
+
+Work standards coverage:
+
+```text
+OPENCLAW_NATIVE_ENGINEERING_VERIFICATION_WORK_STANDARDS_COVERAGE_PLAN.md
 ```
 
 Validation target:

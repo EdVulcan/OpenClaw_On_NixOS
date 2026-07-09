@@ -60,10 +60,16 @@ test("native engineering verification evidence attaches successful transcript to
   assert.equal(response.governance.canCreateTask, false);
   assert.equal(response.summary.total, 1);
   assert.equal(response.summary.passed, 1);
+  assert.equal(response.summary.workStandardsCovered, 1);
+  assert.equal(response.workStandardsCoverage.registry, "openclaw-engineering-work-standards-task-coverage-v0");
+  assert.equal(response.workStandardsCoverage.status, "covered");
+  assert.equal(response.workStandardsCoverage.score.satisfied, 1);
   assert.equal(response.evidence[0].ok, true);
   assert.equal(response.evidence[0].commandShape.command, "npm");
   assert.equal(response.evidence[0].commandShape.cwd, "/tmp/openclaw");
   assert.equal(response.evidence[0].attachment.attachedToTaskCompletion, true);
+  assert.equal(response.evidence[0].workStandardsCoverage.reportReadiness.canReportWithEvidence, true);
+  assert.equal(response.evidence[0].workStandardsCoverage.reportReadiness.commandSucceeded, true);
   assert.equal(response.evidence[0].validation.failedChecks.length, 0);
   assert.equal(response.auditEvidence.evidenceKind, "response_embedded_audit_evidence");
 });
@@ -96,7 +102,12 @@ test("native engineering verification evidence records failures and output budge
   assert.equal(response.summary.total, 1);
   assert.equal(response.summary.failed, 1);
   assert.equal(response.summary.outputTruncated, 1);
+  assert.equal(response.summary.workStandardsCovered, 1);
+  assert.equal(response.summary.workStandardsRecoveryRecommended, 1);
   assert.equal(response.evidence[0].ok, false);
+  assert.equal(response.evidence[0].workStandardsCoverage.status, "covered");
+  assert.equal(response.evidence[0].workStandardsCoverage.reportReadiness.canReportWithEvidence, true);
+  assert.equal(response.evidence[0].workStandardsCoverage.reportReadiness.recoveryEvidenceRecommended, true);
   assert.equal(response.evidence[0].result.stdout, "01234");
   assert.equal(response.evidence[0].result.stderr, "");
   assert.equal(response.evidence[0].result.outputTruncated, true);
@@ -119,7 +130,10 @@ test("native engineering verification evidence filters by task id without execut
 
   assert.equal(response.query.limit, 50);
   assert.equal(response.summary.total, 1);
+  assert.equal(response.workStandardsCoverage.status, "missing_task_completion_attachment");
+  assert.equal(response.workStandardsCoverage.score.missing, 1);
   assert.equal(response.evidence[0].taskId, "task-b");
+  assert.equal(response.evidence[0].workStandardsCoverage.reportReadiness.canReportWithEvidence, false);
   assert.equal(response.governance.canExecuteCommand, false);
   assert.equal(response.deferredExecutionBoundaries.includes("no shell invocation"), true);
 });

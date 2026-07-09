@@ -4,6 +4,7 @@ const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 50;
 const DEFAULT_MAX_OUTPUT_CHARS = 4_000;
 const MAX_OUTPUT_CHARS = 12_000;
+const WORK_STANDARDS_COVERAGE_REGISTRY = "openclaw-engineering-work-standards-task-coverage-v0";
 
 function normalisePositiveInteger(value, fallback, max) {
   const parsed = Number.parseInt(String(value ?? ""), 10);
@@ -106,6 +107,35 @@ function buildChecks({ record, task, attachedToTaskCompletion }) {
   };
 }
 
+function buildWorkStandardsCoverage({ ok, attachedToTaskCompletion }) {
+  const verificationEvidenceCovered = attachedToTaskCompletion === true;
+  return {
+    registry: WORK_STANDARDS_COVERAGE_REGISTRY,
+    sourceRegistry: "openclaw-engineering-work-standards-v0",
+    status: verificationEvidenceCovered ? "covered" : "missing_task_completion_attachment",
+    standards: [
+      {
+        id: "verification_evidence_before_report",
+        required: true,
+        satisfied: verificationEvidenceCovered,
+        evidence: verificationEvidenceCovered ? "outcome.details.commandTranscript" : "not_attached",
+      },
+    ],
+    reportReadiness: {
+      canReportWithEvidence: verificationEvidenceCovered,
+      commandSucceeded: ok === true,
+      recoveryEvidenceRecommended: verificationEvidenceCovered && ok !== true,
+    },
+    governance: {
+      canCreateTask: false,
+      canCreateApproval: false,
+      canExecuteCommand: false,
+      canMutate: false,
+      canCallProvider: false,
+    },
+  };
+}
+
 function buildEvidenceRecord(record, { tasks, invocations, maxOutputChars }) {
   const task = findTask(tasks, record.taskId);
   const invocation = findInvocation(invocations, record);
@@ -158,6 +188,7 @@ function buildEvidenceRecord(record, { tasks, invocations, maxOutputChars }) {
       checks,
       failedChecks,
     },
+    workStandardsCoverage: buildWorkStandardsCoverage({ ok, attachedToTaskCompletion }),
   };
 }
 
@@ -211,6 +242,12 @@ export function buildNativeEngineeringVerificationEvidence({
     if (item.result.outputTruncated) {
       accumulator.outputTruncated += 1;
     }
+    if (item.workStandardsCoverage?.reportReadiness?.canReportWithEvidence) {
+      accumulator.workStandardsCovered += 1;
+    }
+    if (item.workStandardsCoverage?.reportReadiness?.recoveryEvidenceRecommended) {
+      accumulator.workStandardsRecoveryRecommended += 1;
+    }
     return accumulator;
   }, {
     total: 0,
@@ -219,7 +256,32 @@ export function buildNativeEngineeringVerificationEvidence({
     timedOut: 0,
     attachedToCompletedTasks: 0,
     outputTruncated: 0,
+    workStandardsCovered: 0,
+    workStandardsRecoveryRecommended: 0,
   });
+  const workStandardsCoverage = {
+    registry: WORK_STANDARDS_COVERAGE_REGISTRY,
+    sourceRegistry: "openclaw-engineering-work-standards-v0",
+    status: summary.total === 0
+      ? "no_verification_records"
+      : summary.workStandardsCovered === summary.total
+        ? "covered"
+        : "missing_task_completion_attachment",
+    score: {
+      required: summary.total,
+      satisfied: summary.workStandardsCovered,
+      missing: Math.max(0, summary.total - summary.workStandardsCovered),
+    },
+    coveredStandards: ["verification_evidence_before_report"],
+    missingRequiredStandards: summary.workStandardsCovered === summary.total ? [] : ["verification_evidence_before_report"],
+    governance: {
+      canCreateTask: false,
+      canCreateApproval: false,
+      canExecuteCommand: false,
+      canMutate: false,
+      canCallProvider: false,
+    },
+  };
 
   return {
     ok: true,
@@ -253,6 +315,7 @@ export function buildNativeEngineeringVerificationEvidence({
       noApprovalCreation: true,
     },
     governance: buildGovernance(),
+    workStandardsCoverage,
     evidence,
     summary,
     auditEvidence: {
