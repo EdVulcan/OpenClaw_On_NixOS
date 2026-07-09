@@ -53,6 +53,7 @@ const requiredHtml = [
   "screen-capture-strategy",
   "screen-work-view-url",
   "screen-snapshot",
+  "run-recommended-work-view-action-button",
 ];
 const requiredClient = [
   "screen.captureSource",
@@ -62,6 +63,9 @@ const requiredClient = [
   "trustedSession.identityLevel",
   "trustedSession.helperReadiness",
   "trustedSession.recoveryRecommendation",
+  "runRecommendedWorkViewAction",
+  "prepare_work_view",
+  "reveal_work_view",
   "Trusted Boundary",
 ];
 
@@ -114,6 +118,7 @@ console.log(JSON.stringify({
       "screen-capture-source",
       "screen-capture-strategy",
       "screen-work-view-url",
+      "run-recommended-work-view-action-button",
     ],
     clientFields: [
       "screen.captureSource",
@@ -122,6 +127,7 @@ console.log(JSON.stringify({
       "screen.captureMetadata.activeUrl",
       "trustedSession.identityLevel",
       "trustedSession.helperReadiness",
+      "runRecommendedWorkViewAction",
     ],
   },
   screen: {

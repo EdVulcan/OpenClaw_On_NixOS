@@ -300,6 +300,47 @@ async function postWorkView(path, payload = {}) {
   await refreshScreen();
 }
 
+async function readLatestWorkViewStateForAction() {
+  const data = await fetchJson(\`\${observerConfig.sessionManagerUrl}/work-view/state\`);
+  latestWorkViewState = data.workView ?? null;
+  return latestWorkViewState;
+}
+
+async function runRecommendedWorkViewAction() {
+  const workView = await readLatestWorkViewStateForAction();
+  const recommendation = workView?.trustedSession?.recoveryRecommendation ?? {};
+  const action = recommendation.action ?? "none";
+
+  if (action === "none") {
+    setControlMessage("Work view helper is ready; no recovery action recommended.");
+    await refreshWorkView();
+    await refreshScreen();
+    return;
+  }
+
+  if (action === "prepare_work_view") {
+    await postWorkView("/work-view/prepare", {
+      displayTarget: workView?.displayTarget ?? "workspace-2",
+      entryUrl: getDesiredWorkViewUrl(),
+    });
+    return;
+  }
+
+  if (action === "reveal_work_view") {
+    await postWorkView("/work-view/reveal", {
+      entryUrl: workView?.activeUrl ?? workView?.entryUrl ?? getDesiredWorkViewUrl(),
+    });
+    return;
+  }
+
+  if (action === "hide_work_view") {
+    await postWorkView("/work-view/hide");
+    return;
+  }
+
+  setControlMessage(\`Unsupported work view recommendation: \${action}\`);
+}
+
 async function openWorkViewUrl(taskId = null) {
   const entryUrl = getDesiredWorkViewUrl();
   if (taskId) {

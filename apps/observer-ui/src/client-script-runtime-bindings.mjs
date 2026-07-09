@@ -255,6 +255,12 @@ hideWorkViewButton.addEventListener("click", () => {
   });
 });
 
+runRecommendedWorkViewActionButton.addEventListener("click", () => {
+  runRecommendedWorkViewAction().catch((error) => {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  });
+});
+
 refreshScreenButton.addEventListener("click", () => {
   refreshScreenNow().catch((error) => {
     setControlMessage(\`Request failed: \${formatError(error)}\`);

@@ -4,8 +4,8 @@ Updated: 2026-07-10
 
 ## Active Slice
 
-Identity-upgrade bridge: trusted AI work-view session contract and helper
-readiness recommendation.
+Identity-upgrade bridge: trusted AI work-view session contract, helper
+readiness recommendation, and explicit Observer recovery bridge.
 
 This slice moves OpenClaw from a plain Level 1 user-space work-view readback
 toward Level 2 trusted session/work-view behavior by making the AI-owned work
@@ -36,6 +36,24 @@ execution path. A visible work view reports `ready` with no recovery action. A
 prepared hidden work view recommends `/work-view/reveal`. A missing or degraded
 browser-runtime-backed work view recommends `/work-view/prepare`. All recovery
 recommendations remain user-space, Observer-visible, and root-free.
+
+Observer now exposes a single explicit recovery bridge:
+
+```text
+Run Recommended Work View Action
+```
+
+The bridge reads `trustedSession.recoveryRecommendation` from `/work-view/state`
+and maps only whitelisted actions to existing user-space endpoints:
+
+```text
+prepare_work_view -> POST /work-view/prepare
+reveal_work_view -> POST /work-view/reveal
+hide_work_view -> POST /work-view/hide
+none -> no mutation
+```
+
+It does not call arbitrary endpoints returned by the service contract.
 
 The contract is emitted through:
 
@@ -71,6 +89,9 @@ Observer visibility:
 ```text
 apps/observer-ui/src/client-script-refreshers-runtime.mjs
 apps/observer-ui/src/client-script-refreshers-mvp-phases.mjs
+apps/observer-ui/src/client-script-runtime-actions.mjs
+apps/observer-ui/src/client-script-runtime-bindings.mjs
+apps/observer-ui/src/observer-panels-operations.mjs
 ```
 
 Targeted milestone coverage:
@@ -97,19 +118,19 @@ nested compositor or graphics-stack-native workspace
 host mutation and input execution beyond existing governed user-space paths
 provider egress or credential access
 automatic recovery execution; the contract recommends existing operator actions
+unreviewed endpoint invocation from recommendation payloads
 ```
 
 ## Next Slice
 
-The next high-density identity-upgrade slice should turn helper readiness into a
-recoverable operator workflow without escalating privileges:
+The next high-density identity-upgrade slice should add recovery evidence after
+an explicit operator action without expanding into a new readiness chain:
 
 ```text
-AI work-view helper recovery action bridge
+AI work-view recovery action result evidence
 ```
 
-That should reuse the existing `/work-view/state`, `/screen/current`, Observer
-work-view panel, and `/work-view/prepare|reveal|hide` actions where possible.
-It should keep automatic execution deferred; the useful increment is making the
-recommended action explicit enough for Observer/operator control surfaces to
-invoke the existing governed action deliberately.
+That should reuse the existing work-view state, screen state, control-result
+message, and targeted work-view milestones. The useful increment is confirming
+which recommended action was explicitly invoked and what state changed, not
+creating another standalone readiness surface.

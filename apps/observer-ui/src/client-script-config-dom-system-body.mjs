@@ -243,6 +243,7 @@ const useDetailUrlButton = document.querySelector("#use-detail-url-button");
 const prepareWorkViewButton = document.querySelector("#prepare-work-view-button");
 const revealWorkViewButton = document.querySelector("#reveal-work-view-button");
 const hideWorkViewButton = document.querySelector("#hide-work-view-button");
+const runRecommendedWorkViewActionButton = document.querySelector("#run-recommended-work-view-action-button");
 const refreshScreenButton = document.querySelector("#refresh-screen-button");
 const clickActionButton = document.querySelector("#click-action-button");
 const typeActionButton = document.querySelector("#type-action-button");
