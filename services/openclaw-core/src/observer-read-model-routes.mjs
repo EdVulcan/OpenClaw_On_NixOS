@@ -1,4 +1,5 @@
 import { sendJson } from "../../../packages/shared-utils/src/http.mjs";
+import { buildNativeAcpxCodexBridgeProcessSpawnProposal } from "./native-acpx-codex-bridge-builders.mjs";
 import { buildNativeAcpxCodexWrapperWriteExecutionEvidence } from "./native-acpx-codex-wrapper-write-execution-evidence-builders.mjs";
 import { buildNativeEngineeringEditExecutionEvidence } from "./native-engineering-edit-execution-evidence-builders.mjs";
 import { buildNativeEngineeringMicrocompactEvidence } from "./native-engineering-microcompact-evidence-builders.mjs";
@@ -193,6 +194,23 @@ export async function handleObserverReadModelRoute({ req, res, requestUrl, state
       tasks: state.tasks,
       taskId,
       limit: safeLimit,
+    }));
+    return true;
+  }
+
+  if (requestUrl.pathname === "/plugins/native-adapter/acpx-codex-bridge-process-spawn-proposal") {
+    const safeLimit = clampLedgerLimit(parseLimit(requestUrl.searchParams));
+    const taskId = requestUrl.searchParams.get("taskId") ?? null;
+    const ledgerLimit = taskId ? 100 : safeLimit;
+    const wrapperWriteExecutionEvidence = buildNativeAcpxCodexWrapperWriteExecutionEvidence({
+      filesystemChanges: executor.listFilesystemChangeRecords({ limit: ledgerLimit }),
+      tasks: state.tasks,
+      taskId,
+      limit: safeLimit,
+    });
+    sendJson(res, 200, buildNativeAcpxCodexBridgeProcessSpawnProposal({
+      wrapperWriteExecutionEvidence,
+      taskId,
     }));
     return true;
   }

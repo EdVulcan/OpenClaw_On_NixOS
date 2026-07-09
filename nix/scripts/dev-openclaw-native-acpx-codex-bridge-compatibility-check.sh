@@ -67,6 +67,7 @@ cleanup() {
     "${WRAPPER_WRITE_HISTORY_FILE:-}" \
     "${WRAPPER_WRITE_LEDGER_FILE:-}" \
     "${WRAPPER_WRITE_EXECUTION_FILE:-}" \
+    "${PROCESS_SPAWN_PROPOSAL_FILE:-}" \
     "${AFTER_RESTART_FILE:-}"
   "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 }
@@ -94,6 +95,7 @@ WRAPPER_WRITE_TASK_STATE_FILE="$(mktemp)"
 WRAPPER_WRITE_HISTORY_FILE="$(mktemp)"
 WRAPPER_WRITE_LEDGER_FILE="$(mktemp)"
 WRAPPER_WRITE_EXECUTION_FILE="$(mktemp)"
+PROCESS_SPAWN_PROPOSAL_FILE="$(mktemp)"
 AFTER_RESTART_FILE="$(mktemp)"
 
 curl --silent --fail "$CORE_URL/plugins/native-adapter/acpx-codex-bridge-compatibility?sessionKey=agent:codex:missing" > "$INITIAL_FILE"
@@ -368,8 +370,9 @@ curl --silent --fail "$CORE_URL/tasks/$wrapper_write_task_id" > "$WRAPPER_WRITE_
 curl --silent --fail "$CORE_URL/capabilities/invocations?capabilityId=act.filesystem.write_text&limit=5" > "$WRAPPER_WRITE_HISTORY_FILE"
 curl --silent --fail "$CORE_URL/filesystem/changes?limit=10" > "$WRAPPER_WRITE_LEDGER_FILE"
 curl --silent --fail "$CORE_URL/plugins/native-adapter/acpx-codex-bridge-wrapper-write-execution/evidence?taskId=$wrapper_write_task_id" > "$WRAPPER_WRITE_EXECUTION_FILE"
+curl --silent --fail "$CORE_URL/plugins/native-adapter/acpx-codex-bridge-process-spawn-proposal?taskId=$wrapper_write_task_id" > "$PROCESS_SPAWN_PROPOSAL_FILE"
 
-node - <<'EOF' "$WRITE_PROPOSAL_FILE" "$WRAPPER_WRITE_APPROVED_FILE" "$WRAPPER_WRITE_STEP_FILE" "$WRAPPER_WRITE_TASK_STATE_FILE" "$WRAPPER_WRITE_HISTORY_FILE" "$WRAPPER_WRITE_LEDGER_FILE" "$WRAPPER_WRITE_EXECUTION_FILE" "$WORKSPACE_DIR"
+node - <<'EOF' "$WRITE_PROPOSAL_FILE" "$WRAPPER_WRITE_APPROVED_FILE" "$WRAPPER_WRITE_STEP_FILE" "$WRAPPER_WRITE_TASK_STATE_FILE" "$WRAPPER_WRITE_HISTORY_FILE" "$WRAPPER_WRITE_LEDGER_FILE" "$WRAPPER_WRITE_EXECUTION_FILE" "$PROCESS_SPAWN_PROPOSAL_FILE" "$WORKSPACE_DIR"
 const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
@@ -381,7 +384,8 @@ const taskState = readJson(5);
 const history = readJson(6);
 const ledger = readJson(7);
 const executionEvidence = readJson(8);
-const workspaceDir = process.argv[9];
+const processSpawnProposal = readJson(9);
+const workspaceDir = process.argv[10];
 const content = proposal.proposal.wrapper.contentPreview;
 const wrapperPath = path.join(workspaceDir, proposal.proposal.wrapper.relativePath);
 const expectedHash = `sha256:${crypto.createHash("sha256").update(content, "utf8").digest("hex")}`;
@@ -450,6 +454,32 @@ if (
   || executionEvidence.governance?.canUseNetwork !== false
 ) {
   throw new Error(`ACPX/Codex wrapper write execution evidence mismatch: ${JSON.stringify(executionEvidence)}`);
+}
+if (
+  processSpawnProposal.registry !== "openclaw-native-acpx-codex-bridge-process-spawn-proposal-v0"
+  || processSpawnProposal.capability?.id !== "plan.openclaw.acpx_codex_bridge.process_spawn"
+  || processSpawnProposal.capability?.futureExecutionCapabilityId !== "act.system.command.execute"
+  || processSpawnProposal.proposal?.capabilityId !== "plan.openclaw.acpx_codex_bridge.process_spawn"
+  || processSpawnProposal.proposal?.status !== "ready_for_spawn_approval_design"
+  || processSpawnProposal.summary?.readyForSpawnApprovalDesign !== true
+  || processSpawnProposal.summary?.selectedWrapperWriteTaskId !== taskState.task?.id
+  || processSpawnProposal.proposal?.wrapper?.relativePath !== proposal.proposal?.wrapper?.relativePath
+  || processSpawnProposal.proposal?.wrapper?.contentPreviewExposed !== false
+  || processSpawnProposal.proposal?.commandContract?.futureCapabilityId !== "act.system.command.execute"
+  || processSpawnProposal.proposal?.commandContract?.argsExposed !== false
+  || processSpawnProposal.proposal?.commandContract?.commandExecuted !== false
+  || processSpawnProposal.proposal?.commandContract?.processSpawned !== false
+  || processSpawnProposal.recoveryRecommendation?.needed !== false
+  || processSpawnProposal.governance?.createsTask !== false
+  || processSpawnProposal.governance?.createsApproval !== false
+  || processSpawnProposal.governance?.canExecuteOperatorStep !== false
+  || processSpawnProposal.governance?.canReadCredentialValue !== false
+  || processSpawnProposal.governance?.canCopyAuthMaterial !== false
+  || processSpawnProposal.governance?.canExecuteWrapper !== false
+  || processSpawnProposal.governance?.canSpawnCodexAcp !== false
+  || processSpawnProposal.governance?.canUseNetwork !== false
+) {
+  throw new Error(`ACPX/Codex process spawn proposal mismatch: ${JSON.stringify(processSpawnProposal)}`);
 }
 EOF
 

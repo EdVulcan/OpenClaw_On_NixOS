@@ -14,12 +14,17 @@ export const observerClientAcpxCodexBridgeRenderersScript = `function renderAcpx
   const writeEvidenceSummary = wrapperWriteExecutionEvidence?.summary ?? {};
   const writeRecovery = wrapperWriteExecutionEvidence?.recoveryRecommendation ?? {};
   const latestWriteEvidence = Array.isArray(wrapperWriteExecutionEvidence?.evidence) ? wrapperWriteExecutionEvidence.evidence[0] : null;
+  const processSpawnProposal = data?.processSpawnProposal ?? null;
+  const spawnProposal = processSpawnProposal?.proposal ?? {};
+  const spawnSummary = processSpawnProposal?.summary ?? {};
+  const spawnGovernance = processSpawnProposal?.governance ?? {};
   const records = Array.isArray(persistence.records) ? persistence.records : [];
   const selected = persistence.selectedRecord ?? null;
   const deferred = Array.isArray(data?.deferredExecutionBoundaries) ? data.deferredExecutionBoundaries : [];
   const draftDeferred = Array.isArray(wrapperDraft?.deferredExecutionBoundaries) ? wrapperDraft.deferredExecutionBoundaries : [];
   const writeDeferred = Array.isArray(wrapperWriteProposal?.deferredExecutionBoundaries) ? wrapperWriteProposal.deferredExecutionBoundaries : [];
   const writeEvidenceDeferred = Array.isArray(wrapperWriteExecutionEvidence?.deferredExecutionBoundaries) ? wrapperWriteExecutionEvidence.deferredExecutionBoundaries : [];
+  const spawnDeferred = Array.isArray(processSpawnProposal?.deferredExecutionBoundaries) ? processSpawnProposal.deferredExecutionBoundaries : [];
 
   acpxCodexBridgeRegistry.textContent = data?.registry ?? "openclaw-native-acpx-codex-bridge-compatibility-v0";
   acpxCodexBridgeSessions.textContent = String(persistence.totalRecords ?? records.length);
@@ -29,6 +34,7 @@ export const observerClientAcpxCodexBridgeRenderersScript = `function renderAcpx
   acpxCodexBridgeRuntime.textContent = governance.canSpawnCodexAcp || governance.canExecuteWrapper ? "enabled" : "blocked";
   acpxCodexBridgeWriteEvidence.textContent = \`\${writeEvidenceSummary.passed ?? 0}/\${writeEvidenceSummary.total ?? 0}\`;
   acpxCodexBridgeRecovery.textContent = writeRecovery.needed ? (writeRecovery.status ?? "review") : "not needed";
+  acpxCodexBridgeSpawnProposal.textContent = spawnSummary.readyForSpawnApprovalDesign ? "ready" : (spawnProposal.status ?? "blocked");
   acpxCodexBridgeMode.textContent = data?.mode ?? "compatibility-and-persistence-evidence";
 
   acpxCodexBridgeJson.textContent = [
@@ -53,6 +59,10 @@ export const observerClientAcpxCodexBridgeRenderersScript = `function renderAcpx
     latestWriteEvidence ? \`Latest wrapper write: task=\${latestWriteEvidence.taskId ?? "none"} status=\${latestWriteEvidence.taskStatus ?? "none"} path=\${latestWriteEvidence.wrapper?.target?.relativePath ?? "none"} hash=\${latestWriteEvidence.wrapper?.target?.contentHash ?? "none"} validation=\${Boolean(latestWriteEvidence.validation?.ok)} argsExposed=\${Boolean(latestWriteEvidence.wrapper?.command?.argsExposed)} spawn=\${Boolean(latestWriteEvidence.wrapper?.command?.processSpawned)}\` : null,
     wrapperWriteExecutionEvidence ? \`Wrapper recovery: needed=\${Boolean(writeRecovery.needed)} status=\${writeRecovery.status ?? "unknown"} next=\${writeRecovery.recommendedNextAction ?? "none"} createsTask=\${Boolean(writeRecovery.createsTask)}\` : null,
     wrapperWriteExecutionEvidence ? \`Wrapper evidence governance: readLedger=\${Boolean(wrapperWriteExecutionEvidence.governance?.canReadFilesystemChangeLedger)} write=\${Boolean(wrapperWriteExecutionEvidence.governance?.canWriteFile)} task=\${Boolean(wrapperWriteExecutionEvidence.governance?.canCreateTask)} approval=\${Boolean(wrapperWriteExecutionEvidence.governance?.canCreateApproval)} approve=\${Boolean(wrapperWriteExecutionEvidence.governance?.canApproveTask)} operator=\${Boolean(wrapperWriteExecutionEvidence.governance?.canExecuteOperatorStep)} credentialRead=\${Boolean(wrapperWriteExecutionEvidence.governance?.canReadCredentialValue)} authCopy=\${Boolean(wrapperWriteExecutionEvidence.governance?.canCopyAuthMaterial)} chmod=\${Boolean(wrapperWriteExecutionEvidence.governance?.canChmodWrapper)} exec=\${Boolean(wrapperWriteExecutionEvidence.governance?.canExecuteWrapper)} spawn=\${Boolean(wrapperWriteExecutionEvidence.governance?.canSpawnCodexAcp)} provider=\${Boolean(wrapperWriteExecutionEvidence.governance?.canCallProvider)} network=\${Boolean(wrapperWriteExecutionEvidence.governance?.canUseNetwork)}\` : null,
+    processSpawnProposal ? \`Process spawn proposal capability: \${processSpawnProposal.auditEvidence?.capabilityId ?? "plan.openclaw.acpx_codex_bridge.process_spawn"}\` : null,
+    processSpawnProposal ? \`Process spawn proposal: registry=\${processSpawnProposal.registry ?? "unknown"} status=\${spawnProposal.status ?? "unknown"} ready=\${Boolean(spawnSummary.readyForSpawnApprovalDesign)} wrapper=\${spawnProposal.wrapper?.relativePath ?? "none"} task=\${spawnSummary.selectedWrapperWriteTaskId ?? "none"} invocation=\${spawnSummary.selectedInvocationId ?? "none"}\` : null,
+    processSpawnProposal ? \`Process spawn contract: future=\${spawnProposal.commandContract?.futureCapabilityId ?? "none"} command=\${spawnProposal.commandContract?.commandName ?? "node"} argsCount=\${spawnProposal.commandContract?.argsCount ?? 0} argsExposed=\${Boolean(spawnProposal.commandContract?.argsExposed)} executed=\${Boolean(spawnProposal.commandContract?.commandExecuted)} spawned=\${Boolean(spawnProposal.commandContract?.processSpawned)}\` : null,
+    processSpawnProposal ? \`Process spawn governance: proposal=\${Boolean(spawnGovernance.canBuildProcessSpawnProposal)} task=\${Boolean(spawnGovernance.createsTask)} approval=\${Boolean(spawnGovernance.createsApproval)} approve=\${Boolean(spawnGovernance.canApproveTask)} operator=\${Boolean(spawnGovernance.canExecuteOperatorStep)} credentialRead=\${Boolean(spawnGovernance.canReadCredentialValue)} authCopy=\${Boolean(spawnGovernance.canCopyAuthMaterial)} chmod=\${Boolean(spawnGovernance.canChmodWrapper)} exec=\${Boolean(spawnGovernance.canExecuteWrapper)} spawn=\${Boolean(spawnGovernance.canSpawnCodexAcp)} provider=\${Boolean(spawnGovernance.canCallProvider)} network=\${Boolean(spawnGovernance.canUseNetwork)}\` : null,
     \`Audit: operation=\${data?.auditEvidence?.operation ?? "acpx_codex_bridge_compatibility_read"} evidence=\${data?.auditEvidence?.evidenceKind ?? "missing"} persisted=\${Boolean(data?.auditEvidence?.persisted)}\`,
     "",
     ...records.slice(0, 8).map((record) => \`\${record.sessionKey ?? "session"} agent=\${record.agentId ?? "unknown"} record=\${record.acpxRecordId ?? "unknown"} revision=\${record.revision ?? 0} credentialRead=\${Boolean(record.credentialValueRead)} copied=\${Boolean(record.authMaterialCopied)} wrapper=\${Boolean(record.wrapperWritten)} spawn=\${Boolean(record.processSpawned)}\`),
@@ -61,6 +71,7 @@ export const observerClientAcpxCodexBridgeRenderersScript = `function renderAcpx
     ...draftDeferred.map((boundary) => \`draft deferred: \${boundary}\`),
     ...writeDeferred.map((boundary) => \`write proposal deferred: \${boundary}\`),
     ...writeEvidenceDeferred.map((boundary) => \`write evidence deferred: \${boundary}\`),
+    ...spawnDeferred.map((boundary) => \`spawn proposal deferred: \${boundary}\`),
   ].filter(Boolean).join("\\n");
 }
 

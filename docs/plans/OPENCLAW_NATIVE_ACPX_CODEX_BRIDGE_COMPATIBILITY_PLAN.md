@@ -8,7 +8,7 @@ ACPX/Codex bridge compatibility, runtime persistence evidence, Observer
 visibility, wrapper/action proposal draft, approval-gated wrapper action task
 bridge, wrapper write proposal/preview, approval-gated wrapper write bridge
 through the existing workspace text-write path, and wrapper write execution
-readback/recovery recommendation.
+readback/recovery recommendation, and process-spawn proposal contract.
 
 This slice migrates the useful enhanced-source ACPX/Codex bridge lessons into
 OpenClaw-native Level 1 behavior:
@@ -21,6 +21,7 @@ GET /plugins/native-adapter/acpx-codex-bridge-wrapper-write-proposal
 POST /plugins/native-adapter/acpx-codex-bridge-wrapper-tasks
 POST /plugins/native-adapter/acpx-codex-bridge-wrapper-write-tasks
 GET /plugins/native-adapter/acpx-codex-bridge-wrapper-write-execution/evidence
+GET /plugins/native-adapter/acpx-codex-bridge-process-spawn-proposal
 Observer panel: OpenClaw ACPX/Codex Bridge
 ```
 
@@ -94,6 +95,13 @@ execute operator steps, write files, read credentials, copy auth material,
 chmod wrappers, execute wrappers, spawn ACP/Codex, call providers, or use
 network.
 
+The process-spawn proposal route consumes approved wrapper-write execution
+evidence and maps the future supervised launch contract: wrapper-relative path,
+content hash, future `act.system.command.execute` boundary, approval
+requirement, and preconditions. It does not create tasks or approvals, execute
+the wrapper, run `node`/`npx`, spawn ACP/Codex, read/copy auth material, call
+providers, or use network.
+
 ## Governance
 
 Capability mapping:
@@ -107,6 +115,7 @@ ACPX/Codex wrapper write proposal -> plan.openclaw.acpx_codex_bridge.wrapper_wri
 ACPX/Codex wrapper write approval bridge -> act.openclaw.acpx_codex_bridge.wrapper_write_bridge
 Delegated approved write -> act.openclaw.workspace_text_write
 ACPX/Codex wrapper write execution readback -> sense.openclaw.acpx_codex_bridge.wrapper_write_execution_evidence
+ACPX/Codex process-spawn proposal -> plan.openclaw.acpx_codex_bridge.process_spawn
 ```
 
 This is intentionally not a live bridge execution path. It creates a native
@@ -183,10 +192,10 @@ root/system daemon work
 The next smallest useful bridge follow-up is:
 
 ```text
-ACPX/Codex bridge process-spawn proposal contract
+ACPX/Codex bridge process-spawn approval task design
 ```
 
-That should be proposal-only: map what a future supervised `npx`/ACP spawn would
-need from the approved wrapper write evidence, but do not execute the wrapper,
-spawn ACP/Codex, read/copy auth material, chmod files, call providers, or use
-network egress.
+That should remain approval-gated and may initially record an approved-deferred
+or preflight-only boundary. It must not execute the wrapper, spawn ACP/Codex,
+read/copy auth material, chmod files, call providers, or use network egress
+until the execution boundary is explicitly selected and validated.

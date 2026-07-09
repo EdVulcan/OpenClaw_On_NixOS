@@ -1,7 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { createNativeAcpxCodexBridgeBuilders } from "../src/native-acpx-codex-bridge-builders.mjs";
+import {
+  buildNativeAcpxCodexBridgeProcessSpawnProposal,
+  createNativeAcpxCodexBridgeBuilders,
+  NATIVE_ACPX_CODEX_BRIDGE_PROCESS_SPAWN_PROPOSAL_REGISTRY,
+} from "../src/native-acpx-codex-bridge-builders.mjs";
 
 function createHarness() {
   const events = [];
@@ -171,6 +175,56 @@ test("native ACPX/Codex wrapper write proposal previews content without writing 
   assert.equal(proposal.governance.canWriteWrapper, false);
   assert.equal(proposal.governance.futureWrapperWriteUsesWorkspaceTextWrite, true);
   assert.equal(raw.includes("must-not-leak"), false);
+});
+
+test("native ACPX/Codex process spawn proposal requires approved wrapper write evidence", () => {
+  const blocked = buildNativeAcpxCodexBridgeProcessSpawnProposal({
+    wrapperWriteExecutionEvidence: {
+      registry: "openclaw-native-acpx-codex-wrapper-write-execution-evidence-v0",
+      evidence: [],
+      recoveryRecommendation: { needed: false, status: "not_needed", createsTask: false },
+    },
+  });
+  assert.equal(blocked.registry, NATIVE_ACPX_CODEX_BRIDGE_PROCESS_SPAWN_PROPOSAL_REGISTRY);
+  assert.equal(blocked.proposal.status, "blocked_missing_approved_wrapper_write_evidence");
+  assert.equal(blocked.summary.readyForSpawnApprovalDesign, false);
+  assert.equal(blocked.recoveryRecommendation.needed, true);
+  assert.equal(blocked.governance.createsTask, false);
+  assert.equal(blocked.governance.canSpawnCodexAcp, false);
+
+  const ready = buildNativeAcpxCodexBridgeProcessSpawnProposal({
+    taskId: "task-acpx-write",
+    wrapperWriteExecutionEvidence: {
+      registry: "openclaw-native-acpx-codex-wrapper-write-execution-evidence-v0",
+      recoveryRecommendation: { needed: false, status: "not_needed", createsTask: false },
+      evidence: [{
+        taskId: "task-acpx-write",
+        invocationId: "write-1",
+        validation: { ok: true },
+        wrapper: {
+          registry: "openclaw-native-acpx-codex-bridge-wrapper-write-task-v0",
+          target: {
+            relativePath: ".openclaw/acpx/codex-bridge/codex-acp-test.sh",
+            contentHash: "sha256:abc123",
+            contentPreviewBytes: 123,
+            contentPreviewExposed: false,
+            chmodApplied: false,
+          },
+        },
+      }],
+    },
+  });
+
+  assert.equal(ready.proposal.status, "ready_for_spawn_approval_design");
+  assert.equal(ready.summary.readyForSpawnApprovalDesign, true);
+  assert.equal(ready.proposal.commandContract.futureCapabilityId, "act.system.command.execute");
+  assert.equal(ready.proposal.commandContract.commandExecuted, false);
+  assert.equal(ready.proposal.commandContract.processSpawned, false);
+  assert.equal(ready.proposal.commandContract.argsExposed, false);
+  assert.equal(ready.proposal.wrapper.contentPreviewExposed, false);
+  assert.equal(ready.governance.canExecuteWrapper, false);
+  assert.equal(ready.governance.canSpawnCodexAcp, false);
+  assert.equal(JSON.stringify(ready).includes("@zed-industries/codex-acp"), false);
 });
 
 test("native ACPX/Codex session metadata rejects traversal-like keys", async () => {
