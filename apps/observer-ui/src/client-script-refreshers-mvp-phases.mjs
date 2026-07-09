@@ -294,6 +294,7 @@ async function refreshPhase3BackgroundWorkView() {
       "Trusted Boundary: " + (trustedSession.boundary?.workViewScope ?? "unknown") + " revealGate=" + (trustedSession.operatorGates?.reveal ?? "unknown"),
       "Helper Readiness: " + (trustedSession.helperReadiness?.state ?? "unknown") + " recovery=" + (trustedSession.recoveryRecommendation?.action ?? "unknown"),
       "Last Operator Action: " + (workView.lastOperatorAction?.action ?? "none") + " source=" + (workView.lastOperatorAction?.source ?? "none"),
+      "Sidecar Contract: " + (trustedSession.sidecarContract?.status ?? "unknown") + " processStarted=" + String(Boolean(trustedSession.sidecarContract?.lifecycle?.processStarted)),
     ].join("\\n");
   } catch {
     phase3BackgroundReady.textContent = "false";

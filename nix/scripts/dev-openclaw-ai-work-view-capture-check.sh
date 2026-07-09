@@ -93,7 +93,10 @@ if (captureTrust?.identityLevel !== "level_2_trusted_session_work_view"
   || captureTrust?.boundary?.rootRequired !== false
   || captureTrust?.operatorGates?.reveal !== "explicit_operator_action"
   || captureTrust?.helperReadiness?.state !== "ready"
-  || captureTrust?.recoveryRecommendation?.action !== "none") {
+  || captureTrust?.recoveryRecommendation?.action !== "none"
+  || captureTrust?.sidecarContract?.status !== "drafted_not_started"
+  || captureTrust?.sidecarContract?.lifecycle?.processStarted !== false
+  || captureTrust?.sidecarContract?.lifecycle?.rootRequired !== false) {
   throw new Error(`capture should expose trusted AI work-view boundary: ${JSON.stringify(captureTrust)}`);
 }
 if (!capture.sessionId || !capture.snapshotText?.includes("Capture Strategy: browser-runtime-backed")) {
@@ -135,6 +138,7 @@ console.log(JSON.stringify({
     mode: capture.workView?.mode ?? null,
     trustedSession: captureTrust.identityLevel,
     helperReadiness: captureTrust.helperReadiness.state,
+    sidecarContract: captureTrust.sidecarContract.status,
   },
   screenSense: {
     readiness: screen.readiness,

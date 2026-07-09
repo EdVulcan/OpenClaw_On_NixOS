@@ -115,7 +115,10 @@ export function createPhase3WorkViewBuilders(deps) {
       trustedSession?.boundary?.rootRequired === false &&
       trustedSession?.operatorGates?.reveal === "explicit_operator_action" &&
       trustedSession?.recoveryRecommendation?.rootRequired === false &&
-      ["none", "reveal_work_view", "prepare_work_view"].includes(trustedSession?.recoveryRecommendation?.action);
+      ["none", "reveal_work_view", "prepare_work_view"].includes(trustedSession?.recoveryRecommendation?.action) &&
+      trustedSession?.sidecarContract?.status === "drafted_not_started" &&
+      trustedSession?.sidecarContract?.lifecycle?.processStarted === false &&
+      trustedSession?.sidecarContract?.lifecycle?.rootRequired === false;
     const checks = [
       {
         id: "phase-3-plan-ready",

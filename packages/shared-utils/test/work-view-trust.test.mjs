@@ -38,6 +38,9 @@ test("trusted work-view contract records Level 2 boundary without host takeover"
   assert.equal(contract.captureProvenance.activeUrl, "https://example.com/work-view");
   assert.equal(contract.helperReadiness.state, "ready");
   assert.equal(contract.recoveryRecommendation.action, "none");
+  assert.equal(contract.sidecarContract.status, "drafted_not_started");
+  assert.equal(contract.sidecarContract.lifecycle.processStarted, false);
+  assert.equal(contract.sidecarContract.forbidden.desktopWideCapture, true);
 });
 
 test("trusted work-view contract reports degraded helper state", () => {

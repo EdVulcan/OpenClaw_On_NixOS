@@ -145,6 +145,7 @@ async function refreshWorkView() {
       \`Helper Readiness: \${trustedSession.helperReadiness?.state ?? "unknown"} reason=\${trustedSession.helperReadiness?.reason ?? "unknown"}\`,
       \`Recovery Recommendation: \${trustedSession.recoveryRecommendation?.action ?? "unknown"} endpoint=\${trustedSession.recoveryRecommendation?.endpoint ?? "none"}\`,
       \`Last Operator Action: \${workView.lastOperatorAction?.action ?? "none"} source=\${workView.lastOperatorAction?.source ?? "none"}\`,
+      \`Sidecar Contract: \${trustedSession.sidecarContract?.status ?? "unknown"} processStarted=\${String(Boolean(trustedSession.sidecarContract?.lifecycle?.processStarted))} root=\${String(Boolean(trustedSession.sidecarContract?.lifecycle?.rootRequired))}\`,
       \`Reveal Gate: \${trustedSession.operatorGates?.reveal ?? "unknown"}\`,
       \`Entry URL: \${workView.entryUrl ?? "none"}\`,
       \`Active URL: \${workView.activeUrl ?? "none"}\`,
@@ -186,6 +187,7 @@ async function refreshScreen() {
           "Trusted Boundary: " + (trustedSession.boundary?.workViewScope ?? "unknown"),
           "Helper Readiness: " + (trustedSession.helperReadiness?.state ?? "unknown"),
           "Recovery Recommendation: " + (trustedSession.recoveryRecommendation?.action ?? "unknown"),
+          "Sidecar Contract: " + (trustedSession.sidecarContract?.status ?? "unknown"),
           "Visible Text: " + ((workViewSummary.visibleTextBlocks ?? []).join(" | ") || "none"),
           "Recent Input: " + (workViewSummary.recentInteraction?.input ?? "none"),
         ].join("\\n")

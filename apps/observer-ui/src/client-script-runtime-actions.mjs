@@ -295,6 +295,7 @@ async function postWorkView(path, payload = {}) {
               identityLevel: result.workView.trustedSession.identityLevel ?? null,
               helperReadiness: result.workView.trustedSession.helperReadiness?.state ?? null,
               recoveryRecommendation: result.workView.trustedSession.recoveryRecommendation?.action ?? null,
+              sidecarContract: result.workView.trustedSession.sidecarContract?.status ?? null,
             }
           : null,
       });

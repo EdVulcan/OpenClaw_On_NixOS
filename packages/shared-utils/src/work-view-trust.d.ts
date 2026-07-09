@@ -59,6 +59,36 @@ export type TrustedWorkViewContract = {
     rootRequired: false;
     canRecoverWithoutRoot: true;
   };
+  sidecarContract: {
+    status: "drafted_not_started";
+    identityLevel: "level_2_trusted_session_work_view";
+    lifecycle: {
+      processStarted: false;
+      installRequired: false;
+      rootRequired: false;
+      systemDaemonRequired: false;
+      approvalRequiredBeforeStart: true;
+    };
+    responsibilities: {
+      capture: string;
+      action: string;
+      recovery: string;
+      observer: string;
+    };
+    forbidden: {
+      desktopWideCapture: true;
+      rootDaemon: true;
+      hostMutation: true;
+      providerEgress: true;
+      credentialAccess: true;
+      arbitraryEndpointExecution: true;
+    };
+    observerVisibility: {
+      workViewState: string;
+      screenState: string;
+      phase3Readback: string;
+    };
+  };
   evidence: {
     sessionStatus: string;
     workViewStatus: string;

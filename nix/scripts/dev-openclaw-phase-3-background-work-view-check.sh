@@ -72,7 +72,10 @@ if (trustedSession?.identityLevel !== "level_2_trusted_session_work_view"
   || trustedSession?.operatorGates?.reveal !== "explicit_operator_action"
   || trustedSession?.helperReadiness?.state !== "prepared_hidden"
   || trustedSession?.recoveryRecommendation?.action !== "reveal_work_view"
-  || trustedSession?.recoveryRecommendation?.rootRequired !== false) {
+  || trustedSession?.recoveryRecommendation?.rootRequired !== false
+  || trustedSession?.sidecarContract?.status !== "drafted_not_started"
+  || trustedSession?.sidecarContract?.lifecycle?.processStarted !== false
+  || trustedSession?.sidecarContract?.lifecycle?.rootRequired !== false) {
   throw new Error(`background work-view should expose trusted session boundary: ${JSON.stringify(trustedSession)}`);
 }
 
@@ -85,6 +88,7 @@ console.log(JSON.stringify({
     trustedSession: trustedSession.identityLevel,
     recoveryRecommendation: trustedSession.recoveryRecommendation.action,
     lastOperatorAction: background.current.workView.lastOperatorAction.action,
+    sidecarContract: trustedSession.sidecarContract.status,
   },
 }, null, 2));
 EOF

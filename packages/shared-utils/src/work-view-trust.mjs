@@ -101,6 +101,39 @@ function deriveHelperReadiness({ readiness, helperStatus, browserStatus, browser
   };
 }
 
+function buildSidecarContract() {
+  return {
+    status: "drafted_not_started",
+    identityLevel: TRUSTED_WORK_VIEW_IDENTITY_LEVEL,
+    lifecycle: {
+      processStarted: false,
+      installRequired: false,
+      rootRequired: false,
+      systemDaemonRequired: false,
+      approvalRequiredBeforeStart: true,
+    },
+    responsibilities: {
+      capture: "emit_ai_owned_work_view_capture_contract",
+      action: "mediate_ai_owned_work_view_reveal_hide_prepare_only",
+      recovery: "surface_recommendations_and_record_operator_action_results",
+      observer: "publish_state_without_revealing_user_foreground",
+    },
+    forbidden: {
+      desktopWideCapture: true,
+      rootDaemon: true,
+      hostMutation: true,
+      providerEgress: true,
+      credentialAccess: true,
+      arbitraryEndpointExecution: true,
+    },
+    observerVisibility: {
+      workViewState: "/work-view/state",
+      screenState: "/screen/current",
+      phase3Readback: "/phase-3/background-work-view",
+    },
+  };
+}
+
 export function buildTrustedWorkViewContract(input = {}) {
   const session = input.session ?? {};
   const workView = input.workView ?? {};
@@ -190,6 +223,7 @@ export function buildTrustedWorkViewContract(input = {}) {
       rootRequired: helperReadiness.rootRequired,
       canRecoverWithoutRoot: helperReadiness.canRecoverWithoutRoot,
     },
+    sidecarContract: buildSidecarContract(),
     evidence: {
       sessionStatus: firstString(session.status, "unknown"),
       workViewStatus: firstString(workView.status, "unknown"),

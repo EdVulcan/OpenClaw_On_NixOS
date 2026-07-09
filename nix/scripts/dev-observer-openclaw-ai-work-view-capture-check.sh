@@ -67,6 +67,8 @@ const requiredClient = [
   "operatorActionSource",
   "lastOperatorAction",
   "workViewRecoveryAction",
+  "sidecarContract",
+  "Sidecar Contract",
   "prepare_work_view",
   "reveal_work_view",
   "Trusted Boundary",
@@ -111,7 +113,9 @@ const trustedSession = screen.trustedSession ?? screen.workView?.trustedSession 
 if (trustedSession?.identityLevel !== "level_2_trusted_session_work_view"
   || trustedSession?.boundary?.workViewScope !== "ai_owned_work_view_only"
   || trustedSession?.operatorGates?.reveal !== "explicit_operator_action"
-  || trustedSession?.helperReadiness?.state !== "ready") {
+  || trustedSession?.helperReadiness?.state !== "ready"
+  || trustedSession?.sidecarContract?.status !== "drafted_not_started"
+  || trustedSession?.sidecarContract?.lifecycle?.processStarted !== false) {
   throw new Error(`Observer-facing screen state should expose trusted session boundary: ${JSON.stringify(trustedSession)}`);
 }
 
@@ -140,6 +144,7 @@ console.log(JSON.stringify({
     activeUrl: screen.workView?.activeUrl ?? null,
     trustedSession: trustedSession.identityLevel,
     recoveryRecommendation: trustedSession.recoveryRecommendation.action,
+    sidecarContract: trustedSession.sidecarContract?.status ?? null,
   },
 }, null, 2));
 EOF
