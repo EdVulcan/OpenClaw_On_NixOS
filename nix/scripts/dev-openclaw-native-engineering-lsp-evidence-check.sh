@@ -74,7 +74,7 @@ process.stdin.on("data", (chunk) => {
   if (!sentSymbol && input.includes('"method":"textDocument/definition"') && input.includes("OpenClawNeedle")) {
     sentSymbol = true;
     process.stderr.write("openclaw-fixture-symbol-request-observed\n");
-    frame({ jsonrpc: "2.0", id: 3, result: [{ uri: "file:///openclaw/src/app.ts", range: { start: { line: 1, character: 14 }, end: { line: 1, character: 26 } } }] });
+    frame({ jsonrpc: "2.0", id: 3, result: [{ uri: process.env.OPENCLAW_FAKE_LSP_TARGET_URI ?? "file:///openclaw/src/app.ts", range: { start: { line: 1, character: 14 }, end: { line: 1, character: 26 } } }] });
   }
   if (!sentShutdown && input.includes('"method":"shutdown"')) {
     sentShutdown = true;
@@ -88,6 +88,7 @@ setTimeout(() => process.exit(3), 5000);
 NODE
 chmod +x "$FAKE_BIN_DIR/typescript-language-server"
 export PATH="$FAKE_BIN_DIR:$PATH"
+export OPENCLAW_FAKE_LSP_TARGET_URI="$(node -e 'const { pathToFileURL } = require("node:url"); console.log(pathToFileURL(process.argv[1]).href);' "$WORKSPACE_DIR/src/app.ts")"
 rm -f "$OPENCLAW_CORE_STATE_FILE" "$OPENCLAW_CORE_STATE_FILE.tmp" "$OPENCLAW_EVENT_LOG_FILE"
 
 cleanup() {
@@ -140,6 +141,7 @@ cleanup() {
     "${SYMBOL_REQUEST_STEP_FILE:-}" \
     "${SYMBOL_REQUEST_TASK_READBACK_FILE:-}" \
     "${SYMBOL_REQUEST_STATE_FILE:-}" \
+    "${SYMBOL_TARGET_BRIDGE_FILE:-}" \
     "${EVENTS_FILE:-}"
   "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 }
@@ -199,6 +201,7 @@ SYMBOL_REQUEST_APPROVED_FILE="$(mktemp)"
 SYMBOL_REQUEST_STEP_FILE="$(mktemp)"
 SYMBOL_REQUEST_TASK_READBACK_FILE="$(mktemp)"
 SYMBOL_REQUEST_STATE_FILE="$(mktemp)"
+SYMBOL_TARGET_BRIDGE_FILE="$(mktemp)"
 EVENTS_FILE="$(mktemp)"
 
 curl --silent --fail "$CORE_URL/plugins/native-adapter/engineering-lsp/evidence?action=check&language=typescript&limit=200" > "$CHECK_FILE"
@@ -416,6 +419,7 @@ post_json "$CORE_URL/approvals/$symbol_request_approval_id/approve" '{"approvedB
 post_json "$CORE_URL/operator/step" '{}' > "$SYMBOL_REQUEST_STEP_FILE"
 curl --silent --fail "$CORE_URL/tasks/$symbol_request_task_id" > "$SYMBOL_REQUEST_TASK_READBACK_FILE"
 curl --silent --fail "$CORE_URL/plugins/native-adapter/engineering-lsp/lifecycle-state?language=typescript&limit=10" > "$SYMBOL_REQUEST_STATE_FILE"
+curl --silent --fail "$CORE_URL/plugins/native-adapter/engineering-lsp/selected-target-read-bridge?language=typescript&taskId=$symbol_request_task_id&contextLines=0&includeRead=true&maxOutputChars=800" > "$SYMBOL_TARGET_BRIDGE_FILE"
 curl --silent --fail "$EVENT_HUB_URL/events/audit?limit=120" > "$EVENTS_FILE"
 
 node - <<'EOF' \
@@ -468,7 +472,8 @@ node - <<'EOF' \
   "$SYMBOL_REQUEST_APPROVED_FILE" \
   "$SYMBOL_REQUEST_STEP_FILE" \
   "$SYMBOL_REQUEST_TASK_READBACK_FILE" \
-  "$SYMBOL_REQUEST_STATE_FILE"
+  "$SYMBOL_REQUEST_STATE_FILE" \
+  "$SYMBOL_TARGET_BRIDGE_FILE"
 const fs = require("node:fs");
 const readJson = (index) => JSON.parse(fs.readFileSync(process.argv[index], "utf8"));
 
@@ -522,7 +527,9 @@ const symbolRequestApproved = readJson(48);
 const symbolRequestStep = readJson(49);
 const symbolRequestTaskReadback = readJson(50);
 const symbolRequestState = readJson(51);
-const raw = JSON.stringify({ check, position, bad, draft, sourceTransfer, sourceTransferTaskResponse, sourceTransferBlockedStep, sourceTransferApproved, sourceTransferStep, sourceTransferTaskReadback, sourceTransferState, symbolRequest, symbolRequestTaskResponse, symbolRequestBlockedStep, symbolRequestApproved, symbolRequestStep, symbolRequestTaskReadback, symbolRequestState, adapter, taskResponse, blockedStep, approved, execStep, taskReadback, processTaskResponse, processBlockedStep, processApproved, processStep, processTaskReadback, lifecycleStateAfterProcess, stopTaskResponse, stopBlockedStep, stopApproved, stopStep, stopTaskReadback, lifecycleStateAfterStop, restartTaskResponse, restartBlockedStep, restartApproved, restartStep, restartTaskReadback, lifecycleState, handshakeTaskResponse, handshakeBlockedStep, handshakeApproved, handshakeStep, handshakeTaskReadback, handshakeState, events });
+const symbolTargetBridge = readJson(52);
+const expectedTargetUri = process.env.OPENCLAW_FAKE_LSP_TARGET_URI;
+const raw = JSON.stringify({ check, position, bad, draft, sourceTransfer, sourceTransferTaskResponse, sourceTransferBlockedStep, sourceTransferApproved, sourceTransferStep, sourceTransferTaskReadback, sourceTransferState, symbolRequest, symbolRequestTaskResponse, symbolRequestBlockedStep, symbolRequestApproved, symbolRequestStep, symbolRequestTaskReadback, symbolRequestState, symbolTargetBridge, adapter, taskResponse, blockedStep, approved, execStep, taskReadback, processTaskResponse, processBlockedStep, processApproved, processStep, processTaskReadback, lifecycleStateAfterProcess, stopTaskResponse, stopBlockedStep, stopApproved, stopStep, stopTaskReadback, lifecycleStateAfterStop, restartTaskResponse, restartBlockedStep, restartApproved, restartStep, restartTaskReadback, lifecycleState, handshakeTaskResponse, handshakeBlockedStep, handshakeApproved, handshakeStep, handshakeTaskReadback, handshakeState, events });
 
 if (
   !check.ok
@@ -647,6 +654,7 @@ if (
   || !adapter.implementedCapabilities?.includes("act.openclaw.engineering_tool.lsp_source_transfer_task")
   || !adapter.implementedCapabilities?.includes("plan.openclaw.engineering_tool.lsp_symbol_request")
   || !adapter.implementedCapabilities?.includes("act.openclaw.engineering_tool.lsp_symbol_request_task")
+  || !adapter.implementedCapabilities?.includes("sense.openclaw.engineering_tool.lsp_selected_target_read_bridge")
   || adapter.summary?.canReadEngineeringLspEvidence !== true
   || adapter.summary?.canDraftEngineeringLspLifecycleAction !== true
   || adapter.summary?.canCreateApprovalGatedEngineeringLspLifecycleTasks !== true
@@ -655,6 +663,7 @@ if (
   || adapter.summary?.canCreateApprovalGatedEngineeringLspSourceTransferTasks !== true
   || adapter.summary?.canDraftEngineeringLspSymbolRequestProposal !== true
   || adapter.summary?.canCreateApprovalGatedEngineeringLspSymbolRequestTasks !== true
+  || adapter.summary?.canReadEngineeringLspSelectedTargetBridge !== true
 ) {
   throw new Error(`native adapter missing LSP evidence/lifecycle capability: ${JSON.stringify(adapter)}`);
 }
@@ -985,7 +994,7 @@ if (
   || symbolRequestExecution?.server?.symbolResponseSummary?.uriCount !== 1
   || symbolRequestExecution?.server?.symbolResponseSummary?.rangeCount !== 1
   || symbolRequestExecution?.server?.symbolResponseSummary?.targetCount !== 1
-  || symbolRequestExecution?.server?.symbolResponseSummary?.selectedTarget?.uri !== "file:///openclaw/src/app.ts"
+  || symbolRequestExecution?.server?.symbolResponseSummary?.selectedTarget?.uri !== expectedTargetUri
   || symbolRequestExecution?.server?.symbolResponseSummary?.rawResultIncluded !== false
   || symbolRequestExecution?.server?.symbolResponseSummary?.rawTargetsIncluded !== false
   || symbolRequestExecution?.processSupervision?.protocolHandshake?.ok !== true
@@ -1025,6 +1034,7 @@ if (
   || symbolRequestStateItem?.server?.symbolRequestSent !== true
   || symbolRequestStateItem?.server?.symbolRequestMethod !== "textDocument/definition"
   || symbolRequestStateItem?.server?.symbolResponseSummary?.resultCount !== 1
+  || symbolRequestStateItem?.server?.symbolResponseSummary?.selectedTarget?.uri !== expectedTargetUri
   || symbolRequestStateItem?.server?.symbolResponseSummary?.selectedTarget?.range?.start?.line !== 1
   || symbolRequestStateItem?.process?.protocolHandshake?.symbolRequestsSent !== true
   || symbolRequestStateItem?.boundaries?.jsonRpcOperationalRequestsEnabled !== true
@@ -1035,6 +1045,32 @@ if (
 const symbolExecutionRaw = JSON.stringify({ symbolRequestTaskResponse, symbolRequestBlockedStep, symbolRequestApproved, symbolRequestStep, symbolRequestTaskReadback, symbolRequestState });
 if (symbolExecutionRaw.includes("OpenClawNeedle")) {
   throw new Error("LSP symbol request execution leaked source body instead of bounded metadata");
+}
+if (
+  !symbolTargetBridge.ok
+  || symbolTargetBridge.registry !== "openclaw-native-engineering-lsp-selected-target-read-bridge-v0"
+  || symbolTargetBridge.mode !== "lsp-selected-target-to-native-read-bridge"
+  || symbolTargetBridge.sourceRecord?.sourceTaskId !== symbolRequestTask.id
+  || symbolTargetBridge.sourceRecord?.responseSummary?.rawResultIncluded !== false
+  || symbolTargetBridge.sourceRecord?.responseSummary?.rawTargetsIncluded !== false
+  || symbolTargetBridge.selectedTarget?.uri !== expectedTargetUri
+  || symbolTargetBridge.target?.relativePath !== "src/app.ts"
+  || symbolTargetBridge.target?.startLine !== 2
+  || symbolTargetBridge.target?.endLine !== 2
+  || symbolTargetBridge.readRequest?.operatorActionRequired !== false
+  || symbolTargetBridge.readResult?.ok !== true
+  || symbolTargetBridge.readResult?.operation !== "read"
+  || symbolTargetBridge.readResult?.target?.relativePath !== "src/app.ts"
+  || symbolTargetBridge.readResult?.summary?.lineCount !== 1
+  || !String(symbolTargetBridge.readResult?.content ?? "").includes("OpenClawNeedle")
+  || symbolTargetBridge.governance?.canStartLspServer !== false
+  || symbolTargetBridge.governance?.canSendJsonRpcRequest !== false
+  || symbolTargetBridge.governance?.canMutateWorkspace !== false
+  || symbolTargetBridge.bounds?.workspaceRootConstrained !== true
+  || symbolTargetBridge.bounds?.noRawLspPayload !== true
+  || symbolTargetBridge.bounds?.noWorkspaceMutation !== true
+) {
+  throw new Error(`LSP selected-target read bridge mismatch: ${JSON.stringify(symbolTargetBridge)}`);
 }
 const eventTypes = new Set((events.items ?? events.events ?? []).map((event) => event.type));
 for (const type of ["approval.created", "approval.approved", "policy.evaluated"]) {
@@ -1055,6 +1091,9 @@ for (const token of [
   "lsp-symbol-request-proposal-only",
   "approval-gated-lsp-symbol-request",
   "symbol_request_completed_long_lived_pool_deferred",
+  "openclaw-native-engineering-lsp-selected-target-read-bridge-v0",
+  "lsp-selected-target-to-native-read-bridge",
+  "sense.openclaw.engineering_tool.lsp_selected_target_read_bridge",
   "no textDocument/didOpen notification sent",
   "approval-gated-lsp-lifecycle-binary-gate",
   "approved-lsp-lifecycle-binary-gate",
@@ -1100,6 +1139,9 @@ console.log(JSON.stringify({
     approvedSymbolRequestMethod: symbolRequestExecution.server.symbolRequestMethod,
     approvedSymbolResponseResults: symbolRequestExecution.server.symbolResponseSummary.resultCount,
     approvedSymbolResponseTargets: symbolRequestExecution.server.symbolResponseSummary.targetCount,
+    selectedTargetReadBridgeRegistry: symbolTargetBridge.registry,
+    selectedTargetReadBridgePath: symbolTargetBridge.target.relativePath,
+    selectedTargetReadBridgeLines: symbolTargetBridge.readResult.summary.lineCount,
     serverStatus: check.serverReadiness.status,
     lifecycleTaskStatus: lifecycleTask.status,
     binaryFound: execution.server.binaryFound,

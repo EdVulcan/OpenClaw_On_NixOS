@@ -312,6 +312,34 @@ test("native adapter engineering LSP symbol request proposal route preserves req
   assert.equal(response.body.registry, "openclaw-native-engineering-lsp-symbol-request-proposal-v0");
 });
 
+test("native adapter engineering LSP selected-target read bridge route preserves bounded read inputs", async () => {
+  let observedInput = null;
+  const response = await invokeNativeAdapterPluginRoute({
+    buildNativeEngineeringLspSelectedTargetReadBridge: (input) => {
+      observedInput = input;
+      return {
+        ok: true,
+        registry: "openclaw-native-engineering-lsp-selected-target-read-bridge-v0",
+        mode: "lsp-selected-target-to-native-read-bridge",
+      };
+    },
+  }, "GET", "/plugins/native-adapter/engineering-lsp/selected-target-read-bridge?workspacePath=/tmp/openclaw&language=typescript&taskId=task-symbol&targetIndex=1&contextLines=2&includeRead=true&maxOutputChars=700&maxFileSizeBytes=2048");
+
+  assert.equal(response.handled, true);
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(observedInput, {
+    workspacePath: "/tmp/openclaw",
+    language: "typescript",
+    taskId: "task-symbol",
+    targetIndex: "1",
+    contextLines: "2",
+    includeRead: "true",
+    maxOutputChars: "700",
+    maxFileSizeBytes: "2048",
+  });
+  assert.equal(response.body.registry, "openclaw-native-engineering-lsp-selected-target-read-bridge-v0");
+});
+
 test("native adapter engineering write proposal route preserves bounded proposal inputs", async () => {
   let observedInput = null;
   const response = await invokeNativeAdapterPluginRoute({

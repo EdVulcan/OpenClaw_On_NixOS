@@ -168,10 +168,11 @@ governed surfaces:
   binary gate after approval, attaches recovery evidence when the server binary
   is missing, starts and terminates a bounded user-space process supervision
   probe when a mapped server binary exists, records read-only lifecycle state
-  for approved start/restart probes, explicit stop actions, and recovery
-  outcomes, records initialize/shutdown-only handshake evidence, and keeps
-  long-lived process pools, actual source-content transfer, operational LSP
-  requests, mutation, provider calls, and network egress blocked.
+  for approved start/restart probes, explicit stop actions, recovery outcomes,
+  and initialize/shutdown-only handshake evidence. Later LSP slices add approved
+  didOpen, single symbol requests, bounded response target selection, and
+  explicit selected-target native read bridging while keeping long-lived process
+  pools, provider calls, and network egress blocked.
 - Native engineering LSP source-transfer proposal:
   `plan.openclaw.engineering_tool.lsp_source_transfer` reads one bounded
   workspace source file locally, reports the future `textDocument/didOpen`
@@ -222,7 +223,7 @@ enhanced `openclaw` modules.
 | `cc_write` | absorbed through governed proposal/approval/execution evidence | `act.openclaw.engineering_tool.write_proposal` creates redacted create/overwrite proposal evidence; `openclaw-native-engineering-write-proposal-task-v0` bridges confirmed proposals to approval-gated `workspace_text_write` tasks; `sense.openclaw.engineering_tool.write_execution_evidence` reads completed write ledger evidence. | Keep proposal, approval, execution, and recovery separated. Do not migrate raw overwrite semantics as an autonomous default. | Level 1 |
 | `cc_glob` | absorbed | `sense.openclaw.engineering_tool.glob` performs bounded workspace file discovery with skipped hidden/generated/cache/dependency directories and result caps. | Continue native bounded discovery; do not execute enhanced `GlobTool.ts`. | Level 1 |
 | `cc_grep` | absorbed | `sense.openclaw.engineering_tool.grep` performs bounded workspace text search with literal/regex mode, include filters, result/output caps, binary skips, audit, and Observer evidence. | Continue native bounded search; do not execute enhanced `GrepTool.ts`. | Level 1 |
-| `cc_lsp` | partially absorbed as evidence, lifecycle draft, approval-gated binary gate, bounded process supervision probe, lifecycle state readback, initialize/shutdown handshake, didOpen source-transfer proposal, approval-gated didOpen task, symbol request proposal, and approval-gated single symbol request task | `sense.openclaw.engineering_tool.lsp_evidence` maps `check`, `definition`, `references`, and `hover` contracts, reports language/config metadata and server hints, and keeps source-content reads and symbol requests blocked. `plan.openclaw.engineering_tool.lsp_lifecycle` drafts a workspace-scoped lifecycle action and readiness gates. `act.openclaw.engineering_tool.lsp_lifecycle_task` creates an approval-gated lifecycle task, proves pre-approval blocking, checks the mapped server binary after approval, records missing-binary recovery evidence, starts and terminates a bounded user-space process supervision probe when a mapped server binary exists, sends initialize/shutdown-only handshake messages for the `handshake` action, and `sense.openclaw.engineering_tool.lsp_lifecycle_state` persists read-only start/stop/restart/recovery/handshake/didOpen/symbol-request state. `plan.openclaw.engineering_tool.lsp_source_transfer` reads one bounded source file locally for proposal preview/hash and future didOpen metadata. `act.openclaw.engineering_tool.lsp_source_transfer_task` re-reads and hash-checks after approval, sends didOpen to a bounded short-lived server, and records source-transfer state. `plan.openclaw.engineering_tool.lsp_symbol_request` drafts definition/references/hover JSON-RPC metadata from approved didOpen state. `act.openclaw.engineering_tool.lsp_symbol_request_task` replays approved didOpen setup after approval, sends exactly one selected symbol request, records bounded response-summary metadata, and keeps long-lived process pools blocked. `sense.openclaw.workspace_symbol_lookup` remains separate derived navigation. | Keep the evidence, draft, task bridge, process probe, lifecycle-state readback, handshake evidence, source-transfer proposal, approved didOpen task, symbol proposal, and single approved symbol request task in one LSP lane. Defer long-lived process pools, multi-request sessions, provider egress, package installation, and root/system daemon work. | Level 1 now, Level 2 later |
+| `cc_lsp` | partially absorbed as evidence, lifecycle draft, approval-gated binary gate, bounded process supervision probe, lifecycle state readback, initialize/shutdown handshake, didOpen source-transfer proposal, approval-gated didOpen task, symbol request proposal, approval-gated single symbol request task, bounded target selection, and selected-target read bridge | `sense.openclaw.engineering_tool.lsp_evidence` maps `check`, `definition`, `references`, and `hover` contracts, reports language/config metadata and server hints, and keeps source-content reads and symbol requests blocked. `plan.openclaw.engineering_tool.lsp_lifecycle` drafts a workspace-scoped lifecycle action and readiness gates. `act.openclaw.engineering_tool.lsp_lifecycle_task` creates an approval-gated lifecycle task, proves pre-approval blocking, checks the mapped server binary after approval, records missing-binary recovery evidence, starts and terminates a bounded user-space process supervision probe when a mapped server binary exists, sends initialize/shutdown-only handshake messages for the `handshake` action, and `sense.openclaw.engineering_tool.lsp_lifecycle_state` persists read-only start/stop/restart/recovery/handshake/didOpen/symbol-request state. `plan.openclaw.engineering_tool.lsp_source_transfer` reads one bounded source file locally for proposal preview/hash and future didOpen metadata. `act.openclaw.engineering_tool.lsp_source_transfer_task` re-reads and hash-checks after approval, sends didOpen to a bounded short-lived server, and records source-transfer state. `plan.openclaw.engineering_tool.lsp_symbol_request` drafts definition/references/hover JSON-RPC metadata from approved didOpen state. `act.openclaw.engineering_tool.lsp_symbol_request_task` replays approved didOpen setup after approval, sends exactly one selected symbol request, records bounded response-summary metadata, and keeps long-lived process pools blocked. `sense.openclaw.engineering_tool.lsp_selected_target_read_bridge` maps a completed selected target URI/range into the existing bounded native read/search surface and returns read content only when `includeRead=true` is explicit. `sense.openclaw.workspace_symbol_lookup` remains separate derived navigation. | Keep the evidence, draft, task bridge, process probe, lifecycle-state readback, handshake evidence, source-transfer proposal, approved didOpen task, symbol proposal, single approved symbol request task, target selection, and selected-target read bridge in one LSP lane. Defer long-lived process pools, multi-request sessions, provider egress, package installation, and root/system daemon work. | Level 1 now, Level 2 later |
 | `cc_verify` | absorbed as evidence | `sense.openclaw.engineering_tool.verify_evidence` reads approval-gated command transcripts, capability invocations, and completed task outcomes to produce bounded verification evidence with checks, output budgets, retry-policy metadata, audit evidence, and Observer visibility. `sense.openclaw.engineering_tool.recovery_evidence` adds read-only failed-evidence recovery recommendations. | Keep actual command execution on the existing approval-gated source/workspace command task path. Do not add ungoverned shell execution or automatic retries. | Level 1 |
 | `cc_plan_enter`, `cc_plan_exit`, `cc_todo_write` | absorbed as evidence plus operator-visible workbench state | `sense.openclaw.engineering_context.plan_todo_evidence` reads visible task/workbench plan state, maps planning/todo tool semantics, reports todo counts, and exposes Observer evidence without hidden mode switches, task mutation, or `.openclaw/cc-todo.md` writes. `openclaw-native-engineering-planning-workbench-state-v0` bridges that evidence into Engineering Loop State for selected engineering tasks. | Keep hidden mode, todo-file persistence, and task mutation deferred until governed workbench storage exists. | Level 1 |
 | `microcompact` | absorbed as evidence | `sense.openclaw.engineering_context.microcompact_evidence` reads command transcript metadata, protects recent engineering evidence by default, and estimates reclaimable context budget without returning raw output or mutating logs. | Keep actual runtime-message compaction deferred until the evidence surface is stable and governed. Do not silently mutate persisted transcript or hide current verification/recovery evidence. | Level 1 |
@@ -780,28 +781,30 @@ It produces:
 - Continued deferral of raw response payloads, long-lived LSP pools,
   auto-approval, provider calls, and root/system daemon work.
 
-Latest LSP response target selection completed:
+Latest LSP selected-target read bridge completed:
 
 ```text
-OPENCLAW_NATIVE_ENGINEERING_LSP_RESPONSE_TARGET_SELECTION_PLAN.md
+OPENCLAW_NATIVE_ENGINEERING_LSP_SELECTED_TARGET_READ_BRIDGE_PLAN.md
 ```
 
 It produces:
 
-- Capped target descriptors with URI and range only.
-- A selected target in task and lifecycle readback.
-- Observer readback for selected target metadata.
-- No raw source body, raw response payload, automatic follow-up read/search,
-  provider call, network egress, mutation, or long-lived LSP pool.
+- A follow-up native read/search request from capped selected target URI/range
+  metadata.
+- Optional bounded read preview only when `includeRead=true` is explicit.
+- Observer readback guidance for the bridge route.
+- No raw LSP payload, automatic follow-up task/approval, provider call,
+  network egress, mutation, or long-lived LSP pool.
 
 Next smallest real capability:
 
 ```text
-LSP selected-target read bridge
+Observer selected-target read control
 ```
 
-That should propose a bounded native read/search follow-up from the selected
-target without adding another readiness marker or opening a long-lived LSP pool.
+That should let the operator call the selected-target read bridge from Observer
+task readback without adding another readiness marker or opening a long-lived
+LSP pool.
 
 Required answer for every following slice:
 

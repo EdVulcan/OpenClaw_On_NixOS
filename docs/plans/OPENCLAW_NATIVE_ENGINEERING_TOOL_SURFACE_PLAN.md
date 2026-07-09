@@ -50,7 +50,7 @@ call providers or perform network egress
 | `cc_write` | `act.openclaw.engineering_tool.write_proposal` / `sense.openclaw.engineering_tool.write_execution_evidence` | `mutation_proposal_and_execution_evidence` | high | approval required before create or overwrite | absorbed through governed proposal, approval bridge, and execution evidence |
 | `cc_glob` | `sense.openclaw.engineering_tool.glob` | `read_only_path_search` | low | no approval for bounded metadata search | contract mapped, execution deferred |
 | `cc_grep` | `sense.openclaw.engineering_tool.grep` | `read_only_content_search` | low | no approval for bounded search; snippets require budget and audit | contract mapped, execution deferred |
-| `cc_lsp` | `sense.openclaw.engineering_tool.lsp_evidence` / `act.openclaw.engineering_tool.lsp_lifecycle_task` / `sense.openclaw.engineering_tool.lsp_lifecycle_state` / `plan.openclaw.engineering_tool.lsp_source_transfer` / `act.openclaw.engineering_tool.lsp_source_transfer_task` / `plan.openclaw.engineering_tool.lsp_symbol_request` / `act.openclaw.engineering_tool.lsp_symbol_request_task` | `language_intelligence_evidence_governed_lifecycle_source_transfer_and_symbol_boundary` | medium | no approval for evidence/state/proposal readback; approval required before lifecycle/source-transfer/symbol execution | partially absorbed as evidence, lifecycle draft, approval-gated binary gate, bounded process supervision probe, lifecycle state readback, initialize/shutdown handshake, didOpen source-transfer proposal, approval-gated didOpen task, symbol request proposal, and approval-gated single symbol request task |
+| `cc_lsp` | `sense.openclaw.engineering_tool.lsp_evidence` / `act.openclaw.engineering_tool.lsp_lifecycle_task` / `sense.openclaw.engineering_tool.lsp_lifecycle_state` / `plan.openclaw.engineering_tool.lsp_source_transfer` / `act.openclaw.engineering_tool.lsp_source_transfer_task` / `plan.openclaw.engineering_tool.lsp_symbol_request` / `act.openclaw.engineering_tool.lsp_symbol_request_task` / `sense.openclaw.engineering_tool.lsp_selected_target_read_bridge` | `language_intelligence_evidence_governed_lifecycle_source_transfer_symbol_boundary_and_read_bridge` | medium | no approval for evidence/state/proposal/read-bridge readback; approval required before lifecycle/source-transfer/symbol execution | partially absorbed as evidence, lifecycle draft, approval-gated binary gate, bounded process supervision probe, lifecycle state readback, initialize/shutdown handshake, didOpen source-transfer proposal, approval-gated didOpen task, symbol request proposal, approval-gated single symbol request task, bounded response target selection, and selected-target native read bridge |
 | `cc_verify` | `act.openclaw.engineering_tool.verify` | `verification_command_evidence` | medium | command execution requires policy or approval | partially absorbed, command execution deferred |
 | `cc_plan_enter` | `plan.openclaw.engineering_tool.plan_enter` | `planning_state` | low | no hidden mode switch without task/workbench evidence | state mutation deferred |
 | `cc_plan_exit` | `plan.openclaw.engineering_tool.plan_exit` | `planning_state` | low | no hidden execution transition without task evidence | state mutation deferred |
@@ -118,7 +118,8 @@ long-lived LSP process pool and multi-request symbol navigation sessions;
 approval-gated binary gate, bounded process supervision probe, lifecycle state
 readback, initialize/shutdown handshake, source-transfer proposal, and approved
 didOpen source-transfer task, symbol request proposal, and approval-gated single
-symbol request task are absorbed
+symbol request task, bounded target selection, and explicit selected-target read
+bridge are absorbed
 verification command execution and task-completion attachment
 planning/todo evidence is absorbed; hidden planning mode and todo state mutation remain deferred
 provider calls, network egress, and result envelopes
@@ -296,12 +297,22 @@ OPENCLAW_NATIVE_ENGINEERING_LSP_RESPONSE_TARGET_SELECTION_PLAN.md
 That slice records bounded URI/range target descriptors and a selected target
 from approved symbol responses without exposing raw response payloads.
 
+The selected-target read bridge follow-up was completed as:
+
+```text
+OPENCLAW_NATIVE_ENGINEERING_LSP_SELECTED_TARGET_READ_BRIDGE_PLAN.md
+```
+
+That slice connects completed LSP selected target metadata to the native bounded
+read/search surface. It returns a follow-up read request by default and returns
+bounded read content only when `includeRead=true` is explicit.
+
 The current next smallest real capability is:
 
 ```text
-LSP selected-target read bridge
+Observer selected-target read control
 ```
 
-That slice should propose a bounded native read/search follow-up from the
-selected target without automatic task creation, long-lived LSP pools, provider
-egress, or workspace mutation.
+That slice should add an explicit operator control or readback action in
+Observer for the selected-target read bridge without creating another standalone
+readiness/evidence lane.

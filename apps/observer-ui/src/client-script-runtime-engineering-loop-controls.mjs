@@ -137,6 +137,9 @@ async function refreshEngineeringLoopCompletionReadback() {
     const execution = task?.outcome?.details?.lspLifecycleExecution ?? lifecycle.execution ?? {};
     const lifecycleState = execution.lifecycleState ?? lifecycle.lifecycleState ?? {};
     const symbolResponse = lifecycle.symbolRequest?.responseSummary ?? execution.server?.symbolResponseSummary ?? {};
+    const selectedTargetReadBridgeRoute = lifecycle.lifecycleAction === "symbol_request" && symbolResponse.selectedTarget
+      ? \`/plugins/native-adapter/engineering-lsp/selected-target-read-bridge?taskId=\${encodeURIComponent(latestEngineeringLoopControlState.taskId ?? "")}&language=\${encodeURIComponent(lifecycle.language ?? execution.language ?? "typescript")}&includeRead=true\`
+      : null;
     engineeringLoopStateCompletion.textContent = \`status=\${task?.status ?? "unknown"} lifecycle=\${lifecycleState.status ?? execution.result?.state ?? "unknown"}\`;
     engineeringLoopStateJson.textContent = [
       "Kind: lsp-lifecycle",
@@ -151,6 +154,7 @@ async function refreshEngineeringLoopCompletionReadback() {
       lifecycle.lifecycleAction === "symbol_request" && symbolResponse.selectedTarget
         ? \`Selected Target: uri=\${symbolResponse.selectedTarget.uri} start=\${symbolResponse.selectedTarget.range?.start?.line ?? "n/a"}:\${symbolResponse.selectedTarget.range?.start?.character ?? "n/a"} end=\${symbolResponse.selectedTarget.range?.end?.line ?? "n/a"}:\${symbolResponse.selectedTarget.range?.end?.character ?? "n/a"}\`
         : null,
+      selectedTargetReadBridgeRoute ? \`Selected Target Read Bridge: \${selectedTargetReadBridgeRoute}\` : null,
       \`Lifecycle State: \${lifecycleState.status ?? "pending"} active=\${Boolean(lifecycleState.process?.longLivedProcessActive)} jsonRpc=\${Boolean(lifecycleState.boundaries?.jsonRpcEnabled)}\`,
       \`Result: \${execution.result?.state ?? task?.outcome?.kind ?? "pending"}\`,
       \`Recovery: \${execution.recoveryRecommendation?.nextAction ?? task?.outcome?.details?.recoveryEvidence?.recommendation?.nextAction ?? "pending operator step"}\`,

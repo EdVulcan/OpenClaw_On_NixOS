@@ -73,15 +73,16 @@ openclaw-native-engineering-lsp-evidence
 observer-openclaw-native-engineering-lsp-evidence
 ```
 
-## Next Slice
+## Follow-up Completed
 
-The next smallest real capability is:
+The selected-target read bridge follow-up was completed as:
 
 ```text
-LSP selected-target read bridge
+OPENCLAW_NATIVE_ENGINEERING_LSP_SELECTED_TARGET_READ_BRIDGE_PLAN.md
 ```
 
-That follow-up should use the selected target URI/range metadata to propose a
-bounded native read/search follow-up, still requiring explicit operator action
-and still avoiding raw LSP payload exposure, long-lived process pools, provider
+That slice maps bounded LSP selected target URI/range metadata into an explicit
+native read/search follow-up and can return a bounded read preview only when
+`includeRead=true` is explicitly requested. It still avoids raw LSP payload
+exposure, automatic task/approval creation, long-lived process pools, provider
 egress, and workspace mutation.

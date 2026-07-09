@@ -13,6 +13,7 @@ import { createNativeEngineeringLspEvidenceBuilders } from "./native-engineering
 import { createNativeEngineeringLspLifecycleStateBuilders } from "./native-engineering-lsp-lifecycle-state.mjs";
 import { createNativeEngineeringLspSourceTransferProposalBuilders } from "./native-engineering-lsp-source-transfer-proposal-builders.mjs";
 import { createNativeEngineeringLspSymbolRequestProposalBuilders } from "./native-engineering-lsp-symbol-request-proposal-builders.mjs";
+import { createNativeEngineeringLspSelectedTargetReadBridgeBuilders } from "./native-engineering-lsp-selected-target-read-bridge-builders.mjs";
 import {
   createPluginReviewWorkspaceDiscovery,
   safeStat,
@@ -150,6 +151,13 @@ export function createPluginReview(deps) {
   } = createNativeEngineeringLspSymbolRequestProposalBuilders({
     records: nativeEngineeringLspLifecycleRecords,
     selectOpenClawToolCatalogWorkspace,
+  });
+  const {
+    buildNativeEngineeringLspSelectedTargetReadBridge,
+  } = createNativeEngineeringLspSelectedTargetReadBridgeBuilders({
+    records: nativeEngineeringLspLifecycleRecords,
+    selectOpenClawToolCatalogWorkspace,
+    buildNativeEngineeringReadFile,
   });
   const {
     buildOpenClawPluginSearchWebAdapterContract,
@@ -315,6 +323,7 @@ function buildOpenClawNativePluginAdapterStatus() {
       "act.openclaw.engineering_tool.lsp_source_transfer_task",
       "plan.openclaw.engineering_tool.lsp_symbol_request",
       "act.openclaw.engineering_tool.lsp_symbol_request_task",
+      "sense.openclaw.engineering_tool.lsp_selected_target_read_bridge",
       "sense.openclaw.engineering_tool.verify_evidence",
       "sense.openclaw.engineering_tool.recovery_evidence",
       "sense.openclaw.engineering_context.microcompact_evidence",
@@ -333,7 +342,7 @@ function buildOpenClawNativePluginAdapterStatus() {
     ],
     pendingCapabilities: ["act.plugin.capability.invoke"],
     summary: {
-      implemented: 37,
+      implemented: 38,
       pending: 1,
       canReadManifestMetadata: true,
       canReadToolCatalogMetadata: true,
@@ -354,6 +363,7 @@ function buildOpenClawNativePluginAdapterStatus() {
       canCreateApprovalGatedEngineeringLspSourceTransferTasks: true,
       canDraftEngineeringLspSymbolRequestProposal: true,
       canCreateApprovalGatedEngineeringLspSymbolRequestTasks: true,
+      canReadEngineeringLspSelectedTargetBridge: true,
       canReadEngineeringVerificationEvidence: true,
       canReadEngineeringRecoveryEvidence: true,
       canReadEngineeringMicrocompactEvidence: true,
@@ -468,5 +478,6 @@ function buildOpenClawNativePluginAdapterStatus() {
     buildNativeEngineeringLspLifecycleState,
     buildNativeEngineeringLspSourceTransferProposal,
     buildNativeEngineeringLspSymbolRequestProposal,
+    buildNativeEngineeringLspSelectedTargetReadBridge,
   };
 }

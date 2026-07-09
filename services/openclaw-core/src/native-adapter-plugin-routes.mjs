@@ -145,6 +145,19 @@ function engineeringLspSymbolRequestProposalInput(requestUrl) {
   };
 }
 
+function engineeringLspSelectedTargetReadBridgeInput(requestUrl) {
+  return {
+    workspacePath: requestUrl.searchParams.get("workspacePath"),
+    language: requestUrl.searchParams.get("language") ?? "typescript",
+    taskId: requestUrl.searchParams.get("taskId"),
+    targetIndex: requestUrl.searchParams.get("targetIndex"),
+    contextLines: requestUrl.searchParams.get("contextLines"),
+    includeRead: requestUrl.searchParams.get("includeRead"),
+    maxOutputChars: requestUrl.searchParams.get("maxOutputChars"),
+    maxFileSizeBytes: requestUrl.searchParams.get("maxFileSizeBytes"),
+  };
+}
+
 const GET_ROUTES = new Map([
   [
     "/plugins/native-adapter/manifest-profile",
@@ -255,6 +268,14 @@ const GET_ROUTES = new Map([
       builder: "buildNativeEngineeringLspSymbolRequestProposal",
       errorStatus: 400,
       input: engineeringLspSymbolRequestProposalInput,
+    },
+  ],
+  [
+    "/plugins/native-adapter/engineering-lsp/selected-target-read-bridge",
+    {
+      builder: "buildNativeEngineeringLspSelectedTargetReadBridge",
+      errorStatus: 400,
+      input: engineeringLspSelectedTargetReadBridgeInput,
     },
   ],
   [
