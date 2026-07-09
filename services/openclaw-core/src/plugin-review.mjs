@@ -10,6 +10,7 @@ import { createNativeEngineeringReadSearchBuilders } from "./native-engineering-
 import { createNativeEngineeringEditProposalBuilders } from "./native-engineering-edit-proposal-builders.mjs";
 import { createNativeEngineeringWriteProposalBuilders } from "./native-engineering-write-proposal-builders.mjs";
 import { createNativeEngineeringLspEvidenceBuilders } from "./native-engineering-lsp-evidence-builders.mjs";
+import { createNativeEngineeringLspLifecycleStateBuilders } from "./native-engineering-lsp-lifecycle-state.mjs";
 import {
   createPluginReviewWorkspaceDiscovery,
   safeStat,
@@ -20,7 +21,7 @@ const PLUGIN_REVIEW_IGNORED_DIRECTORIES = new Set([".git", "node_modules", "dist
 export function createPluginReview(deps) {
   const { client, state, taskManager, approvalEngine, serialisePlanForPublic, publishEvent } = deps;
   const { fetchJson, readJsonFileIfPresent } = client;
-  const { workspaceRoots, tasks, persistState, autonomyMode } = state;
+  const { workspaceRoots, tasks, persistState, autonomyMode, nativeEngineeringLspLifecycleRecords } = state;
   const {
     createTask,
     supersedeOtherActiveTasks,
@@ -128,6 +129,12 @@ export function createPluginReview(deps) {
     buildNativeEngineeringLspLifecycleDraft,
   } = createNativeEngineeringLspEvidenceBuilders({
     safeStat,
+    selectOpenClawToolCatalogWorkspace,
+  });
+  const {
+    buildNativeEngineeringLspLifecycleState,
+  } = createNativeEngineeringLspLifecycleStateBuilders({
+    records: nativeEngineeringLspLifecycleRecords,
     selectOpenClawToolCatalogWorkspace,
   });
   const {
@@ -289,6 +296,7 @@ function buildOpenClawNativePluginAdapterStatus() {
       "sense.openclaw.engineering_tool.lsp_evidence",
       "plan.openclaw.engineering_tool.lsp_lifecycle",
       "act.openclaw.engineering_tool.lsp_lifecycle_task",
+      "sense.openclaw.engineering_tool.lsp_lifecycle_state",
       "sense.openclaw.engineering_tool.verify_evidence",
       "sense.openclaw.engineering_tool.recovery_evidence",
       "sense.openclaw.engineering_context.microcompact_evidence",
@@ -307,7 +315,7 @@ function buildOpenClawNativePluginAdapterStatus() {
     ],
     pendingCapabilities: ["act.plugin.capability.invoke"],
     summary: {
-      implemented: 32,
+      implemented: 33,
       pending: 1,
       canReadManifestMetadata: true,
       canReadToolCatalogMetadata: true,
@@ -323,6 +331,7 @@ function buildOpenClawNativePluginAdapterStatus() {
       canReadEngineeringLspEvidence: true,
       canDraftEngineeringLspLifecycleAction: true,
       canCreateApprovalGatedEngineeringLspLifecycleTasks: true,
+      canReadEngineeringLspLifecycleState: true,
       canReadEngineeringVerificationEvidence: true,
       canReadEngineeringRecoveryEvidence: true,
       canReadEngineeringMicrocompactEvidence: true,
@@ -430,5 +439,6 @@ function buildOpenClawNativePluginAdapterStatus() {
     buildNativeEngineeringWriteProposal,
     buildNativeEngineeringLspEvidence,
     buildNativeEngineeringLspLifecycleDraft,
+    buildNativeEngineeringLspLifecycleState,
   };
 }

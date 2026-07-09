@@ -167,9 +167,10 @@ governed surfaces:
   lifecycle task, blocks operator execution before approval, records an approved
   binary gate after approval, attaches recovery evidence when the server binary
   is missing, starts and terminates a bounded user-space process supervision
-  probe when a mapped server binary exists, and keeps long-lived process state,
-  source-content transfer, JSON-RPC, mutation, provider calls, and network
-  egress blocked.
+  probe when a mapped server binary exists, records read-only lifecycle state
+  for approved start/restart probes, explicit stop actions, and recovery
+  outcomes, and keeps long-lived process pools, source-content transfer,
+  JSON-RPC, mutation, provider calls, and network egress blocked.
 - Approval-gated workspace mutation:
   `act.openclaw.workspace_text_write` and
   `act.openclaw.workspace_patch_apply`.
@@ -196,7 +197,7 @@ enhanced `openclaw` modules.
 | `cc_write` | absorbed through governed proposal/approval/execution evidence | `act.openclaw.engineering_tool.write_proposal` creates redacted create/overwrite proposal evidence; `openclaw-native-engineering-write-proposal-task-v0` bridges confirmed proposals to approval-gated `workspace_text_write` tasks; `sense.openclaw.engineering_tool.write_execution_evidence` reads completed write ledger evidence. | Keep proposal, approval, execution, and recovery separated. Do not migrate raw overwrite semantics as an autonomous default. | Level 1 |
 | `cc_glob` | absorbed | `sense.openclaw.engineering_tool.glob` performs bounded workspace file discovery with skipped hidden/generated/cache/dependency directories and result caps. | Continue native bounded discovery; do not execute enhanced `GlobTool.ts`. | Level 1 |
 | `cc_grep` | absorbed | `sense.openclaw.engineering_tool.grep` performs bounded workspace text search with literal/regex mode, include filters, result/output caps, binary skips, audit, and Observer evidence. | Continue native bounded search; do not execute enhanced `GrepTool.ts`. | Level 1 |
-| `cc_lsp` | partially absorbed as evidence, lifecycle draft, approval-gated binary gate, and bounded process supervision probe | `sense.openclaw.engineering_tool.lsp_evidence` maps `check`, `definition`, `references`, and `hover` contracts, reports language/config metadata and server hints, and keeps source-content reads and JSON-RPC blocked. `plan.openclaw.engineering_tool.lsp_lifecycle` drafts a workspace-scoped lifecycle action and readiness gates. `act.openclaw.engineering_tool.lsp_lifecycle_task` creates an approval-gated lifecycle task, proves pre-approval blocking, checks the mapped server binary after approval, records missing-binary recovery evidence, starts and terminates a bounded user-space process supervision probe when a mapped server binary exists, and still keeps long-lived lifecycle state and JSON-RPC blocked. `sense.openclaw.workspace_symbol_lookup` remains separate derived navigation. | Keep the evidence, draft, task bridge, and process probe in one LSP lane. Defer persistent lifecycle state, reusable stop/restart recovery, source-content transfer, and JSON-RPC until state/readback are proven. | Level 1 now, Level 2 later |
+| `cc_lsp` | partially absorbed as evidence, lifecycle draft, approval-gated binary gate, bounded process supervision probe, and lifecycle state readback | `sense.openclaw.engineering_tool.lsp_evidence` maps `check`, `definition`, `references`, and `hover` contracts, reports language/config metadata and server hints, and keeps source-content reads and JSON-RPC blocked. `plan.openclaw.engineering_tool.lsp_lifecycle` drafts a workspace-scoped lifecycle action and readiness gates. `act.openclaw.engineering_tool.lsp_lifecycle_task` creates an approval-gated lifecycle task, proves pre-approval blocking, checks the mapped server binary after approval, records missing-binary recovery evidence, starts and terminates a bounded user-space process supervision probe when a mapped server binary exists, and `sense.openclaw.engineering_tool.lsp_lifecycle_state` persists read-only start/stop/restart/recovery state while long-lived process pools and JSON-RPC remain blocked. `sense.openclaw.workspace_symbol_lookup` remains separate derived navigation. | Keep the evidence, draft, task bridge, process probe, and lifecycle-state readback in one LSP lane. Defer source-content transfer, LSP initialize/didOpen/definition/references/hover JSON-RPC, long-lived process pools, provider egress, package installation, and root/system daemon work. | Level 1 now, Level 2 later |
 | `cc_verify` | absorbed as evidence | `sense.openclaw.engineering_tool.verify_evidence` reads approval-gated command transcripts, capability invocations, and completed task outcomes to produce bounded verification evidence with checks, output budgets, retry-policy metadata, audit evidence, and Observer visibility. `sense.openclaw.engineering_tool.recovery_evidence` adds read-only failed-evidence recovery recommendations. | Keep actual command execution on the existing approval-gated source/workspace command task path. Do not add ungoverned shell execution or automatic retries. | Level 1 |
 | `cc_plan_enter`, `cc_plan_exit`, `cc_todo_write` | absorbed as evidence plus operator-visible workbench state | `sense.openclaw.engineering_context.plan_todo_evidence` reads visible task/workbench plan state, maps planning/todo tool semantics, reports todo counts, and exposes Observer evidence without hidden mode switches, task mutation, or `.openclaw/cc-todo.md` writes. `openclaw-native-engineering-planning-workbench-state-v0` bridges that evidence into Engineering Loop State for selected engineering tasks. | Keep hidden mode, todo-file persistence, and task mutation deferred until governed workbench storage exists. | Level 1 |
 | `microcompact` | absorbed as evidence | `sense.openclaw.engineering_context.microcompact_evidence` reads command transcript metadata, protects recent engineering evidence by default, and estimates reclaimable context budget without returning raw output or mutating logs. | Keep actual runtime-message compaction deferred until the evidence surface is stable and governed. Do not silently mutate persisted transcript or hide current verification/recovery evidence. | Level 1 |
@@ -345,19 +346,22 @@ Current OpenClaw:
   recommendation evidence when the binary is missing, and starts then
   terminates a bounded user-space process supervision probe when a mapped server
   binary exists.
-- It does not implement persistent Language Server Protocol process state, open
-  files in an LSP connection, send JSON-RPC requests, persist reusable lifecycle
-  state, or perform optional language server installation checks.
+- `sense.openclaw.engineering_tool.lsp_lifecycle_state` persists read-only state
+  records for approved start/restart probes, explicit stop actions, and
+  recovery-required outcomes.
+- It does not implement a long-lived Language Server Protocol process pool, open
+  files in an LSP connection, send JSON-RPC requests, transfer source content,
+  or perform optional language server installation checks.
 
 Classification: partially absorbed as evidence plus lifecycle draft plus
-approval-gated binary gate and bounded process supervision probe.
+approval-gated binary gate, bounded process supervision probe, and lifecycle
+state readback.
 
 Recommendation:
 
 - Keep the current evidence, lifecycle draft, and approval-gated task bridge in
-  one Level 1 LSP lane. Extend it next with persistent lifecycle state,
-  reusable stop/restart readback, stale-process recovery evidence, and Observer
-  recovery controls rather than creating another static readiness shell or a
+  one Level 1 LSP lane. Extend it next with a governed initialize/shutdown
+  handshake probe rather than creating another static readiness shell or a
   hidden long-lived process.
 
 ### `cc_verify`
@@ -586,12 +590,13 @@ Deferred:
   content budgets, audit evidence, and Observer visibility.
 - Raw enhanced glob/grep execution outside the native bounded read/search
   surface.
-- Persistent LSP server lifecycle state, reusable stop/restart process
-  management, file open notifications, source-content transfer, and
-  definition/references/hover JSON-RPC until a governed service boundary is
-  chosen. The current absorbed surface is evidence, lifecycle readiness draft,
-  approval-gated binary gate task, missing-binary recovery readback, and bounded
-  process supervision probe.
+- Long-lived LSP process pools, file open notifications, source-content
+  transfer, initialize/didOpen/definition/references/hover JSON-RPC, provider
+  egress, package installation, and root/system daemon work until a governed
+  service boundary is chosen. The current absorbed surface is evidence,
+  lifecycle readiness draft, approval-gated binary gate task, missing-binary
+  recovery readback, bounded process supervision probe, and lifecycle state
+  readback.
 - Verification-command execution until command provenance and completion
   evidence attach cleanly to task records.
 - Actual microcompact runtime-message transformation until the evidence route
@@ -624,16 +629,19 @@ Native governed engineering tool surface
 Next smallest real capability:
 
 ```text
-Native governed LSP persistent lifecycle state and stop/restart readback
+Native governed LSP initialize/shutdown handshake evidence
 ```
 
 This should produce:
 
-- An explicit lifecycle state store for approved LSP process probes.
-- Bounded readback for start, stop, restart, and stale-process recovery.
-- Observer-visible lifecycle state and recovery recommendation evidence.
-- Continued deferral of source-content transfer, JSON-RPC requests, provider
-  calls, network egress, package installation, and root/system daemon work.
+- An approved short-lived LSP process probe that sends only initialize/shutdown
+  protocol messages.
+- Bounded handshake transcript metadata attached to the existing lifecycle state
+  lane.
+- Observer-visible handshake status and recovery recommendation evidence.
+- Continued deferral of source-content transfer, textDocument/didOpen,
+  definition/references/hover requests, provider calls, network egress, package
+  installation, long-lived process pools, and root/system daemon work.
 - No raw file mutation, no provider call, no hidden enhanced-source import, and
   no automatic activation.
 - Evidence through focused unit tests plus a targeted local milestone if an

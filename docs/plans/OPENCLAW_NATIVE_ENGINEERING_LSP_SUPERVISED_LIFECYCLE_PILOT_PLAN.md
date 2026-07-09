@@ -5,13 +5,14 @@ Updated: 2026-07-09
 ## Active Slice
 
 Native governed LSP supervised lifecycle pilot, implemented as an
-approval-gated lifecycle task, binary gate, and short supervised process probe.
+approval-gated lifecycle task, binary gate, short supervised process probe, and
+read-only lifecycle state record.
 
 This slice moves `cc_lsp` migration beyond read-only evidence and draft-only
 readiness. It creates a real OpenClaw task, requires operator approval, runs one
 bounded lifecycle gate after approval, starts and supervises a user-space process
 probe when the mapped server binary exists, records task outcome/readback, and
-makes the recovery recommendation visible to Observer.
+makes the recovery recommendation and lifecycle state visible to Observer.
 
 Identity alignment: Level 1, stable user-space control plane.
 
@@ -46,6 +47,8 @@ when the binary is present for start/restart/recover, starts a short user-space
 process supervision probe
 captures bounded stdout/stderr metadata, records pid/exit/signal/readback, and
 terminates the probe process
+persists a read-only lifecycle state record for start, stop, restart, and
+recovery-required outcomes
 exposes readback through /tasks/:id and the Observer engineering loop state
 ```
 
@@ -59,7 +62,7 @@ The pilot still explicitly blocks:
 
 ```text
 long-lived server process persistence
-long-lived lifecycle state persistence and process reuse
+long-lived process reuse
 source file content reads into LSP
 textDocument/didOpen notification
 definition / references / hover JSON-RPC requests
@@ -79,6 +82,7 @@ source-content transfer.
 Runtime task builders:
 
 ```text
+services/openclaw-core/src/native-engineering-lsp-lifecycle-state.mjs
 services/openclaw-core/src/native-engineering-lsp-lifecycle-tasks.mjs
 ```
 
@@ -111,7 +115,8 @@ observer-openclaw-native-engineering-lsp-evidence
 The existing LSP evidence milestones now prove evidence, lifecycle draft,
 approval-gated task creation, pre-approval block, approval transition, missing
 binary recovery, supervised process probe with controlled termination, task
-readback, audit events, and Observer-visible controls in one cohesive lane.
+readback, explicit stop/restart lifecycle-state readback, audit events, and
+Observer-visible controls in one cohesive lane.
 
 ## Deferred
 
@@ -119,7 +124,7 @@ The following remain deliberately deferred:
 
 ```text
 long-lived language server process pool
-server lifecycle state store and reusable stop/restart process management
+reusable stop/restart process management for long-lived processes
 bounded initialize/didOpen/definition/references/hover JSON-RPC
 source-content transfer into a language server
 automatic install or PATH mutation
@@ -129,7 +134,8 @@ automatic recovery task creation
 ## Next Slice
 
 Do not add another standalone LSP evidence/readiness shell. The next meaningful
-LSP step is to extend this same lifecycle lane with a persistent lifecycle state
-store and explicit stop/restart readback. Keep JSON-RPC disabled until process
-ownership, bounded IO, stale-process recovery, and Observer recovery controls
-are proven against that state store.
+LSP step is to extend this same lifecycle lane with a governed
+initialize/shutdown handshake probe. Keep source-content transfer,
+textDocument/didOpen, definition/references/hover requests, long-lived process
+pools, package installation, provider egress, and root/system daemon work
+disabled.

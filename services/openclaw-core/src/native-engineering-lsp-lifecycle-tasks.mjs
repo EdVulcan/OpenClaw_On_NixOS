@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import { accessSync, constants, realpathSync } from "node:fs";
 import path from "node:path";
 import { createEventName } from "../../../packages/shared-events/src/event-factory.mjs";
+import { recordNativeEngineeringLspLifecycleExecution } from "./native-engineering-lsp-lifecycle-state.mjs";
 
 export const NATIVE_ENGINEERING_LSP_LIFECYCLE_TASK_REGISTRY = "openclaw-native-engineering-lsp-lifecycle-task-v0";
 export const NATIVE_ENGINEERING_LSP_LIFECYCLE_EXECUTION_REGISTRY = "openclaw-native-engineering-lsp-lifecycle-execution-v0";
@@ -11,6 +12,7 @@ const DEFAULT_PROCESS_PROBE_MS = 300;
 const MAX_PROCESS_PROBE_MS = 2_000;
 const DEFAULT_PROCESS_OUTPUT_CHARS = 4_096;
 const PROCESS_SUPERVISION_ACTIONS = new Set(["start", "restart", "recover"]);
+const BINARY_GATE_ACTIONS = new Set(["start", "restart", "recover"]);
 
 function redactedWorkspace(workspace) {
   return {
@@ -273,6 +275,10 @@ function shouldRunProcessSupervisionProbe(metadata) {
   return PROCESS_SUPERVISION_ACTIONS.has(metadata.lifecycleAction ?? "start");
 }
 
+function shouldCheckBinaryGate(metadata) {
+  return BINARY_GATE_ACTIONS.has(metadata.lifecycleAction ?? "start");
+}
+
 function startSupervisedLifecycleProcess({
   executablePath,
   args = [],
@@ -390,8 +396,15 @@ function startSupervisedLifecycleProcess({
   });
 }
 
-function resultStateForExecution({ binaryFound, processProbe }) {
-  if (!binaryFound) {
+function resultStateForExecution({ lifecycleAction = "start", binaryChecked, binaryFound, processProbe }) {
+  if (lifecycleAction === "stop") {
+    return {
+      ok: true,
+      state: "stop_recorded_no_live_process",
+      failureKind: null,
+    };
+  }
+  if (binaryChecked && !binaryFound) {
     return {
       ok: false,
       state: "server_binary_missing",
@@ -419,24 +432,25 @@ function resultStateForExecution({ binaryFound, processProbe }) {
   };
 }
 
-function buildLifecycleExecution({ task, executablePath, approved = false, processProbe = null }) {
+function buildLifecycleExecution({ task, executablePath, binaryChecked = true, approved = false, processProbe = null }) {
   const metadata = task.engineeringLspLifecycle ?? {};
   const now = new Date().toISOString();
   const serverBinary = metadata.server?.serverBinary ?? null;
-  const binaryFound = Boolean(executablePath);
-  const result = resultStateForExecution({ binaryFound, processProbe });
+  const lifecycleAction = metadata.lifecycleAction ?? "start";
+  const binaryFound = binaryChecked && Boolean(executablePath);
+  const result = resultStateForExecution({ lifecycleAction, binaryChecked, binaryFound, processProbe });
   return {
     registry: NATIVE_ENGINEERING_LSP_LIFECYCLE_EXECUTION_REGISTRY,
     mode: "approved-lsp-lifecycle-binary-gate",
     generatedAt: now,
     taskId: task.id,
-    lifecycleAction: metadata.lifecycleAction ?? null,
+    lifecycleAction,
     language: metadata.language ?? null,
     workspace: metadata.workspace ?? null,
     server: {
       serverBinary,
       serverArgs: metadata.server?.serverArgs ?? [],
-      binaryChecked: true,
+      binaryChecked,
       binaryFound,
       executablePath: executablePath ?? null,
       processStarted: processProbe?.started === true,
@@ -448,7 +462,11 @@ function buildLifecycleExecution({ task, executablePath, approved = false, proce
     processSupervision: processProbe ?? {
       mode: "not_attempted",
       attempted: false,
-      reason: binaryFound ? "process_supervision_deferred" : "server_binary_missing",
+      reason: lifecycleAction === "stop"
+        ? "stop_recorded_no_live_process"
+        : binaryFound
+          ? "process_supervision_deferred"
+          : "server_binary_missing",
     },
     result,
     governance: {
@@ -458,7 +476,12 @@ function buildLifecycleExecution({ task, executablePath, approved = false, proce
       jsonRpcEnabled: false,
       contentExposed: false,
     },
-    recoveryRecommendation: result.failureKind === "lsp_server_process_start_failed"
+    recoveryRecommendation: lifecycleAction === "stop"
+      ? {
+          recoverable: false,
+          nextAction: "stop was recorded against the lifecycle state store; no long-lived LSP process is active in this Level 1 lane",
+        }
+      : result.failureKind === "lsp_server_process_start_failed"
       ? {
           recoverable: true,
           nextAction: `inspect ${serverBinary ?? "the requested language server"} process startup output and rerun the approved lifecycle task after fixing the service PATH or binary wrapper`,
@@ -489,7 +512,7 @@ export function createNativeEngineeringLspLifecycleTaskHandlers({
   policyEvaluator,
   publishEvent,
 }) {
-  const { approvals, persistState, workspaceRoots } = state;
+  const { approvals, persistState, workspaceRoots, nativeEngineeringLspLifecycleRecords } = state;
   const { serialiseTask, isActiveTask, setTaskPhase, completeTask, failTask } = taskManager;
   const { serialiseApproval } = approvalEngine;
   const { ensureTaskPolicy } = policyEvaluator;
@@ -545,7 +568,10 @@ export function createNativeEngineeringLspLifecycleTaskHandlers({
         serverBinary: task.engineeringLspLifecycle?.server?.serverBinary ?? null,
       },
     });
-    const executablePath = resolveExecutablePath(task.engineeringLspLifecycle?.server?.serverBinary);
+    const binaryChecked = shouldCheckBinaryGate(task.engineeringLspLifecycle ?? {});
+    const executablePath = binaryChecked
+      ? resolveExecutablePath(task.engineeringLspLifecycle?.server?.serverBinary)
+      : null;
     const processProbe = executablePath && shouldRunProcessSupervisionProbe(task.engineeringLspLifecycle ?? {})
       ? await startSupervisedLifecycleProcess({
           executablePath,
@@ -553,12 +579,20 @@ export function createNativeEngineeringLspLifecycleTaskHandlers({
           cwd: resolveSupervisionCwd(task.engineeringLspLifecycle ?? {}, workspaceRoots).cwd,
         })
       : null;
-    const execution = buildLifecycleExecution({ task, executablePath, approved: true, processProbe });
+    const execution = buildLifecycleExecution({ task, executablePath, binaryChecked, approved: true, processProbe });
+    const lifecycleState = recordNativeEngineeringLspLifecycleExecution({
+      records: nativeEngineeringLspLifecycleRecords,
+      task,
+      execution,
+    });
+    if (lifecycleState) {
+      execution.lifecycleState = lifecycleState;
+    }
     task.engineeringLspLifecycle = {
       ...(task.engineeringLspLifecycle ?? {}),
       server: {
         ...(task.engineeringLspLifecycle?.server ?? {}),
-        binaryChecked: true,
+        binaryChecked: execution.server.binaryChecked,
         binaryFound: execution.server.binaryFound,
         executablePath: execution.server.executablePath,
         processStarted: execution.server.processStarted,
@@ -568,6 +602,7 @@ export function createNativeEngineeringLspLifecycleTaskHandlers({
         jsonRpcHandshakeSent: false,
       },
       execution,
+      lifecycleState,
     };
     persistState();
 
@@ -599,6 +634,7 @@ export function createNativeEngineeringLspLifecycleTaskHandlers({
           checks: [
             { name: "server_binary_present", ok: execution.server.binaryFound === true },
             { name: "process_supervision_probe", ok: execution.processSupervision?.started === true },
+            { name: "lifecycle_state_recorded", ok: Boolean(lifecycleState) },
           ],
           failedChecks: execution.server.binaryFound ? ["process_supervision_probe"] : ["server_binary_present"],
         },
@@ -610,7 +646,9 @@ export function createNativeEngineeringLspLifecycleTaskHandlers({
 
     const completedTask = completeTask(task, {
       executor: "native-engineering-lsp-lifecycle-v0",
-      summary: execution.processSupervision?.attempted
+      summary: execution.lifecycleAction === "stop"
+        ? "LSP lifecycle stop state recorded; no long-lived process is active."
+        : execution.processSupervision?.attempted
         ? "LSP lifecycle process supervision probe completed; JSON-RPC remains deferred."
         : "LSP lifecycle binary gate passed; process supervision remains deferred.",
       lspLifecycleExecution: execution,
@@ -628,8 +666,9 @@ export function createNativeEngineeringLspLifecycleTaskHandlers({
       verification: {
         ok: true,
         checks: [
-          { name: "server_binary_present", ok: true },
+          { name: "server_binary_present", ok: execution.server.binaryChecked ? execution.server.binaryFound === true : null },
           { name: "process_supervision_probe", ok: execution.processSupervision?.attempted ? execution.processSupervision?.started === true : null },
+          { name: "lifecycle_state_recorded", ok: Boolean(lifecycleState) },
         ],
         failedChecks: [],
       },

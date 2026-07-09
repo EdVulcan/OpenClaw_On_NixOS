@@ -237,6 +237,30 @@ test("native adapter engineering LSP lifecycle draft route preserves bounded dra
   assert.equal(response.body.registry, "openclaw-native-engineering-lsp-lifecycle-draft-v0");
 });
 
+test("native adapter engineering LSP lifecycle state route preserves readback filters", async () => {
+  let observedInput = null;
+  const response = await invokeNativeAdapterPluginRoute({
+    buildNativeEngineeringLspLifecycleState: (input) => {
+      observedInput = input;
+      return {
+        ok: true,
+        registry: "openclaw-native-engineering-lsp-lifecycle-state-v0",
+        mode: "read-only-lsp-lifecycle-state-readback",
+        summary: { totalRecords: 1 },
+      };
+    },
+  }, "GET", "/plugins/native-adapter/engineering-lsp/lifecycle-state?workspacePath=/tmp/openclaw&language=typescript&limit=3");
+
+  assert.equal(response.handled, true);
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(observedInput, {
+    workspacePath: "/tmp/openclaw",
+    language: "typescript",
+    limit: "3",
+  });
+  assert.equal(response.body.registry, "openclaw-native-engineering-lsp-lifecycle-state-v0");
+});
+
 test("native adapter engineering write proposal route preserves bounded proposal inputs", async () => {
   let observedInput = null;
   const response = await invokeNativeAdapterPluginRoute({

@@ -75,6 +75,19 @@ cleanup() {
     "${PROCESS_APPROVED_FILE:-}" \
     "${PROCESS_STEP_FILE:-}" \
     "${PROCESS_TASK_READBACK_FILE:-}" \
+    "${LIFECYCLE_STATE_AFTER_PROCESS_FILE:-}" \
+    "${STOP_TASK_FILE:-}" \
+    "${STOP_BLOCKED_STEP_FILE:-}" \
+    "${STOP_APPROVED_FILE:-}" \
+    "${STOP_STEP_FILE:-}" \
+    "${STOP_TASK_READBACK_FILE:-}" \
+    "${LIFECYCLE_STATE_AFTER_STOP_FILE:-}" \
+    "${RESTART_TASK_FILE:-}" \
+    "${RESTART_BLOCKED_STEP_FILE:-}" \
+    "${RESTART_APPROVED_FILE:-}" \
+    "${RESTART_STEP_FILE:-}" \
+    "${RESTART_TASK_READBACK_FILE:-}" \
+    "${LIFECYCLE_STATE_FILE:-}" \
     "${EVENTS_FILE:-}"
   "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 }
@@ -101,6 +114,19 @@ PROCESS_BLOCKED_STEP_FILE="$(mktemp)"
 PROCESS_APPROVED_FILE="$(mktemp)"
 PROCESS_STEP_FILE="$(mktemp)"
 PROCESS_TASK_READBACK_FILE="$(mktemp)"
+LIFECYCLE_STATE_AFTER_PROCESS_FILE="$(mktemp)"
+STOP_TASK_FILE="$(mktemp)"
+STOP_BLOCKED_STEP_FILE="$(mktemp)"
+STOP_APPROVED_FILE="$(mktemp)"
+STOP_STEP_FILE="$(mktemp)"
+STOP_TASK_READBACK_FILE="$(mktemp)"
+LIFECYCLE_STATE_AFTER_STOP_FILE="$(mktemp)"
+RESTART_TASK_FILE="$(mktemp)"
+RESTART_BLOCKED_STEP_FILE="$(mktemp)"
+RESTART_APPROVED_FILE="$(mktemp)"
+RESTART_STEP_FILE="$(mktemp)"
+RESTART_TASK_READBACK_FILE="$(mktemp)"
+LIFECYCLE_STATE_FILE="$(mktemp)"
 EVENTS_FILE="$(mktemp)"
 
 curl --silent --fail "$CORE_URL/plugins/native-adapter/engineering-lsp/evidence?action=check&language=typescript&limit=200" > "$CHECK_FILE"
@@ -188,6 +214,51 @@ EOF
 post_json "$CORE_URL/approvals/$process_approval_id/approve" '{"approvedBy":"dev-openclaw-native-engineering-lsp-evidence-check","reason":"approve bounded LSP lifecycle process supervision probe"}' > "$PROCESS_APPROVED_FILE"
 post_json "$CORE_URL/operator/step" '{}' > "$PROCESS_STEP_FILE"
 curl --silent --fail "$CORE_URL/tasks/$process_task_id" > "$PROCESS_TASK_READBACK_FILE"
+curl --silent --fail "$CORE_URL/plugins/native-adapter/engineering-lsp/lifecycle-state?language=typescript&limit=10" > "$LIFECYCLE_STATE_AFTER_PROCESS_FILE"
+
+post_json "$CORE_URL/plugins/native-adapter/engineering-lsp/lifecycle-tasks" '{"language":"typescript","lifecycleAction":"stop","confirm":true}' > "$STOP_TASK_FILE"
+post_json "$CORE_URL/operator/step" '{}' > "$STOP_BLOCKED_STEP_FILE"
+read -r stop_approval_id stop_task_id < <(node - <<'EOF' "$STOP_TASK_FILE" "$STOP_BLOCKED_STEP_FILE"
+const fs = require("node:fs");
+const taskResponse = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+const blockedStep = JSON.parse(fs.readFileSync(process.argv[3], "utf8"));
+if (
+  !taskResponse.ok
+  || taskResponse.engineeringLspLifecycle?.language !== "typescript"
+  || taskResponse.engineeringLspLifecycle?.lifecycleAction !== "stop"
+  || blockedStep.reason !== "policy_requires_approval"
+) {
+  throw new Error(`LSP lifecycle stop task should be approval-gated: ${JSON.stringify({ taskResponse, blockedStep })}`);
+}
+process.stdout.write(`${blockedStep.approval.id} ${taskResponse.task.id}\n`);
+EOF
+)
+post_json "$CORE_URL/approvals/$stop_approval_id/approve" '{"approvedBy":"dev-openclaw-native-engineering-lsp-evidence-check","reason":"approve bounded LSP lifecycle stop state record"}' > "$STOP_APPROVED_FILE"
+post_json "$CORE_URL/operator/step" '{}' > "$STOP_STEP_FILE"
+curl --silent --fail "$CORE_URL/tasks/$stop_task_id" > "$STOP_TASK_READBACK_FILE"
+curl --silent --fail "$CORE_URL/plugins/native-adapter/engineering-lsp/lifecycle-state?language=typescript&limit=10" > "$LIFECYCLE_STATE_AFTER_STOP_FILE"
+
+post_json "$CORE_URL/plugins/native-adapter/engineering-lsp/lifecycle-tasks" '{"language":"typescript","lifecycleAction":"restart","confirm":true}' > "$RESTART_TASK_FILE"
+post_json "$CORE_URL/operator/step" '{}' > "$RESTART_BLOCKED_STEP_FILE"
+read -r restart_approval_id restart_task_id < <(node - <<'EOF' "$RESTART_TASK_FILE" "$RESTART_BLOCKED_STEP_FILE"
+const fs = require("node:fs");
+const taskResponse = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+const blockedStep = JSON.parse(fs.readFileSync(process.argv[3], "utf8"));
+if (
+  !taskResponse.ok
+  || taskResponse.engineeringLspLifecycle?.language !== "typescript"
+  || taskResponse.engineeringLspLifecycle?.lifecycleAction !== "restart"
+  || blockedStep.reason !== "policy_requires_approval"
+) {
+  throw new Error(`LSP lifecycle restart task should be approval-gated: ${JSON.stringify({ taskResponse, blockedStep })}`);
+}
+process.stdout.write(`${blockedStep.approval.id} ${taskResponse.task.id}\n`);
+EOF
+)
+post_json "$CORE_URL/approvals/$restart_approval_id/approve" '{"approvedBy":"dev-openclaw-native-engineering-lsp-evidence-check","reason":"approve bounded LSP lifecycle restart state record"}' > "$RESTART_APPROVED_FILE"
+post_json "$CORE_URL/operator/step" '{}' > "$RESTART_STEP_FILE"
+curl --silent --fail "$CORE_URL/tasks/$restart_task_id" > "$RESTART_TASK_READBACK_FILE"
+curl --silent --fail "$CORE_URL/plugins/native-adapter/engineering-lsp/lifecycle-state?language=typescript&limit=10" > "$LIFECYCLE_STATE_FILE"
 curl --silent --fail "$EVENT_HUB_URL/events/audit?limit=120" > "$EVENTS_FILE"
 
 node - <<'EOF' \
@@ -207,6 +278,19 @@ node - <<'EOF' \
   "$PROCESS_APPROVED_FILE" \
   "$PROCESS_STEP_FILE" \
   "$PROCESS_TASK_READBACK_FILE" \
+  "$LIFECYCLE_STATE_AFTER_PROCESS_FILE" \
+  "$STOP_TASK_FILE" \
+  "$STOP_BLOCKED_STEP_FILE" \
+  "$STOP_APPROVED_FILE" \
+  "$STOP_STEP_FILE" \
+  "$STOP_TASK_READBACK_FILE" \
+  "$LIFECYCLE_STATE_AFTER_STOP_FILE" \
+  "$RESTART_TASK_FILE" \
+  "$RESTART_BLOCKED_STEP_FILE" \
+  "$RESTART_APPROVED_FILE" \
+  "$RESTART_STEP_FILE" \
+  "$RESTART_TASK_READBACK_FILE" \
+  "$LIFECYCLE_STATE_FILE" \
   "$EVENTS_FILE"
 const fs = require("node:fs");
 const readJson = (index) => JSON.parse(fs.readFileSync(process.argv[index], "utf8"));
@@ -227,8 +311,21 @@ const processBlockedStep = readJson(14);
 const processApproved = readJson(15);
 const processStep = readJson(16);
 const processTaskReadback = readJson(17);
-const events = readJson(18);
-const raw = JSON.stringify({ check, position, bad, draft, adapter, taskResponse, blockedStep, approved, execStep, taskReadback, processTaskResponse, processBlockedStep, processApproved, processStep, processTaskReadback, events });
+const lifecycleStateAfterProcess = readJson(18);
+const stopTaskResponse = readJson(19);
+const stopBlockedStep = readJson(20);
+const stopApproved = readJson(21);
+const stopStep = readJson(22);
+const stopTaskReadback = readJson(23);
+const lifecycleStateAfterStop = readJson(24);
+const restartTaskResponse = readJson(25);
+const restartBlockedStep = readJson(26);
+const restartApproved = readJson(27);
+const restartStep = readJson(28);
+const restartTaskReadback = readJson(29);
+const lifecycleState = readJson(30);
+const events = readJson(31);
+const raw = JSON.stringify({ check, position, bad, draft, adapter, taskResponse, blockedStep, approved, execStep, taskReadback, processTaskResponse, processBlockedStep, processApproved, processStep, processTaskReadback, lifecycleStateAfterProcess, stopTaskResponse, stopBlockedStep, stopApproved, stopStep, stopTaskReadback, lifecycleStateAfterStop, restartTaskResponse, restartBlockedStep, restartApproved, restartStep, restartTaskReadback, lifecycleState, events });
 
 if (
   !check.ok
@@ -314,9 +411,11 @@ if (
   !adapter.implementedCapabilities?.includes("sense.openclaw.engineering_tool.lsp_evidence")
   || !adapter.implementedCapabilities?.includes("plan.openclaw.engineering_tool.lsp_lifecycle")
   || !adapter.implementedCapabilities?.includes("act.openclaw.engineering_tool.lsp_lifecycle_task")
+  || !adapter.implementedCapabilities?.includes("sense.openclaw.engineering_tool.lsp_lifecycle_state")
   || adapter.summary?.canReadEngineeringLspEvidence !== true
   || adapter.summary?.canDraftEngineeringLspLifecycleAction !== true
   || adapter.summary?.canCreateApprovalGatedEngineeringLspLifecycleTasks !== true
+  || adapter.summary?.canReadEngineeringLspLifecycleState !== true
 ) {
   throw new Error(`native adapter missing LSP evidence/lifecycle capability: ${JSON.stringify(adapter)}`);
 }
@@ -402,8 +501,27 @@ if (
   || supervisedExecution?.governance?.approved !== true
   || supervisedExecution?.governance?.jsonRpcEnabled !== false
   || supervisedExecution?.governance?.contentExposed !== false
+  || supervisedExecution?.lifecycleState?.registry !== "openclaw-native-engineering-lsp-lifecycle-state-v0"
+  || supervisedExecution?.lifecycleState?.status !== "probe_completed_no_live_process"
+  || supervisedExecution?.lifecycleState?.process?.longLivedProcessActive !== false
+  || supervisedExecution?.lifecycleState?.boundaries?.jsonRpcEnabled !== false
 ) {
   throw new Error(`LSP process supervision readback mismatch: ${JSON.stringify({ supervisedTask, supervisedExecution })}`);
+}
+const processStateItem = lifecycleStateAfterProcess.items?.[0];
+if (
+  lifecycleStateAfterProcess.registry !== "openclaw-native-engineering-lsp-lifecycle-state-v0"
+  || lifecycleStateAfterProcess.mode !== "read-only-lsp-lifecycle-state-readback"
+  || lifecycleStateAfterProcess.governance?.readOnly !== true
+  || lifecycleStateAfterProcess.governance?.canStartProcess !== false
+  || lifecycleStateAfterProcess.governance?.jsonRpcEnabled !== false
+  || processStateItem?.sourceTaskId !== supervisedTask.id
+  || processStateItem?.status !== "probe_completed_no_live_process"
+  || processStateItem?.process?.longLivedProcessActive !== false
+  || processStateItem?.boundaries?.sourceContentTransferred !== false
+  || !String(processStateItem?.output?.stderr?.preview ?? "").includes("openclaw-fixture-typescript-lsp-ready")
+) {
+  throw new Error(`LSP lifecycle state should record process probe readback: ${JSON.stringify(lifecycleStateAfterProcess)}`);
 }
 if (
   processTaskReadback.task?.id !== supervisedTask.id
@@ -411,6 +529,80 @@ if (
   || processTaskReadback.task?.engineeringLspLifecycle?.server?.jsonRpcHandshakeSent !== false
 ) {
   throw new Error(`LSP process task endpoint should preserve supervision readback: ${JSON.stringify(processTaskReadback)}`);
+}
+if (stopApproved.approval?.status !== "approved" || stopApproved.task?.policy?.decision?.decision !== "audit_only") {
+  throw new Error(`LSP stop approval should convert task to audited execution: ${JSON.stringify(stopApproved)}`);
+}
+if (!stopStep.ok || stopStep.ran !== true || stopStep.blocked !== false) {
+  throw new Error(`approved LSP stop task should complete: ${JSON.stringify(stopStep)}`);
+}
+const stopTask = stopStep.task;
+const stopExecution = stopTask?.outcome?.details?.lspLifecycleExecution ?? stopTask?.engineeringLspLifecycle?.execution;
+if (
+  stopTaskResponse.engineeringLspLifecycle?.lifecycleAction !== "stop"
+  || stopBlockedStep.reason !== "policy_requires_approval"
+  || stopTask?.id !== stopTaskResponse.task?.id
+  || stopTask.status !== "completed"
+  || stopExecution?.result?.state !== "stop_recorded_no_live_process"
+  || stopExecution?.server?.binaryChecked !== false
+  || stopExecution?.server?.processStarted !== false
+  || stopExecution?.server?.jsonRpcHandshakeSent !== false
+  || stopExecution?.processSupervision?.reason !== "stop_recorded_no_live_process"
+  || stopExecution?.lifecycleState?.status !== "stopped_no_live_process"
+  || stopExecution?.lifecycleState?.process?.longLivedProcessActive !== false
+) {
+  throw new Error(`LSP stop lifecycle readback mismatch: ${JSON.stringify({ stopTask, stopExecution })}`);
+}
+const stopStateItem = lifecycleStateAfterStop.items?.[0];
+if (
+  stopTaskReadback.task?.id !== stopTask.id
+  || stopTaskReadback.task?.engineeringLspLifecycle?.lifecycleState?.status !== "stopped_no_live_process"
+  || lifecycleStateAfterStop.registry !== "openclaw-native-engineering-lsp-lifecycle-state-v0"
+  || stopStateItem?.sourceTaskId !== stopTask.id
+  || stopStateItem?.status !== "stopped_no_live_process"
+  || stopStateItem?.process?.longLivedProcessActive !== false
+  || stopStateItem?.boundaries?.jsonRpcEnabled !== false
+) {
+  throw new Error(`LSP lifecycle state should record stop readback: ${JSON.stringify({ stopTaskReadback, lifecycleStateAfterStop })}`);
+}
+if (restartApproved.approval?.status !== "approved" || restartApproved.task?.policy?.decision?.decision !== "audit_only") {
+  throw new Error(`LSP restart approval should convert task to audited execution: ${JSON.stringify(restartApproved)}`);
+}
+if (!restartStep.ok || restartStep.ran !== true || restartStep.blocked !== false) {
+  throw new Error(`approved LSP restart task should complete: ${JSON.stringify(restartStep)}`);
+}
+const restartTask = restartStep.task;
+const restartExecution = restartTask?.outcome?.details?.lspLifecycleExecution ?? restartTask?.engineeringLspLifecycle?.execution;
+if (
+  restartTaskResponse.engineeringLspLifecycle?.lifecycleAction !== "restart"
+  || restartBlockedStep.reason !== "policy_requires_approval"
+  || restartTask?.id !== restartTaskResponse.task?.id
+  || restartTask.status !== "completed"
+  || restartExecution?.result?.state !== "process_supervision_probe_completed_json_rpc_deferred"
+  || restartExecution?.server?.processStarted !== true
+  || restartExecution?.server?.processTerminated !== true
+  || restartExecution?.server?.jsonRpcHandshakeSent !== false
+  || restartExecution?.lifecycleState?.status !== "probe_completed_no_live_process"
+  || restartExecution?.lifecycleState?.history?.length < 3
+) {
+  throw new Error(`LSP restart lifecycle readback mismatch: ${JSON.stringify({ restartTask, restartExecution })}`);
+}
+const finalStateItem = lifecycleState.items?.[0];
+if (
+  restartTaskReadback.task?.id !== restartTask.id
+  || restartTaskReadback.task?.engineeringLspLifecycle?.lifecycleState?.status !== "probe_completed_no_live_process"
+  || lifecycleState.registry !== "openclaw-native-engineering-lsp-lifecycle-state-v0"
+  || lifecycleState.summary?.activeLongLivedProcesses !== 0
+  || lifecycleState.summary?.jsonRpcEnabled !== false
+  || lifecycleState.summary?.sourceContentTransferred !== false
+  || finalStateItem?.sourceTaskId !== restartTask.id
+  || finalStateItem?.lifecycleAction !== "restart"
+  || finalStateItem?.status !== "probe_completed_no_live_process"
+  || finalStateItem?.process?.longLivedProcessActive !== false
+  || finalStateItem?.boundaries?.sourceContentTransferred !== false
+  || finalStateItem?.boundaries?.providerEgress !== false
+) {
+  throw new Error(`LSP lifecycle state should record restart readback: ${JSON.stringify({ restartTaskReadback, lifecycleState })}`);
 }
 const eventTypes = new Set((events.items ?? events.events ?? []).map((event) => event.type));
 for (const type of ["approval.created", "approval.approved", "policy.evaluated"]) {
@@ -450,7 +642,9 @@ console.log(JSON.stringify({
     lifecycleRegistry: draft.registry,
     lifecycleTaskRegistry: taskResponse.registry,
     lifecycleExecutionRegistry: execution.registry,
+    lifecycleStateRegistry: lifecycleState.registry,
     lifecycleProcessState: supervisedExecution.result.state,
+    lifecycleFinalState: finalStateItem.status,
     languages: check.summary.detectedLanguages,
     lifecycleAction: draft.summary.lifecycleAction,
     serverStatus: check.serverReadiness.status,
@@ -461,6 +655,9 @@ console.log(JSON.stringify({
     supervisedProcessStarted: supervisedExecution.server.processStarted,
     supervisedProcessTerminated: supervisedExecution.server.processTerminated,
     supervisedJsonRpcSent: supervisedExecution.server.jsonRpcHandshakeSent,
+    stopLifecycleState: stopExecution.result.state,
+    restartLifecycleState: restartExecution.result.state,
+    lifecycleStateRecords: lifecycleState.summary.totalRecords,
     badPathStatus: badStatus,
     lspEvidenceJsonRpcSent: check.summary.jsonRpcSent,
   },

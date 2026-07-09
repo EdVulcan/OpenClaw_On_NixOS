@@ -10,6 +10,7 @@ const tasks = new Map();
 const approvals = new Map();
 const policyAuditLog = [];
 const capabilityInvocationLog = [];
+const nativeEngineeringLspLifecycleRecords = new Map();
 const runtimeState = {
   status: "idle",
   currentTaskId: null,
@@ -24,6 +25,7 @@ const MAX_PHASE_HISTORY_ENTRIES = 50;
 const MAX_POLICY_AUDIT_ENTRIES = 100;
 const MAX_APPROVAL_ITEMS = 200;
 const MAX_CAPABILITY_INVOCATION_ENTRIES = 200;
+const MAX_NATIVE_ENGINEERING_LSP_LIFECYCLE_RECORDS = 100;
 const CROSS_BOUNDARY_INTENTS = new Set([
   "account.login",
   "data.egress",
@@ -134,6 +136,7 @@ function updateRuntimeState(patch) {
     approvals: [...approvals.values()],
     policyAuditLog,
     capabilityInvocationLog,
+    nativeEngineeringLspLifecycleRecords: [...nativeEngineeringLspLifecycleRecords.values()],
   }));
 
   // L231-282
@@ -181,6 +184,14 @@ function loadPersistentState() {
         ...data.capabilityInvocationLog.slice(-MAX_CAPABILITY_INVOCATION_ENTRIES),
       );
     }
+    if (Array.isArray(data?.nativeEngineeringLspLifecycleRecords)) {
+      nativeEngineeringLspLifecycleRecords.clear();
+      for (const record of data.nativeEngineeringLspLifecycleRecords.slice(-MAX_NATIVE_ENGINEERING_LSP_LIFECYCLE_RECORDS)) {
+        if (record?.key) {
+          nativeEngineeringLspLifecycleRecords.set(record.key, record);
+        }
+      }
+    }
   } catch (error) {
     console.error("Failed to load persisted core state:", error);
   }
@@ -191,9 +202,10 @@ function getCurrentTask() {
 }
 
   return {
-    tasks, approvals, runtimeState, policyAuditLog, capabilityInvocationLog,
+    tasks, approvals, runtimeState, policyAuditLog, capabilityInvocationLog, nativeEngineeringLspLifecycleRecords,
     ACTIVE_TASK_STATUSES, MAX_TASK_ENTRIES, MAX_PHASE_HISTORY_ENTRIES,
     MAX_POLICY_AUDIT_ENTRIES, MAX_APPROVAL_ITEMS, MAX_CAPABILITY_INVOCATION_ENTRIES,
+    MAX_NATIVE_ENGINEERING_LSP_LIFECYCLE_RECORDS,
     CROSS_BOUNDARY_INTENTS, DENIED_INTENTS, CAPABILITY_HEALTH_TIMEOUT_MS,
     APPROVAL_TTL_MS, SYSTEMD_REPAIR_EXECUTION_TIMEOUT_MS, SYSTEMD_REPAIR_RESTART_HELPER,
     SYSTEMD_REPAIR_RESTART_HELPER_SUDO, SYSTEMD_REPAIR_AUTH_DELEGATION, STATUS_PRIORITY,

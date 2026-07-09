@@ -116,6 +116,14 @@ function engineeringLspLifecycleDraftInput(requestUrl) {
   };
 }
 
+function engineeringLspLifecycleStateInput(requestUrl) {
+  return {
+    workspacePath: requestUrl.searchParams.get("workspacePath"),
+    language: requestUrl.searchParams.get("language"),
+    limit: requestUrl.searchParams.get("limit"),
+  };
+}
+
 const GET_ROUTES = new Map([
   [
     "/plugins/native-adapter/manifest-profile",
@@ -202,6 +210,14 @@ const GET_ROUTES = new Map([
       builder: "buildNativeEngineeringLspLifecycleDraft",
       errorStatus: 400,
       input: engineeringLspLifecycleDraftInput,
+    },
+  ],
+  [
+    "/plugins/native-adapter/engineering-lsp/lifecycle-state",
+    {
+      builder: "buildNativeEngineeringLspLifecycleState",
+      errorStatus: 400,
+      input: engineeringLspLifecycleStateInput,
     },
   ],
   [

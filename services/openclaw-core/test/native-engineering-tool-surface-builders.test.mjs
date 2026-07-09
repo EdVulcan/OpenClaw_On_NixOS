@@ -115,7 +115,9 @@ test("native engineering tool surface maps cc-tools contracts without execution"
 
   const lspContract = inventory.tools.find((tool) => tool.sourceToolName === "cc_lsp");
   assert.equal(lspContract.sourceEvidence.sourceFilesPresent, 2);
-  assert.match(lspContract.deferredExecutionBoundary, /no language server is started/i);
+  assert.equal(lspContract.operationClass, "language_intelligence_evidence_and_governed_lifecycle_state");
+  assert.match(lspContract.intendedNativeCapabilityId, /lsp_lifecycle_state/u);
+  assert.match(lspContract.deferredExecutionBoundary, /JSON-RPC requests/i);
 
   for (const secret of [
     "SECRET_ENGINEERING_TOOL_SURFACE_INDEX_BODY",

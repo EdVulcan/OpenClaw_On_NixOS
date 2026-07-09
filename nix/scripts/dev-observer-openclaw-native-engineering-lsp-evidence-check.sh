@@ -111,6 +111,7 @@ for (const token of [
   "approval-gated binary gate",
   "aliveAtProbe",
   "processTerminated",
+  "Lifecycle State",
   "Missing server binaries become recoverable task evidence",
   "Native engineering LSP evidence",
   "sense.openclaw.engineering_tool.lsp_evidence",

@@ -135,7 +135,8 @@ async function refreshEngineeringLoopCompletionReadback() {
     const task = evidence?.task ?? evidence;
     const lifecycle = task?.engineeringLspLifecycle ?? {};
     const execution = task?.outcome?.details?.lspLifecycleExecution ?? lifecycle.execution ?? {};
-    engineeringLoopStateCompletion.textContent = \`status=\${task?.status ?? "unknown"} binary=\${execution?.server?.binaryFound === true ? "found" : "missing"}\`;
+    const lifecycleState = execution.lifecycleState ?? lifecycle.lifecycleState ?? {};
+    engineeringLoopStateCompletion.textContent = \`status=\${task?.status ?? "unknown"} lifecycle=\${lifecycleState.status ?? execution.result?.state ?? "unknown"}\`;
     engineeringLoopStateJson.textContent = [
       "Kind: lsp-lifecycle",
       \`Task: \${latestEngineeringLoopControlState.taskId}\`,
@@ -143,6 +144,7 @@ async function refreshEngineeringLoopCompletionReadback() {
       \`Task Status: \${task?.status ?? "unknown"}\`,
       \`Action: \${lifecycle.lifecycleAction ?? execution.lifecycleAction ?? "start"} language=\${lifecycle.language ?? execution.language ?? "typescript"}\`,
       \`Server: \${lifecycle.server?.serverBinary ?? execution.server?.serverBinary ?? "unknown"} binaryFound=\${Boolean(execution.server?.binaryFound)} processStarted=\${Boolean(execution.server?.processStarted)} aliveAtProbe=\${Boolean(execution.server?.processAliveAtProbe)} terminated=\${Boolean(execution.server?.processTerminated)} jsonRpc=\${Boolean(execution.server?.jsonRpcHandshakeSent)}\`,
+      \`Lifecycle State: \${lifecycleState.status ?? "pending"} active=\${Boolean(lifecycleState.process?.longLivedProcessActive)} jsonRpc=\${Boolean(lifecycleState.boundaries?.jsonRpcEnabled)}\`,
       \`Result: \${execution.result?.state ?? task?.outcome?.kind ?? "pending"}\`,
       \`Recovery: \${execution.recoveryRecommendation?.nextAction ?? task?.outcome?.details?.recoveryEvidence?.recommendation?.nextAction ?? "pending operator step"}\`,
       "Boundary: approval-gated binary gate plus process probe only; no long-lived process state, JSON-RPC, source-content read, mutation, provider call, or result envelope.",
