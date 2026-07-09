@@ -123,6 +123,15 @@ export function observerOperationsPanels() {
           <pre id="command-ledger-json">Loading command transcript ledger...</pre>
         </section>
         <section class="panel">
+          <h2>Engineering Loop State</h2>
+          <div class="metric"><span>Kind</span><span id="engineering-loop-state-kind">none</span></div>
+          <div class="metric"><span>Task</span><span id="engineering-loop-state-task">none</span></div>
+          <div class="metric"><span>Approval</span><span id="engineering-loop-state-approval">none</span></div>
+          <div class="metric"><span>Next</span><span id="engineering-loop-state-next">create task</span></div>
+          <div class="metric"><span>Evidence</span><span id="engineering-loop-state-evidence">none</span></div>
+          <pre id="engineering-loop-state-json">No engineering loop task created from Observer controls yet.</pre>
+        </section>
+        <section class="panel">
           <h2>Engineering Verification Evidence</h2>
           <div class="metric"><span>Registry</span><span id="engineering-verification-registry">openclaw-native-engineering-verification-evidence-v0</span></div>
           <div class="metric"><span>Passed</span><span id="engineering-verification-passed">0</span></div>

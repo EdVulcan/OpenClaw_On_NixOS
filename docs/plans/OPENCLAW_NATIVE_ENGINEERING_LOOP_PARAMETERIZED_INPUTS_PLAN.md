@@ -77,13 +77,11 @@ raw credential reads
 
 ## Next Slice
 
-The next highest-density capability slice should connect operator-selected
-tasks to clearer post-creation loop state:
+The loop-state guidance follow-up was completed as:
 
 ```text
-Native governed engineering loop state guidance
+OPENCLAW_NATIVE_ENGINEERING_LOOP_STATE_GUIDANCE_PLAN.md
 ```
 
-That slice should help the operator see which created task needs approval,
-which step should be run next, and where verification/recovery evidence will
-appear, without auto-approving or auto-running.
+The next slice should make completed loop outcomes easier to inspect after
+manual approval and operator execution, without auto-approving or auto-running.

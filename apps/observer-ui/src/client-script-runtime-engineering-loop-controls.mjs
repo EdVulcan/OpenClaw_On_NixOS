@@ -32,6 +32,37 @@ function readEngineeringVerificationLoopInput() {
   };
 }
 
+function engineeringLoopEvidenceRoute(kind, taskId) {
+  if (kind === "edit") {
+    return \`/plugins/native-adapter/engineering-edit-execution/evidence?taskId=\${taskId ?? ""}\`;
+  }
+  if (kind === "write") {
+    return \`/plugins/native-adapter/engineering-write-execution/evidence?taskId=\${taskId ?? ""}\`;
+  }
+  return \`/plugins/native-adapter/engineering-verification/evidence?taskId=\${taskId ?? ""}\`;
+}
+
+function renderEngineeringLoopControlState(kind, result) {
+  const taskId = result.task?.id ?? "none";
+  const approvalId = result.approval?.id ?? "none";
+  const evidenceRoute = engineeringLoopEvidenceRoute(kind, result.task?.id ?? null);
+  engineeringLoopStateKind.textContent = kind;
+  engineeringLoopStateTask.textContent = taskId === "none" ? "none" : taskId.slice(0, 8);
+  engineeringLoopStateApproval.textContent = approvalId === "none" ? "none" : approvalId.slice(0, 8);
+  engineeringLoopStateNext.textContent = "approve pending approval, then run operator step";
+  engineeringLoopStateEvidence.textContent = evidenceRoute;
+  engineeringLoopStateJson.textContent = [
+    \`Kind: \${kind}\`,
+    \`Task: \${taskId}\`,
+    \`Approval: \${approvalId}\`,
+    \`Task Status: \${result.task?.status ?? "unknown"}\`,
+    \`Approval Status: \${result.approval?.status ?? "unknown"}\`,
+    "Next: approve pending approval, then run operator step",
+    \`Evidence: \${evidenceRoute}\`,
+    "Boundary: no auto-approval, no automatic operator step, no unapproved mutation.",
+  ].join("\\n");
+}
+
 async function refreshEngineeringLoopControlSurfaces() {
   await refreshRuntime();
   await refreshTaskList();
@@ -61,6 +92,7 @@ async function createEngineeringEditLoopApprovalTask() {
   });
 
   focusEngineeringLoopTask(result);
+  renderEngineeringLoopControlState("edit", result);
   setControlMessage(\`Created approval-gated engineering edit task \${result.task?.id ?? "unknown"}; approval and operator step are still required.\`);
   await refreshEngineeringLoopControlSurfaces();
   await refreshWorkspacePatchApplyDraft();
@@ -81,6 +113,7 @@ async function createEngineeringWriteLoopApprovalTask() {
   });
 
   focusEngineeringLoopTask(result);
+  renderEngineeringLoopControlState("write", result);
   setControlMessage(\`Created approval-gated engineering write task \${result.task?.id ?? "unknown"}; approval and operator step are still required.\`);
   await refreshEngineeringLoopControlSurfaces();
   await refreshWorkspaceTextWriteDraft();
@@ -99,6 +132,7 @@ async function createEngineeringVerificationLoopApprovalTask() {
   });
 
   focusEngineeringLoopTask(result);
+  renderEngineeringLoopControlState("verification", result);
   setControlMessage(\`Created approval-gated engineering verification task \${result.task?.id ?? "unknown"}; approval and operator step are still required.\`);
   await refreshEngineeringLoopControlSurfaces();
   await refreshSourceCommandPlanDraft();

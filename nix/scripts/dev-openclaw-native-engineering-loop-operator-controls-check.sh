@@ -122,6 +122,12 @@ for (const token of [
   "engineering-write-content-input",
   "engineering-verification-proposal-input",
   "engineering-verification-query-input",
+  "engineering-loop-state-kind",
+  "engineering-loop-state-task",
+  "engineering-loop-state-approval",
+  "engineering-loop-state-next",
+  "engineering-loop-state-evidence",
+  "engineering-loop-state-json",
 ]) {
   if (!html.includes(token)) {
     throw new Error(`Observer HTML missing engineering loop operator control/input: ${token}`);
@@ -133,6 +139,9 @@ for (const token of [
   "readEngineeringEditLoopInput",
   "readEngineeringWriteLoopInput",
   "readEngineeringVerificationLoopInput",
+  "engineeringLoopEvidenceRoute",
+  "renderEngineeringLoopControlState",
+  "approve pending approval, then run operator step",
   "createEngineeringEditLoopApprovalTask",
   "createEngineeringWriteLoopApprovalTask",
   "createEngineeringVerificationLoopApprovalTask",
