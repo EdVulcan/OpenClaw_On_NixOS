@@ -55,6 +55,60 @@ function engineeringLspSelectedTargetEditProposalSeedRoute(taskId, language = "t
   return \`/plugins/native-adapter/engineering-lsp/selected-target-edit-proposal-seed?taskId=\${encodeURIComponent(taskId ?? "")}&language=\${encodeURIComponent(language ?? "typescript")}&contextLines=0\`;
 }
 
+function formatEngineeringLoopWorkStandards(workStandards) {
+  const score = workStandards?.score ?? {};
+  const missing = workStandards?.missingRequiredStandards ?? [];
+  return [
+    "Work Standards:",
+    \`Registry: \${workStandards?.registry ?? "openclaw-engineering-work-standards-v0"}\`,
+    \`Status: \${workStandards?.status ?? "unknown"} satisfied=\${score.satisfied ?? 0}/\${score.required ?? 0} missing=\${score.missing ?? missing.length ?? 0}\`,
+    \`Missing: \${missing.join(",") || "none"}\`,
+    \`Operator Contract: approval=\${Boolean(workStandards?.operatorContract?.mutationRequiresApproval)} verification=\${Boolean(workStandards?.operatorContract?.completionShouldAttachVerificationEvidence)} promptWall=\${Boolean(workStandards?.operatorContract?.promptWallEnforced)}\`,
+    "Boundary: standards are read-only guidance; no task, approval, operator step, mutation, prompt execution, or provider call is created.",
+  ].join("\\n");
+}
+
+function renderEngineeringLoopWorkStandards(workStandards) {
+  if (!latestEngineeringLoopControlState) {
+    return;
+  }
+  latestEngineeringLoopControlState.workStandards = {
+    registry: workStandards?.registry ?? "openclaw-engineering-work-standards-v0",
+    status: workStandards?.status ?? "unknown",
+    score: workStandards?.score ?? {},
+    missingRequiredStandards: workStandards?.missingRequiredStandards ?? [],
+  };
+  const marker = "\\n\\nWork Standards:\\n";
+  const existing = String(engineeringLoopStateJson.textContent ?? "");
+  const base = existing.includes(marker) ? existing.split(marker)[0] : existing;
+  engineeringLoopStateJson.textContent = [
+    base,
+    formatEngineeringLoopWorkStandards(workStandards),
+  ].join("\\n\\n");
+}
+
+async function refreshEngineeringLoopWorkStandards() {
+  if (!latestEngineeringLoopControlState?.taskId) {
+    return;
+  }
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/prompt-semantics?query=edit&limit=24\`);
+    renderEngineeringLoopWorkStandards(data?.workStandards ?? data?.derivedPlanSemantics?.workStandards ?? null);
+  } catch {
+    renderEngineeringLoopWorkStandards({
+      registry: "openclaw-engineering-work-standards-v0",
+      status: "offline",
+      score: { required: 0, satisfied: 0, missing: 0 },
+      missingRequiredStandards: [],
+      operatorContract: {
+        mutationRequiresApproval: true,
+        completionShouldAttachVerificationEvidence: true,
+        promptWallEnforced: false,
+      },
+    });
+  }
+}
+
 function renderEngineeringLoopControlState(kind, result) {
   const taskId = result.task?.id ?? "none";
   const approvalId = result.approval?.id ?? "none";
@@ -639,6 +693,7 @@ async function refreshEngineeringLoopControlSurfaces() {
   await refreshEngineeringVerificationEvidence();
   await refreshEngineeringRecoveryEvidence();
   await refreshEngineeringLspEvidence();
+  await refreshEngineeringLoopWorkStandards();
 }
 
 async function createEngineeringEditLoopApprovalTask() {
