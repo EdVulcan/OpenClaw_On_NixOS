@@ -566,11 +566,17 @@ async function refreshNativePluginRuntimeRefreshEvidence() {
 async function refreshAcpxCodexBridgeCompatibility() {
   try {
     const data = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/acpx-codex-bridge-compatibility\`);
-    renderAcpxCodexBridgeCompatibility(data);
+    const selectedSessionKey = data?.persistence?.records?.[0]?.sessionKey ?? data?.persistence?.selectedSessionKey ?? null;
+    const draftUrl = selectedSessionKey
+      ? \`\${observerConfig.coreUrl}/plugins/native-adapter/acpx-codex-bridge-wrapper-draft?sessionKey=\${encodeURIComponent(selectedSessionKey)}\`
+      : \`\${observerConfig.coreUrl}/plugins/native-adapter/acpx-codex-bridge-wrapper-draft\`;
+    const wrapperDraft = await fetchJson(draftUrl);
+    renderAcpxCodexBridgeCompatibility({ ...data, wrapperDraft });
   } catch {
     acpxCodexBridgeRegistry.textContent = "offline";
     acpxCodexBridgeSessions.textContent = "0";
     acpxCodexBridgeSelected.textContent = "unknown";
+    acpxCodexBridgeDraft.textContent = "unknown";
     acpxCodexBridgeAuth.textContent = "unknown";
     acpxCodexBridgeRuntime.textContent = "unknown";
     acpxCodexBridgeMode.textContent = "unknown";

@@ -38,6 +38,7 @@ cleanup() {
     "${FIRST_FILE:-}" \
     "${SECOND_FILE:-}" \
     "${BRIDGE_FILE:-}" \
+    "${DRAFT_FILE:-}" \
     "${APPROVALS_FILE:-}" \
     "${HISTORY_FILE:-}"
   "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
@@ -51,6 +52,7 @@ CLIENT_FILE="$(mktemp)"
 FIRST_FILE="$(mktemp)"
 SECOND_FILE="$(mktemp)"
 BRIDGE_FILE="$(mktemp)"
+DRAFT_FILE="$(mktemp)"
 APPROVALS_FILE="$(mktemp)"
 HISTORY_FILE="$(mktemp)"
 
@@ -59,10 +61,11 @@ post_json "$CORE_URL/plugins/native-adapter/acpx-codex-session-records" '{"sessi
 curl --silent --fail "$OBSERVER_URL/" > "$HTML_FILE"
 curl --silent --fail "$OBSERVER_URL/client-v5.js" > "$CLIENT_FILE"
 curl --silent --fail "$CORE_URL/plugins/native-adapter/acpx-codex-bridge-compatibility?sessionKey=agent:codex:observer-one" > "$BRIDGE_FILE"
+curl --silent --fail "$CORE_URL/plugins/native-adapter/acpx-codex-bridge-wrapper-draft?sessionKey=agent:codex:observer-one&command=npx.cmd&wrapperName=observer-codex-acp" > "$DRAFT_FILE"
 curl --silent --fail "$CORE_URL/approvals?status=pending&limit=10" > "$APPROVALS_FILE"
 curl --silent --fail "$CORE_URL/capabilities/invocations?limit=10" > "$HISTORY_FILE"
 
-node - <<'EOF' "$HTML_FILE" "$CLIENT_FILE" "$FIRST_FILE" "$SECOND_FILE" "$BRIDGE_FILE" "$APPROVALS_FILE" "$HISTORY_FILE"
+node - <<'EOF' "$HTML_FILE" "$CLIENT_FILE" "$FIRST_FILE" "$SECOND_FILE" "$BRIDGE_FILE" "$DRAFT_FILE" "$APPROVALS_FILE" "$HISTORY_FILE"
 const fs = require("node:fs");
 const readText = (index) => fs.readFileSync(process.argv[index], "utf8");
 const readJson = (index) => JSON.parse(readText(index));
@@ -72,15 +75,17 @@ const client = readText(3);
 const first = readJson(4);
 const second = readJson(5);
 const bridge = readJson(6);
-const approvals = readJson(7);
-const history = readJson(8);
-const raw = JSON.stringify({ html, client, first, second, bridge, approvals, history });
+const draft = readJson(7);
+const approvals = readJson(8);
+const history = readJson(9);
+const raw = JSON.stringify({ html, client, first, second, bridge, draft, approvals, history });
 
 for (const token of [
   "OpenClaw ACPX/Codex Bridge",
   "acpx-codex-bridge-registry",
   "acpx-codex-bridge-sessions",
   "acpx-codex-bridge-selected",
+  "acpx-codex-bridge-draft",
   "acpx-codex-bridge-auth",
   "acpx-codex-bridge-runtime",
   "acpx-codex-bridge-mode",
@@ -92,10 +97,13 @@ for (const token of [
 }
 for (const token of [
   "/plugins/native-adapter/acpx-codex-bridge-compatibility",
+  "/plugins/native-adapter/acpx-codex-bridge-wrapper-draft",
   "refreshAcpxCodexBridgeCompatibility",
   "renderAcpxCodexBridgeCompatibility",
   "ACPX/Codex bridge compatibility",
+  "Wrapper draft",
   "sense.openclaw.acpx_codex_bridge.compatibility",
+  "plan.openclaw.acpx_codex_bridge.wrapper_action",
   "compatibility-and-persistence-evidence",
 ]) {
   if (!client.includes(token)) {
@@ -127,6 +135,29 @@ if (
 ) {
   throw new Error(`Observer ACPX/Codex bridge read model mismatch: ${JSON.stringify(bridge)}`);
 }
+if (
+  !draft.ok
+  || draft.registry !== "openclaw-native-acpx-codex-bridge-wrapper-draft-v0"
+  || draft.proposal?.status !== "ready_for_approval_bridge"
+  || draft.summary?.readyForApprovalBridge !== true
+  || draft.proposal?.wrapper?.relativePath !== ".openclaw/acpx/codex-bridge/observer-codex-acp.sh"
+  || draft.proposal?.wrapper?.wrapperWritten !== false
+  || draft.proposal?.command?.command !== "npx.cmd"
+  || draft.proposal?.command?.commandExecuted !== false
+  || draft.proposal?.command?.processSpawned !== false
+  || draft.proposal?.authIsolation?.credentialValueRead !== false
+  || draft.governance?.createsTask !== false
+  || draft.governance?.createsApproval !== false
+  || draft.governance?.canReadCredentialValue !== false
+  || draft.governance?.canCopyAuthMaterial !== false
+  || draft.governance?.canWriteWrapper !== false
+  || draft.governance?.canExecuteWrapper !== false
+  || draft.governance?.canSpawnCodexAcp !== false
+  || draft.governance?.canCallProvider !== false
+  || draft.governance?.canUseNetwork !== false
+) {
+  throw new Error(`Observer ACPX/Codex wrapper draft mismatch: ${JSON.stringify(draft)}`);
+}
 if ((approvals.items ?? []).length !== 0) {
   throw new Error(`Observer ACPX/Codex bridge visibility must not create approvals: ${JSON.stringify(approvals.items)}`);
 }
@@ -150,6 +181,7 @@ console.log(JSON.stringify({
     totalRecords: bridge.persistence.totalRecords,
     selectedSession: bridge.persistence.selectedRecord.sessionKey,
     observerVisible: bridge.governance.observerVisible,
+    wrapperDraft: draft.proposal.status,
     credentialValueRead: bridge.governance.canReadCredentialValue,
     wrapperWritten: bridge.governance.canWriteWrapper,
     processSpawned: bridge.governance.canSpawnCodexAcp,

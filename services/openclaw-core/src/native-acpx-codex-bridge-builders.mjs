@@ -3,8 +3,10 @@ import { createEventName } from "../../../packages/shared-events/src/event-facto
 
 export const NATIVE_ACPX_CODEX_BRIDGE_COMPATIBILITY_REGISTRY = "openclaw-native-acpx-codex-bridge-compatibility-v0";
 export const NATIVE_ACPX_CODEX_SESSION_PERSISTENCE_REGISTRY = "openclaw-native-acpx-codex-session-persistence-v0";
+export const NATIVE_ACPX_CODEX_BRIDGE_WRAPPER_DRAFT_REGISTRY = "openclaw-native-acpx-codex-bridge-wrapper-draft-v0";
 
 const SESSION_KEY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$/;
+const COMMAND_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/;
 const SECRET_KEY_PATTERN = /(auth|token|secret|password|credential|api[_-]?key|private[_-]?key)/i;
 
 function nowIso() {
@@ -40,6 +42,23 @@ function normaliseRecordId(value, sessionKey) {
     throw new Error("ACPX/Codex recordId must use only letters, numbers, '.', '_', ':', or '-'.");
   }
   return recordId;
+}
+
+function normaliseCommandName(value) {
+  const commandName = typeof value === "string" && value.trim() ? value.trim() : "npx";
+  if (!COMMAND_NAME_PATTERN.test(commandName) || commandName.includes("..")) {
+    throw new Error("ACPX/Codex bridge command must be a simple command name without separators.");
+  }
+  return commandName;
+}
+
+function normaliseWrapperName(value, sessionKey = null) {
+  const fallback = `codex-acp-${sha256(sessionKey ?? "unselected-session").slice(0, 12)}.sh`;
+  const wrapperName = typeof value === "string" && value.trim() ? value.trim() : fallback;
+  if (!COMMAND_NAME_PATTERN.test(wrapperName.replace(/\.sh$/u, "")) || wrapperName.includes("/") || wrapperName.includes("\\") || wrapperName.includes("..")) {
+    throw new Error("ACPX/Codex bridge wrapperName must be a simple filename stem, optionally ending in .sh.");
+  }
+  return wrapperName.endsWith(".sh") ? wrapperName : `${wrapperName}.sh`;
 }
 
 function sanitiseMetadata(metadata) {
@@ -183,6 +202,144 @@ export function createNativeAcpxCodexBridgeBuilders({
     };
   }
 
+  function buildNativeAcpxCodexBridgeWrapperDraft({
+    sessionKey = null,
+    command = null,
+    wrapperName = null,
+  } = {}) {
+    const selectedSessionKey = sessionKey ? normaliseSessionKey(sessionKey) : null;
+    const selectedRecord = selectedSessionKey ? acpxBridgeSessionRecords.get(selectedSessionKey) ?? null : null;
+    const commandName = normaliseCommandName(command);
+    const safeWrapperName = normaliseWrapperName(wrapperName, selectedSessionKey);
+    const generatedAt = nowIso();
+    const readyForApprovalBridge = selectedRecord !== null;
+    const readinessGates = [
+      {
+        id: "selected-session-metadata",
+        status: readyForApprovalBridge ? "passed" : "blocked",
+        requiredForApprovalBridge: true,
+        evidence: selectedRecord ? "persisted_session_metadata_found" : "missing_session_metadata",
+      },
+      {
+        id: "auth-isolation",
+        status: "passed",
+        requiredForApprovalBridge: true,
+        credentialValueRead: false,
+        authMaterialCopied: false,
+      },
+      {
+        id: "wrapper-write-boundary",
+        status: "deferred",
+        requiredForApprovalBridge: true,
+        wrapperWritten: false,
+        futureApprovalRequired: true,
+      },
+      {
+        id: "process-spawn-boundary",
+        status: "deferred",
+        requiredForApprovalBridge: true,
+        commandExecuted: false,
+        processSpawned: false,
+        futureApprovalRequired: true,
+      },
+    ];
+    const gatesPassed = readinessGates.filter((gate) => gate.status === "passed").length;
+    const gatesBlocked = readinessGates.filter((gate) => gate.status === "blocked").length;
+    const gatesDeferred = readinessGates.filter((gate) => gate.status === "deferred").length;
+
+    return {
+      ok: true,
+      registry: NATIVE_ACPX_CODEX_BRIDGE_WRAPPER_DRAFT_REGISTRY,
+      mode: "proposal-only-acpx-codex-bridge-wrapper-action-draft",
+      generatedAt,
+      identityLevel: "Level 1: stable user-space control plane",
+      sourceCapability: {
+        sourceFiles: [
+          "extensions/acpx/src/codex-auth-bridge.ts",
+          "extensions/acpx/src/runtime-persistence.test.ts",
+        ],
+        migrationMode: "native_wrapper_action_proposal_without_auth_copy_or_process_spawn",
+      },
+      proposal: {
+        id: `acpx-codex-wrapper-draft-${sha256(`${selectedSessionKey ?? "none"}:${safeWrapperName}:${commandName}`).slice(0, 12)}`,
+        capabilityId: "plan.openclaw.acpx_codex_bridge.wrapper_action",
+        status: readyForApprovalBridge ? "ready_for_approval_bridge" : "blocked_missing_session_metadata",
+        session: {
+          requestedSessionKey: selectedSessionKey,
+          selectedRecord: serialiseRecord(selectedRecord),
+        },
+        wrapper: {
+          relativePath: `.openclaw/acpx/codex-bridge/${safeWrapperName}`,
+          contentPreviewExposed: false,
+          contentHashComputed: false,
+          wrapperWritten: false,
+        },
+        command: {
+          command: commandName,
+          args: commandName === "npx" || commandName === "npx.cmd" ? ["@openai/codex", "acp"] : ["acp"],
+          commandOverrideSupported: true,
+          commandExecuted: false,
+          processSpawned: false,
+        },
+        authIsolation: {
+          codexHomeRead: false,
+          authJsonRead: false,
+          configTomlRead: false,
+          authMaterialCopied: false,
+          credentialValueRead: false,
+          secretValuesEmbeddedInWrapper: false,
+        },
+      },
+      readinessGates,
+      summary: {
+        readyForApprovalBridge,
+        gatesPassed,
+        gatesBlocked,
+        gatesDeferred,
+        credentialValueRead: false,
+        authMaterialCopied: false,
+        wrapperWritten: false,
+        commandExecuted: false,
+        processSpawned: false,
+        providerCalled: false,
+        networkUsed: false,
+      },
+      governance: {
+        canDraftWrapperAction: true,
+        createsTask: false,
+        createsApproval: false,
+        canReadCredentialValue: false,
+        canCopyAuthMaterial: false,
+        canWriteWrapper: false,
+        canExecuteWrapper: false,
+        canSpawnCodexAcp: false,
+        canCallProvider: false,
+        canUseNetwork: false,
+        futureWrapperWriteRequiresApproval: true,
+        futureProcessSpawnRequiresApproval: true,
+        observerVisible: true,
+      },
+      auditEvidence: {
+        operation: "acpx_codex_bridge_wrapper_action_draft",
+        capabilityId: "plan.openclaw.acpx_codex_bridge.wrapper_action",
+        generatedAt,
+        persisted: false,
+        evidenceKind: "proposal_embedded_audit_evidence",
+      },
+      deferredExecutionBoundaries: [
+        "no CODEX_HOME read",
+        "no auth.json or config.toml read",
+        "no auth material copy",
+        "no wrapper file write",
+        "no npx or npx.cmd execution",
+        "no ACP/Codex process spawn",
+        "no provider call",
+        "no network egress",
+        "no task or approval creation in this draft route",
+      ],
+    };
+  }
+
   async function recordNativeAcpxCodexSession({
     sessionKey,
     agentId = "codex",
@@ -255,6 +412,7 @@ export function createNativeAcpxCodexBridgeBuilders({
 
   return {
     buildNativeAcpxCodexBridgeCompatibility,
+    buildNativeAcpxCodexBridgeWrapperDraft,
     recordNativeAcpxCodexSession,
   };
 }

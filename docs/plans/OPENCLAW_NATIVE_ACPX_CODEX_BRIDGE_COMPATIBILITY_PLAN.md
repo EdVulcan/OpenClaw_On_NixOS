@@ -4,8 +4,8 @@ Updated: 2026-07-10
 
 ## Active Slice
 
-ACPX/Codex bridge compatibility, runtime persistence evidence, and Observer
-visibility.
+ACPX/Codex bridge compatibility, runtime persistence evidence, Observer
+visibility, and wrapper/action proposal draft.
 
 This slice migrates the useful enhanced-source ACPX/Codex bridge lessons into
 OpenClaw-native Level 1 behavior:
@@ -13,6 +13,7 @@ OpenClaw-native Level 1 behavior:
 ```text
 GET /plugins/native-adapter/acpx-codex-bridge-compatibility
 POST /plugins/native-adapter/acpx-codex-session-records
+GET /plugins/native-adapter/acpx-codex-bridge-wrapper-draft
 Observer panel: OpenClaw ACPX/Codex Bridge
 ```
 
@@ -47,6 +48,11 @@ sessions:
 Observer now exposes the existing read model without creating tasks, approvals,
 wrapper files, ACP/Codex processes, provider calls, or network egress.
 
+The wrapper/action draft route creates a proposal-only bridge action shape for a
+selected persisted session. It records the planned wrapper-relative path,
+command shape, auth-isolation boundary, readiness gates, and future approval
+requirements without creating a task or approval.
+
 ## Governance
 
 Capability mapping:
@@ -54,6 +60,7 @@ Capability mapping:
 ```text
 ACPX/Codex bridge compatibility -> sense.openclaw.acpx_codex_bridge.compatibility
 ACPX runtime persistence tests -> state.openclaw.acpx_codex_bridge.session_metadata
+ACPX/Codex wrapper/action draft -> plan.openclaw.acpx_codex_bridge.wrapper_action
 ```
 
 This is intentionally not a live bridge execution path. It creates a native
@@ -109,6 +116,7 @@ CODEX_HOME read
 auth.json/config.toml read
 auth material copy
 wrapper file write
+task or approval creation for wrapper/action draft
 npx/npx.cmd execution
 ACP/Codex process spawn
 provider calls
@@ -121,10 +129,10 @@ root/system daemon work
 The next smallest useful bridge follow-up is:
 
 ```text
-ACPX/Codex bridge wrapper/action proposal draft
+ACPX/Codex bridge wrapper/action approval bridge
 ```
 
-That should remain a proposal-only or approval-bridge slice until a governed
-wrapper write and process-spawn boundary is explicitly selected. It must not
-read real Codex credential values, copy auth material, execute `npx`, spawn an
-ACP/Codex process, or use provider/network egress.
+That bridge should create an approval-gated task from a reviewed draft but still
+keep actual wrapper file writes, auth material copy, `npx` execution, ACP/Codex
+process spawn, provider calls, and network egress deferred until those execution
+boundaries are explicitly selected and governed.

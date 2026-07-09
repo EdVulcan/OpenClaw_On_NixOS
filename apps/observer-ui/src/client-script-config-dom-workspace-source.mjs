@@ -240,6 +240,7 @@ const nativePluginRuntimeRefreshJson = document.querySelector("#native-plugin-ru
 const acpxCodexBridgeRegistry = document.querySelector("#acpx-codex-bridge-registry");
 const acpxCodexBridgeSessions = document.querySelector("#acpx-codex-bridge-sessions");
 const acpxCodexBridgeSelected = document.querySelector("#acpx-codex-bridge-selected");
+const acpxCodexBridgeDraft = document.querySelector("#acpx-codex-bridge-draft");
 const acpxCodexBridgeAuth = document.querySelector("#acpx-codex-bridge-auth");
 const acpxCodexBridgeRuntime = document.querySelector("#acpx-codex-bridge-runtime");
 const acpxCodexBridgeMode = document.querySelector("#acpx-codex-bridge-mode");

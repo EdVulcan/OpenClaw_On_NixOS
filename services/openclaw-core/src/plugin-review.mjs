@@ -164,6 +164,7 @@ export function createPluginReview(deps) {
   });
   const {
     buildNativeAcpxCodexBridgeCompatibility,
+    buildNativeAcpxCodexBridgeWrapperDraft,
     recordNativeAcpxCodexSession,
   } = createNativeAcpxCodexBridgeBuilders({
     state,
@@ -343,6 +344,7 @@ function buildOpenClawNativePluginAdapterStatus() {
       "act.openclaw.plugin_runtime.refresh_task",
       "sense.openclaw.acpx_codex_bridge.compatibility",
       "state.openclaw.acpx_codex_bridge.session_metadata",
+      "plan.openclaw.acpx_codex_bridge.wrapper_action",
       "sense.openclaw.prompt_pack",
       "sense.openclaw.plugin_manifest_map",
       "plan.openclaw.plugin_capability",
@@ -356,7 +358,7 @@ function buildOpenClawNativePluginAdapterStatus() {
     ],
     pendingCapabilities: ["act.plugin.capability.invoke"],
     summary: {
-      implemented: 42,
+      implemented: 43,
       pending: 1,
       canReadManifestMetadata: true,
       canReadToolCatalogMetadata: true,
@@ -387,6 +389,7 @@ function buildOpenClawNativePluginAdapterStatus() {
       canCreateApprovalGatedPluginRuntimeRefreshTasks: true,
       canReadAcpxCodexBridgeCompatibility: true,
       canPersistAcpxCodexSessionMetadata: true,
+      canDraftAcpxCodexWrapperActions: true,
       canReadPluginManifestMapMetadata: true,
       canPlanPluginCapabilityAbsorption: true,
       canPlanSearchWebAdapterContract: true,
@@ -438,6 +441,7 @@ function buildOpenClawNativePluginAdapterStatus() {
       "native plugin runtime refresh evidence recomputes registry read-model state and reports cache/activation boundaries without importing modules or activating runtime",
       "native plugin runtime refresh tasks require explicit approval before recomputing read-model evidence and still do not import modules, execute plugin code, activate runtime, or mutate caches",
       "ACPX/Codex bridge compatibility maps command/auth isolation lessons and persists bounded session metadata without reading Codex credentials, writing wrappers, spawning ACP processes, or using network",
+      "ACPX/Codex bridge wrapper actions are proposal-only until a governed wrapper write and process-spawn boundary is selected",
       "runtime preflight builds a governed execution envelope without loading plugin modules",
       "source contents, README text, script bodies, dependency versions, plugin code execution, and runtime activation remain blocked",
       "mutating plugin invocation remains pending explicit adapter design and approval gates",
@@ -501,6 +505,7 @@ function buildOpenClawNativePluginAdapterStatus() {
     buildNativeEngineeringLspSelectedTargetReadBridge,
     buildNativeEngineeringLspSelectedTargetEditProposalSeed,
     buildNativeAcpxCodexBridgeCompatibility,
+    buildNativeAcpxCodexBridgeWrapperDraft,
     recordNativeAcpxCodexSession,
   };
 }

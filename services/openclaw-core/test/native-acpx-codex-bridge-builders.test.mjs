@@ -88,6 +88,44 @@ test("native ACPX/Codex session metadata persistence supports independent sessio
   assert.equal(events.filter((event) => event.name === "acpx_codex.session_recorded").length, 3);
 });
 
+test("native ACPX/Codex wrapper draft depends on persisted session metadata without execution", async () => {
+  const { builders } = createHarness();
+
+  const blocked = builders.buildNativeAcpxCodexBridgeWrapperDraft({
+    sessionKey: "agent:codex:missing",
+  });
+  assert.equal(blocked.registry, "openclaw-native-acpx-codex-bridge-wrapper-draft-v0");
+  assert.equal(blocked.summary.readyForApprovalBridge, false);
+  assert.equal(blocked.proposal.status, "blocked_missing_session_metadata");
+  assert.equal(blocked.governance.createsTask, false);
+  assert.equal(blocked.governance.createsApproval, false);
+  assert.equal(blocked.governance.canWriteWrapper, false);
+  assert.equal(blocked.governance.canSpawnCodexAcp, false);
+
+  await builders.recordNativeAcpxCodexSession({
+    sessionKey: "agent:codex:ready",
+    recordId: "record-ready",
+    metadata: { purpose: "wrapper-draft", credential: "must-not-leak" },
+    confirm: true,
+  });
+  const draft = builders.buildNativeAcpxCodexBridgeWrapperDraft({
+    sessionKey: "agent:codex:ready",
+    command: "npx.cmd",
+    wrapperName: "codex-acp-ready",
+  });
+
+  assert.equal(draft.summary.readyForApprovalBridge, true);
+  assert.equal(draft.proposal.status, "ready_for_approval_bridge");
+  assert.equal(draft.proposal.command.command, "npx.cmd");
+  assert.equal(draft.proposal.command.commandExecuted, false);
+  assert.equal(draft.proposal.wrapper.relativePath, ".openclaw/acpx/codex-bridge/codex-acp-ready.sh");
+  assert.equal(draft.proposal.wrapper.wrapperWritten, false);
+  assert.equal(draft.proposal.authIsolation.credentialValueRead, false);
+  assert.equal(draft.proposal.session.selectedRecord.metadata.credential, "[redacted-key]");
+  assert.equal(draft.governance.futureWrapperWriteRequiresApproval, true);
+  assert.equal(draft.governance.futureProcessSpawnRequiresApproval, true);
+});
+
 test("native ACPX/Codex session metadata rejects traversal-like keys", async () => {
   const { builders } = createHarness();
 
@@ -97,5 +135,12 @@ test("native ACPX/Codex session metadata rejects traversal-like keys", async () 
       confirm: true,
     }),
     /sessionKey/,
+  );
+  assert.throws(
+    () => builders.buildNativeAcpxCodexBridgeWrapperDraft({
+      sessionKey: "agent:codex:one",
+      wrapperName: "../codex-acp",
+    }),
+    /wrapperName/,
   );
 });

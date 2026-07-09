@@ -51,6 +51,7 @@ cleanup() {
     "${SECOND_FILE:-}" \
     "${OVERWRITE_FILE:-}" \
     "${BEFORE_RESTART_FILE:-}" \
+    "${DRAFT_FILE:-}" \
     "${AFTER_RESTART_FILE:-}"
   "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 }
@@ -63,6 +64,7 @@ FIRST_FILE="$(mktemp)"
 SECOND_FILE="$(mktemp)"
 OVERWRITE_FILE="$(mktemp)"
 BEFORE_RESTART_FILE="$(mktemp)"
+DRAFT_FILE="$(mktemp)"
 AFTER_RESTART_FILE="$(mktemp)"
 
 curl --silent --fail "$CORE_URL/plugins/native-adapter/acpx-codex-bridge-compatibility?sessionKey=agent:codex:missing" > "$INITIAL_FILE"
@@ -70,8 +72,9 @@ post_json "$CORE_URL/plugins/native-adapter/acpx-codex-session-records" '{"sessi
 post_json "$CORE_URL/plugins/native-adapter/acpx-codex-session-records" '{"sessionKey":"agent:codex:two","agentId":"codex","recordId":"record-two","metadata":{"purpose":"second"},"confirm":true}' > "$SECOND_FILE"
 post_json "$CORE_URL/plugins/native-adapter/acpx-codex-session-records" '{"sessionKey":"agent:codex:one","agentId":"codex","recordId":"record-one-updated","metadata":{"purpose":"updated","password":"ACPX_CODEX_SECRET_PASSWORD_SHOULD_NOT_LEAK"},"confirm":true}' > "$OVERWRITE_FILE"
 curl --silent --fail "$CORE_URL/plugins/native-adapter/acpx-codex-bridge-compatibility?sessionKey=agent:codex:one" > "$BEFORE_RESTART_FILE"
+curl --silent --fail "$CORE_URL/plugins/native-adapter/acpx-codex-bridge-wrapper-draft?sessionKey=agent:codex:one&command=npx.cmd&wrapperName=codex-acp-one" > "$DRAFT_FILE"
 
-node - <<'EOF' "$INITIAL_FILE" "$FIRST_FILE" "$SECOND_FILE" "$OVERWRITE_FILE" "$BEFORE_RESTART_FILE"
+node - <<'EOF' "$INITIAL_FILE" "$FIRST_FILE" "$SECOND_FILE" "$OVERWRITE_FILE" "$BEFORE_RESTART_FILE" "$DRAFT_FILE"
 const fs = require("node:fs");
 const readJson = (index) => JSON.parse(fs.readFileSync(process.argv[index], "utf8"));
 
@@ -80,7 +83,8 @@ const first = readJson(3);
 const second = readJson(4);
 const overwrite = readJson(5);
 const before = readJson(6);
-const raw = JSON.stringify({ initial, first, second, overwrite, before });
+const draft = readJson(7);
+const raw = JSON.stringify({ initial, first, second, overwrite, before, draft });
 
 if (
   !initial.ok
@@ -122,6 +126,31 @@ if (
   || before.persistence?.supportsOverwrite !== true
 ) {
   throw new Error(`ACPX/Codex bridge persistence readback mismatch: ${JSON.stringify(before)}`);
+}
+if (
+  !draft.ok
+  || draft.registry !== "openclaw-native-acpx-codex-bridge-wrapper-draft-v0"
+  || draft.proposal?.status !== "ready_for_approval_bridge"
+  || draft.summary?.readyForApprovalBridge !== true
+  || draft.proposal?.wrapper?.relativePath !== ".openclaw/acpx/codex-bridge/codex-acp-one.sh"
+  || draft.proposal?.wrapper?.wrapperWritten !== false
+  || draft.proposal?.command?.command !== "npx.cmd"
+  || draft.proposal?.command?.commandExecuted !== false
+  || draft.proposal?.command?.processSpawned !== false
+  || draft.proposal?.authIsolation?.credentialValueRead !== false
+  || draft.governance?.createsTask !== false
+  || draft.governance?.createsApproval !== false
+  || draft.governance?.canReadCredentialValue !== false
+  || draft.governance?.canCopyAuthMaterial !== false
+  || draft.governance?.canWriteWrapper !== false
+  || draft.governance?.canExecuteWrapper !== false
+  || draft.governance?.canSpawnCodexAcp !== false
+  || draft.governance?.canCallProvider !== false
+  || draft.governance?.canUseNetwork !== false
+  || draft.governance?.futureWrapperWriteRequiresApproval !== true
+  || draft.governance?.futureProcessSpawnRequiresApproval !== true
+) {
+  throw new Error(`ACPX/Codex wrapper draft mismatch: ${JSON.stringify(draft)}`);
 }
 for (const secret of [
   "ACPX_CODEX_SECRET_TOKEN_SHOULD_NOT_LEAK",

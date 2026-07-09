@@ -604,6 +604,7 @@ export function observerOperationsPanels() {
           <div class="metric"><span>Registry</span><span id="acpx-codex-bridge-registry">openclaw-native-acpx-codex-bridge-compatibility-v0</span></div>
           <div class="metric"><span>Sessions</span><span id="acpx-codex-bridge-sessions">0</span></div>
           <div class="metric"><span>Selected</span><span id="acpx-codex-bridge-selected">none</span></div>
+          <div class="metric"><span>Draft</span><span id="acpx-codex-bridge-draft">blocked</span></div>
           <div class="metric"><span>Auth</span><span id="acpx-codex-bridge-auth">isolated</span></div>
           <div class="metric"><span>Runtime</span><span id="acpx-codex-bridge-runtime">blocked</span></div>
           <div class="metric"><span>Mode</span><span id="acpx-codex-bridge-mode">compatibility-and-persistence-evidence</span></div>
