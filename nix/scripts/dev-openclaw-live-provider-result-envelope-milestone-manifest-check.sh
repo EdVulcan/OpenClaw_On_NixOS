@@ -182,7 +182,7 @@ const milestones = readTsv(manifestFile, [
 ], "manifest").map((entry) => ({ ...entry, phaseNumber: Number.parseInt(entry.phase, 10) }));
 
 const expectedFirstPhase = 99;
-const expectedLastPhase = 134;
+const expectedLastPhase = 135;
 const expectedMilestoneRows = expectedLastPhase - expectedFirstPhase + 1;
 
 if (milestones.length !== expectedMilestoneRows) {

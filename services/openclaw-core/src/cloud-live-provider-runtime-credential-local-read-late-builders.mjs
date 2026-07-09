@@ -6,6 +6,7 @@ import { createCredentialLocalReadResultEnvelopeCreationExecutionAttemptLocalRea
 import { createCredentialLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeRuntime } from "./cloud-live-provider-runtime-credential-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope.mjs";
 import { createCredentialLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationRuntime } from "./cloud-live-provider-runtime-credential-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-creation.mjs";
 import { createCredentialLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationExecutionAttemptRuntime } from "./cloud-live-provider-runtime-credential-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-creation-execution-attempt.mjs";
+import { createCredentialLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadRuntime } from "./cloud-live-provider-runtime-credential-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-creation-execution-attempt-local-read.mjs";
 import { createCredentialLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationExecutionAttemptTaskShellRuntime } from "./cloud-live-provider-runtime-credential-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-creation-execution-attempt-task-shell.mjs";
 import { createCredentialLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationExecutionTaskShellRuntime } from "./cloud-live-provider-runtime-credential-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-creation-execution-task-shell.mjs";
 import { createCredentialLocalReadResultEnvelopeCreationExecutionAttemptRuntime } from "./cloud-live-provider-runtime-credential-local-read-result-envelope-creation-execution-attempt.mjs";
@@ -118,6 +119,11 @@ export function createCloudLiveProviderRuntimeCredentialLocalReadLateBuilders(co
         resultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationExecutionAttemptRuntime.buildCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationExecutionAttemptRoute,
       ...taskRuntimeContext,
     });
+  const resultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadRuntime =
+    createCredentialLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadRuntime({
+      buildCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationExecutionAttemptFinalReadinessPreflight:
+        resultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationExecutionAttemptTaskShellRuntime.buildCloudConsciousnessLiveProviderCredentialValueLocalReadExecutionLocalReadAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationExecutionAttemptFinalReadinessPreflight,
+    });
 
   return {
     ...attemptRuntime,
@@ -132,5 +138,6 @@ export function createCloudLiveProviderRuntimeCredentialLocalReadLateBuilders(co
     ...resultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationExecutionTaskShellRuntime,
     ...resultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationExecutionAttemptRuntime,
     ...resultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationExecutionAttemptTaskShellRuntime,
+    ...resultEnvelopeCreationExecutionAttemptLocalReadResultEnvelopeCreationExecutionAttemptLocalReadRuntime,
   };
 }
