@@ -1,5 +1,6 @@
 import { observerClientWorkspaceSourceRenderersScript } from "./client-script-renderers-workspace-source.mjs";
 import { observerClientEngineeringEditRenderersScript } from "./client-script-renderers-engineering-edit.mjs";
+import { observerClientEngineeringVerificationRenderersScript } from "./client-script-renderers-engineering-verification.mjs";
 export const observerClientRenderersScript = `function setHealthPill(target, ok, text) {
   target.textContent = text;
   target.className = ok ? "status-pill" : "status-pill warn";
@@ -361,7 +362,7 @@ function renderFilesystemReadLedger(data) {
   ].join("\\n");
 }
 
-${observerClientWorkspaceSourceRenderersScript}${observerClientEngineeringEditRenderersScript}function renderNativePluginContract(data) {
+${observerClientWorkspaceSourceRenderersScript}${observerClientEngineeringEditRenderersScript}${observerClientEngineeringVerificationRenderersScript}function renderNativePluginContract(data) {
   const summary = data?.summary ?? {};
   const contract = data?.contract ?? {};
   const governance = summary.governance ?? contract.governance ?? {};

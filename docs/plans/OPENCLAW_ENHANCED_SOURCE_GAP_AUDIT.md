@@ -84,6 +84,9 @@ governed surfaces:
 - Native engineering proposal surface:
   `act.openclaw.engineering_tool.edit_proposal` creates exact-match surgical
   edit proposals and bounded diff previews without applying patches.
+- Native engineering verification evidence:
+  `sense.openclaw.engineering_tool.verify_evidence` converts governed command
+  transcripts into bounded verification evidence attached to completed tasks.
 - Approval-gated workspace mutation:
   `act.openclaw.workspace_text_write` and
   `act.openclaw.workspace_patch_apply`.
@@ -111,7 +114,7 @@ enhanced `openclaw` modules.
 | `cc_glob` | absorbed | `sense.openclaw.engineering_tool.glob` performs bounded workspace file discovery with skipped hidden/generated/cache/dependency directories and result caps. | Continue native bounded discovery; do not execute enhanced `GlobTool.ts`. | Level 1 |
 | `cc_grep` | absorbed | `sense.openclaw.engineering_tool.grep` performs bounded workspace text search with literal/regex mode, include filters, result/output caps, binary skips, audit, and Observer evidence. | Continue native bounded search; do not execute enhanced `GrepTool.ts`. | Level 1 |
 | `cc_lsp` | requires source transfer | `sense.openclaw.workspace_symbol_lookup` approximates navigation but does not start or manage LSP servers. | Transfer the LSP manager idea, rewritten as an optional governed workspace service with lifecycle evidence. | Level 1 now, Level 2 later |
-| `cc_verify` | partially absorbed | Task execution and source command chains record evidence, but engineering verification is not yet a native tool result attached to task completion. | Add verification command evidence as a governed completion artifact with retry budget and Observer visibility. | Level 1 |
+| `cc_verify` | absorbed as evidence | `sense.openclaw.engineering_tool.verify_evidence` reads approval-gated command transcripts, capability invocations, and completed task outcomes to produce bounded verification evidence with checks, output budgets, retry-policy metadata, audit evidence, and Observer visibility. | Keep actual command execution on the existing approval-gated source/workspace command task path. Do not add ungoverned shell execution or automatic retries. | Level 1 |
 | `cc_plan_enter`, `cc_plan_exit`, `cc_todo_write` | partially absorbed | Core tasks, plans, approvals, and recovery exist; no lightweight planning mode or `.openclaw/cc-todo.md` equivalent is native. | Treat as plan-state evidence, not hidden agent mode. Integrate with task/workbench state if migrated. | Level 1 |
 | `microcompact` | not absorbed | Only docs mention microcompaction; no context-management runtime exists in this repo. | Add as explicit context-management evidence. Do not silently mutate persisted transcript or hide current verification evidence. | Level 1 |
 | Live plugin runtime refresh | requires source transfer | Main has runtime activation tasks and deferred gates, but not live in-process refresh after install/enable/disable. | Transfer the refresh semantics into a governed lifecycle action with cache invalidation, status, recovery, and Observer evidence. | Level 1 |
@@ -249,16 +252,18 @@ Current OpenClaw:
 
 - Source-derived command chains can plan, approve, execute, recover, harden, and
   persist command tasks.
-- Task/work-view verification exists elsewhere, but engineering verification
-  evidence is not yet a native tool completion artifact.
+- `sense.openclaw.engineering_tool.verify_evidence` now reads command
+  transcripts, capability invocation records, and completed task outcomes to
+  create bounded verification evidence.
 
-Classification: partially absorbed.
+Classification: absorbed as evidence.
 
 Recommendation:
 
-- Add verification command evidence after read/search and edit proposals. The
-  result should attach to the task completion record with command shape,
-  provenance, output budget, exit status, timeout flag, and Observer display.
+- Keep execution on the existing approval-gated command task path. Use the
+  native verification evidence surface for command shape, provenance, output
+  budget, exit status, timeout flag, retry-policy metadata, and Observer
+  display.
 
 ### `cc_plan_enter`, `cc_plan_exit`, and `cc_todo_write`
 

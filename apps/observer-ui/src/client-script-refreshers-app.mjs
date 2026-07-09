@@ -84,6 +84,20 @@ async function refreshCommandLedger() {
   }
 }
 
+async function refreshEngineeringVerificationEvidence() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/engineering-verification/evidence?limit=8&maxOutputChars=2000\`);
+    renderEngineeringVerificationEvidence(data);
+  } catch {
+    engineeringVerificationRegistry.textContent = "offline";
+    engineeringVerificationPassed.textContent = "0";
+    engineeringVerificationFailed.textContent = "0";
+    engineeringVerificationAttached.textContent = "0";
+    engineeringVerificationExecution.textContent = "unknown";
+    engineeringVerificationJson.textContent = "Unable to read native engineering verification evidence.";
+  }
+}
+
 async function refreshFilesystemLedger() {
   try {
     const data = await fetchJson(\`\${observerConfig.coreUrl}/filesystem/changes?limit=8\`);

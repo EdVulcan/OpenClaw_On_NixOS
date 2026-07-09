@@ -123,6 +123,15 @@ export function observerOperationsPanels() {
           <pre id="command-ledger-json">Loading command transcript ledger...</pre>
         </section>
         <section class="panel">
+          <h2>Engineering Verification Evidence</h2>
+          <div class="metric"><span>Registry</span><span id="engineering-verification-registry">openclaw-native-engineering-verification-evidence-v0</span></div>
+          <div class="metric"><span>Passed</span><span id="engineering-verification-passed">0</span></div>
+          <div class="metric"><span>Failed</span><span id="engineering-verification-failed">0</span></div>
+          <div class="metric"><span>Attached</span><span id="engineering-verification-attached">0</span></div>
+          <div class="metric"><span>Execution</span><span id="engineering-verification-execution">blocked</span></div>
+          <pre id="engineering-verification-json">Loading native engineering verification evidence...</pre>
+        </section>
+        <section class="panel">
           <h2>Filesystem Ledger</h2>
           <div class="metric"><span>Total</span><span id="filesystem-ledger-total">0</span></div>
           <div class="metric"><span>Mkdir</span><span id="filesystem-ledger-mkdir">0</span></div>
