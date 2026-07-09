@@ -2,6 +2,14 @@
 
 更新时间：2026-05-15 12:05 +08:00
 
+> 2026-07-09 status: historical stage log. The active route for enhanced
+> `openclaw` source integration is now
+> [`../OPENCLAW_FORWARD_WORK_DIRECTIVE.md`](../OPENCLAW_FORWARD_WORK_DIRECTIVE.md)
+> plus
+> [`OPENCLAW_ENHANCED_SOURCE_MIGRATION_BRIEF.md`](./OPENCLAW_ENHANCED_SOURCE_MIGRATION_BRIEF.md).
+> Keep this file as source-integration history and evidence, but do not continue
+> work solely by appending more safety/readiness layers here.
+
 本文档用于跟踪当前阶段：把旁路 `openclaw` 增强源码项目中的能力，受控接入 `OpenClawOnNixOS`。后续每推进一个接入切片，都必须同步更新本文件，避免路线漂移、重复准备层、或忘记阶段边界。
 
 ## 1. 阶段定位

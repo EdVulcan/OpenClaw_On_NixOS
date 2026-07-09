@@ -249,6 +249,20 @@ agent inspect that branch as an external source reference.
 The best preservation path is to save the enhanced `openclaw` source as its own
 GitHub-visible reference, not as a direct dump into `OpenClawOnNixOS`.
 
+Current preservation status as of 2026-07-09:
+
+```text
+pending
+```
+
+Observed constraints from the Windows host:
+
+```text
+https://github.com/EdVulcan/openclaw.git was not found.
+GitHub CLI (`gh`) was not installed in the Windows shell.
+The enhanced source still exists only in D:\OpenclawAndClaudecode\openclaw.
+```
+
 Recommended shape:
 
 ```text
