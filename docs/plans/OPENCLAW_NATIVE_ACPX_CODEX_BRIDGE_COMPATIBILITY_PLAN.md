@@ -4,7 +4,8 @@ Updated: 2026-07-10
 
 ## Active Slice
 
-ACPX/Codex bridge compatibility and runtime persistence evidence.
+ACPX/Codex bridge compatibility, runtime persistence evidence, and Observer
+visibility.
 
 This slice migrates the useful enhanced-source ACPX/Codex bridge lessons into
 OpenClaw-native Level 1 behavior:
@@ -12,6 +13,7 @@ OpenClaw-native Level 1 behavior:
 ```text
 GET /plugins/native-adapter/acpx-codex-bridge-compatibility
 POST /plugins/native-adapter/acpx-codex-session-records
+Observer panel: OpenClaw ACPX/Codex Bridge
 ```
 
 Identity alignment: Level 1, stable user-space control plane.
@@ -26,6 +28,8 @@ The compatibility read model records:
 - explicit auth isolation boundaries
 - session metadata persistence status
 - selected-session readback and missing-session null behavior
+- Observer-visible compatibility, auth-isolation, runtime-blocked, and session
+  persistence state
 
 The session persistence store records bounded metadata for future ACPX/Codex
 sessions:
@@ -39,6 +43,9 @@ sessions:
 - no wrapper writes
 - no `npx` or ACP process spawn
 - no provider/network egress
+
+Observer now exposes the existing read model without creating tasks, approvals,
+wrapper files, ACP/Codex processes, provider calls, or network egress.
 
 ## Governance
 
@@ -74,12 +81,23 @@ Route wiring:
 services/openclaw-core/src/native-adapter-plugin-routes.mjs
 ```
 
+Observer visibility:
+
+```text
+apps/observer-ui/src/observer-panels-operations.mjs
+apps/observer-ui/src/client-script-config-dom-workspace-source.mjs
+apps/observer-ui/src/client-script-refreshers-workspace-source.mjs
+apps/observer-ui/src/client-script-renderers-acpx-codex-bridge.mjs
+apps/observer-ui/src/client-script-startup-refreshes.mjs
+```
+
 Validation target:
 
 ```text
 services/openclaw-core/test/native-acpx-codex-bridge-builders.test.mjs
 services/openclaw-core/test/native-adapter-plugin-routes.test.mjs
 openclaw-native-acpx-codex-bridge-compatibility
+observer-openclaw-native-acpx-codex-bridge-compatibility
 ```
 
 ## Deferred
@@ -95,7 +113,6 @@ npx/npx.cmd execution
 ACP/Codex process spawn
 provider calls
 network egress
-Observer UI panel
 root/system daemon work
 ```
 
@@ -104,8 +121,10 @@ root/system daemon work
 The next smallest useful bridge follow-up is:
 
 ```text
-Observer visibility for ACPX/Codex bridge compatibility and persistence state
+ACPX/Codex bridge wrapper/action proposal draft
 ```
 
-That should expose the existing read model in Observer without adding live auth
-copy, wrapper execution, or provider egress.
+That should remain a proposal-only or approval-bridge slice until a governed
+wrapper write and process-spawn boundary is explicitly selected. It must not
+read real Codex credential values, copy auth material, execute `npx`, spawn an
+ACP/Codex process, or use provider/network egress.

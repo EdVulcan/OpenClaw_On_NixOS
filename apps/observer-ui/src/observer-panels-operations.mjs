@@ -600,6 +600,16 @@ export function observerOperationsPanels() {
           <pre id="native-plugin-runtime-refresh-json">Loading native plugin runtime refresh evidence...</pre>
         </section>
         <section class="panel">
+          <h2>OpenClaw ACPX/Codex Bridge</h2>
+          <div class="metric"><span>Registry</span><span id="acpx-codex-bridge-registry">openclaw-native-acpx-codex-bridge-compatibility-v0</span></div>
+          <div class="metric"><span>Sessions</span><span id="acpx-codex-bridge-sessions">0</span></div>
+          <div class="metric"><span>Selected</span><span id="acpx-codex-bridge-selected">none</span></div>
+          <div class="metric"><span>Auth</span><span id="acpx-codex-bridge-auth">isolated</span></div>
+          <div class="metric"><span>Runtime</span><span id="acpx-codex-bridge-runtime">blocked</span></div>
+          <div class="metric"><span>Mode</span><span id="acpx-codex-bridge-mode">compatibility-and-persistence-evidence</span></div>
+          <pre id="acpx-codex-bridge-json">Loading ACPX/Codex bridge compatibility evidence...</pre>
+        </section>
+        <section class="panel">
           <h2>OpenClaw Native Runtime Adapter Contract</h2>
           <div class="metric"><span>Registry</span><span id="native-plugin-runtime-contract-registry">openclaw-native-plugin-runtime-adapter-contract-v0</span></div>
           <div class="metric"><span>Status</span><span id="native-plugin-runtime-contract-status">unknown</span></div>

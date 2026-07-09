@@ -8,6 +8,7 @@ import { observerClientEngineeringPlanTodoRenderersScript } from "./client-scrip
 import { observerClientEngineeringRecoveryRenderersScript } from "./client-script-renderers-engineering-recovery.mjs";
 import { observerClientEngineeringVerificationRenderersScript } from "./client-script-renderers-engineering-verification.mjs";
 import { observerClientNativeRuntimeRefreshRenderersScript } from "./client-script-renderers-native-runtime-refresh.mjs";
+import { observerClientAcpxCodexBridgeRenderersScript } from "./client-script-renderers-acpx-codex-bridge.mjs";
 export const observerClientRenderersScript = `function setHealthPill(target, ok, text) {
   target.textContent = text;
   target.className = ok ? "status-pill" : "status-pill warn";
@@ -369,7 +370,7 @@ function renderFilesystemReadLedger(data) {
   ].join("\\n");
 }
 
-${observerClientWorkspaceSourceRenderersScript}${observerClientEngineeringEditRenderersScript}${observerClientEngineeringWriteRenderersScript}${observerClientEngineeringWriteExecutionRenderersScript}${observerClientEngineeringLspRenderersScript}${observerClientEngineeringVerificationRenderersScript}${observerClientEngineeringRecoveryRenderersScript}${observerClientEngineeringMicrocompactRenderersScript}${observerClientEngineeringPlanTodoRenderersScript}${observerClientNativeRuntimeRefreshRenderersScript}function renderNativePluginContract(data) {
+${observerClientWorkspaceSourceRenderersScript}${observerClientEngineeringEditRenderersScript}${observerClientEngineeringWriteRenderersScript}${observerClientEngineeringWriteExecutionRenderersScript}${observerClientEngineeringLspRenderersScript}${observerClientEngineeringVerificationRenderersScript}${observerClientEngineeringRecoveryRenderersScript}${observerClientEngineeringMicrocompactRenderersScript}${observerClientEngineeringPlanTodoRenderersScript}${observerClientNativeRuntimeRefreshRenderersScript}${observerClientAcpxCodexBridgeRenderersScript}function renderNativePluginContract(data) {
   const summary = data?.summary ?? {};
   const contract = data?.contract ?? {};
   const governance = summary.governance ?? contract.governance ?? {};

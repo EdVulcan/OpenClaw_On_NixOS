@@ -38,6 +38,8 @@ test("native ACPX/Codex bridge compatibility reports credential and execution bo
   assert.equal(evidence.governance.canReadCredentialValue, false);
   assert.equal(evidence.governance.canWriteWrapper, false);
   assert.equal(evidence.governance.canSpawnCodexAcp, false);
+  assert.equal(evidence.governance.observerVisible, true);
+  assert.equal(evidence.governance.observerVisibilityDeferred, false);
   assert.equal(evidence.persistence.missingSessionReturnsNull, true);
   assert.equal(evidence.persistence.selectedRecord, null);
 });

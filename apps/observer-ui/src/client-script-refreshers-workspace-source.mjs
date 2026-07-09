@@ -563,6 +563,21 @@ async function refreshNativePluginRuntimeRefreshEvidence() {
   }
 }
 
+async function refreshAcpxCodexBridgeCompatibility() {
+  try {
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/acpx-codex-bridge-compatibility\`);
+    renderAcpxCodexBridgeCompatibility(data);
+  } catch {
+    acpxCodexBridgeRegistry.textContent = "offline";
+    acpxCodexBridgeSessions.textContent = "0";
+    acpxCodexBridgeSelected.textContent = "unknown";
+    acpxCodexBridgeAuth.textContent = "unknown";
+    acpxCodexBridgeRuntime.textContent = "unknown";
+    acpxCodexBridgeMode.textContent = "unknown";
+    acpxCodexBridgeJson.textContent = "Unable to read ACPX/Codex bridge compatibility evidence.";
+  }
+}
+
 async function refreshNativePluginRuntimeAdapterContract() {
   try {
     const data = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/runtime-adapter-contract\`);

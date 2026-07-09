@@ -93,6 +93,8 @@ if (
   || initial.governance?.canCopyAuthMaterial !== false
   || initial.governance?.canWriteWrapper !== false
   || initial.governance?.canSpawnCodexAcp !== false
+  || initial.governance?.observerVisible !== true
+  || initial.governance?.observerVisibilityDeferred !== false
   || initial.persistence?.missingSessionReturnsNull !== true
 ) {
   throw new Error(`initial ACPX/Codex bridge compatibility mismatch: ${JSON.stringify(initial)}`);

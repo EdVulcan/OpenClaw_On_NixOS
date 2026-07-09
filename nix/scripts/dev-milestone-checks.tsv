@@ -471,6 +471,7 @@ observer-openclaw-native-plugin-invoke-deferred	dev-observer-openclaw-native-plu
 observer-openclaw-native-plugin-runtime-preflight	dev-observer-openclaw-native-plugin-runtime-preflight-check.sh	Observer visibility for native OpenClaw plugin runtime preflight envelopes
 observer-openclaw-native-plugin-runtime-activation-plan	dev-observer-openclaw-native-plugin-runtime-activation-plan-check.sh	Observer visibility for native OpenClaw plugin runtime activation gates
 observer-openclaw-native-plugin-runtime-refresh-evidence	dev-observer-openclaw-native-plugin-runtime-refresh-evidence-check.sh	Observer visibility for native plugin runtime refresh evidence
+observer-openclaw-native-acpx-codex-bridge-compatibility	dev-observer-openclaw-native-acpx-codex-bridge-compatibility-check.sh	Observer visibility for native ACPX/Codex bridge compatibility and session persistence evidence
 observer-openclaw-native-plugin-runtime-activation-task	dev-observer-openclaw-native-plugin-runtime-activation-task-check.sh	Observer controls for approval-gated native OpenClaw plugin runtime activation tasks
 observer-openclaw-native-plugin-runtime-activation-denial-recovery	dev-observer-openclaw-native-plugin-runtime-activation-denial-recovery-check.sh	Observer visibility for denied and recovered native OpenClaw plugin runtime activation tasks
 observer-openclaw-native-plugin-runtime-activation-hardening	dev-observer-openclaw-native-plugin-runtime-activation-hardening-check.sh	Observer visibility for hardened native OpenClaw plugin runtime activation recovery chains

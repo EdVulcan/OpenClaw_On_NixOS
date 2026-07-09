@@ -160,8 +160,8 @@ export function createNativeAcpxCodexBridgeBuilders({
         canSpawnCodexAcp: false,
         canCallProvider: false,
         canUseNetwork: false,
-        observerVisible: false,
-        observerVisibilityDeferred: true,
+        observerVisible: true,
+        observerVisibilityDeferred: false,
       },
       auditEvidence: {
         operation: "acpx_codex_bridge_compatibility_read",
