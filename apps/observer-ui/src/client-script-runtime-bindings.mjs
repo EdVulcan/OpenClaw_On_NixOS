@@ -22,6 +22,24 @@ sourceCommandTaskButton.addEventListener("click", () => {
   });
 });
 
+engineeringEditProposalTaskButton.addEventListener("click", () => {
+  createEngineeringEditLoopApprovalTask().catch((error) => {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  });
+});
+
+engineeringWriteProposalTaskButton.addEventListener("click", () => {
+  createEngineeringWriteLoopApprovalTask().catch((error) => {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  });
+});
+
+engineeringVerificationTaskButton.addEventListener("click", () => {
+  createEngineeringVerificationLoopApprovalTask().catch((error) => {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  });
+});
+
 nativePluginInvokeTaskButton.addEventListener("click", () => {
   createNativePluginInvokeApprovalTask().catch((error) => {
     setControlMessage(\`Request failed: \${formatError(error)}\`);

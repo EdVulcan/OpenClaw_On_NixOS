@@ -98,11 +98,13 @@ readback and no readiness chain.
 
 ## Next Slice
 
-The next highest-density capability slice should improve operator ergonomics:
+The operator ergonomics follow-up was completed as:
 
 ```text
-Native governed engineering loop operator controls
+OPENCLAW_NATIVE_ENGINEERING_LOOP_OPERATOR_CONTROLS_PLAN.md
 ```
 
-That slice should make the proven write/edit loops easier to operate from
-Observer/workbench without bypassing approval.
+The next highest-density capability slice is `Native governed engineering loop
+parameterized workbench inputs`, so the Observer controls can use
+operator-selected bounded edit/write/verification values while preserving
+approval.

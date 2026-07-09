@@ -101,12 +101,21 @@ raw credential reads
 
 ## Next Slice
 
-The next highest-density capability slice should move from proof scripts toward
-operator ergonomics:
+The operator ergonomics follow-up was completed as:
 
 ```text
-Native governed engineering loop operator controls
+OPENCLAW_NATIVE_ENGINEERING_LOOP_OPERATOR_CONTROLS_PLAN.md
 ```
 
-That slice should make the closed loop easier to operate from Observer/workbench
-without bypassing approval or adding another readiness chain.
+That slice adds Observer controls for edit, write, and verification approval
+task creation while preserving the approval gate.
+
+The next highest-density capability slice should make those controls accept
+operator-selected bounded parameters:
+
+```text
+Native governed engineering loop parameterized workbench inputs
+```
+
+That slice should remove hardcoded sample edit/write values without bypassing
+approval or adding another readiness chain.

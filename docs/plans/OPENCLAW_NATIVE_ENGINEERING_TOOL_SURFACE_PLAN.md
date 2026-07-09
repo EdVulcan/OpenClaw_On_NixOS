@@ -125,8 +125,9 @@ provider calls, network egress, and result envelopes
 The current next smallest real capability is:
 
 ```text
-Native governed engineering loop operator controls
+Native governed engineering loop parameterized workbench inputs
 ```
 
-That slice should make the proven write/edit loops easier to operate from
-Observer/workbench without bypassing approval or adding another readiness chain.
+The operator-control bridge is now visible in Observer. The next slice should
+replace hardcoded sample values with bounded operator-selected workbench inputs
+without bypassing approval or adding another readiness chain.

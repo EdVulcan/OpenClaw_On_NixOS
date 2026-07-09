@@ -94,6 +94,10 @@ governed surfaces:
   back to `cc_edit` proposal metadata; the closed-loop milestone proves
   read/search, proposal, approval, patch apply, ledger, Observer,
   verification, and recovery together.
+- Native engineering loop operator controls:
+  Observer buttons create the existing approval-gated edit, write, and
+  verification tasks from the engineering panels while preserving manual
+  approval and operator-step gates.
 - Native engineering write proposal surface:
   `act.openclaw.engineering_tool.write_proposal` maps `cc_write`
   create/overwrite intent into bounded workspace proposal evidence with redacted
@@ -162,7 +166,7 @@ enhanced `openclaw` modules.
 | ACPX/Codex bridge compatibility | requires source transfer | No ACPX/Codex bridge implementation exists in this repo. | Transfer compatibility lessons only where useful for OpenClaw's NixOS body and ACP bridge model. Do not center Windows wrapper behavior. | Level 1 |
 | Runtime persistence tests | partially absorbed | Main has many task/approval/recovery persistence milestones; enhanced ACPX/runtime persistence tests are not migrated. | Reuse the persistence discipline, and add native tests only when adopting ACPX or live runtime refresh behavior. | Level 1 |
 | Engineering prompt semantics | partially absorbed | Project docs and Codex skills encode evidence-first, precise edits, low coupling, and scoped validation; no product runtime prompt-pack enforcement exists. | Convert useful semantics into Observer-verifiable work standards, not a monolithic prompt wall. | Level 1 |
-| Operator-facing UI refinements | partially absorbed | Observer UI has been decoupled into panels/refreshers/renderers, but enhanced chat/tool-card styling is not migrated. | Cherry-pick interaction patterns after capability surfaces exist. Avoid wholesale CSS import. | Level 2 when work-view is active |
+| Operator-facing UI refinements | partially absorbed | Observer UI has been decoupled into panels/refreshers/renderers and now exposes engineering loop controls for edit/write/verification approval tasks, but enhanced chat/tool-card styling and parameterized engineering forms are not migrated. | Keep product-native controls; next migrate bounded operator-selected inputs. Avoid wholesale CSS import. | Level 1 now, Level 2 when work-view is active |
 | `HEARTBEAT.md`, `SOUL.md`, `TOOLS.md` identity notes | should not migrate | Main has mission/docs/skills and fixtures that read `TOOLS.md`, but not these identity files as product authority. | Do not copy persona or local setup notes wholesale. Extract only governed context-file concepts after policy review. | Level 1 |
 
 ## Capability Findings

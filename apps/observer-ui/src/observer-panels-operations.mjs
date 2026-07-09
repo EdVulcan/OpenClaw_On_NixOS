@@ -129,6 +129,9 @@ export function observerOperationsPanels() {
           <div class="metric"><span>Failed</span><span id="engineering-verification-failed">0</span></div>
           <div class="metric"><span>Attached</span><span id="engineering-verification-attached">0</span></div>
           <div class="metric"><span>Execution</span><span id="engineering-verification-execution">blocked</span></div>
+          <div class="actions tight">
+            <button id="engineering-verification-task-button" class="secondary" type="button">Create Verification Task</button>
+          </div>
           <pre id="engineering-verification-json">Loading native engineering verification evidence...</pre>
         </section>
         <section class="panel">
@@ -372,6 +375,9 @@ export function observerOperationsPanels() {
           <div class="metric"><span>Preview</span><span id="engineering-edit-proposal-preview">0 lines</span></div>
           <div class="metric"><span>Apply</span><span id="engineering-edit-proposal-apply">blocked</span></div>
           <div class="metric"><span>Audit</span><span id="engineering-edit-proposal-audit">missing</span></div>
+          <div class="actions tight">
+            <button id="engineering-edit-proposal-task-button" class="secondary" type="button">Create Edit Task</button>
+          </div>
           <pre id="engineering-edit-proposal-json">Loading native engineering edit proposal evidence...</pre>
         </section>
         <section class="panel">
@@ -382,6 +388,9 @@ export function observerOperationsPanels() {
           <div class="metric"><span>Bytes</span><span id="engineering-write-proposal-bytes">0</span></div>
           <div class="metric"><span>Mutation</span><span id="engineering-write-proposal-mutation">blocked</span></div>
           <div class="metric"><span>Mode</span><span id="engineering-write-proposal-mode">source-write-proposal-diff-metadata-preview-only</span></div>
+          <div class="actions tight">
+            <button id="engineering-write-proposal-task-button" class="secondary" type="button">Create Write Task</button>
+          </div>
           <pre id="engineering-write-proposal-json">Loading native engineering write proposal evidence...</pre>
         </section>
         <section class="panel">
