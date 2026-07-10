@@ -45,7 +45,21 @@ function helperActions() {
   ];
 }
 
-function deriveHelperReadiness({ readiness, helperStatus, browserStatus, browserRunning, activeUrl, visibility }) {
+function deriveHelperReadiness({ readiness, helperStatus, browserStatus, browserRunning, activeUrl, visibility, sessionIdentityStatus }) {
+  if (sessionIdentityStatus === "divergent") {
+    return {
+      state: "degraded",
+      reason: "session_identity_divergent",
+      recommendedOperatorAction: "prepare_work_view",
+      recoveryEndpoint: "/work-view/prepare",
+      approvalRequired: false,
+      rootRequired: false,
+      canRecoverWithoutRoot: true,
+      observerVisible: true,
+      availableOperatorActions: helperActions(),
+    };
+  }
+
   if (readiness === "degraded" || helperStatus === "degraded" || browserStatus === "unavailable") {
     return {
       state: "degraded",
@@ -233,7 +247,7 @@ export function buildTrustedWorkViewContract(input = {}) {
   const browserRunning = firstBoolean(input.browserRunning, capture.browserRunning, browser.running, browserStatus === "running");
   const visibility = firstString(input.visibility, capture.workView?.visibility, workView.visibility, browserRunning ? "observable" : "hidden");
   const mode = firstString(input.mode, capture.workView?.mode, workView.mode, "ai-owned-work-view");
-  const readiness = deriveReadiness({
+  const baseReadiness = deriveReadiness({
     degraded: input.degraded === true,
     helperStatus,
     sessionStatus: session.status,
@@ -241,6 +255,7 @@ export function buildTrustedWorkViewContract(input = {}) {
     workViewStatus: workView.status,
     activeUrl,
   });
+  const readiness = sessionIdentity.status === "divergent" ? "degraded" : baseReadiness;
   const helperReadiness = deriveHelperReadiness({
     readiness,
     helperStatus,
@@ -248,6 +263,7 @@ export function buildTrustedWorkViewContract(input = {}) {
     browserRunning,
     activeUrl,
     visibility,
+    sessionIdentityStatus: sessionIdentity.status,
   });
 
   return {

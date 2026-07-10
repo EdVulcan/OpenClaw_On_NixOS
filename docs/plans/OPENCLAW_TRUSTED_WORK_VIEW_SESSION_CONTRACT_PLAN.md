@@ -49,7 +49,9 @@ browser-runtime when opening the AI-owned work view. Browser, screen, Phase 3,
 and Observer readbacks report whether browser-runtime is matched, pending, or
 divergent from that authority. This makes Level 2 work-view identity auditable
 without introducing a sidecar process, daemon, root boundary, or desktop-wide
-capture.
+capture. Divergence degrades helper readiness and recommends the existing
+`prepare_work_view` operator action; it does not automatically reset the
+browser, start a sidecar, mutate the host, or call an arbitrary endpoint.
 
 Observer now exposes a single explicit recovery bridge:
 

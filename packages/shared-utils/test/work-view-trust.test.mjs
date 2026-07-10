@@ -84,6 +84,10 @@ test("trusted work-view contract detects divergent browser runtime session ident
   assert.equal(contract.sessionIdentity.authority, "openclaw-session-manager");
   assert.equal(contract.sessionIdentity.alignment.component, "divergent");
   assert.equal(contract.sessionIdentity.alignment.browserRuntime, "divergent");
+  assert.equal(contract.readiness, "degraded");
+  assert.equal(contract.helperReadiness.reason, "session_identity_divergent");
+  assert.equal(contract.recoveryRecommendation.action, "prepare_work_view");
+  assert.equal(contract.recoveryRecommendation.canRecoverWithoutRoot, true);
   assert.equal(contract.sessionIdentity.rootRequired, false);
   assert.equal(contract.sessionIdentity.hostMutation, false);
 });
