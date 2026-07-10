@@ -365,28 +365,31 @@ trusted-lease mediation for keyboard hotkey/window-focus paths that do not yet
 mutate browser-runtime state
 automatic sidecar restart after crash or heartbeat timeout; recovery remains an
 explicit approved operator action
-browser-runtime restart continuity; loss of the bounded capture source currently
-blocks fresh-capture action gates but does not yet expose one explicit recovery
-transition through the session-manager contract
+browser navigation/new-tab transport beyond existing input and click; broader
+navigation remains deferred until it uses the same sidecar lease, capture gate,
+audit, and AI-owned work-view boundary
 ```
 
 ## Next Slice
 
 The approved user-space sidecar now owns heartbeat, fail-closed liveness,
 continuously refreshed bounded capture, bounded browser input/click transport,
-and explicit recovery across session-manager restart. The next Level 2 slice
-should make browser-runtime restart semantics explicit:
+and explicit recovery across session-manager and browser-runtime restarts.
+Browser-runtime loss marks the capture source `recovery_required`, blocks
+screen-act before dispatch, recommends the existing `prepare_work_view`
+operator action, and resumes capture and IPC actions on the same sidecar after
+prepare. The next Level 2 slice should add one new real work-view action:
 
 ```text
-browser-runtime restart
--> sidecar capture becomes failed or stale
--> browser actions remain fail-closed
--> Observer exposes the capture-source recovery state
--> explicit work-view prepare relaunches the bounded browser runtime
--> the authoritative session lease is rebound before capture and actions resume
+bounded browser navigation/new-tab request
+-> derive the current trusted helper lease
+-> require a fresh same-session sidecar capture
+-> transport the request through sidecar IPC
+-> mutate only the AI-owned browser runtime
+-> refresh bounded capture and expose the result in Observer/audit
 ```
 
-It should extend the same supervisor, work-view contract, capture gate, and
-Observer readback rather than add another readiness chain. Root/system daemon
-work, desktop-wide capture, graphics-stack integration, broader input,
+It should extend the same sidecar action transport, work-view contract, capture
+gate, and Observer readback rather than add another readiness chain. Root/system
+daemon work, desktop-wide capture, graphics-stack integration, broader input,
 automatic restart, and provider egress remain deferred.

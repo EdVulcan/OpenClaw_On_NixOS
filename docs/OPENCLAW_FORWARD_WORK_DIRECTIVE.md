@@ -252,9 +252,13 @@ Session-manager restart now persists only compact lifecycle intent, exits the
 owned child with its parent, revokes the surviving browser lease before
 listening, reports `recovery_required`, and reuses the existing approved task
 for explicit restart under a new session lease. It never automatically
-resurrects the child. The next slice should make browser-runtime restart and
-explicit work-view recovery equally visible and fail-closed. Do not add a
-readiness-only chain or desktop-wide capture.
+resurrects the child. Browser-runtime restart recovery is also complete: an
+unavailable browser capture source becomes
+`recovery_required`, screen-act blocks before dispatch, Observer recommends the
+existing prepare action, and a fresh bounded capture restores sidecar IPC
+without restarting the helper. The next slice should carry one bounded browser
+navigation/new-tab action through the same trusted sidecar transport. Do not add
+a readiness-only chain or desktop-wide capture.
 
 ## Identity-Upgrade Alignment
 

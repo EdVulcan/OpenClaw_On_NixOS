@@ -24,6 +24,8 @@ SCREEN_ACT_URL="http://127.0.0.1:$OPENCLAW_SCREEN_ACT_PORT"
 LEDGER_DIR="$REPO_ROOT/.artifacts/openclaw-body-evidence-ledger"
 SESSION_MANAGER_PID_FILE="$REPO_ROOT/.artifacts/openclaw-session-manager.pid"
 SESSION_MANAGER_LOG_FILE="$REPO_ROOT/.artifacts/openclaw-session-manager.log"
+BROWSER_RUNTIME_PID_FILE="$REPO_ROOT/.artifacts/openclaw-browser-runtime.pid"
+BROWSER_RUNTIME_LOG_FILE="$REPO_ROOT/.artifacts/openclaw-browser-runtime.log"
 
 "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 rm -f "$OPENCLAW_CORE_STATE_FILE" "$OPENCLAW_CORE_STATE_FILE.tmp" "$OPENCLAW_SYSTEM_HEAL_STATE_FILE" "$OPENCLAW_SYSTEM_HEAL_STATE_FILE.tmp" \
@@ -37,8 +39,13 @@ cleanup() {
   rm -f "${RECOVERY_REQUIRED_STATE_FILE:-}" "${RECOVERY_BROWSER_ACTION_FILE:-}" "${RESTART_SIDECAR_FILE:-}" "${RESTARTED_STATE_FILE:-}"
   rm -f "${CAPTURE_REFRESH_STATE_FILE:-}"
   rm -f "${FRESH_CAPTURE_ACTION_FILE:-}"
+  rm -f "${BROWSER_FAILURE_STATE_FILE:-}" "${BROWSER_FAILURE_ACTION_FILE:-}" \
+    "${BROWSER_RECOVERED_STATE_FILE:-}" "${BROWSER_RECOVERED_ACTION_FILE:-}"
   if [[ -n "${RESTARTED_SESSION_MANAGER_PID:-}" ]]; then
     kill -TERM "$RESTARTED_SESSION_MANAGER_PID" >/dev/null 2>&1 || true
+  fi
+  if [[ -n "${RESTARTED_BROWSER_RUNTIME_PID:-}" ]]; then
+    kill -TERM "$RESTARTED_BROWSER_RUNTIME_PID" >/dev/null 2>&1 || true
   fi
   "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
   rm -f "$OPENCLAW_SESSION_MANAGER_STATE_FILE" "$OPENCLAW_SESSION_MANAGER_STATE_FILE.tmp"
@@ -162,6 +169,60 @@ RESTARTED_STATE_FILE="$(mktemp)"
 curl --silent --fail -X POST "$CORE_URL/work-view/trusted-sidecar/lifecycle-tasks/$sidecar_task_id/start-probe" \
   -H 'content-type: application/json' --data '{}' > "$RESTART_SIDECAR_FILE"
 curl --silent --fail "$SESSION_MANAGER_URL/work-view/state" > "$RESTARTED_STATE_FILE"
+restarted_capture_sequence="$(node -e 'const data=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8")); process.stdout.write(String(data.workView.helperRuntime.sidecar.captureObservation.sequence));' "$RESTARTED_STATE_FILE")"
+old_browser_runtime_pid="$(cat "$BROWSER_RUNTIME_PID_FILE")"
+kill -TERM "$old_browser_runtime_pid"
+for _ in $(seq 1 50); do
+  if ! kill -0 "$old_browser_runtime_pid" >/dev/null 2>&1 && ! curl --silent --fail "$BROWSER_RUNTIME_URL/health" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 0.1
+done
+if kill -0 "$old_browser_runtime_pid" >/dev/null 2>&1; then
+  echo "browser-runtime did not stop during capture recovery check" >&2
+  exit 1
+fi
+(
+  cd "$REPO_ROOT/services/openclaw-browser-runtime"
+  nohup env \
+    OPENCLAW_BROWSER_RUNTIME_HOST=0.0.0.0 \
+    OPENCLAW_BROWSER_RUNTIME_PORT="$OPENCLAW_BROWSER_RUNTIME_PORT" \
+    OPENCLAW_EVENT_HUB_URL="http://127.0.0.1:$OPENCLAW_EVENT_HUB_PORT" \
+    OPENCLAW_SESSION_MANAGER_URL="$SESSION_MANAGER_URL" \
+    node src/server.mjs >> "$BROWSER_RUNTIME_LOG_FILE" 2>&1 &
+  echo $! > "$BROWSER_RUNTIME_PID_FILE"
+)
+RESTARTED_BROWSER_RUNTIME_PID="$(cat "$BROWSER_RUNTIME_PID_FILE")"
+for _ in $(seq 1 50); do
+  if curl --silent --fail "$BROWSER_RUNTIME_URL/health" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 0.1
+done
+curl --silent --fail "$BROWSER_RUNTIME_URL/health" >/dev/null
+BROWSER_FAILURE_STATE_FILE="$(mktemp)"
+for _ in $(seq 1 50); do
+  curl --silent --fail "$SESSION_MANAGER_URL/work-view/state" > "$BROWSER_FAILURE_STATE_FILE"
+  if node -e 'const data=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8")); const s=data.workView?.helperRuntime?.sidecar??{}; process.exit(s.captureSourceStatus==="recovery_required" && s.captureFailure==="browser_runtime_not_running" ? 0 : 1);' "$BROWSER_FAILURE_STATE_FILE"; then
+    break
+  fi
+  sleep 0.1
+done
+BROWSER_FAILURE_ACTION_FILE="$(mktemp)"
+curl --silent --fail -X POST "$SCREEN_ACT_URL/act/keyboard/type" \
+  -H 'content-type: application/json' --data '{"text":"must-block-during-browser-restart"}' > "$BROWSER_FAILURE_ACTION_FILE"
+post_json "$SESSION_MANAGER_URL/work-view/prepare" '{"displayTarget":"workspace-2","entryUrl":"https://example.com/phase-3-browser-recovered","operatorActionSource":"trusted_session_recovery_recommendation","recommendedAction":"prepare_work_view"}' >/dev/null
+BROWSER_RECOVERED_STATE_FILE="$(mktemp)"
+for _ in $(seq 1 50); do
+  curl --silent --fail "$SESSION_MANAGER_URL/work-view/state" > "$BROWSER_RECOVERED_STATE_FILE"
+  if node -e 'const data=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8")); const s=data.workView?.helperRuntime?.sidecar??{}; process.exit(s.captureSourceStatus==="ready" && s.captureRecoveryRequired===false && s.captureFreshness==="fresh" && (s.captureObservation?.sequence??0)>Number(process.argv[2]) ? 0 : 1);' "$BROWSER_RECOVERED_STATE_FILE" "$restarted_capture_sequence"; then
+    break
+  fi
+  sleep 0.1
+done
+BROWSER_RECOVERED_ACTION_FILE="$(mktemp)"
+curl --silent --fail -X POST "$SCREEN_ACT_URL/act/keyboard/type" \
+  -H 'content-type: application/json' --data '{"text":"allowed-after-explicit-browser-prepare"}' > "$BROWSER_RECOVERED_ACTION_FILE"
 STOP_SIDECAR_FILE="$(mktemp)"
 CONTROLS_AFTER_STOP_FILE="$(mktemp)"
 curl --silent --fail \
@@ -170,7 +231,7 @@ curl --silent --fail \
   --data '{}' > "$STOP_SIDECAR_FILE"
 curl --silent --fail "$CORE_URL/phase-3/operator-interrupt-controls" > "$CONTROLS_AFTER_STOP_FILE"
 
-node - <<'EOF' "$CONTROLS_FILE" "$takeover" "$sidecar_task" "$start_probe_status" "$START_PROBE_FILE" "$approved_sidecar" "$approved_start_probe_status" "$APPROVED_START_PROBE_FILE" "$CONTROLS_AFTER_PROBE_FILE" "$SUSPENDED_STATE_FILE" "$old_browser_action_status" "$OLD_BROWSER_ACTION_FILE" "$resume" "$RESUMED_STATE_FILE" "$RESUMED_BROWSER_ACTION_FILE" "$STOP_SIDECAR_FILE" "$CONTROLS_AFTER_STOP_FILE" "$RECOVERY_REQUIRED_STATE_FILE" "$recovery_action_status" "$RECOVERY_BROWSER_ACTION_FILE" "$RESTART_SIDECAR_FILE" "$RESTARTED_STATE_FILE" "$CAPTURE_REFRESH_STATE_FILE"
+node - <<'EOF' "$CONTROLS_FILE" "$takeover" "$sidecar_task" "$start_probe_status" "$START_PROBE_FILE" "$approved_sidecar" "$approved_start_probe_status" "$APPROVED_START_PROBE_FILE" "$CONTROLS_AFTER_PROBE_FILE" "$SUSPENDED_STATE_FILE" "$old_browser_action_status" "$OLD_BROWSER_ACTION_FILE" "$resume" "$RESUMED_STATE_FILE" "$RESUMED_BROWSER_ACTION_FILE" "$STOP_SIDECAR_FILE" "$CONTROLS_AFTER_STOP_FILE" "$RECOVERY_REQUIRED_STATE_FILE" "$recovery_action_status" "$RECOVERY_BROWSER_ACTION_FILE" "$RESTART_SIDECAR_FILE" "$RESTARTED_STATE_FILE" "$CAPTURE_REFRESH_STATE_FILE" "$BROWSER_FAILURE_STATE_FILE" "$BROWSER_FAILURE_ACTION_FILE" "$BROWSER_RECOVERED_STATE_FILE" "$BROWSER_RECOVERED_ACTION_FILE"
 const fs = require("node:fs");
 const controls = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
 const takeover = JSON.parse(process.argv[3]);
@@ -195,6 +256,10 @@ const recoveryAction = JSON.parse(fs.readFileSync(process.argv[21], "utf8"));
 const restartedSidecar = JSON.parse(fs.readFileSync(process.argv[22], "utf8"));
 const restartedState = JSON.parse(fs.readFileSync(process.argv[23], "utf8"));
 const captureRefreshState = JSON.parse(fs.readFileSync(process.argv[24], "utf8"));
+const browserFailureState = JSON.parse(fs.readFileSync(process.argv[25], "utf8"));
+const browserFailureAction = JSON.parse(fs.readFileSync(process.argv[26], "utf8"));
+const browserRecoveredState = JSON.parse(fs.readFileSync(process.argv[27], "utf8"));
+const browserRecoveredAction = JSON.parse(fs.readFileSync(process.argv[28], "utf8"));
 
 if (!controls.ok
   || controls.registry !== "openclaw-phase-3-operator-interrupt-controls-v0"
@@ -346,6 +411,36 @@ if (!restartedSidecar.ok
   || restartedRuntime.leaseId === resumedRuntime.leaseId) {
   throw new Error(`explicit approved recovery should launch a new process under a new session lease: ${JSON.stringify({ restartedSidecar, restartedRuntime, resumedRuntime })}`);
 }
+const browserFailureSidecar = browserFailureState.workView?.helperRuntime?.sidecar ?? {};
+const blockedBrowserRecoveryMediation = browserFailureAction.action?.mediation ?? {};
+if (browserFailureSidecar.status !== "running"
+  || browserFailureSidecar.captureSourceStatus !== "recovery_required"
+  || browserFailureSidecar.captureRecoveryRequired !== true
+  || browserFailureSidecar.captureFailure !== "browser_runtime_not_running"
+  || browserFailureSidecar.running !== true
+  || browserFailureState.workView?.trustedSession?.recoveryRecommendation?.action !== "prepare_work_view"
+  || browserFailureState.workView?.trustedSession?.recoveryRecommendation?.reason !== "trusted_sidecar_capture_source_unavailable"
+  || blockedBrowserRecoveryMediation.accepted !== false
+  || blockedBrowserRecoveryMediation.attempted !== false
+  || blockedBrowserRecoveryMediation.reason !== "trusted_sidecar_capture_source_unavailable") {
+  throw new Error(`browser-runtime restart should fail closed at the sidecar capture gate: ${JSON.stringify({ browserFailureSidecar, browserFailureAction })}`);
+}
+const browserRecoveredSidecar = browserRecoveredState.workView?.helperRuntime?.sidecar ?? {};
+const recoveredBrowserMediation = browserRecoveredAction.action?.mediation ?? {};
+if (browserRecoveredSidecar.status !== "running"
+  || browserRecoveredSidecar.captureSourceStatus !== "ready"
+  || browserRecoveredSidecar.captureRecoveryRequired !== false
+  || browserRecoveredSidecar.captureFailure !== null
+  || browserRecoveredSidecar.captureFreshness !== "fresh"
+  || browserRecoveredSidecar.captureObservation?.sequence <= restartedRuntime.sidecar.captureObservation.sequence
+  || browserRecoveredSidecar.pid !== restartedRuntime.sidecar.pid
+  || browserRecoveredState.workView?.lastOperatorAction?.source !== "trusted_session_recovery_recommendation"
+  || browserRecoveredState.workView?.lastOperatorAction?.recommendedAction !== "prepare_work_view"
+  || browserRecoveredAction.action?.result !== "executed-browser-runtime"
+  || recoveredBrowserMediation.accepted !== true
+  || recoveredBrowserMediation.transport !== "trusted-sidecar-ipc") {
+  throw new Error(`explicit work-view prepare should recover capture and actions without restarting the sidecar: ${JSON.stringify({ browserRecoveredSidecar, browserRecoveredAction })}`);
+}
 if (!stoppedSidecar.ok
   || stoppedSidecar.mode !== "trusted-sidecar-stopped-after-operator-action"
   || stoppedSidecar.readback?.status !== "stopped_after_operator_action"
@@ -379,6 +474,9 @@ console.log(JSON.stringify({
     restartRecoveryStatus: recoveryRuntime.sidecar.status,
     staleLeaseActionStatus: recoveryActionStatus,
     restartPid: restartedSidecar.readback.execution.pid,
+    browserCaptureFailure: browserFailureSidecar.captureFailure,
+    browserRecoveredSequence: browserRecoveredSidecar.captureObservation.sequence,
+    browserRecoveryTransport: recoveredBrowserMediation.transport,
     stoppedSidecar: stoppedSidecar.readback.status,
   },
 }, null, 2));

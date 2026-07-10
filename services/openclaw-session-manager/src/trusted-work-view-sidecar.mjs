@@ -38,6 +38,12 @@ async function observeBrowserCapture() {
   try {
     const response = await fetch(`${browserRuntimeUrl}/browser/capture`);
     const data = await response.json();
+    if (!response.ok || data?.ok !== true) {
+      throw new Error(data?.error ?? "browser_capture_request_failed");
+    }
+    if (data.running !== true || !data.capture) {
+      throw new Error("browser_runtime_not_running");
+    }
     const capture = data.capture ?? {};
     const summary = capture.workViewSummary ?? {};
     captureSequence += 1;

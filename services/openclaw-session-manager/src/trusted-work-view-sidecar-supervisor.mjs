@@ -39,6 +39,7 @@ export function createTrustedWorkViewSidecarSupervisor({
   let failureReported = false;
   let captureObservation = null;
   let captureFailure = null;
+  let captureFailedAt = null;
   let captureResolver = null;
   const pendingActions = new Map();
 
@@ -95,6 +96,11 @@ export function createTrustedWorkViewSidecarSupervisor({
       degradedReason,
       captureObservation,
       captureFailure,
+      captureFailedAt,
+      captureSourceStatus: captureFailure
+        ? "recovery_required"
+        : captureObservation ? "ready" : "waiting",
+      captureRecoveryRequired: Boolean(captureFailure),
       captureFreshness,
       captureAgeMs,
       captureStaleAfterMs,
@@ -135,10 +141,12 @@ export function createTrustedWorkViewSidecarSupervisor({
     } else if (message.type === "capture_observation") {
       captureObservation = message.observation ?? null;
       captureFailure = null;
+      captureFailedAt = null;
       captureResolver?.();
       captureResolver = null;
     } else if (message.type === "capture_failed") {
       captureFailure = message.reason ?? "capture_failed";
+      captureFailedAt = message.emittedAt ?? now();
       captureResolver?.();
       captureResolver = null;
     } else if (message.type === "action_result") {
@@ -188,6 +196,7 @@ export function createTrustedWorkViewSidecarSupervisor({
     failureReported = false;
     captureObservation = null;
     captureFailure = null;
+    captureFailedAt = null;
 
     const processHandle = spawnProcess(process.execPath, [sidecarPath.pathname], {
       stdio: ["ignore", "ignore", "ignore", "ipc"],

@@ -207,6 +207,35 @@ test("trusted work-view contract reports a bounded running sidecar from helper r
   assert.equal(contract.sidecarContract.approvalTaskDraft.processStartEnabledAfterApproval, true);
 });
 
+test("trusted work-view contract recommends prepare while the sidecar capture source needs recovery", () => {
+  const contract = buildTrustedWorkViewContract({
+    source: "session-manager",
+    session: { sessionId: "session-recovery", status: "running" },
+    workView: {
+      status: "prepared",
+      visibility: "hidden",
+      helperStatus: "active",
+      browserStatus: "running",
+      activeUrl: "https://example.com/recovery",
+      helperRuntime: {
+        status: "active",
+        sidecar: {
+          taskId: "task-sidecar",
+          status: "running",
+          running: true,
+          captureFailure: "browser_runtime_not_running",
+          captureRecoveryRequired: true,
+        },
+      },
+    },
+  });
+  assert.equal(contract.helperReadiness.state, "needs_prepare");
+  assert.equal(contract.recoveryRecommendation.action, "prepare_work_view");
+  assert.equal(contract.recoveryRecommendation.endpoint, "/work-view/prepare");
+  assert.equal(contract.recoveryRecommendation.reason, "trusted_sidecar_capture_source_unavailable");
+  assert.equal(contract.recoveryRecommendation.approvalRequired, false);
+});
+
 test("trusted work-view contract detects divergent browser runtime session identity", () => {
   const contract = buildTrustedWorkViewContract({
     source: "screen-sense",

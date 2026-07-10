@@ -92,3 +92,20 @@ test("screen-act requires fresh same-session capture after sidecar lifecycle act
   assert.equal(divergent.ready, false);
   assert.equal(divergent.reason, "trusted_sidecar_capture_not_ready");
 });
+
+test("screen-act blocks immediately while the sidecar capture source requires recovery", () => {
+  const mediation = buildTrustedWorkViewActionLease(trustedScreen({
+    sidecar: {
+      taskId: "task-sidecar",
+      status: "running",
+      captureFreshness: "fresh",
+      captureObservation: { sessionId: "session-1" },
+      captureFailure: "browser_runtime_not_running",
+      captureRecoveryRequired: true,
+    },
+  }));
+  assert.equal(mediation.required, true);
+  assert.equal(mediation.ready, false);
+  assert.equal(mediation.reason, "trusted_sidecar_capture_source_unavailable");
+  assert.equal(mediation.trustedHelperLease, null);
+});

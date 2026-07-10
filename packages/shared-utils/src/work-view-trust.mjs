@@ -221,7 +221,7 @@ function helperActions() {
   ];
 }
 
-function deriveHelperReadiness({ readiness, helperStatus, browserStatus, browserRunning, activeUrl, visibility, sessionIdentityStatus, helperRuntimeStatus, helperRuntimeSuspensionReason }) {
+function deriveHelperReadiness({ readiness, helperStatus, browserStatus, browserRunning, activeUrl, visibility, sessionIdentityStatus, helperRuntimeStatus, helperRuntimeSuspensionReason, helperRuntimeSidecar }) {
   if (helperRuntimeStatus === "suspended") {
     const sidecarFailure = typeof helperRuntimeSuspensionReason === "string"
       && helperRuntimeSuspensionReason.startsWith("trusted_sidecar");
@@ -231,6 +231,20 @@ function deriveHelperReadiness({ readiness, helperStatus, browserStatus, browser
       recommendedOperatorAction: sidecarFailure ? "restart_approved_trusted_sidecar" : "resume_ai_action_authority",
       recoveryEndpoint: sidecarFailure ? null : "/control/resume",
       approvalRequired: sidecarFailure,
+      rootRequired: false,
+      canRecoverWithoutRoot: true,
+      observerVisible: true,
+      availableOperatorActions: helperActions(),
+    };
+  }
+
+  if (helperRuntimeSidecar?.captureRecoveryRequired === true || helperRuntimeSidecar?.captureFailure) {
+    return {
+      state: "needs_prepare",
+      reason: "trusted_sidecar_capture_source_unavailable",
+      recommendedOperatorAction: "prepare_work_view",
+      recoveryEndpoint: "/work-view/prepare",
+      approvalRequired: false,
       rootRequired: false,
       canRecoverWithoutRoot: true,
       observerVisible: true,
@@ -495,6 +509,7 @@ export function buildTrustedWorkViewContract(input = {}) {
     sessionIdentityStatus: sessionIdentity.status,
     helperRuntimeStatus: helperRuntime.status,
     helperRuntimeSuspensionReason: helperRuntime.suspensionReason,
+    helperRuntimeSidecar: helperRuntime.sidecar,
   });
 
   return {

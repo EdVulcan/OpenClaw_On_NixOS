@@ -34,6 +34,16 @@ export function buildTrustedWorkViewActionLease(screen) {
   }
 
   const sidecar = helperRuntime.sidecar ?? null;
+  if (sidecar?.taskId && (sidecar.captureRecoveryRequired === true || sidecar.captureFailure)) {
+    return {
+      registry: "openclaw-trusted-work-view-action-mediation-v0",
+      required: true,
+      ready: false,
+      status: "blocked",
+      reason: "trusted_sidecar_capture_source_unavailable",
+      trustedHelperLease: null,
+    };
+  }
   if (sidecar?.taskId && (
     sidecar.status !== "running"
     || sidecar.captureFreshness !== "fresh"

@@ -302,6 +302,7 @@ async function refreshPhase3BackgroundWorkView() {
       "Last Operator Action: " + (workView.lastOperatorAction?.action ?? "none") + " source=" + (workView.lastOperatorAction?.source ?? "none"),
       "Sidecar Contract: " + (trustedSession.sidecarContract?.status ?? "unknown") + " processStarted=" + String(Boolean(trustedSession.sidecarContract?.lifecycle?.processStarted)) + " supervisor=" + (trustedSession.sidecarContract?.lifecycle?.supervisorStatus ?? "unknown") + " heartbeat=" + (trustedSession.sidecarContract?.lifecycle?.heartbeatCount ?? 0),
       "Sidecar Recovery: status=" + (sidecar.status ?? "inactive") + " required=" + Boolean(sidecar.recoveryRequired) + " automaticRestart=" + Boolean(sidecar.automaticRestart),
+      "Capture Source: status=" + (sidecar.captureSourceStatus ?? "waiting") + " recoveryRequired=" + Boolean(sidecar.captureRecoveryRequired) + " failure=" + (sidecar.captureFailure ?? "none"),
       "Sidecar Lifecycle: " + (trustedSession.sidecarContract?.lifecycleProposal?.status ?? "unknown") + " execution=" + (trustedSession.sidecarContract?.lifecycleProposal?.executionStatus ?? "unknown"),
       "Sidecar Approval Draft: " + (trustedSession.sidecarContract?.approvalTaskDraft?.status ?? "unknown") + " createsTask=" + String(Boolean(trustedSession.sidecarContract?.approvalTaskDraft?.createsTaskNow)),
     ].join("\\n");

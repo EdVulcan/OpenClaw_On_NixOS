@@ -112,9 +112,11 @@ explicit resume/rebind, then runs a bounded approval-gated user-space helper
 heartbeat process under the existing sidecar lifecycle. Fail-closed recovery
 across session-manager restart now persists compact intent, revokes the old
 browser lease, avoids automatic child resurrection, and reuses the approved
-task for explicit restart. The next real slice is browser-runtime restart
-continuity through the same capture gate, work-view prepare path, and Observer
-surface. Do not add a readiness milestone, automatic restart loop, or
+task for explicit restart. Browser-runtime restart continuity now blocks actions
+on capture-source loss, recommends prepare through the existing Observer path,
+and recovers capture plus sidecar IPC without restarting the helper. The next
+real slice is bounded browser navigation/new-tab through the same trusted
+transport. Do not add a readiness milestone, automatic restart loop, or
 desktop-wide capture.
 
 ## Historical Phase Plans
