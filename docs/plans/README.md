@@ -109,11 +109,13 @@ OPENCLAW_TRUSTED_WORK_VIEW_SESSION_CONTRACT_PLAN.md
 
 It now closes browser action mediation through operator takeover suspension and
 explicit resume/rebind, then runs a bounded approval-gated user-space helper
-heartbeat process under the existing sidecar lifecycle. The next real slice is
-now fail-closed lifecycle recovery across session-manager restart; sidecar-owned
-browser input/click, fresh-capture mediation, bounded refresh, heartbeat-loss
-recovery, and explicit approved restart are complete. Do not add a readiness
-milestone, automatic restart loop, or desktop-wide capture.
+heartbeat process under the existing sidecar lifecycle. Fail-closed recovery
+across session-manager restart now persists compact intent, revokes the old
+browser lease, avoids automatic child resurrection, and reuses the approved
+task for explicit restart. The next real slice is browser-runtime restart
+continuity through the same capture gate, work-view prepare path, and Observer
+surface. Do not add a readiness milestone, automatic restart loop, or
+desktop-wide capture.
 
 ## Historical Phase Plans
 

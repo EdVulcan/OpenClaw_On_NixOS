@@ -331,6 +331,23 @@ openclaw-phase-3-operator-interrupt-controls
 observer-openclaw-phase-3-operator-interrupt-controls
 ```
 
+Session-manager restart recovery is now part of the same Level 2 lifecycle:
+
+```text
+approved sidecar start
+-> synchronously persist compact task/approval/status intent
+-> session-manager stops and the owned child exits on IPC disconnect
+-> restart projects prior running intent as recovery_required
+-> browser-runtime suspends the surviving old lease before session-manager listens
+-> no child is started automatically
+-> work-view prepare establishes a new session lease
+-> the existing approved lifecycle task explicitly starts a new child
+```
+
+The persisted record excludes lease values, capture payloads, input text,
+credentials, and provider material. Observer renders the recovery-required and
+automatic-restart fields through the existing work-view panel.
+
 ## Deferred
 
 The following remain intentionally deferred:
@@ -346,29 +363,30 @@ automatic recovery execution; the contract recommends existing operator actions
 unreviewed endpoint invocation from recommendation payloads
 trusted-lease mediation for keyboard hotkey/window-focus paths that do not yet
 mutate browser-runtime state
-session-manager restart persistence; sidecar action transport is active but its
-lifecycle intent is not restored after parent restart
 automatic sidecar restart after crash or heartbeat timeout; recovery remains an
 explicit approved operator action
+browser-runtime restart continuity; loss of the bounded capture source currently
+blocks fresh-capture action gates but does not yet expose one explicit recovery
+transition through the session-manager contract
 ```
 
 ## Next Slice
 
 The approved user-space sidecar now owns heartbeat, fail-closed liveness,
-continuously refreshed bounded capture, and bounded browser input/click
-transport. The next Level 2 slice should make service restart semantics
-explicit:
+continuously refreshed bounded capture, bounded browser input/click transport,
+and explicit recovery across session-manager restart. The next Level 2 slice
+should make browser-runtime restart semantics explicit:
 
 ```text
-session-manager restart
--> child exits with parent
--> persisted lifecycle intent reads as recovery_required
--> action authority remains fail-closed
--> existing approved task enables explicit restart
--> no automatic child resurrection
+browser-runtime restart
+-> sidecar capture becomes failed or stale
+-> browser actions remain fail-closed
+-> Observer exposes the capture-source recovery state
+-> explicit work-view prepare relaunches the bounded browser runtime
+-> the authoritative session lease is rebound before capture and actions resume
 ```
 
-It should extend the same supervisor, lifecycle task, work-view contract, and
+It should extend the same supervisor, work-view contract, capture gate, and
 Observer readback rather than add another readiness chain. Root/system daemon
 work, desktop-wide capture, graphics-stack integration, broader input,
 automatic restart, and provider egress remain deferred.

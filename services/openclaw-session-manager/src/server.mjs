@@ -4,6 +4,7 @@ import { createEventName } from "../../../packages/shared-events/src/event-facto
 import { buildTrustedWorkViewContract } from "../../../packages/shared-utils/src/work-view-trust.mjs";
 import { createTrustedWorkViewHelperRuntime } from "./trusted-work-view-helper-runtime.mjs";
 import { createTrustedWorkViewSidecarSupervisor } from "./trusted-work-view-sidecar-supervisor.mjs";
+import { createTrustedWorkViewSidecarRecoveryStore } from "./trusted-work-view-sidecar-recovery-store.mjs";
 
 const host = process.env.OPENCLAW_SESSION_MANAGER_HOST ?? "127.0.0.1";
 const port = Number.parseInt(process.env.OPENCLAW_SESSION_MANAGER_PORT ?? "4102", 10);
@@ -11,6 +12,7 @@ const eventHubUrl = process.env.OPENCLAW_EVENT_HUB_URL ?? "http://127.0.0.1:4101
 const browserRuntimeUrl = process.env.OPENCLAW_BROWSER_RUNTIME_URL ?? "http://127.0.0.1:4103";
 const startDelayMs = Number.parseInt(process.env.OPENCLAW_SESSION_START_DELAY_MS ?? "0", 10);
 const defaultWorkViewUrl = process.env.OPENCLAW_WORK_VIEW_URL ?? "https://example.com/work-view";
+const stateFilePath = process.env.OPENCLAW_SESSION_MANAGER_STATE_FILE ?? `/tmp/openclaw-session-manager-${port}.json`;
 const trustedWorkViewHelperRuntime = createTrustedWorkViewHelperRuntime();
 
 const sessionState = {
@@ -41,6 +43,8 @@ const workViewState = {
   lastHiddenAt: null,
   updatedAt: new Date().toISOString(),
 };
+const sidecarRecoveryStore = createTrustedWorkViewSidecarRecoveryStore({ stateFilePath });
+let sidecarLifecycleIntent = sidecarRecoveryStore.snapshot();
 const trustedWorkViewSidecarSupervisor = createTrustedWorkViewSidecarSupervisor({
   onHeartbeat(message) {
     const helperRuntime = trustedWorkViewHelperRuntime.snapshot();
@@ -75,7 +79,17 @@ function updateSessionState(patch) {
 }
 
 function serialiseWorkViewState() {
-  const sidecar = trustedWorkViewSidecarSupervisor.snapshot();
+  const supervisedSidecar = trustedWorkViewSidecarSupervisor.snapshot();
+  const sidecar = !supervisedSidecar.taskId && sidecarLifecycleIntent?.taskId
+    ? {
+        ...supervisedSidecar,
+        taskId: sidecarLifecycleIntent.taskId,
+        approvalId: sidecarLifecycleIntent.approvalId ?? null,
+        status: sidecarLifecycleIntent.status,
+        recoveryRequired: sidecarLifecycleIntent.status === "recovery_required",
+        automaticRestart: false,
+      }
+    : supervisedSidecar;
   const helperRuntime = {
     ...trustedWorkViewHelperRuntime.snapshot(),
     externalProcessStarted: sidecar.running,
@@ -280,6 +294,11 @@ async function handleTrustedSidecarFailure(failure) {
       recoveryAction: "restart_approved_trusted_sidecar",
       previous,
     },
+  });
+  sidecarLifecycleIntent = sidecarRecoveryStore.record({
+    taskId: failure.taskId,
+    approvalId: failure.approvalId,
+    status: "recovery_required",
   });
   try {
     await syncBrowserHelperLease();
@@ -662,6 +681,11 @@ const server = http.createServer(async (req, res) => {
         approvalStatus: body.approvalStatus,
         browserRuntimeUrl,
       });
+      sidecarLifecycleIntent = sidecarRecoveryStore.record({
+        taskId: body.taskId,
+        approvalId: body.approvalId,
+        status: "running",
+      });
       let authority = null;
       if (trustedWorkViewHelperRuntime.snapshot().actionAuthority === "suspended") {
         authority = await resumeHelperActionAuthority("approved_trusted_sidecar_restart");
@@ -685,6 +709,11 @@ const server = http.createServer(async (req, res) => {
     try {
       const body = await readJsonBody(req);
       const sidecar = await trustedWorkViewSidecarSupervisor.stop({ taskId: body.taskId });
+      sidecarLifecycleIntent = sidecarRecoveryStore.record({
+        taskId: body.taskId,
+        approvalId: sidecarLifecycleIntent?.approvalId ?? null,
+        status: "stopped",
+      });
       const authority = await suspendHelperActionAuthority("trusted_sidecar_stopped");
       const workView = serialiseWorkViewState();
       await publishEvent(createEventName("screen.updated"), {
@@ -724,11 +753,41 @@ const server = http.createServer(async (req, res) => {
   sendJson(res, 404, { ok: false, error: "Route not found." });
 });
 
-server.listen(port, host, async () => {
-  console.log(`openclaw-session-manager listening on http://${host}:${port}`);
-  await registerService(eventHubUrl, "openclaw-session-manager", `http://${host}:${port}`);
-  await publishEvent(createEventName("service.started"), {
-    service: "openclaw-session-manager",
-    url: `http://${host}:${port}`,
+async function revokeStaleBrowserLeaseBeforeRecovery() {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    try {
+      const response = await fetch(`${browserRuntimeUrl}/browser/trusted-helper-lease/revoke`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}",
+      });
+      const result = await response.json().catch(() => null);
+      if (response.ok && result?.ok === true) {
+        return;
+      }
+    } catch {
+      // Browser runtime may still be starting alongside session-manager.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error("Unable to revoke stale browser helper lease during sidecar recovery.");
+}
+
+async function startSessionManager() {
+  if (sidecarLifecycleIntent?.status === "recovery_required") {
+    await revokeStaleBrowserLeaseBeforeRecovery();
+  }
+  server.listen(port, host, async () => {
+    console.log(`openclaw-session-manager listening on http://${host}:${port}`);
+    await registerService(eventHubUrl, "openclaw-session-manager", `http://${host}:${port}`);
+    await publishEvent(createEventName("service.started"), {
+      service: "openclaw-session-manager",
+      url: `http://${host}:${port}`,
+    });
   });
+}
+
+startSessionManager().catch((error) => {
+  console.error(error instanceof Error ? error.message : error);
+  process.exitCode = 1;
 });

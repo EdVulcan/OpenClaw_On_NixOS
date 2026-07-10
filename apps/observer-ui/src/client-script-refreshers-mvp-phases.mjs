@@ -283,6 +283,7 @@ async function refreshPhase3BackgroundWorkView() {
     const trustedSession = data.workViewContract?.trustedSession ?? workView.trustedSession ?? {};
     const sessionIdentity = trustedSession.sessionIdentity ?? {};
     const helperRuntime = trustedSession.helperRuntime ?? {};
+    const sidecar = helperRuntime.sidecar ?? {};
     phase3BackgroundReady.textContent = String(Boolean(summary.ready));
     phase3BackgroundVisibility.textContent = workView.visibility ?? data.workViewContract?.defaultVisibility ?? "hidden";
     phase3BackgroundMode.textContent = workView.mode ?? data.workViewContract?.defaultMode ?? "background";
@@ -300,6 +301,7 @@ async function refreshPhase3BackgroundWorkView() {
       "Helper Readiness: " + (trustedSession.helperReadiness?.state ?? "unknown") + " recovery=" + (trustedSession.recoveryRecommendation?.action ?? "unknown"),
       "Last Operator Action: " + (workView.lastOperatorAction?.action ?? "none") + " source=" + (workView.lastOperatorAction?.source ?? "none"),
       "Sidecar Contract: " + (trustedSession.sidecarContract?.status ?? "unknown") + " processStarted=" + String(Boolean(trustedSession.sidecarContract?.lifecycle?.processStarted)) + " supervisor=" + (trustedSession.sidecarContract?.lifecycle?.supervisorStatus ?? "unknown") + " heartbeat=" + (trustedSession.sidecarContract?.lifecycle?.heartbeatCount ?? 0),
+      "Sidecar Recovery: status=" + (sidecar.status ?? "inactive") + " required=" + Boolean(sidecar.recoveryRequired) + " automaticRestart=" + Boolean(sidecar.automaticRestart),
       "Sidecar Lifecycle: " + (trustedSession.sidecarContract?.lifecycleProposal?.status ?? "unknown") + " execution=" + (trustedSession.sidecarContract?.lifecycleProposal?.executionStatus ?? "unknown"),
       "Sidecar Approval Draft: " + (trustedSession.sidecarContract?.approvalTaskDraft?.status ?? "unknown") + " createsTask=" + String(Boolean(trustedSession.sidecarContract?.approvalTaskDraft?.createsTaskNow)),
     ].join("\\n");

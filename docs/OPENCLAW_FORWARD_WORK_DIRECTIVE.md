@@ -247,10 +247,14 @@ allowlisted loopback-only source, with single-flight polling, sequence, and
 fresh/stale state but no retained full payload. Screen-act now requires a fresh
 same-session sidecar observation alongside the helper lease after sidecar
 lifecycle activation. Bounded browser input/click now travels through sidecar
-IPC, rechecks capture/session, and returns through screen-act audit. The next
-slice should preserve fail-closed lifecycle recovery intent across
-session-manager restart without automatically resurrecting the child. Do not
-add a readiness-only chain or desktop-wide capture.
+IPC, rechecks capture/session, and returns through screen-act audit.
+Session-manager restart now persists only compact lifecycle intent, exits the
+owned child with its parent, revokes the surviving browser lease before
+listening, reports `recovery_required`, and reuses the existing approved task
+for explicit restart under a new session lease. It never automatically
+resurrects the child. The next slice should make browser-runtime restart and
+explicit work-view recovery equally visible and fail-closed. Do not add a
+readiness-only chain or desktop-wide capture.
 
 ## Identity-Upgrade Alignment
 

@@ -353,6 +353,23 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === "POST" && requestUrl.pathname === "/browser/trusted-helper-lease/revoke") {
+    if (browserState.sessionAuthority !== "openclaw-session-manager" || !browserState.trustedHelperLease) {
+      sendJson(res, 200, { ok: true, revoked: false, browser: serialiseBrowserState() });
+      return;
+    }
+    updateBrowserState({
+      trustedHelperLease: {
+        ...browserState.trustedHelperLease,
+        actionAuthority: "suspended",
+        suspendedAt: new Date().toISOString(),
+        suspensionReason: "session_manager_recovery_required",
+      },
+    });
+    sendJson(res, 200, { ok: true, revoked: true, browser: serialiseBrowserState() });
+    return;
+  }
+
   if (req.method === "POST" && requestUrl.pathname === "/browser/input") {
     try {
       if (!browserState.running) {

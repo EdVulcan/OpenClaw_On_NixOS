@@ -15,6 +15,7 @@ export OPENCLAW_SYSTEM_HEAL_PORT="${OPENCLAW_SYSTEM_HEAL_PORT:-6767}"
 export OBSERVER_UI_PORT="${OBSERVER_UI_PORT:-6768}"
 export OPENCLAW_CORE_STATE_FILE="${OPENCLAW_CORE_STATE_FILE:-$REPO_ROOT/.artifacts/openclaw-core-observer-phase-3-operator-interrupt-controls-check.json}"
 export OPENCLAW_SYSTEM_HEAL_STATE_FILE="${OPENCLAW_SYSTEM_HEAL_STATE_FILE:-$REPO_ROOT/.artifacts/openclaw-system-heal-observer-phase-3-operator-interrupt-controls-check.json}"
+export OPENCLAW_SESSION_MANAGER_STATE_FILE="${OPENCLAW_SESSION_MANAGER_STATE_FILE:-$REPO_ROOT/.artifacts/openclaw-session-manager-observer-phase-3-operator-interrupt-controls-check.json}"
 
 CORE_URL="http://127.0.0.1:$OPENCLAW_CORE_PORT"
 SESSION_MANAGER_URL="http://127.0.0.1:$OPENCLAW_SESSION_MANAGER_PORT"
@@ -22,12 +23,14 @@ OBSERVER_URL="http://127.0.0.1:$OBSERVER_UI_PORT"
 LEDGER_DIR="$REPO_ROOT/.artifacts/openclaw-body-evidence-ledger"
 
 "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
-rm -f "$OPENCLAW_CORE_STATE_FILE" "$OPENCLAW_CORE_STATE_FILE.tmp" "$OPENCLAW_SYSTEM_HEAL_STATE_FILE" "$OPENCLAW_SYSTEM_HEAL_STATE_FILE.tmp"
+rm -f "$OPENCLAW_CORE_STATE_FILE" "$OPENCLAW_CORE_STATE_FILE.tmp" "$OPENCLAW_SYSTEM_HEAL_STATE_FILE" "$OPENCLAW_SYSTEM_HEAL_STATE_FILE.tmp" \
+  "$OPENCLAW_SESSION_MANAGER_STATE_FILE" "$OPENCLAW_SESSION_MANAGER_STATE_FILE.tmp"
 rm -rf "$LEDGER_DIR"
 
 cleanup() {
   rm -f "${HTML_FILE:-}" "${CLIENT_FILE:-}" "${CONTROLS_FILE:-}" "${START_PROBE_FILE:-}" "${APPROVED_START_PROBE_FILE:-}" "${CONTROLS_AFTER_PROBE_FILE:-}" "${STOP_SIDECAR_FILE:-}" "${CONTROLS_AFTER_STOP_FILE:-}"
   "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
+  rm -f "$OPENCLAW_SESSION_MANAGER_STATE_FILE" "$OPENCLAW_SESSION_MANAGER_STATE_FILE.tmp"
 }
 trap cleanup EXIT
 
@@ -88,7 +91,7 @@ for (const token of ["Phase 3 Operator Interrupt Controls", "phase3-operator-int
     throw new Error(`Observer HTML missing ${token}`);
   }
 }
-for (const token of ["/phase-3/operator-interrupt-controls", "refreshPhase3OperatorInterruptControls", "openclaw-phase-3-operator-interrupt-controls-v0", "/control/takeover", "/control/resume", "/work-view/trusted-sidecar/lifecycle-tasks", "/start-probe", "/stop", "createTrustedSidecarLifecycleTask", "startTrustedSidecarLifecycleProbe", "stopTrustedSidecarLifecycle", "sidecarLifecycle", "latestProbe", "workViewRecoveryAction", "trustedSession.helperReadiness", "Action Authority", "actionAuthoritySuspended", "helperRuntime.actionAuthority", "safety.supervisorStatus", "safety.heartbeatCount", "Sidecar Failure", "lastSidecarFailure", "automaticRestart"]) {
+for (const token of ["/phase-3/operator-interrupt-controls", "refreshPhase3OperatorInterruptControls", "openclaw-phase-3-operator-interrupt-controls-v0", "/control/takeover", "/control/resume", "/work-view/trusted-sidecar/lifecycle-tasks", "/start-probe", "/stop", "createTrustedSidecarLifecycleTask", "startTrustedSidecarLifecycleProbe", "stopTrustedSidecarLifecycle", "sidecarLifecycle", "latestProbe", "workViewRecoveryAction", "trustedSession.helperReadiness", "Action Authority", "actionAuthoritySuspended", "helperRuntime.actionAuthority", "safety.supervisorStatus", "safety.heartbeatCount", "Sidecar Failure", "Sidecar Recovery", "recoveryRequired", "lastSidecarFailure", "automaticRestart"]) {
   if (!client.includes(token)) {
     throw new Error(`Observer client missing ${token}`);
   }
