@@ -251,6 +251,7 @@ export function createPlanBuilder(deps) {
     fetchJson,
     sessionManagerUrl,
     buildOperatorState,
+    tasks,
   });
   const {
     buildPhase3Plan,

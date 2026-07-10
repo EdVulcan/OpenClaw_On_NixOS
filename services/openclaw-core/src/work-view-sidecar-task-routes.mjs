@@ -216,11 +216,13 @@ function sidecarTaskIdFromStartProbePath(pathname) {
   return pathname.slice(prefix.length, -suffix.length);
 }
 
-function buildSidecarStartProbeReadback({ task, approval, status, reason }) {
+function buildSidecarStartProbeReadback({ task, approval, status, reason, generatedAt = new Date().toISOString() }) {
   return {
     status,
     reason,
+    generatedAt,
     taskId: task.id,
+    approvalId: approval?.id ?? task.approval?.requestId ?? null,
     approvalStatus: approval?.status ?? task.approval?.status ?? "missing",
     execution: {
       processStarted: false,
@@ -234,6 +236,33 @@ function buildSidecarStartProbeReadback({ task, approval, status, reason }) {
   };
 }
 
+async function recordSidecarStartProbeReadback({
+  mode,
+  task,
+  readback,
+  taskManager,
+  serialiseTask,
+  publishEvent,
+}) {
+  const record = {
+    mode,
+    route: `/work-view/trusted-sidecar/lifecycle-tasks/${task.id}/start-probe`,
+    ...readback,
+  };
+  task.workViewTrustedSidecarLifecycle = {
+    ...(task.workViewTrustedSidecarLifecycle ?? {}),
+    execution: record,
+  };
+  const updatedTask = taskManager.appendTaskPhase(task, `trusted_sidecar_start_probe_${readback.status}`, {
+    workViewTrustedSidecarLifecycle: {
+      mode,
+      readback: record,
+    },
+  });
+  await publishEvent(createEventName("task.phase_changed"), { task: serialiseTask(updatedTask) });
+  return { record, task: updatedTask };
+}
+
 async function handleSidecarStartProbe({
   res,
   requestUrl,
@@ -241,6 +270,7 @@ async function handleSidecarStartProbe({
   taskManager,
   serialiseTask,
   serialiseApproval,
+  publishEvent,
 }) {
   const taskId = sidecarTaskIdFromStartProbePath(requestUrl.pathname);
   if (!taskId) {
@@ -255,31 +285,49 @@ async function handleSidecarStartProbe({
 
   const approval = task.approval?.requestId ? state.approvals.get(task.approval.requestId) : null;
   if (approval?.status !== "approved") {
+    const readback = buildSidecarStartProbeReadback({
+      task,
+      approval,
+      status: "blocked_before_approval",
+      reason: "approval_required_before_sidecar_start_probe",
+    });
+    const recorded = await recordSidecarStartProbeReadback({
+      mode: "trusted-sidecar-start-probe-blocked",
+      task,
+      readback,
+      taskManager,
+      serialiseTask,
+      publishEvent,
+    });
     sendJson(res, 409, {
       ok: false,
       mode: "trusted-sidecar-start-probe-blocked",
-      readback: buildSidecarStartProbeReadback({
-        task,
-        approval,
-        status: "blocked_before_approval",
-        reason: "approval_required_before_sidecar_start_probe",
-      }),
-      task: serialiseTask(task),
+      readback: recorded.record,
+      task: serialiseTask(recorded.task),
       approval: approval ? serialiseApproval(approval) : null,
     });
     return true;
   }
 
+  const readback = buildSidecarStartProbeReadback({
+    task,
+    approval,
+    status: "deferred_after_approval",
+    reason: "sidecar_process_start_deferred_to_later_slice",
+  });
+  const recorded = await recordSidecarStartProbeReadback({
+    mode: "trusted-sidecar-start-probe-deferred-after-approval",
+    task,
+    readback,
+    taskManager,
+    serialiseTask,
+    publishEvent,
+  });
   sendJson(res, 200, {
     ok: true,
     mode: "trusted-sidecar-start-probe-deferred-after-approval",
-    readback: buildSidecarStartProbeReadback({
-      task,
-      approval,
-      status: "deferred_after_approval",
-      reason: "sidecar_process_start_deferred_to_later_slice",
-    }),
-    task: serialiseTask(task),
+    readback: recorded.record,
+    task: serialiseTask(recorded.task),
     approval: serialiseApproval(approval),
   });
   return true;
@@ -306,6 +354,7 @@ export async function handleWorkViewSidecarTaskRoute({
     taskManager,
     serialiseTask,
     serialiseApproval,
+    publishEvent,
   })) {
     return true;
   }

@@ -18,6 +18,7 @@ export function createPhase3WorkViewBuilders(deps) {
     fetchJson,
     sessionManagerUrl,
     buildOperatorState,
+    tasks = new Map(),
   } = deps;
 
   async function readSessionWorkViewState() {
@@ -36,6 +37,59 @@ export function createPhase3WorkViewBuilders(deps) {
         workView: null,
       };
     }
+  }
+
+  function buildLatestSidecarLifecycleReadback() {
+    const latestTask = [...tasks.values()]
+      .filter((task) => task?.type === "work_view_trusted_sidecar_lifecycle")
+      .sort((left, right) => Date.parse(right.updatedAt ?? right.createdAt) - Date.parse(left.updatedAt ?? left.createdAt))[0] ?? null;
+    if (!latestTask) {
+      return {
+        present: false,
+        taskId: null,
+        approvalId: null,
+        approvalStatus: null,
+        latestProbe: null,
+        safety: {
+          processStarted: false,
+          processStartEnabled: false,
+          rootRequired: false,
+          systemDaemonRequired: false,
+          desktopWideCapture: false,
+          hostMutation: false,
+          providerEgress: false,
+        },
+      };
+    }
+
+    const lifecycle = latestTask.workViewTrustedSidecarLifecycle ?? {};
+    const latestProbe = lifecycle.execution ?? null;
+    const execution = latestProbe?.execution ?? lifecycle.governance ?? {};
+    return {
+      present: true,
+      taskId: latestTask.id,
+      taskStatus: latestTask.status,
+      executionPhase: latestTask.executionPhase ?? null,
+      approvalId: latestTask.approval?.requestId ?? latestProbe?.approvalId ?? null,
+      approvalStatus: latestTask.approval?.status ?? latestProbe?.approvalStatus ?? null,
+      latestProbe: latestProbe ? {
+        mode: latestProbe.mode ?? null,
+        status: latestProbe.status ?? null,
+        reason: latestProbe.reason ?? null,
+        generatedAt: latestProbe.generatedAt ?? null,
+        route: latestProbe.route ?? null,
+        approvalStatus: latestProbe.approvalStatus ?? null,
+      } : null,
+      safety: {
+        processStarted: Boolean(execution.processStarted),
+        processStartEnabled: Boolean(execution.processStartEnabled),
+        rootRequired: Boolean(execution.rootRequired),
+        systemDaemonRequired: Boolean(execution.systemDaemonRequired),
+        desktopWideCapture: Boolean(execution.desktopWideCapture),
+        hostMutation: Boolean(execution.hostMutation),
+        providerEgress: Boolean(execution.providerEgress),
+      },
+    };
   }
 
   async function buildPhase3Plan() {
@@ -203,6 +257,7 @@ export function createPhase3WorkViewBuilders(deps) {
   async function buildPhase3OperatorInterruptControls() {
     const background = await buildPhase3BackgroundWorkView();
     const operator = buildOperatorState();
+    const sidecarLifecycle = buildLatestSidecarLifecycleReadback();
     const controls = [
       { id: "pause", endpoint: "/control/pause", available: true, effect: "pause current active task" },
       { id: "resume", endpoint: "/control/resume", available: true, effect: "resume a paused task as queued work" },
@@ -228,6 +283,18 @@ export function createPhase3WorkViewBuilders(deps) {
         passed: Boolean(operator) && operator.policy?.respectsPause === true,
         evidence: operator.status,
       },
+      {
+        id: "trusted-sidecar-lifecycle-readback-safe",
+        label: "Trusted sidecar lifecycle readback remains approval-gated and non-executing",
+        passed: sidecarLifecycle.safety.processStarted === false
+          && sidecarLifecycle.safety.processStartEnabled === false
+          && sidecarLifecycle.safety.rootRequired === false
+          && sidecarLifecycle.safety.systemDaemonRequired === false
+          && sidecarLifecycle.safety.desktopWideCapture === false
+          && sidecarLifecycle.safety.hostMutation === false
+          && sidecarLifecycle.safety.providerEgress === false,
+        evidence: sidecarLifecycle.latestProbe?.status ?? sidecarLifecycle.approvalStatus ?? "no_sidecar_lifecycle_task",
+      },
     ];
     const passed = checks.filter((check) => check.passed).length;
 
@@ -244,6 +311,7 @@ export function createPhase3WorkViewBuilders(deps) {
       governance: phase3ReadOnlyGovernance(),
       controls,
       operator,
+      sidecarLifecycle,
       checks,
       summary: {
         ready: passed === checks.length,
@@ -252,10 +320,14 @@ export function createPhase3WorkViewBuilders(deps) {
         completionPercent: Math.round((passed / checks.length) * 100),
         takeoverSupported: true,
         hiddenAutomation: false,
+        sidecarLifecycleTaskId: sidecarLifecycle.taskId,
+        sidecarLifecycleApprovalStatus: sidecarLifecycle.approvalStatus,
+        sidecarStartProbeStatus: sidecarLifecycle.latestProbe?.status ?? null,
+        sidecarProcessStarted: sidecarLifecycle.safety.processStarted,
       },
       next: {
         recommendedSlice: "openclaw-phase-3-completion-readiness",
-        boundary: "summarize Phase 3 readiness before final exit; do not add more controls",
+        boundary: "summarize Phase 3 readiness before final exit; keep trusted sidecar process start deferred",
       },
     };
   }

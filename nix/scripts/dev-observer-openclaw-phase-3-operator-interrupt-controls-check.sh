@@ -26,7 +26,7 @@ rm -f "$OPENCLAW_CORE_STATE_FILE" "$OPENCLAW_CORE_STATE_FILE.tmp" "$OPENCLAW_SYS
 rm -rf "$LEDGER_DIR"
 
 cleanup() {
-  rm -f "${HTML_FILE:-}" "${CLIENT_FILE:-}" "${CONTROLS_FILE:-}" "${START_PROBE_FILE:-}" "${APPROVED_START_PROBE_FILE:-}"
+  rm -f "${HTML_FILE:-}" "${CLIENT_FILE:-}" "${CONTROLS_FILE:-}" "${START_PROBE_FILE:-}" "${APPROVED_START_PROBE_FILE:-}" "${CONTROLS_AFTER_PROBE_FILE:-}"
   "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -49,6 +49,7 @@ SIDECAR_TASK_ID="$(node -e 'const data = JSON.parse(process.argv[1]); process.st
 SIDECAR_APPROVAL_ID="$(node -e 'const data = JSON.parse(process.argv[1]); process.stdout.write(data.approval.id)' "$SIDECAR_TASK")"
 START_PROBE_FILE="$(mktemp)"
 APPROVED_START_PROBE_FILE="$(mktemp)"
+CONTROLS_AFTER_PROBE_FILE="$(mktemp)"
 START_PROBE_STATUS="$(curl --silent --output "$START_PROBE_FILE" --write-out "%{http_code}" \
   -X POST "$CORE_URL/work-view/trusted-sidecar/lifecycle-tasks/$SIDECAR_TASK_ID/start-probe" \
   -H 'content-type: application/json' \
@@ -60,8 +61,9 @@ APPROVED_START_PROBE_STATUS="$(curl --silent --output "$APPROVED_START_PROBE_FIL
   -X POST "$CORE_URL/work-view/trusted-sidecar/lifecycle-tasks/$SIDECAR_TASK_ID/start-probe" \
   -H 'content-type: application/json' \
   --data '{}')"
+curl --silent --fail "$CORE_URL/phase-3/operator-interrupt-controls" > "$CONTROLS_AFTER_PROBE_FILE"
 
-node - <<'EOF' "$HTML_FILE" "$CLIENT_FILE" "$CONTROLS_FILE" "$SIDECAR_TASK" "$START_PROBE_STATUS" "$START_PROBE_FILE" "$APPROVED_SIDECAR" "$APPROVED_START_PROBE_STATUS" "$APPROVED_START_PROBE_FILE"
+node - <<'EOF' "$HTML_FILE" "$CLIENT_FILE" "$CONTROLS_FILE" "$SIDECAR_TASK" "$START_PROBE_STATUS" "$START_PROBE_FILE" "$APPROVED_SIDECAR" "$APPROVED_START_PROBE_STATUS" "$APPROVED_START_PROBE_FILE" "$CONTROLS_AFTER_PROBE_FILE"
 const fs = require("node:fs");
 const html = fs.readFileSync(process.argv[2], "utf8");
 const client = fs.readFileSync(process.argv[3], "utf8");
@@ -72,13 +74,14 @@ const startProbe = JSON.parse(fs.readFileSync(process.argv[7], "utf8"));
 const approvedSidecar = JSON.parse(process.argv[8]);
 const approvedStartProbeStatus = process.argv[9];
 const approvedStartProbe = JSON.parse(fs.readFileSync(process.argv[10], "utf8"));
+const controlsAfterProbe = JSON.parse(fs.readFileSync(process.argv[11], "utf8"));
 
 for (const token of ["Phase 3 Operator Interrupt Controls", "phase3-operator-interrupt-controls-panel", "phase3-controls-takeover", "create-trusted-sidecar-lifecycle-task-button"]) {
   if (!html.includes(token)) {
     throw new Error(`Observer HTML missing ${token}`);
   }
 }
-for (const token of ["/phase-3/operator-interrupt-controls", "refreshPhase3OperatorInterruptControls", "openclaw-phase-3-operator-interrupt-controls-v0", "/control/takeover", "/work-view/trusted-sidecar/lifecycle-tasks", "createTrustedSidecarLifecycleTask", "workViewRecoveryAction", "trustedSession.helperReadiness"]) {
+for (const token of ["/phase-3/operator-interrupt-controls", "refreshPhase3OperatorInterruptControls", "openclaw-phase-3-operator-interrupt-controls-v0", "/control/takeover", "/work-view/trusted-sidecar/lifecycle-tasks", "createTrustedSidecarLifecycleTask", "sidecarLifecycle", "latestProbe", "workViewRecoveryAction", "trustedSession.helperReadiness"]) {
   if (!client.includes(token)) {
     throw new Error(`Observer client missing ${token}`);
   }
@@ -124,6 +127,19 @@ if (approvedStartProbeStatus !== "200"
   || approvedStartProbe.readback?.execution?.providerEgress !== false) {
   throw new Error(`Observer approved sidecar start probe should remain deferred without execution: ${approvedStartProbeStatus} ${JSON.stringify(approvedStartProbe)}`);
 }
+if (!approvedStartProbe.task?.workViewTrustedSidecarLifecycle?.execution
+  || approvedStartProbe.task.workViewTrustedSidecarLifecycle.execution.status !== "deferred_after_approval"
+  || approvedStartProbe.task.workViewTrustedSidecarLifecycle.execution.execution?.processStarted !== false) {
+  throw new Error(`Observer approved sidecar start probe should be recorded on the task: ${JSON.stringify(approvedStartProbe.task?.workViewTrustedSidecarLifecycle)}`);
+}
+if (controlsAfterProbe.sidecarLifecycle?.taskId !== sidecarTask.task.id
+  || controlsAfterProbe.sidecarLifecycle?.approvalStatus !== "approved"
+  || controlsAfterProbe.sidecarLifecycle?.latestProbe?.status !== "deferred_after_approval"
+  || controlsAfterProbe.sidecarLifecycle?.safety?.processStarted !== false
+  || controlsAfterProbe.summary?.sidecarStartProbeStatus !== "deferred_after_approval"
+  || controlsAfterProbe.summary?.sidecarProcessStarted !== false) {
+  throw new Error(`Observer controls should consolidate sidecar lifecycle readback: ${JSON.stringify(controlsAfterProbe.sidecarLifecycle)}`);
+}
 
 console.log(JSON.stringify({
   observerOpenClawPhase3OperatorInterruptControls: {
@@ -134,6 +150,7 @@ console.log(JSON.stringify({
     approval: sidecarTask.approval.id,
     startProbeBeforeApproval: startProbe.readback.status,
     startProbeAfterApproval: approvedStartProbe.readback.status,
+    controlsSidecarProbe: controlsAfterProbe.sidecarLifecycle.latestProbe.status,
   },
 }, null, 2));
 EOF

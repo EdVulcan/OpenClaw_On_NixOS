@@ -79,7 +79,10 @@ desktop-wide capture is used, no host mutation occurs, and no provider egress is
 performed. After the operator approves the lifecycle task, the same probe
 returns `deferred_after_approval` while preserving the same non-execution flags.
 This proves the approval bridge and deferred execution boundary without
-starting a helper process.
+starting a helper process. Each probe is recorded on the existing lifecycle task
+and consolidated into `/phase-3/operator-interrupt-controls`, so the Observer
+Phase 3 controls panel can show the latest task, approval, probe status, and
+non-execution flags without a new evidence endpoint.
 
 Every work-view prepare/reveal/hide call now records `lastOperatorAction` in the
 existing work-view state. The record includes:
@@ -123,6 +126,7 @@ GET /session/state
 GET /browser/capture
 GET /screen/current
 GET /phase-3/background-work-view
+GET /phase-3/operator-interrupt-controls
 POST /work-view/trusted-sidecar/lifecycle-tasks
 POST /work-view/trusted-sidecar/lifecycle-tasks/:taskId/start-probe
 Observer work-view and screen panels
@@ -197,8 +201,7 @@ runtime owner is selected:
 AI work-view trusted sidecar Observer recovery/readback consolidation
 ```
 
-It should reuse existing `/work-view/state`, task phase attachments, and Phase 3
-Observer panels to show the latest lifecycle task, approval status, start-probe
-readback, and recovery recommendation in one operator-visible place. It should
-not add another readiness-only milestone. Actual process start, installation,
-root/system daemon work, and desktop-wide capture remain deferred.
+It should connect this readback to the complete engineering loop only when there
+is a governed runtime owner for a user-space helper. It should not add another
+readiness-only milestone. Actual process start, installation, root/system daemon
+work, and desktop-wide capture remain deferred.

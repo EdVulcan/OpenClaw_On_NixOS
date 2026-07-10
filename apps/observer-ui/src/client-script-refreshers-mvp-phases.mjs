@@ -313,11 +313,15 @@ async function refreshPhase3OperatorInterruptControls() {
     phase3ControlsReady.textContent = String(Boolean(summary.ready));
     phase3ControlsTakeover.textContent = String(Boolean(summary.takeoverSupported));
     phase3ControlsHiddenAutomation.textContent = String(Boolean(summary.hiddenAutomation));
+    const sidecarLifecycle = data.sidecarLifecycle ?? {};
+    const latestProbe = sidecarLifecycle.latestProbe ?? {};
+    const safety = sidecarLifecycle.safety ?? {};
     phase3ControlsJson.textContent = [
       "Registry: " + (data.registry ?? "openclaw-phase-3-operator-interrupt-controls-v0"),
       "Mode: " + (data.mode ?? "unknown") + " status=" + (data.status ?? "unknown"),
       "Controls: " + ((data.controls ?? []).map((control) => control.id + " " + control.endpoint).join(" | ") || "none"),
       "Operator: status=" + (data.operator?.status ?? "unknown") + " blocked=" + Boolean(data.operator?.blocked),
+      "Sidecar: task=" + (sidecarLifecycle.taskId ?? "none") + " approval=" + (sidecarLifecycle.approvalStatus ?? "none") + " probe=" + (latestProbe.status ?? "none") + " processStarted=" + Boolean(safety.processStarted),
       "Next: " + (data.next?.recommendedSlice ?? "unknown"),
     ].join("\\n");
   } catch {

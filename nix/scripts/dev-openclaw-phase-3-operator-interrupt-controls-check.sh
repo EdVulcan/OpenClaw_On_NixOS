@@ -25,7 +25,7 @@ rm -f "$OPENCLAW_CORE_STATE_FILE" "$OPENCLAW_CORE_STATE_FILE.tmp" "$OPENCLAW_SYS
 rm -rf "$LEDGER_DIR"
 
 cleanup() {
-  rm -f "${CONTROLS_FILE:-}" "${START_PROBE_FILE:-}" "${APPROVED_START_PROBE_FILE:-}"
+  rm -f "${CONTROLS_FILE:-}" "${START_PROBE_FILE:-}" "${APPROVED_START_PROBE_FILE:-}" "${CONTROLS_AFTER_PROBE_FILE:-}"
   "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -50,6 +50,7 @@ sidecar_approval_id="$(node -e 'const data = JSON.parse(process.argv[1]); proces
 CONTROLS_FILE="$(mktemp)"
 START_PROBE_FILE="$(mktemp)"
 APPROVED_START_PROBE_FILE="$(mktemp)"
+CONTROLS_AFTER_PROBE_FILE="$(mktemp)"
 curl --silent --fail "$CORE_URL/phase-3/operator-interrupt-controls" > "$CONTROLS_FILE"
 start_probe_status="$(curl --silent --output "$START_PROBE_FILE" --write-out "%{http_code}" \
   -X POST "$CORE_URL/work-view/trusted-sidecar/lifecycle-tasks/$sidecar_task_id/start-probe" \
@@ -60,8 +61,9 @@ approved_start_probe_status="$(curl --silent --output "$APPROVED_START_PROBE_FIL
   -X POST "$CORE_URL/work-view/trusted-sidecar/lifecycle-tasks/$sidecar_task_id/start-probe" \
   -H 'content-type: application/json' \
   --data '{}')"
+curl --silent --fail "$CORE_URL/phase-3/operator-interrupt-controls" > "$CONTROLS_AFTER_PROBE_FILE"
 
-node - <<'EOF' "$CONTROLS_FILE" "$takeover" "$sidecar_task" "$start_probe_status" "$START_PROBE_FILE" "$approved_sidecar" "$approved_start_probe_status" "$APPROVED_START_PROBE_FILE"
+node - <<'EOF' "$CONTROLS_FILE" "$takeover" "$sidecar_task" "$start_probe_status" "$START_PROBE_FILE" "$approved_sidecar" "$approved_start_probe_status" "$APPROVED_START_PROBE_FILE" "$CONTROLS_AFTER_PROBE_FILE"
 const fs = require("node:fs");
 const controls = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
 const takeover = JSON.parse(process.argv[3]);
@@ -71,6 +73,7 @@ const startProbe = JSON.parse(fs.readFileSync(process.argv[6], "utf8"));
 const approvedSidecar = JSON.parse(process.argv[7]);
 const approvedStartProbeStatus = process.argv[8];
 const approvedStartProbe = JSON.parse(fs.readFileSync(process.argv[9], "utf8"));
+const controlsAfterProbe = JSON.parse(fs.readFileSync(process.argv[10], "utf8"));
 
 if (!controls.ok
   || controls.registry !== "openclaw-phase-3-operator-interrupt-controls-v0"
@@ -132,6 +135,19 @@ if (approvedStartProbeStatus !== "200"
   || approvedStartProbe.readback?.execution?.providerEgress !== false) {
   throw new Error(`approved sidecar start probe should remain deferred without execution: ${approvedStartProbeStatus} ${JSON.stringify(approvedStartProbe)}`);
 }
+if (!approvedStartProbe.task?.workViewTrustedSidecarLifecycle?.execution
+  || approvedStartProbe.task.workViewTrustedSidecarLifecycle.execution.status !== "deferred_after_approval"
+  || approvedStartProbe.task.workViewTrustedSidecarLifecycle.execution.execution?.processStarted !== false) {
+  throw new Error(`approved sidecar start probe should be recorded on the task: ${JSON.stringify(approvedStartProbe.task?.workViewTrustedSidecarLifecycle)}`);
+}
+if (controlsAfterProbe.sidecarLifecycle?.taskId !== sidecarTask.task.id
+  || controlsAfterProbe.sidecarLifecycle?.approvalStatus !== "approved"
+  || controlsAfterProbe.sidecarLifecycle?.latestProbe?.status !== "deferred_after_approval"
+  || controlsAfterProbe.sidecarLifecycle?.safety?.processStarted !== false
+  || controlsAfterProbe.summary?.sidecarStartProbeStatus !== "deferred_after_approval"
+  || controlsAfterProbe.summary?.sidecarProcessStarted !== false) {
+  throw new Error(`operator controls should consolidate sidecar lifecycle readback: ${JSON.stringify(controlsAfterProbe.sidecarLifecycle)}`);
+}
 
 console.log(JSON.stringify({
   openclawPhase3OperatorInterruptControls: {
@@ -143,6 +159,7 @@ console.log(JSON.stringify({
     approval: sidecarTask.approval.id,
     startProbeBeforeApproval: startProbe.readback.status,
     startProbeAfterApproval: approvedStartProbe.readback.status,
+    controlsSidecarProbe: controlsAfterProbe.sidecarLifecycle.latestProbe.status,
   },
 }, null, 2));
 EOF
