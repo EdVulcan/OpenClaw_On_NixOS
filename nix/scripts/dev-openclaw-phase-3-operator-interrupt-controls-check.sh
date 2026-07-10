@@ -90,7 +90,7 @@ initial_capture_sequence="$(node -e 'const data=JSON.parse(require("node:fs").re
 FRESH_CAPTURE_ACTION_FILE="$(mktemp)"
 curl --silent --fail -X POST "$SCREEN_ACT_URL/act/keyboard/type" \
   -H 'content-type: application/json' --data '{"text":"fresh sidecar capture mediated action"}' > "$FRESH_CAPTURE_ACTION_FILE"
-node -e 'const data=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8")); const mediation=data.action?.mediation??{}; if(data.action?.result!=="executed-browser-runtime" || mediation.accepted!==true || mediation.leaseMatched!==true){throw new Error(`fresh capture action was not mediated: ${JSON.stringify(data)}`);}' "$FRESH_CAPTURE_ACTION_FILE"
+node -e 'const data=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8")); const mediation=data.action?.mediation??{}; if(data.action?.result!=="executed-browser-runtime" || mediation.accepted!==true || mediation.leaseMatched!==true || mediation.transport!=="trusted-sidecar-ipc"){throw new Error(`fresh capture action was not sidecar mediated: ${JSON.stringify(data)}`);}' "$FRESH_CAPTURE_ACTION_FILE"
 CAPTURE_REFRESH_STATE_FILE="$(mktemp)"
 for _ in $(seq 1 40); do
   curl --silent --fail "$SESSION_MANAGER_URL/work-view/state" > "$CAPTURE_REFRESH_STATE_FILE"

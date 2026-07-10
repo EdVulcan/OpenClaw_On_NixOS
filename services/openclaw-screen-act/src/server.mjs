@@ -7,6 +7,7 @@ const host = process.env.OPENCLAW_SCREEN_ACT_HOST ?? "127.0.0.1";
 const port = Number.parseInt(process.env.OPENCLAW_SCREEN_ACT_PORT ?? "4105", 10);
 const eventHubUrl = process.env.OPENCLAW_EVENT_HUB_URL ?? "http://127.0.0.1:4101";
 const screenSenseUrl = process.env.OPENCLAW_SCREEN_SENSE_URL ?? "http://127.0.0.1:4104";
+const sessionManagerUrl = process.env.OPENCLAW_SESSION_MANAGER_URL ?? "http://127.0.0.1:4102";
 const browserRuntimeUrl = process.env.OPENCLAW_BROWSER_RUNTIME_URL ?? "http://127.0.0.1:4103";
 const screenWaitMs = Number.parseInt(process.env.OPENCLAW_SCREEN_ACT_WAIT_MS ?? "1500", 10);
 const screenPollMs = Number.parseInt(process.env.OPENCLAW_SCREEN_ACT_POLL_MS ?? "100", 10);
@@ -109,13 +110,19 @@ async function executeBrowserAction(kind, params, screen) {
     const payload = kind === "mouse.click"
       ? { x: params.x, y: params.y }
       : { text: params.text ?? "" };
-    const response = await fetch(`${browserRuntimeUrl}${endpoint}`, {
+    const sidecarActive = Boolean(
+      screen?.trustedSession?.helperRuntime?.sidecar?.taskId
+      && screen.trustedSession.helperRuntime.sidecar.status === "running"
+    );
+    const targetUrl = sidecarActive
+      ? `${sessionManagerUrl}/work-view/trusted-sidecar/action`
+      : `${browserRuntimeUrl}${endpoint}`;
+    const response = await fetch(targetUrl, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        ...payload,
-        trustedHelperLease: leaseContext.trustedHelperLease,
-      }),
+      body: JSON.stringify(sidecarActive
+        ? { kind, payload, trustedHelperLease: leaseContext.trustedHelperLease }
+        : { ...payload, trustedHelperLease: leaseContext.trustedHelperLease }),
     });
     const data = await response.json().catch(() => null);
     const mediation = data?.mediation ?? {};
@@ -129,6 +136,7 @@ async function executeBrowserAction(kind, params, screen) {
       sessionId: mediation.sessionId ?? screen?.sessionId ?? null,
       leaseId: mediation.leaseId ?? leaseContext.trustedHelperLease?.leaseId ?? null,
       leaseMatched: mediation.leaseMatched === true,
+      transport: data?.transport ?? "browser-runtime-direct",
     };
   } catch (error) {
     return {

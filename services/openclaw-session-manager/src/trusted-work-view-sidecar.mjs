@@ -8,6 +8,7 @@ const captureIntervalMs = Math.max(500, Number.parseInt(process.env.OPENCLAW_SID
 let heartbeatCount = 1;
 let captureSequence = 0;
 let captureInFlight = false;
+let latestCaptureObservation = null;
 
 function send(type, details = {}) {
   if (typeof process.send !== "function") {
@@ -40,8 +41,7 @@ async function observeBrowserCapture() {
     const capture = data.capture ?? {};
     const summary = capture.workViewSummary ?? {};
     captureSequence += 1;
-    send("capture_observation", {
-      observation: {
+    latestCaptureObservation = {
         registry: "openclaw-trusted-work-view-sidecar-capture-observation-v0",
         source: "browser-runtime-loopback",
         sessionId: capture.sessionId ?? data.browser?.sessionId ?? null,
@@ -54,8 +54,8 @@ async function observeBrowserCapture() {
         sequence: captureSequence,
         fullPayloadRetained: false,
         desktopWideCapture: false,
-      },
-    });
+    };
+    send("capture_observation", { observation: latestCaptureObservation });
   } catch (error) {
     send("capture_failed", { reason: error instanceof Error ? error.message : "capture_failed" });
   } finally {
@@ -78,8 +78,50 @@ function stop(reason) {
 process.on("message", (message) => {
   if (message?.type === "shutdown") {
     stop("parent_requested_shutdown");
+  } else if (message?.type === "browser_action") {
+    executeBrowserAction(message);
   }
 });
+
+async function executeBrowserAction(message) {
+  const observedAt = Date.parse(latestCaptureObservation?.observedAt ?? "");
+  const fresh = Number.isFinite(observedAt) && Date.now() - observedAt <= 3_000;
+  if (!fresh || latestCaptureObservation?.sessionId !== sessionId) {
+    send("action_result", {
+      requestId: message.requestId,
+      result: { ok: false, reason: fresh ? "capture_session_mismatch" : "capture_stale" },
+    });
+    return;
+  }
+  const endpoint = message.kind === "keyboard.type"
+    ? "/browser/input"
+    : message.kind === "mouse.click" ? "/browser/click" : null;
+  if (!endpoint) {
+    send("action_result", { requestId: message.requestId, result: { ok: false, reason: "unsupported_action" } });
+    return;
+  }
+  try {
+    const response = await fetch(`${browserRuntimeUrl}${endpoint}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ...message.payload, trustedHelperLease: message.trustedHelperLease }),
+    });
+    const data = await response.json();
+    send("action_result", {
+      requestId: message.requestId,
+      result: {
+        ok: response.ok && data?.ok === true,
+        reason: data?.mediation?.reason ?? data?.error ?? null,
+        mediation: data?.mediation ?? null,
+      },
+    });
+  } catch (error) {
+    send("action_result", {
+      requestId: message.requestId,
+      result: { ok: false, reason: error instanceof Error ? error.message : "browser_action_failed" },
+    });
+  }
+}
 process.on("disconnect", () => process.exit(0));
 process.on("SIGTERM", () => stop("sigterm"));
 process.on("SIGINT", () => stop("sigint"));

@@ -246,9 +246,11 @@ sidecar now continuously refreshes a bounded browser observation over an
 allowlisted loopback-only source, with single-flight polling, sequence, and
 fresh/stale state but no retained full payload. Screen-act now requires a fresh
 same-session sidecar observation alongside the helper lease after sidecar
-lifecycle activation. The next slice should move the final bounded browser
-input/click loopback transport into sidecar IPC while preserving screen-act
-audit. Do not add a readiness-only chain or desktop-wide capture.
+lifecycle activation. Bounded browser input/click now travels through sidecar
+IPC, rechecks capture/session, and returns through screen-act audit. The next
+slice should preserve fail-closed lifecycle recovery intent across
+session-manager restart without automatically resurrecting the child. Do not
+add a readiness-only chain or desktop-wide capture.
 
 ## Identity-Upgrade Alignment
 

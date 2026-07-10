@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 
 const HEARTBEAT_REGISTRY = "openclaw-trusted-work-view-sidecar-heartbeat-v0";
 const SIDECAR_REGISTRY = "openclaw-trusted-work-view-sidecar-supervisor-v0";
@@ -39,6 +40,7 @@ export function createTrustedWorkViewSidecarSupervisor({
   let captureObservation = null;
   let captureFailure = null;
   let captureResolver = null;
+  const pendingActions = new Map();
 
   function clearHeartbeatTimer() {
     if (heartbeatTimer) {
@@ -139,6 +141,12 @@ export function createTrustedWorkViewSidecarSupervisor({
       captureFailure = message.reason ?? "capture_failed";
       captureResolver?.();
       captureResolver = null;
+    } else if (message.type === "action_result") {
+      const pending = pendingActions.get(message.requestId);
+      if (pending) {
+        pendingActions.delete(message.requestId);
+        pending.resolve(message.result ?? { ok: false, reason: "missing_action_result" });
+      }
     }
   }
 
@@ -287,5 +295,25 @@ export function createTrustedWorkViewSidecarSupervisor({
     return snapshot();
   }
 
-  return { start, stop, rebindLease, snapshot };
+  async function executeBrowserAction({ kind, payload, trustedHelperLease } = {}) {
+    if (!child || status !== "running" || captureObservation?.sessionId !== owner?.sessionId) {
+      throw new Error("Trusted work-view sidecar action transport is not ready.");
+    }
+    const requestId = randomUUID();
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        pendingActions.delete(requestId);
+        reject(new Error("Trusted work-view sidecar action timed out."));
+      }, startTimeoutMs);
+      pendingActions.set(requestId, {
+        resolve(result) {
+          clearTimeout(timeout);
+          resolve(result);
+        },
+      });
+      child.send({ type: "browser_action", requestId, kind, payload, trustedHelperLease });
+    });
+  }
+
+  return { start, stop, rebindLease, executeBrowserAction, snapshot };
 }

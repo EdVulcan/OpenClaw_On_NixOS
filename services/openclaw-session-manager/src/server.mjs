@@ -700,6 +700,27 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === "POST" && requestUrl.pathname === "/work-view/trusted-sidecar/action") {
+    try {
+      const body = await readJsonBody(req);
+      const result = await trustedWorkViewSidecarSupervisor.executeBrowserAction({
+        kind: body.kind,
+        payload: body.payload ?? {},
+        trustedHelperLease: body.trustedHelperLease,
+      });
+      sendJson(res, result.ok ? 200 : 409, {
+        ok: result.ok,
+        transport: "trusted-sidecar-ipc",
+        mediation: result.mediation ?? { accepted: false, reason: result.reason },
+        error: result.ok ? null : result.reason,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 409, { ok: false, error: message, transport: "trusted-sidecar-ipc" });
+    }
+    return;
+  }
+
   sendJson(res, 404, { ok: false, error: "Route not found." });
 });
 

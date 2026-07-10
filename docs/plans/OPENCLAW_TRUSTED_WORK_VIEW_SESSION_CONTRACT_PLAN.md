@@ -274,6 +274,14 @@ missing, or cross-session observations block before browser mutation. The
 legacy helper-lease path remains compatible until a sidecar lifecycle is
 activated.
 
+For an active lifecycle, screen-act now sends bounded keyboard-type or click
+envelopes to session-manager, which forwards them over the supervised IPC
+channel. The sidecar rechecks its local capture freshness and session identity,
+then performs the loopback browser-runtime request with the current helper
+lease. Browser-runtime remains the final lease validator, while the resulting
+mediation is returned through the existing screen-act audit event and action
+state. Unsupported hotkey/window-focus actions are not added to this transport.
+
 ## Evidence
 
 Runtime contract builder:
@@ -338,25 +346,26 @@ automatic recovery execution; the contract recommends existing operator actions
 unreviewed endpoint invocation from recommendation payloads
 trusted-lease mediation for keyboard hotkey/window-focus paths that do not yet
 mutate browser-runtime state
-sidecar-owned browser action transport; screen-act currently performs the final
-loopback mutation after checking sidecar freshness
+session-manager restart persistence; sidecar action transport is active but its
+lifecycle intent is not restored after parent restart
 automatic sidecar restart after crash or heartbeat timeout; recovery remains an
 explicit approved operator action
 ```
 
 ## Next Slice
 
-The approved user-space sidecar now owns heartbeat, fail-closed liveness, a
-continuously refreshed bounded loopback browser observation, and the freshness
-gate for existing browser actions. The next Level 2 slice should move the final
-bounded transport into the sidecar:
+The approved user-space sidecar now owns heartbeat, fail-closed liveness,
+continuously refreshed bounded capture, and bounded browser input/click
+transport. The next Level 2 slice should make service restart semantics
+explicit:
 
 ```text
-screen-act approved browser mutation
--> sidecar receives bounded action envelope over IPC
--> sidecar rechecks session and capture freshness
--> loopback browser input/click
--> bounded action result returns through screen-act audit
+session-manager restart
+-> child exits with parent
+-> persisted lifecycle intent reads as recovery_required
+-> action authority remains fail-closed
+-> existing approved task enables explicit restart
+-> no automatic child resurrection
 ```
 
 It should extend the same supervisor, lifecycle task, work-view contract, and
