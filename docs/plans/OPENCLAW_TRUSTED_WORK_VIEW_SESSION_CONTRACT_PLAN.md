@@ -260,6 +260,12 @@ time. It does not retain visible text, recent input, click details, browser
 payloads, screenshots, or desktop-wide data. The bounded observation is carried
 through the existing lifecycle task and Observer readback.
 
+The sidecar refreshes this projection at a bounded one-second interval with a
+single in-flight request. Each observation carries a monotonic sequence and the
+supervisor derives `fresh`, `stale`, or `missing` from a three-second freshness
+budget. The milestone proves a browser update advances the observation sequence
+without retaining the updated input text.
+
 ## Evidence
 
 Runtime contract builder:
@@ -324,8 +330,6 @@ automatic recovery execution; the contract recommends existing operator actions
 unreviewed endpoint invocation from recommendation payloads
 trusted-lease mediation for keyboard hotkey/window-focus paths that do not yet
 mutate browser-runtime state
-continuous sidecar capture refresh and freshness expiry; the current bounded
-observation is taken on approved start
 sidecar-owned browser action transport
 automatic sidecar restart after crash or heartbeat timeout; recovery remains an
 explicit approved operator action
@@ -333,19 +337,19 @@ explicit approved operator action
 
 ## Next Slice
 
-The approved user-space sidecar now owns heartbeat, fail-closed liveness, and
-one bounded loopback browser capture observation. The next Level 2 slice should
-keep that observation current:
+The approved user-space sidecar now owns heartbeat, fail-closed liveness, and a
+continuously refreshed bounded loopback browser observation. The next Level 2
+slice should bind that freshness to the existing action path:
 
 ```text
-browser update
--> sidecar refreshes the bounded observation
--> freshness and stale state become explicit
--> stale capture fails closed for future sidecar-owned actions
--> no desktop-wide capture or polling storm
+screen-act browser mutation
+-> matching helper lease
+-> fresh sidecar capture observation for the same session
+-> browser input/click
+-> stale or missing capture blocks before mutation
 ```
 
 It should extend the same supervisor, lifecycle task, work-view contract, and
 Observer readback rather than add another readiness chain. Root/system daemon
-work, desktop-wide capture, graphics-stack integration, arbitrary input,
+work, desktop-wide capture, graphics-stack integration, broader input,
 automatic restart, and provider egress remain deferred.

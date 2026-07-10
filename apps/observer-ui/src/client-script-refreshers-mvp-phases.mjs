@@ -328,7 +328,7 @@ async function refreshPhase3OperatorInterruptControls() {
       "Controls: " + ((data.controls ?? []).map((control) => control.id + " " + control.endpoint).join(" | ") || "none"),
       "Operator: status=" + (data.operator?.status ?? "unknown") + " blocked=" + Boolean(data.operator?.blocked),
       "Action Authority: " + (summary.actionAuthority ?? helperRuntime.actionAuthority ?? "unknown") + " runtime=" + (helperRuntime.status ?? "unknown") + " suspended=" + Boolean(summary.actionAuthoritySuspended) + " lease=" + (summary.helperLeaseId ?? "none"),
-      "Sidecar: task=" + (sidecarLifecycle.taskId ?? "none") + " approval=" + (sidecarLifecycle.approvalStatus ?? "none") + " lifecycle=" + (latestProbe.status ?? "none") + " supervisor=" + (safety.supervisorStatus ?? "none") + " pid=" + (safety.pid ?? "none") + " heartbeat=" + (safety.heartbeatCount ?? 0) + " processStarted=" + Boolean(safety.processStarted),
+      "Sidecar: task=" + (sidecarLifecycle.taskId ?? "none") + " approval=" + (sidecarLifecycle.approvalStatus ?? "none") + " lifecycle=" + (latestProbe.status ?? "none") + " supervisor=" + (safety.supervisorStatus ?? "none") + " pid=" + (safety.pid ?? "none") + " heartbeat=" + (safety.heartbeatCount ?? 0) + " capture=" + (safety.captureFreshness ?? "missing") + " processStarted=" + Boolean(safety.processStarted),
       "Next: " + (data.next?.recommendedSlice ?? "unknown"),
     ].join("\\n");
   } catch {

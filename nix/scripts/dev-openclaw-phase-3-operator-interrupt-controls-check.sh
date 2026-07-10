@@ -30,6 +30,7 @@ cleanup() {
     "${SUSPENDED_STATE_FILE:-}" "${OLD_BROWSER_ACTION_FILE:-}" "${RESUMED_STATE_FILE:-}" "${RESUMED_BROWSER_ACTION_FILE:-}"
   rm -f "${STOP_SIDECAR_FILE:-}" "${CONTROLS_AFTER_STOP_FILE:-}"
   rm -f "${SIDECAR_FAILURE_STATE_FILE:-}" "${SIDECAR_FAILURE_ACTION_FILE:-}" "${RESTART_SIDECAR_FILE:-}" "${RESTARTED_STATE_FILE:-}"
+  rm -f "${CAPTURE_REFRESH_STATE_FILE:-}"
   "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -83,6 +84,17 @@ approved_start_probe_status="$(curl --silent --output "$APPROVED_START_PROBE_FIL
   -H 'content-type: application/json' \
   --data '{}')"
 curl --silent --fail "$CORE_URL/phase-3/operator-interrupt-controls" > "$CONTROLS_AFTER_PROBE_FILE"
+initial_capture_sequence="$(node -e 'const data=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8")); process.stdout.write(String(data.readback.execution.captureObservation.sequence));' "$APPROVED_START_PROBE_FILE")"
+curl --silent --fail -X POST "$BROWSER_RUNTIME_URL/browser/input" \
+  -H 'content-type: application/json' --data "$resumed_browser_action_body" >/dev/null
+CAPTURE_REFRESH_STATE_FILE="$(mktemp)"
+for _ in $(seq 1 40); do
+  curl --silent --fail "$SESSION_MANAGER_URL/work-view/state" > "$CAPTURE_REFRESH_STATE_FILE"
+  if node -e 'const data=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8")); process.exit((data.workView?.helperRuntime?.sidecar?.captureObservation?.sequence??0)>Number(process.argv[2]) ? 0 : 1);' "$CAPTURE_REFRESH_STATE_FILE" "$initial_capture_sequence"; then
+    break
+  fi
+  sleep 0.1
+done
 sidecar_pid="$(node -e 'const data=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8")); process.stdout.write(String(data.readback.execution.pid));' "$APPROVED_START_PROBE_FILE")"
 kill -TERM "$sidecar_pid"
 SIDECAR_FAILURE_STATE_FILE="$(mktemp)"
@@ -110,7 +122,7 @@ curl --silent --fail \
   --data '{}' > "$STOP_SIDECAR_FILE"
 curl --silent --fail "$CORE_URL/phase-3/operator-interrupt-controls" > "$CONTROLS_AFTER_STOP_FILE"
 
-node - <<'EOF' "$CONTROLS_FILE" "$takeover" "$sidecar_task" "$start_probe_status" "$START_PROBE_FILE" "$approved_sidecar" "$approved_start_probe_status" "$APPROVED_START_PROBE_FILE" "$CONTROLS_AFTER_PROBE_FILE" "$SUSPENDED_STATE_FILE" "$old_browser_action_status" "$OLD_BROWSER_ACTION_FILE" "$resume" "$RESUMED_STATE_FILE" "$RESUMED_BROWSER_ACTION_FILE" "$STOP_SIDECAR_FILE" "$CONTROLS_AFTER_STOP_FILE" "$SIDECAR_FAILURE_STATE_FILE" "$failure_action_status" "$SIDECAR_FAILURE_ACTION_FILE" "$RESTART_SIDECAR_FILE" "$RESTARTED_STATE_FILE"
+node - <<'EOF' "$CONTROLS_FILE" "$takeover" "$sidecar_task" "$start_probe_status" "$START_PROBE_FILE" "$approved_sidecar" "$approved_start_probe_status" "$APPROVED_START_PROBE_FILE" "$CONTROLS_AFTER_PROBE_FILE" "$SUSPENDED_STATE_FILE" "$old_browser_action_status" "$OLD_BROWSER_ACTION_FILE" "$resume" "$RESUMED_STATE_FILE" "$RESUMED_BROWSER_ACTION_FILE" "$STOP_SIDECAR_FILE" "$CONTROLS_AFTER_STOP_FILE" "$SIDECAR_FAILURE_STATE_FILE" "$failure_action_status" "$SIDECAR_FAILURE_ACTION_FILE" "$RESTART_SIDECAR_FILE" "$RESTARTED_STATE_FILE" "$CAPTURE_REFRESH_STATE_FILE"
 const fs = require("node:fs");
 const controls = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
 const takeover = JSON.parse(process.argv[3]);
@@ -134,6 +146,7 @@ const failureActionStatus = process.argv[20];
 const failureAction = JSON.parse(fs.readFileSync(process.argv[21], "utf8"));
 const restartedSidecar = JSON.parse(fs.readFileSync(process.argv[22], "utf8"));
 const restartedState = JSON.parse(fs.readFileSync(process.argv[23], "utf8"));
+const captureRefreshState = JSON.parse(fs.readFileSync(process.argv[24], "utf8"));
 
 if (!controls.ok
   || controls.registry !== "openclaw-phase-3-operator-interrupt-controls-v0"
@@ -234,12 +247,19 @@ if (approvedStartProbeStatus !== "200"
   || approvedStartProbe.readback?.execution?.captureObservation?.activeUrl !== "https://example.com/phase-3-controls"
   || approvedStartProbe.readback?.execution?.captureObservation?.fullPayloadRetained !== false
   || approvedStartProbe.readback?.execution?.captureObservation?.desktopWideCapture !== false
+  || approvedStartProbe.readback?.execution?.captureFreshness !== "fresh"
   || approvedStartProbe.readback?.execution?.rootRequired !== false
   || approvedStartProbe.readback?.execution?.systemDaemonRequired !== false
   || approvedStartProbe.readback?.execution?.desktopWideCapture !== false
   || approvedStartProbe.readback?.execution?.hostMutation !== false
   || approvedStartProbe.readback?.execution?.providerEgress !== false) {
   throw new Error(`approved sidecar start probe should run one bounded heartbeat process: ${approvedStartProbeStatus} ${JSON.stringify(approvedStartProbe)}`);
+}
+const refreshedCapture = captureRefreshState.workView?.helperRuntime?.sidecar ?? {};
+if (refreshedCapture.captureFreshness !== "fresh"
+  || refreshedCapture.captureObservation?.sequence <= approvedStartProbe.readback.execution.captureObservation.sequence
+  || refreshedCapture.captureObservation?.fullPayloadRetained !== false) {
+  throw new Error(`sidecar should refresh bounded capture without retaining full payload: ${JSON.stringify(refreshedCapture)}`);
 }
 if (!approvedStartProbe.task?.workViewTrustedSidecarLifecycle?.execution
   || approvedStartProbe.task.workViewTrustedSidecarLifecycle.execution.status !== "running_after_approval"
@@ -304,6 +324,7 @@ console.log(JSON.stringify({
     startProbeAfterApproval: approvedStartProbe.readback.status,
     sidecarPid: approvedStartProbe.readback.execution.pid,
     heartbeatCount: approvedStartProbe.readback.execution.heartbeatCount,
+    captureRefreshSequence: refreshedCapture.captureObservation.sequence,
     controlsSidecarProbe: controlsAfterProbe.sidecarLifecycle.latestProbe.status,
     failClosedReason: failedRuntime.suspensionReason,
     restartPid: restartedSidecar.readback.execution.pid,

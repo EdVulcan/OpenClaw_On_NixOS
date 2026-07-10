@@ -16,6 +16,8 @@ export function createTrustedWorkViewSidecarSupervisor({
   spawnProcess = spawn,
   now = () => new Date().toISOString(),
   heartbeatIntervalMs = 250,
+  captureIntervalMs = 1_000,
+  captureStaleAfterMs = 3_000,
   heartbeatTimeoutMs = 1_500,
   startTimeoutMs = 2_000,
   stopTimeoutMs = 1_000,
@@ -65,6 +67,13 @@ export function createTrustedWorkViewSidecarSupervisor({
   }
 
   function snapshot() {
+    const captureObservedAt = captureObservation?.observedAt ?? null;
+    const captureAgeMs = captureObservedAt
+      ? Math.max(0, Date.parse(now()) - Date.parse(captureObservedAt))
+      : null;
+    const captureFreshness = captureAgeMs === null
+      ? "missing"
+      : captureAgeMs <= captureStaleAfterMs ? "fresh" : "stale";
     return {
       registry: SIDECAR_REGISTRY,
       status,
@@ -84,6 +93,9 @@ export function createTrustedWorkViewSidecarSupervisor({
       degradedReason,
       captureObservation,
       captureFailure,
+      captureFreshness,
+      captureAgeMs,
+      captureStaleAfterMs,
       mode: "supervised_user_space_ipc_heartbeat",
       sessionManagerOwned: true,
       boundedProcess: true,
@@ -176,6 +188,7 @@ export function createTrustedWorkViewSidecarSupervisor({
         OPENCLAW_SIDECAR_SESSION_ID: nextOwner.sessionId,
         OPENCLAW_SIDECAR_WORK_VIEW_ID: nextOwner.workViewId,
         OPENCLAW_SIDECAR_HEARTBEAT_INTERVAL_MS: String(heartbeatIntervalMs),
+        OPENCLAW_SIDECAR_CAPTURE_INTERVAL_MS: String(captureIntervalMs),
         ...(nextOwner.browserRuntimeUrl
           ? { OPENCLAW_SIDECAR_BROWSER_RUNTIME_URL: nextOwner.browserRuntimeUrl }
           : {}),

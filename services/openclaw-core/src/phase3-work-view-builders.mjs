@@ -99,6 +99,7 @@ export function createPhase3WorkViewBuilders(deps) {
         networkAccessRequired: Boolean(execution.networkAccessRequired),
         networkScope: execution.networkScope ?? "none",
         captureObservation: execution.captureObservation ?? null,
+        captureFreshness: execution.captureFreshness ?? "missing",
         filesystemAccessRequired: Boolean(execution.filesystemAccessRequired),
         rootRequired: Boolean(execution.rootRequired),
         systemDaemonRequired: Boolean(execution.systemDaemonRequired),

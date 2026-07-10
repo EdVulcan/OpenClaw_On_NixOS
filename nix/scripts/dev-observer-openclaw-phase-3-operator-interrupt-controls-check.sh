@@ -138,6 +138,7 @@ if (approvedStartProbeStatus !== "200"
   || approvedStartProbe.readback?.execution?.networkScope !== "loopback_browser_runtime_only"
   || approvedStartProbe.readback?.execution?.captureObservation?.registry !== "openclaw-trusted-work-view-sidecar-capture-observation-v0"
   || approvedStartProbe.readback?.execution?.captureObservation?.fullPayloadRetained !== false
+  || approvedStartProbe.readback?.execution?.captureFreshness !== "fresh"
   || approvedStartProbe.readback?.execution?.rootRequired !== false
   || approvedStartProbe.readback?.execution?.systemDaemonRequired !== false
   || approvedStartProbe.readback?.execution?.desktopWideCapture !== false

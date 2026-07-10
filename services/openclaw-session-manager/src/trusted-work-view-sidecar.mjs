@@ -3,8 +3,11 @@ const intervalMs = Math.max(25, Number.parseInt(process.env.OPENCLAW_SIDECAR_HEA
 const sessionId = process.env.OPENCLAW_SIDECAR_SESSION_ID ?? null;
 const workViewId = process.env.OPENCLAW_SIDECAR_WORK_VIEW_ID ?? null;
 const browserRuntimeUrl = process.env.OPENCLAW_SIDECAR_BROWSER_RUNTIME_URL ?? null;
+const captureIntervalMs = Math.max(500, Number.parseInt(process.env.OPENCLAW_SIDECAR_CAPTURE_INTERVAL_MS ?? "1000", 10));
 
 let heartbeatCount = 1;
+let captureSequence = 0;
+let captureInFlight = false;
 
 function send(type, details = {}) {
   if (typeof process.send !== "function") {
@@ -27,14 +30,16 @@ function heartbeat() {
 }
 
 async function observeBrowserCapture() {
-  if (!browserRuntimeUrl) {
+  if (!browserRuntimeUrl || captureInFlight) {
     return;
   }
+  captureInFlight = true;
   try {
     const response = await fetch(`${browserRuntimeUrl}/browser/capture`);
     const data = await response.json();
     const capture = data.capture ?? {};
     const summary = capture.workViewSummary ?? {};
+    captureSequence += 1;
     send("capture_observation", {
       observation: {
         registry: "openclaw-trusted-work-view-sidecar-capture-observation-v0",
@@ -45,21 +50,27 @@ async function observeBrowserCapture() {
         tabCount: Number.isInteger(summary.tabCount) ? summary.tabCount : 0,
         visibleTextBlockCount: Array.isArray(summary.visibleTextBlocks) ? summary.visibleTextBlocks.length : 0,
         capturedAt: capture.capturedAt ?? new Date().toISOString(),
+        observedAt: new Date().toISOString(),
+        sequence: captureSequence,
         fullPayloadRetained: false,
         desktopWideCapture: false,
       },
     });
   } catch (error) {
     send("capture_failed", { reason: error instanceof Error ? error.message : "capture_failed" });
+  } finally {
+    captureInFlight = false;
   }
 }
 
 send("ready", { heartbeatCount });
 observeBrowserCapture();
 const timer = setInterval(heartbeat, intervalMs);
+const captureTimer = setInterval(observeBrowserCapture, captureIntervalMs);
 
 function stop(reason) {
   clearInterval(timer);
+  clearInterval(captureTimer);
   send("stopped", { heartbeatCount, reason });
   setImmediate(() => process.exit(0));
 }
