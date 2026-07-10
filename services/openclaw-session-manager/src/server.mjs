@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { createEventName } from "../../../packages/shared-events/src/event-factory.mjs";
 import { buildTrustedWorkViewContract } from "../../../packages/shared-utils/src/work-view-trust.mjs";
 import { createTrustedWorkViewHelperRuntime } from "./trusted-work-view-helper-runtime.mjs";
+import { createTrustedWorkViewSidecarSupervisor } from "./trusted-work-view-sidecar-supervisor.mjs";
 
 const host = process.env.OPENCLAW_SESSION_MANAGER_HOST ?? "127.0.0.1";
 const port = Number.parseInt(process.env.OPENCLAW_SESSION_MANAGER_PORT ?? "4102", 10);
@@ -39,6 +40,21 @@ const workViewState = {
   lastHiddenAt: null,
   updatedAt: new Date().toISOString(),
 };
+const trustedWorkViewSidecarSupervisor = createTrustedWorkViewSidecarSupervisor({
+  onHeartbeat(message) {
+    const helperRuntime = trustedWorkViewHelperRuntime.snapshot();
+    if (
+      message.sessionId === sessionState.sessionId
+      && message.leaseId === helperRuntime.leaseId
+    ) {
+      trustedWorkViewHelperRuntime.heartbeat({
+        sessionId: sessionState.sessionId,
+        visibility: workViewState.visibility,
+        action: "trusted_sidecar_heartbeat",
+      });
+    }
+  },
+});
 
 import { corsHeaders, sendJson, readJsonBody, createEventPublisher, registerService } from "../../../packages/shared-utils/src/http.mjs";
 
@@ -55,8 +71,13 @@ function updateSessionState(patch) {
 }
 
 function serialiseWorkViewState() {
-  const helperRuntime = trustedWorkViewHelperRuntime.snapshot();
-  const workView = { ...workViewState, helperRuntime };
+  const sidecar = trustedWorkViewSidecarSupervisor.snapshot();
+  const helperRuntime = {
+    ...trustedWorkViewHelperRuntime.snapshot(),
+    externalProcessStarted: sidecar.running,
+    sidecar,
+  };
+  const workView = { ...workViewState, helperRuntime, trustedSidecar: sidecar };
   return {
     ...workView,
     trustedSession: buildTrustedWorkViewContract({
@@ -245,6 +266,10 @@ async function resumeHelperActionAuthority(reason) {
   if (!helperRuntime.leaseId) {
     return { ok: true, synced: false, previousLeaseId, helperRuntime };
   }
+  trustedWorkViewSidecarSupervisor.rebindLease({
+    sessionId: sessionState.sessionId,
+    leaseId: helperRuntime.leaseId,
+  });
   const sync = await syncBrowserHelperLease();
   updateWorkViewState({
     helperStatus: "active",
@@ -583,6 +608,55 @@ const server = http.createServer(async (req, res) => {
       sendJson(res, 200, { ok: true, authority, session: serialiseSessionState(), workView });
     } catch (error) {
       trustedWorkViewHelperRuntime.markDegraded(error instanceof Error ? error.message : "helper authority resume failed");
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 409, { ok: false, error: message, workView: serialiseWorkViewState() });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/work-view/trusted-sidecar/start") {
+    try {
+      const body = await readJsonBody(req);
+      const helperRuntime = trustedWorkViewHelperRuntime.snapshot();
+      if (!helperRuntime.leaseId || helperRuntime.status === "inactive") {
+        sendJson(res, 409, { ok: false, error: "Trusted work-view helper lease is not active." });
+        return;
+      }
+      const sidecar = await trustedWorkViewSidecarSupervisor.start({
+        sessionId: sessionState.sessionId,
+        workViewId: workViewState.workViewId,
+        leaseId: helperRuntime.leaseId,
+        taskId: body.taskId,
+        approvalId: body.approvalId,
+        approvalStatus: body.approvalStatus,
+      });
+      updateWorkViewState({ helperStatus: trustedWorkViewHelperRuntime.snapshot().status });
+      const workView = serialiseWorkViewState();
+      await publishEvent(createEventName("screen.updated"), {
+        service: "openclaw-session-manager",
+        action: "trusted-sidecar-started",
+        workView,
+      });
+      sendJson(res, 200, { ok: true, sidecar, session: serialiseSessionState(), workView });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 409, { ok: false, error: message, workView: serialiseWorkViewState() });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/work-view/trusted-sidecar/stop") {
+    try {
+      const body = await readJsonBody(req);
+      const sidecar = await trustedWorkViewSidecarSupervisor.stop({ taskId: body.taskId });
+      const workView = serialiseWorkViewState();
+      await publishEvent(createEventName("screen.updated"), {
+        service: "openclaw-session-manager",
+        action: "trusted-sidecar-stopped",
+        workView,
+      });
+      sendJson(res, 200, { ok: true, sidecar, session: serialiseSessionState(), workView });
+    } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       sendJson(res, 409, { ok: false, error: message, workView: serialiseWorkViewState() });
     }

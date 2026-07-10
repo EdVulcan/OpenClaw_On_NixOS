@@ -222,10 +222,9 @@ readback. Do not reopen completed LSP symbol-request slices or add another
 standalone engineering evidence/readiness shell without a concrete operator gap.
 
 The next autonomous product route is the smallest real Level 2 trusted AI
-work-view/session-helper behavior. Keep actual helper installation or process
-start, root/system daemon work, desktop-wide capture, provider egress, and
-arbitrary endpoint execution deferred until their runtime owner and authority
-boundary are explicit.
+work-view/session-helper behavior. Keep helper installation, root/system daemon
+work, desktop-wide capture, provider egress, and arbitrary endpoint execution
+deferred until their runtime owner and authority boundary are explicit.
 
 The first Level 2 runtime slice is now active: session-manager owns an in-process
 AI work-view helper lease and browser-runtime must echo the same session/lease
@@ -238,9 +237,11 @@ screen-act derives the current trusted lease, browser-runtime rejects missing or
 mismatched leases before mutation, and Observer shows the mediation result.
 Operator takeover now suspends the same lease in session-manager and
 browser-runtime; explicit resume rotates and rebinds a new lease before actions
-continue. The next Level 2 slice should use the existing approved sidecar
-lifecycle to pilot a bounded user-space helper process whose heartbeat backs
-lease readiness. Do not turn that pilot into another readiness-only chain.
+continue. The existing approved sidecar lifecycle now starts and stops one
+bounded session-manager-owned user-space process whose IPC heartbeat backs lease
+readiness. The next Level 2 slice should fail closed on unexpected sidecar exit
+or heartbeat timeout and require an explicit approved restart; do not add a
+readiness-only chain or automatic restart loop.
 
 ## Identity-Upgrade Alignment
 

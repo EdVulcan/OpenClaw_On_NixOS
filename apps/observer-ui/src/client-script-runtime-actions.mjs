@@ -370,7 +370,7 @@ async function createTrustedSidecarLifecycleTask() {
   selectedHistoryTaskId = result.task?.id ?? null;
   taskDetailIdInput.value = result.task?.id ?? "";
   renderPlanPanel(result.task);
-  setControlMessage(\`Created trusted work-view sidecar lifecycle task \${result.task?.id ?? "unknown"}; process start remains deferred.\`);
+  setControlMessage(\`Created trusted work-view sidecar lifecycle task \${result.task?.id ?? "unknown"}; approval is required before bounded process start.\`);
   await refreshRuntime();
   await refreshTaskList();
   await refreshTaskHistoryDetail();
@@ -407,6 +407,29 @@ async function startTrustedSidecarLifecycleProbe() {
   await refreshTaskList();
   await refreshTaskHistoryDetail();
   await refreshApprovalState();
+  await refreshOperatorState();
+  await refreshPhase3OperatorInterruptControls();
+  await refreshWorkView();
+}
+
+async function stopTrustedSidecarLifecycle() {
+  const controls = await fetchJson(\`\${observerConfig.coreUrl}/phase-3/operator-interrupt-controls\`);
+  const taskId = controls.sidecarLifecycle?.taskId ?? getSelectedHistoryTaskId();
+  if (!taskId) {
+    throw new Error("Create or load a trusted sidecar lifecycle task first.");
+  }
+  const result = await fetchJson(\`\${observerConfig.coreUrl}/work-view/trusted-sidecar/lifecycle-tasks/\${encodeURIComponent(taskId)}/stop\`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({}),
+  });
+  taskHistoryFocus = "selected-task";
+  selectedHistoryTaskId = result.task?.id ?? taskId;
+  taskDetailIdInput.value = result.task?.id ?? taskId;
+  renderPlanPanel(result.task ?? latestHistoryTask);
+  setControlMessage(\`Trusted sidecar \${result.readback?.status ?? "stopped"} for \${taskId}.\`);
+  await refreshTaskList();
+  await refreshTaskHistoryDetail();
   await refreshOperatorState();
   await refreshPhase3OperatorInterruptControls();
   await refreshWorkView();

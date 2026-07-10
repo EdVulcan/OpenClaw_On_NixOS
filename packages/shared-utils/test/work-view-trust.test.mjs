@@ -180,6 +180,33 @@ test("trusted work-view contract exposes operator takeover suspension without tr
   assert.equal(contract.recoveryRecommendation.endpoint, "/control/resume");
 });
 
+test("trusted work-view contract reports a bounded running sidecar from helper runtime state", () => {
+  const contract = buildTrustedWorkViewContract({
+    source: "session-manager",
+    session: { status: "running" },
+    workView: {
+      status: "prepared",
+      helperRuntime: {
+        status: "active",
+        externalProcessStarted: true,
+        sidecar: {
+          status: "running",
+          running: true,
+          heartbeatAt: "2026-07-10T11:30:00.000Z",
+          heartbeatCount: 3,
+        },
+      },
+    },
+  });
+  assert.equal(contract.helperRuntime.externalProcessStarted, true);
+  assert.equal(contract.sidecarContract.status, "running_user_space_pilot");
+  assert.equal(contract.sidecarContract.lifecycle.processStarted, true);
+  assert.equal(contract.sidecarContract.lifecycle.supervisorStatus, "running");
+  assert.equal(contract.sidecarContract.lifecycle.heartbeatCount, 3);
+  assert.equal(contract.sidecarContract.lifecycleProposal.executionStatus, "running");
+  assert.equal(contract.sidecarContract.approvalTaskDraft.processStartEnabledAfterApproval, true);
+});
+
 test("trusted work-view contract detects divergent browser runtime session identity", () => {
   const contract = buildTrustedWorkViewContract({
     source: "screen-sense",

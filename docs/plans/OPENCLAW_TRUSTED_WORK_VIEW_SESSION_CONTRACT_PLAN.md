@@ -117,19 +117,15 @@ The control resolves the latest sidecar lifecycle task through
 `/work-view/trusted-sidecar/lifecycle-tasks/:taskId/start-probe` route. It
 intentionally accepts the pre-approval HTTP 409 response as a valid readback so
 the operator can see `blocked_before_approval`; after manual approval it reads
-`deferred_after_approval`. Both states preserve `processStarted: false`, no
-root/system daemon requirement, no desktop-wide capture, no host mutation, and
-no provider egress.
+`running_after_approval` with bounded PID and heartbeat evidence.
 
-The contract also carries a future Level 2 sidecar draft. It names the helper's
-capture/action/recovery/Observer responsibilities and explicitly records that no
-process is started, no installation is required, and no root/system daemon is
-used in this slice. The lifecycle proposal records the future approval gate and
-keeps execution deferred. The approval task materialization creates an explicit
-task and pending approval while keeping process start disabled.
+The contract carries the Level 2 sidecar lifecycle and keeps process start
+disabled until an explicit task approval. It names the helper's future
+capture/action/recovery responsibilities while the current pilot performs only
+IPC heartbeat. No installation or root/system daemon is used.
 
-The materialized lifecycle task now exposes a bounded start-probe readback on
-the same route group:
+The materialized lifecycle task exposes the approved bounded start action on the
+same route group:
 
 ```text
 POST /work-view/trusted-sidecar/lifecycle-tasks/:taskId/start-probe
@@ -138,13 +134,13 @@ POST /work-view/trusted-sidecar/lifecycle-tasks/:taskId/start-probe
 Before approval the probe returns `blocked_before_approval` with HTTP 409 and
 records that no process was started, no root/system daemon is required, no
 desktop-wide capture is used, no host mutation occurs, and no provider egress is
-performed. After the operator approves the lifecycle task, the same probe
-returns `deferred_after_approval` while preserving the same non-execution flags.
-This proves the approval bridge and deferred execution boundary without
-starting a helper process. Each probe is recorded on the existing lifecycle task
-and consolidated into `/phase-3/operator-interrupt-controls`, so the Observer
-Phase 3 controls panel can show the latest task, approval, probe status, and
-non-execution flags without a new evidence endpoint.
+performed. After the operator approves the lifecycle task, the same action
+starts one session-manager-owned user-space process and returns
+`running_after_approval` with its PID and IPC heartbeat. The process receives a
+sanitized environment, performs no filesystem or network operation, requires no
+installation or root authority, and exits through the task-scoped `/stop`
+action. Start and stop are recorded on the existing lifecycle task and
+consolidated into `/phase-3/operator-interrupt-controls`.
 
 Every work-view prepare/reveal/hide call now records `lastOperatorAction` in the
 existing work-view state. The record includes:
@@ -191,6 +187,7 @@ GET /phase-3/background-work-view
 GET /phase-3/operator-interrupt-controls
 POST /work-view/trusted-sidecar/lifecycle-tasks
 POST /work-view/trusted-sidecar/lifecycle-tasks/:taskId/start-probe
+POST /work-view/trusted-sidecar/lifecycle-tasks/:taskId/stop
 Observer work-view and screen panels
 ```
 
@@ -222,6 +219,24 @@ the host, capture the desktop, read credentials, or perform provider egress.
 The existing Phase 3 controls readback and Observer panel expose runtime status,
 action authority, suspension state, and current lease id.
 
+## User-Space Sidecar Pilot
+
+The approved lifecycle task now owns a real bounded process:
+
+```text
+core lifecycle task + approved approval id
+-> session-manager sidecar supervisor
+-> minimal Node child with IPC only
+-> ready/heartbeat messages update the authoritative helper lease
+-> work-view state and Observer show PID, supervisor status, and heartbeat count
+-> explicit task-scoped stop terminates the child and records stopped readback
+```
+
+The supervisor does not inherit the parent credential environment. The child
+contains no filesystem, network, browser, provider, desktop-capture, or host
+mutation implementation. Parent IPC disconnect also terminates it, so it cannot
+remain orphaned after session-manager exits.
+
 ## Evidence
 
 Runtime contract builder:
@@ -230,7 +245,10 @@ Runtime contract builder:
 packages/shared-utils/src/work-view-trust.mjs
 packages/shared-utils/test/work-view-trust.test.mjs
 services/openclaw-session-manager/src/trusted-work-view-helper-runtime.mjs
+services/openclaw-session-manager/src/trusted-work-view-sidecar-supervisor.mjs
+services/openclaw-session-manager/src/trusted-work-view-sidecar.mjs
 services/openclaw-session-manager/test/trusted-work-view-helper-runtime.test.mjs
+services/openclaw-session-manager/test/trusted-work-view-sidecar-supervisor.test.mjs
 ```
 
 Service propagation:
@@ -274,36 +292,34 @@ The following remain intentionally deferred:
 
 ```text
 desktop-wide GNOME/Wayland capture
-external session helper process or sidecar installation
+sidecar installation or login-session persistence
 root/system daemon or polkit integration
 nested compositor or graphics-stack-native workspace
 host mutation and input execution beyond existing governed user-space paths
 provider egress or credential access
 automatic recovery execution; the contract recommends existing operator actions
 unreviewed endpoint invocation from recommendation payloads
-actual external trusted sidecar process start after approval
 trusted-lease mediation for keyboard hotkey/window-focus paths that do not yet
 mutate browser-runtime state
-external helper ownership of the lease heartbeat; the current helper remains
-in-process and session-manager-owned
+sidecar-owned browser capture/action transport; this pilot owns heartbeat only
+automatic sidecar restart after crash or heartbeat timeout
 ```
 
 ## Next Slice
 
-The matched helper lease is now enforced for browser input and click actions,
-and explicit operator takeover suspends that authority until resume rotates and
-rebinds the lease. The next Level 2 slice should move one real runtime
-responsibility out of the in-process placeholder:
+The approved user-space sidecar now backs helper readiness with a real IPC
+heartbeat and supports explicit stop. The next Level 2 slice should make loss of
+that heartbeat fail closed:
 
 ```text
-approved user-space trusted helper process pilot
--> session-manager supervision
--> process heartbeat backs lease readiness
--> explicit stop and recovery readback
+unexpected sidecar exit or heartbeat timeout
+-> helper readiness becomes degraded
+-> AI action authority is suspended
+-> Observer recommends explicit approved restart
+-> no automatic restart
 ```
 
-It should reuse the existing trusted-sidecar lifecycle task and approval rather
-than add another readiness chain. The process must be bounded, user-space,
-session-manager-owned, non-installed, and unable to capture the desktop or
-mutate the host. Root/system daemon work, desktop-wide capture, graphics-stack
-integration, and provider egress remain deferred.
+It should extend the same supervisor, lifecycle task, work-view contract, and
+Observer controls rather than add another readiness chain. Root/system daemon
+work, desktop-wide capture, graphics-stack integration, automatic restart, and
+provider egress remain deferred.

@@ -108,9 +108,10 @@ OPENCLAW_TRUSTED_WORK_VIEW_SESSION_CONTRACT_PLAN.md
 ```
 
 It now closes browser action mediation through operator takeover suspension and
-explicit resume/rebind. The next real slice is a bounded, approval-gated
-user-space helper process pilot under the existing sidecar lifecycle, not a new
-readiness milestone.
+explicit resume/rebind, then runs a bounded approval-gated user-space helper
+heartbeat process under the existing sidecar lifecycle. The next real slice is
+fail-closed heartbeat-loss recovery with explicit approved restart, not a new
+readiness milestone or automatic restart loop.
 
 ## Historical Phase Plans
 

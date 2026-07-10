@@ -32,7 +32,7 @@ function buildSidecarLifecyclePlan({ trustedSession, now }) {
     planner: WORK_VIEW_SIDECAR_LIFECYCLE_TASK_REGISTRY,
     capabilityAware: true,
     status: "planned",
-    goal: "Review approval-gated trusted work-view sidecar lifecycle without starting a process",
+    goal: "Run an approval-gated bounded trusted work-view sidecar heartbeat process",
     targetUrl: null,
     intent: "openclaw.work_view.trusted_sidecar.lifecycle",
     createdAt: now,
@@ -75,21 +75,22 @@ function buildSidecarLifecyclePlan({ trustedSession, now }) {
         params: {
           approvalGate: "required_before_process_start",
           processStartEnabled: false,
+          processStartEnabledAfterApproval: true,
           rootRequired: false,
         },
       },
       {
-        id: "deferred-start-probe",
+        id: "approved-start-probe",
         kind: "work_view.trusted_sidecar_start_probe",
         phase: "deferred_user_space_start_probe",
-        title: "Keep sidecar process start deferred after approval until a later slice enables it",
+        title: "Start one bounded user-space sidecar heartbeat process after approval",
         status: "blocked",
         capabilityId: draft.plannedCapabilityId,
         risk: "high",
         requiresApproval: true,
         params: {
-          executionStatus: "deferred",
-          processStartEnabled: false,
+          executionStatus: "approval_gated",
+          processStartEnabledAfterApproval: true,
           installRequired: false,
           rootRequired: false,
           desktopWideCapture: false,
@@ -119,7 +120,7 @@ function buildPolicy({ now }) {
       subject: {
         taskId: null,
         type: "work_view_trusted_sidecar_lifecycle",
-        goal: "Review approval-gated trusted work-view sidecar lifecycle without starting a process",
+        goal: "Run an approval-gated bounded trusted work-view sidecar heartbeat process",
         targetUrl: null,
         intent: policyRequest.intent,
       },
@@ -184,6 +185,7 @@ async function createTrustedSidecarLifecycleTask({
       createsApproval: true,
       canExecuteWithoutApproval: false,
       processStartEnabled: false,
+      processStartEnabledAfterApproval: true,
       rootRequired: false,
       systemDaemonRequired: false,
       desktopWideCapture: false,
@@ -207,16 +209,24 @@ async function createTrustedSidecarLifecycleTask({
   return { task, approval, trustedSession };
 }
 
-function sidecarTaskIdFromStartProbePath(pathname) {
+function sidecarTaskIdFromActionPath(pathname, action) {
   const prefix = "/work-view/trusted-sidecar/lifecycle-tasks/";
-  const suffix = "/start-probe";
+  const suffix = `/${action}`;
   if (!pathname.startsWith(prefix) || !pathname.endsWith(suffix)) {
     return null;
   }
   return pathname.slice(prefix.length, -suffix.length);
 }
 
-function buildSidecarStartProbeReadback({ task, approval, status, reason, generatedAt = new Date().toISOString() }) {
+function buildSidecarStartProbeReadback({
+  task,
+  approval,
+  status,
+  reason,
+  sidecar = null,
+  generatedAt = new Date().toISOString(),
+}) {
+  const running = sidecar?.running === true;
   return {
     status,
     reason,
@@ -225,8 +235,18 @@ function buildSidecarStartProbeReadback({ task, approval, status, reason, genera
     approvalId: approval?.id ?? task.approval?.requestId ?? null,
     approvalStatus: approval?.status ?? task.approval?.status ?? "missing",
     execution: {
-      processStarted: false,
-      processStartEnabled: false,
+      processStarted: running,
+      processStartEnabled: approval?.status === "approved",
+      pid: running ? sidecar.pid ?? null : null,
+      supervisorStatus: sidecar?.status ?? "not_started",
+      heartbeatAt: sidecar?.heartbeatAt ?? null,
+      heartbeatCount: sidecar?.heartbeatCount ?? 0,
+      sessionManagerOwned: sidecar?.sessionManagerOwned === true,
+      boundedProcess: sidecar?.boundedProcess === true,
+      installRequired: false,
+      credentialEnvironmentInherited: sidecar?.credentialEnvironmentInherited === true,
+      networkAccessRequired: sidecar?.networkAccessRequired === true,
+      filesystemAccessRequired: sidecar?.filesystemAccessRequired === true,
       rootRequired: false,
       systemDaemonRequired: false,
       desktopWideCapture: false,
@@ -238,6 +258,7 @@ function buildSidecarStartProbeReadback({ task, approval, status, reason, genera
 
 async function recordSidecarStartProbeReadback({
   mode,
+  action = "start-probe",
   task,
   readback,
   taskManager,
@@ -246,14 +267,14 @@ async function recordSidecarStartProbeReadback({
 }) {
   const record = {
     mode,
-    route: `/work-view/trusted-sidecar/lifecycle-tasks/${task.id}/start-probe`,
+    route: `/work-view/trusted-sidecar/lifecycle-tasks/${task.id}/${action}`,
     ...readback,
   };
   task.workViewTrustedSidecarLifecycle = {
     ...(task.workViewTrustedSidecarLifecycle ?? {}),
     execution: record,
   };
-  const updatedTask = taskManager.appendTaskPhase(task, `trusted_sidecar_start_probe_${readback.status}`, {
+  const updatedTask = taskManager.appendTaskPhase(task, `trusted_sidecar_${action.replaceAll("-", "_")}_${readback.status}`, {
     workViewTrustedSidecarLifecycle: {
       mode,
       readback: record,
@@ -271,8 +292,9 @@ async function handleSidecarStartProbe({
   serialiseTask,
   serialiseApproval,
   publishEvent,
+  sessionManagerUrl,
 }) {
-  const taskId = sidecarTaskIdFromStartProbePath(requestUrl.pathname);
+  const taskId = sidecarTaskIdFromActionPath(requestUrl.pathname, "start-probe");
   if (!taskId) {
     return false;
   }
@@ -309,14 +331,56 @@ async function handleSidecarStartProbe({
     return true;
   }
 
+  let sidecarResponse;
+  try {
+    const response = await fetch(`${sessionManagerUrl}/work-view/trusted-sidecar/start`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        taskId: task.id,
+        approvalId: approval.id,
+        approvalStatus: approval.status,
+      }),
+    });
+    sidecarResponse = await response.json().catch(() => null);
+    if (!response.ok || sidecarResponse?.ok !== true || sidecarResponse?.sidecar?.running !== true) {
+      throw new Error(sidecarResponse?.error ?? "Trusted sidecar process did not start.");
+    }
+  } catch (error) {
+    const readback = buildSidecarStartProbeReadback({
+      task,
+      approval,
+      status: "start_failed_after_approval",
+      reason: errorMessage(error),
+      sidecar: sidecarResponse?.sidecar ?? null,
+    });
+    const recorded = await recordSidecarStartProbeReadback({
+      mode: "trusted-sidecar-start-probe-failed-after-approval",
+      task,
+      readback,
+      taskManager,
+      serialiseTask,
+      publishEvent,
+    });
+    sendJson(res, 409, {
+      ok: false,
+      mode: "trusted-sidecar-start-probe-failed-after-approval",
+      readback: recorded.record,
+      task: serialiseTask(recorded.task),
+      approval: serialiseApproval(approval),
+    });
+    return true;
+  }
+
   const readback = buildSidecarStartProbeReadback({
     task,
     approval,
-    status: "deferred_after_approval",
-    reason: "sidecar_process_start_deferred_to_later_slice",
+    status: "running_after_approval",
+    reason: "bounded_user_space_sidecar_heartbeat_running",
+    sidecar: sidecarResponse.sidecar,
   });
   const recorded = await recordSidecarStartProbeReadback({
-    mode: "trusted-sidecar-start-probe-deferred-after-approval",
+    mode: "trusted-sidecar-start-probe-running-after-approval",
     task,
     readback,
     taskManager,
@@ -325,11 +389,74 @@ async function handleSidecarStartProbe({
   });
   sendJson(res, 200, {
     ok: true,
-    mode: "trusted-sidecar-start-probe-deferred-after-approval",
+    mode: "trusted-sidecar-start-probe-running-after-approval",
     readback: recorded.record,
     task: serialiseTask(recorded.task),
     approval: serialiseApproval(approval),
   });
+  return true;
+}
+
+async function handleSidecarStop({
+  res,
+  requestUrl,
+  state,
+  taskManager,
+  serialiseTask,
+  serialiseApproval,
+  publishEvent,
+  sessionManagerUrl,
+}) {
+  const taskId = sidecarTaskIdFromActionPath(requestUrl.pathname, "stop");
+  if (!taskId) {
+    return false;
+  }
+  const task = taskManager.getTaskById(taskId);
+  if (!task || task.type !== "work_view_trusted_sidecar_lifecycle") {
+    sendJson(res, 404, { ok: false, error: "Trusted work-view sidecar lifecycle task not found." });
+    return true;
+  }
+  const approval = task.approval?.requestId ? state.approvals.get(task.approval.requestId) : null;
+  if (approval?.status !== "approved") {
+    sendJson(res, 409, { ok: false, error: "Approved sidecar lifecycle task is required before stop." });
+    return true;
+  }
+  try {
+    const response = await fetch(`${sessionManagerUrl}/work-view/trusted-sidecar/stop`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ taskId: task.id }),
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok || data?.ok !== true) {
+      throw new Error(data?.error ?? "Trusted sidecar process did not stop.");
+    }
+    const readback = buildSidecarStartProbeReadback({
+      task,
+      approval,
+      status: "stopped_after_operator_action",
+      reason: "bounded_user_space_sidecar_stopped",
+      sidecar: data.sidecar,
+    });
+    const recorded = await recordSidecarStartProbeReadback({
+      mode: "trusted-sidecar-stopped-after-operator-action",
+      action: "stop",
+      task,
+      readback,
+      taskManager,
+      serialiseTask,
+      publishEvent,
+    });
+    sendJson(res, 200, {
+      ok: true,
+      mode: "trusted-sidecar-stopped-after-operator-action",
+      readback: recorded.record,
+      task: serialiseTask(recorded.task),
+      approval: serialiseApproval(approval),
+    });
+  } catch (error) {
+    sendJson(res, 409, { ok: false, error: errorMessage(error), task: serialiseTask(task) });
+  }
   return true;
 }
 
@@ -355,6 +482,20 @@ export async function handleWorkViewSidecarTaskRoute({
     serialiseTask,
     serialiseApproval,
     publishEvent,
+    sessionManagerUrl,
+  })) {
+    return true;
+  }
+
+  if (req.method === "POST" && await handleSidecarStop({
+    res,
+    requestUrl,
+    state,
+    taskManager,
+    serialiseTask,
+    serialiseApproval,
+    publishEvent,
+    sessionManagerUrl,
   })) {
     return true;
   }

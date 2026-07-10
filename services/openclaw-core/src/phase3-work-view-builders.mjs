@@ -53,6 +53,11 @@ export function createPhase3WorkViewBuilders(deps) {
         safety: {
           processStarted: false,
           processStartEnabled: false,
+          sessionManagerOwned: false,
+          boundedProcess: false,
+          credentialEnvironmentInherited: false,
+          networkAccessRequired: false,
+          filesystemAccessRequired: false,
           rootRequired: false,
           systemDaemonRequired: false,
           desktopWideCapture: false,
@@ -83,6 +88,15 @@ export function createPhase3WorkViewBuilders(deps) {
       safety: {
         processStarted: Boolean(execution.processStarted),
         processStartEnabled: Boolean(execution.processStartEnabled),
+        pid: execution.pid ?? null,
+        supervisorStatus: execution.supervisorStatus ?? null,
+        heartbeatAt: execution.heartbeatAt ?? null,
+        heartbeatCount: Number.isInteger(execution.heartbeatCount) ? execution.heartbeatCount : 0,
+        sessionManagerOwned: Boolean(execution.sessionManagerOwned),
+        boundedProcess: Boolean(execution.boundedProcess),
+        credentialEnvironmentInherited: Boolean(execution.credentialEnvironmentInherited),
+        networkAccessRequired: Boolean(execution.networkAccessRequired),
+        filesystemAccessRequired: Boolean(execution.filesystemAccessRequired),
         rootRequired: Boolean(execution.rootRequired),
         systemDaemonRequired: Boolean(execution.systemDaemonRequired),
         desktopWideCapture: Boolean(execution.desktopWideCapture),
@@ -159,9 +173,22 @@ export function createPhase3WorkViewBuilders(deps) {
     const state = await readSessionWorkViewState();
     const workView = state.workView ?? {};
     const trustedSession = workView.trustedSession ?? state.trustedSession ?? null;
+    const helperSidecar = trustedSession?.helperRuntime?.sidecar ?? null;
     const hiddenByDefault = workView.visibility === "hidden";
     const backgroundMode = workView.mode === "background";
     const observableMetadata = Boolean(workView.captureStrategy) && Boolean(workView.displayTarget);
+    const helperProcessSafe = trustedSession?.helperRuntime?.externalProcessStarted !== true
+      || (
+        helperSidecar?.running === true
+        && helperSidecar?.sessionManagerOwned === true
+        && helperSidecar?.boundedProcess === true
+        && helperSidecar?.credentialEnvironmentInherited === false
+        && helperSidecar?.rootRequired === false
+        && helperSidecar?.systemDaemonRequired === false
+        && helperSidecar?.desktopWideCapture === false
+        && helperSidecar?.hostMutation === false
+        && helperSidecar?.providerEgress === false
+      );
     const trustedSessionReady =
       trustedSession?.identityLevel === "level_2_trusted_session_work_view" &&
       trustedSession?.boundary?.workViewScope === "ai_owned_work_view_only" &&
@@ -174,17 +201,17 @@ export function createPhase3WorkViewBuilders(deps) {
       trustedSession?.helperRuntime?.owner === "openclaw-session-manager" &&
       ["active", "suspended"].includes(trustedSession?.helperRuntime?.status) &&
       trustedSession?.helperRuntime?.leaseMatched === true &&
-      trustedSession?.helperRuntime?.externalProcessStarted === false &&
+      helperProcessSafe &&
       trustedSession?.helperRuntime?.rootRequired === false &&
       trustedSession?.helperRuntime?.desktopWideCapture === false &&
       trustedSession?.operatorGates?.reveal === "explicit_operator_action" &&
       trustedSession?.recoveryRecommendation?.rootRequired === false &&
       ["none", "reveal_work_view", "prepare_work_view", "resume_ai_action_authority"].includes(trustedSession?.recoveryRecommendation?.action) &&
-      trustedSession?.sidecarContract?.status === "drafted_not_started" &&
-      trustedSession?.sidecarContract?.lifecycle?.processStarted === false &&
+      ["drafted_not_started", "running_user_space_pilot", "stopped_user_space_pilot"].includes(trustedSession?.sidecarContract?.status) &&
+      trustedSession?.sidecarContract?.lifecycle?.processStarted === (trustedSession?.helperRuntime?.externalProcessStarted === true) &&
       trustedSession?.sidecarContract?.lifecycle?.rootRequired === false &&
       trustedSession?.sidecarContract?.lifecycleProposal?.status === "proposal_ready" &&
-      trustedSession?.sidecarContract?.lifecycleProposal?.executionStatus === "deferred" &&
+      ["deferred", "running", "stopped"].includes(trustedSession?.sidecarContract?.lifecycleProposal?.executionStatus) &&
       trustedSession?.sidecarContract?.approvalTaskDraft?.status === "draft_ready" &&
       trustedSession?.sidecarContract?.approvalTaskDraft?.createsTaskNow === false &&
       trustedSession?.sidecarContract?.approvalTaskDraft?.processStartEnabled === false;
@@ -271,6 +298,15 @@ export function createPhase3WorkViewBuilders(deps) {
     const operator = buildOperatorState();
     const sidecarLifecycle = buildLatestSidecarLifecycleReadback();
     const helperRuntime = background.workViewContract?.trustedSession?.helperRuntime ?? null;
+    const sidecarProcessSafe = sidecarLifecycle.safety.processStarted === false
+      || (
+        sidecarLifecycle.safety.processStartEnabled === true
+        && sidecarLifecycle.safety.sessionManagerOwned === true
+        && sidecarLifecycle.safety.boundedProcess === true
+        && sidecarLifecycle.safety.credentialEnvironmentInherited === false
+        && sidecarLifecycle.safety.networkAccessRequired === false
+        && sidecarLifecycle.safety.filesystemAccessRequired === false
+      );
     const controls = [
       { id: "pause", endpoint: "/control/pause", available: true, effect: "pause current active task" },
       { id: "resume", endpoint: "/control/resume", available: true, effect: "resume a paused task as queued work" },
@@ -298,9 +334,8 @@ export function createPhase3WorkViewBuilders(deps) {
       },
       {
         id: "trusted-sidecar-lifecycle-readback-safe",
-        label: "Trusted sidecar lifecycle readback remains approval-gated and non-executing",
-        passed: sidecarLifecycle.safety.processStarted === false
-          && sidecarLifecycle.safety.processStartEnabled === false
+        label: "Trusted sidecar lifecycle is stopped or running as an approved bounded user-space heartbeat process",
+        passed: sidecarProcessSafe
           && sidecarLifecycle.safety.rootRequired === false
           && sidecarLifecycle.safety.systemDaemonRequired === false
           && sidecarLifecycle.safety.desktopWideCapture === false
@@ -341,10 +376,12 @@ export function createPhase3WorkViewBuilders(deps) {
         sidecarLifecycleApprovalStatus: sidecarLifecycle.approvalStatus,
         sidecarStartProbeStatus: sidecarLifecycle.latestProbe?.status ?? null,
         sidecarProcessStarted: sidecarLifecycle.safety.processStarted,
+        sidecarSupervisorStatus: sidecarLifecycle.safety.supervisorStatus,
+        sidecarHeartbeatCount: sidecarLifecycle.safety.heartbeatCount,
       },
       next: {
         recommendedSlice: "openclaw-phase-3-completion-readiness",
-        boundary: "summarize Phase 3 readiness before final exit; keep trusted sidecar process start deferred",
+        boundary: "preserve bounded sidecar lifecycle evidence and fail closed on heartbeat loss before broader session integration",
       },
     };
   }

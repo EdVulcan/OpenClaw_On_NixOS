@@ -185,7 +185,10 @@ function deriveHelperRuntime({ input, workView, browser, capture, authoritativeS
     scope: TRUSTED_WORK_VIEW_SCOPE,
     observerVisible: true,
     rootRequired: false,
-    externalProcessStarted: false,
+    externalProcessStarted: supplied?.externalProcessStarted === true,
+    sidecar: supplied?.sidecar && typeof supplied.sidecar === "object"
+      ? { ...supplied.sidecar }
+      : null,
     desktopWideCapture: false,
     hostMutation: false,
     providerEgress: false,
@@ -315,22 +318,32 @@ function deriveHelperReadiness({ readiness, helperStatus, browserStatus, browser
   };
 }
 
-function buildSidecarContract() {
+function buildSidecarContract(helperRuntime = {}) {
+  const sidecar = helperRuntime.sidecar ?? {};
+  const running = sidecar.running === true;
+  const stopped = sidecar.status === "stopped";
   return {
-    status: "drafted_not_started",
+    status: running
+      ? "running_user_space_pilot"
+      : stopped
+        ? "stopped_user_space_pilot"
+        : "drafted_not_started",
     identityLevel: TRUSTED_WORK_VIEW_IDENTITY_LEVEL,
     lifecycle: {
-      processStarted: false,
+      processStarted: running,
       installRequired: false,
       rootRequired: false,
       systemDaemonRequired: false,
       approvalRequiredBeforeStart: true,
+      supervisorStatus: sidecar.status ?? "inactive",
+      heartbeatAt: sidecar.heartbeatAt ?? null,
+      heartbeatCount: Number.isInteger(sidecar.heartbeatCount) ? sidecar.heartbeatCount : 0,
     },
     lifecycleProposal: {
       status: "proposal_ready",
       capabilityId: "plan.openclaw.work_view.trusted_sidecar_lifecycle",
       approvalGate: "required_before_process_start",
-      executionStatus: "deferred",
+      executionStatus: running ? "running" : stopped ? "stopped" : "deferred",
       taskCreationDeferred: true,
       allowedTransitions: ["drafted_not_started", "approved_user_space_start_probe", "stopped"],
     },
@@ -343,6 +356,7 @@ function buildSidecarContract() {
       plannedCapabilityId: "act.openclaw.work_view.trusted_sidecar_lifecycle",
       executionStatus: "deferred",
       processStartEnabled: false,
+      processStartEnabledAfterApproval: true,
       rootRequired: false,
       plannedPhases: [
         "review_sidecar_contract",
@@ -528,7 +542,7 @@ export function buildTrustedWorkViewContract(input = {}) {
       rootRequired: helperReadiness.rootRequired,
       canRecoverWithoutRoot: helperReadiness.canRecoverWithoutRoot,
     },
-    sidecarContract: buildSidecarContract(),
+    sidecarContract: buildSidecarContract(helperRuntime),
     evidence: {
       sessionStatus: firstString(session.status, "unknown"),
       workViewStatus: firstString(workView.status, "unknown"),

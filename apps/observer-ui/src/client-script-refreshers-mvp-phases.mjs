@@ -299,7 +299,7 @@ async function refreshPhase3BackgroundWorkView() {
       "Trusted Boundary: " + (trustedSession.boundary?.workViewScope ?? "unknown") + " revealGate=" + (trustedSession.operatorGates?.reveal ?? "unknown"),
       "Helper Readiness: " + (trustedSession.helperReadiness?.state ?? "unknown") + " recovery=" + (trustedSession.recoveryRecommendation?.action ?? "unknown"),
       "Last Operator Action: " + (workView.lastOperatorAction?.action ?? "none") + " source=" + (workView.lastOperatorAction?.source ?? "none"),
-      "Sidecar Contract: " + (trustedSession.sidecarContract?.status ?? "unknown") + " processStarted=" + String(Boolean(trustedSession.sidecarContract?.lifecycle?.processStarted)),
+      "Sidecar Contract: " + (trustedSession.sidecarContract?.status ?? "unknown") + " processStarted=" + String(Boolean(trustedSession.sidecarContract?.lifecycle?.processStarted)) + " supervisor=" + (trustedSession.sidecarContract?.lifecycle?.supervisorStatus ?? "unknown") + " heartbeat=" + (trustedSession.sidecarContract?.lifecycle?.heartbeatCount ?? 0),
       "Sidecar Lifecycle: " + (trustedSession.sidecarContract?.lifecycleProposal?.status ?? "unknown") + " execution=" + (trustedSession.sidecarContract?.lifecycleProposal?.executionStatus ?? "unknown"),
       "Sidecar Approval Draft: " + (trustedSession.sidecarContract?.approvalTaskDraft?.status ?? "unknown") + " createsTask=" + String(Boolean(trustedSession.sidecarContract?.approvalTaskDraft?.createsTaskNow)),
     ].join("\\n");
@@ -328,7 +328,7 @@ async function refreshPhase3OperatorInterruptControls() {
       "Controls: " + ((data.controls ?? []).map((control) => control.id + " " + control.endpoint).join(" | ") || "none"),
       "Operator: status=" + (data.operator?.status ?? "unknown") + " blocked=" + Boolean(data.operator?.blocked),
       "Action Authority: " + (summary.actionAuthority ?? helperRuntime.actionAuthority ?? "unknown") + " runtime=" + (helperRuntime.status ?? "unknown") + " suspended=" + Boolean(summary.actionAuthoritySuspended) + " lease=" + (summary.helperLeaseId ?? "none"),
-      "Sidecar: task=" + (sidecarLifecycle.taskId ?? "none") + " approval=" + (sidecarLifecycle.approvalStatus ?? "none") + " probe=" + (latestProbe.status ?? "none") + " processStarted=" + Boolean(safety.processStarted),
+      "Sidecar: task=" + (sidecarLifecycle.taskId ?? "none") + " approval=" + (sidecarLifecycle.approvalStatus ?? "none") + " lifecycle=" + (latestProbe.status ?? "none") + " supervisor=" + (safety.supervisorStatus ?? "none") + " pid=" + (safety.pid ?? "none") + " heartbeat=" + (safety.heartbeatCount ?? 0) + " processStarted=" + Boolean(safety.processStarted),
       "Next: " + (data.next?.recommendedSlice ?? "unknown"),
     ].join("\\n");
   } catch {
