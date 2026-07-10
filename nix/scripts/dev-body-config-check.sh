@@ -84,6 +84,7 @@ const envNames = [
   "OPENCLAW_BROWSER_EXECUTABLE",
   "OPENCLAW_BROWSER_PROFILE_DIR",
   "OPENCLAW_BODY_PROFILE",
+  "OPENCLAW_BODY_COMPONENT_SCOPE",
 ];
 
 function requireIncludes(label, content, tokens) {
@@ -99,6 +100,9 @@ requireIncludes("openclaw-body module", bodyModule, [
   "systemd.user.services",
   "openclaw-trusted-sidecar@",
   "trustedSidecarUserUnit",
+  "componentOwnership.user",
+  "userService.stateDir",
+  "userService.logDir",
   "EnvironmentFile = \"%t/openclaw-sidecars/%i.env\"",
   "ExecStart = \"${cfg.nodePackage}/bin/node src/trusted-work-view-sidecar.mjs\"",
   "Restart = \"no\"",
@@ -144,6 +148,8 @@ requireIncludes("desktop-body profile", desktopProfile, [
   "./dev-body.nix",
   "profile = \"desktop-body\"",
   "trustedSidecarUserUnit.enable = true",
+  "componentOwnership.user",
+  "browserEngine.mode = \"firefox\"",
   ...componentKeys,
 ]);
 
@@ -178,6 +184,56 @@ console.log(JSON.stringify({
 EOF
 
 if command -v nix >/dev/null 2>&1; then
+  ownership_json="$(nix --extra-experimental-features 'nix-command flakes' eval \
+    --no-update-lock-file --json \
+    .#nixosConfigurations.openclaw-local-dev.config \
+    --apply 'config: let
+      project = unit: {
+        inherit (unit) wantedBy partOf after environment;
+        serviceConfig.User = unit.serviceConfig.User or null;
+      };
+    in {
+      system = builtins.attrNames config.systemd.services;
+      user = builtins.attrNames config.systemd.user.services;
+      session = project config.systemd.user.services.openclaw-session-manager;
+      browser = project config.systemd.user.services.openclaw-browser-runtime;
+    }')"
+  node - <<'EOF' "$ownership_json"
+const ownership = JSON.parse(process.argv[2]);
+const userOwned = ["openclaw-session-manager", "openclaw-browser-runtime"];
+for (const name of userOwned) {
+  if (!ownership.user.includes(name) || ownership.system.includes(name)) {
+    throw new Error(`${name} must exist exclusively in the user manager: ${JSON.stringify(ownership)}`);
+  }
+}
+for (const [name, unit] of [["session", ownership.session], ["browser", ownership.browser]]) {
+  if (!unit.wantedBy?.includes("graphical-session.target")
+    || !unit.partOf?.includes("graphical-session.target")
+    || unit.serviceConfig?.User != null
+    || unit.environment?.OPENCLAW_BODY_COMPONENT_SCOPE !== "user"
+    || unit.environment?.OPENCLAW_BODY_STATE_DIR !== "%S/openclaw"
+    || unit.environment?.OPENCLAW_BODY_LOG_DIR !== "%L/openclaw") {
+    throw new Error(`unexpected ${name} user unit ownership: ${JSON.stringify(unit)}`);
+  }
+}
+if (ownership.browser.environment?.OPENCLAW_BROWSER_ENGINE_MODE !== "firefox"
+  || ownership.browser.environment?.OPENCLAW_BROWSER_PROFILE_DIR !== "%S/openclaw/browser-profile"
+  || !String(ownership.browser.environment?.OPENCLAW_BROWSER_EXECUTABLE ?? "").endsWith("/bin/firefox")) {
+  throw new Error(`desktop browser runtime must use the Nix-managed Firefox user profile: ${JSON.stringify(ownership.browser)}`);
+}
+if (!ownership.browser.after?.includes("openclaw-session-manager.service")) {
+  throw new Error(`browser runtime must retain same-scope session-manager ordering: ${JSON.stringify(ownership.browser.after)}`);
+}
+console.log(JSON.stringify({
+  componentOwnership: {
+    userOwned,
+    duplicated: userOwned.filter((name) => ownership.system.includes(name)),
+    browserEngine: ownership.browser.environment.OPENCLAW_BROWSER_ENGINE_MODE,
+    browserProfile: ownership.browser.environment.OPENCLAW_BROWSER_PROFILE_DIR,
+  },
+}, null, 2));
+EOF
+
   user_unit_json="$(nix --extra-experimental-features 'nix-command flakes' eval \
     --no-update-lock-file --json \
     .#nixosConfigurations.openclaw-local-dev.config.systemd.user.services \

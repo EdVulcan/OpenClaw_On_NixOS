@@ -349,13 +349,22 @@ AI profile on disconnect/shutdown. The targeted milestone uses a loopback page
 and the production prepare/lease path; no hidden browser download, external
 fixture, root launch, desktop capture, or `--no-sandbox` bypass is involved.
 
-The remaining Level 2 deployment gap is component ownership: the Nix body
-skeleton still defines session-manager and browser-runtime as system services,
-so its desktop profile cannot truthfully default to the real user browser. Move
-those two components into the selected login user's manager alongside the
-sidecar without creating duplicate instances or hardcoding a UID. Until then,
-real engine mode remains explicit and simulated mode remains the default Nix
-fallback.
+The Level 2 component-ownership gap is now closed. The Nix body partitions
+enabled components into exclusive system or login-user ownership, and the
+desktop profile places session-manager and browser-runtime in
+`systemd.user.services` alongside the sidecar contract. They follow the
+graphical session, use per-user state/profile paths, preserve same-scope
+ordering, and default to the fixed NixOS Firefox package. Nix evaluation proves
+neither component is duplicated in the system manager; no UID, root proxy, or
+browser sandbox bypass is used.
+
+The next real Level 2 gap is bounded visual capture of the AI-owned browser
+page. The real adapter currently supplies process/page/tab metadata, while the
+capture response's readable blocks are still derived from runtime state rather
+than a browser pixel frame. Extend the existing capture/trust/Observer lane with
+strictly bounded frame acquisition and freshness evidence. Do not capture the
+desktop, write arbitrary image paths, add a parallel route, or create another
+readiness shell.
 
 ## Identity-Upgrade Alignment
 

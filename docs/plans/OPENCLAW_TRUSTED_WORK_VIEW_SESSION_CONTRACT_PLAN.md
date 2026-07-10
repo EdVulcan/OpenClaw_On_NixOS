@@ -378,9 +378,9 @@ explicit approved operator action
 automatic task or sidecar restart after session authority loss; recovery remains
 an explicit operator action using the existing approved lifecycle and task
 recovery routes
-login-session installation or persistence beyond the bounded reconnect timeout;
-the current user-session process is runtime-scoped and self-terminates if no
-authority reconnects
+sidecar login auto-start or persistence beyond the bounded reconnect timeout;
+the approved sidecar remains runtime-scoped and self-terminates if no authority
+reconnects
 ```
 
 ## Next Slice
@@ -657,3 +657,32 @@ in the same selected login-user manager as the trusted sidecar, so the desktop
 profile can select the real engine without running a browser from a root system
 service. This must be a declarative component ownership move, not duplicate
 system and user instances, a hardcoded UID, `--no-sandbox`, or a root proxy.
+
+That deployment slice is now complete. The body module partitions enabled
+components before emitting units: names selected by
+`services.openclaw.componentOwnership.user` exist only in
+`systemd.user.services`, and all other enabled names exist only in
+`systemd.services`. User-owned components use `%S/openclaw` and `%L/openclaw`,
+retain only same-scope unit dependencies, and are wanted by and part of
+`graphical-session.target`. No UID, username, root-to-user proxy, or browser
+sandbox bypass is present.
+
+The desktop profile places only session-manager and browser-runtime in the
+login-user manager and defaults browser-runtime to the fixed NixOS Firefox
+package. Nix assertions reject a root-owned Firefox runtime and reject a
+system-unit repair delegation aimed at a user-owned browser. The existing
+`body-config` milestone evaluates the real generated units and proves the two
+names are absent from the system manager, present in the user manager, use
+per-user state/profile paths, retain session-manager -> browser-runtime
+ordering, and resolve the Nix Firefox executable. Existing Phase 3 and capture
+milestones continue to prove approval, recovery, Observer, and real-engine
+behavior without changing ports or public routes.
+
+The next real Level 2 gap is visual capture rather than more ownership
+readiness. The current Firefox adapter reads real page and process metadata,
+but `/browser/capture` still synthesizes its readable snapshot from runtime
+state rather than acquiring a bounded browser pixel frame. Add AI-owned-page
+capture behind the existing route and trust contract, with strict dimensions,
+byte limits, freshness, cleanup, and no desktop-wide source. Do not add a
+parallel capture API, arbitrary filesystem output, root ownership, or a new
+readiness milestone.

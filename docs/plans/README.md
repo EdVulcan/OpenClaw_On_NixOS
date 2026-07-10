@@ -169,12 +169,14 @@ restoring lease or actions, and explicit prepare rebinds fresh authority. The
 next real slice is a local real-browser-engine adapter behind the existing
 browser API and sidecar, replacing the synthetic PID/in-memory capture model.
 
-The real browser-engine adapter is now complete and proven with NixOS Firefox,
-Puppeteer, a loopback fixture, fresh helper authority, real PID/page metadata,
-screen-sense projection, and ephemeral profile cleanup. The next Level 2 slice
-is declarative login-user ownership for session-manager and browser-runtime so
-desktop deployment can enable the real engine without a root browser or
-duplicate system/user instances.
+The real browser-engine adapter and declarative login-user ownership are now
+complete. The desktop profile emits session-manager and browser-runtime only as
+graphical-session user units, uses per-user state/profile paths, and defaults to
+the fixed NixOS Firefox without a root browser, hardcoded UID, or duplicate
+system units. The next Level 2 slice is bounded pixel capture of the AI-owned
+browser page through the existing capture/trust/Observer lane; current capture
+metadata is real, but its readable blocks are not yet derived from an acquired
+browser frame.
 
 ## Historical Phase Plans
 

@@ -44,9 +44,9 @@ let
       portEnv = "OPENCLAW_BROWSER_RUNTIME_PORT";
       port = cfg.ports.browserRuntime;
       after = [ "openclaw-event-hub" "openclaw-session-manager" ];
-      extraEnvironment = {
+      extraEnvironment = profileDir: {
         OPENCLAW_BROWSER_ENGINE_MODE = cfg.browserEngine.mode;
-        OPENCLAW_BROWSER_PROFILE_DIR = cfg.browserEngine.profileDir;
+        OPENCLAW_BROWSER_PROFILE_DIR = profileDir;
       } // optionalAttrs (cfg.browserEngine.mode == "firefox") {
         OPENCLAW_BROWSER_EXECUTABLE = "${cfg.browserEngine.package}/bin/firefox";
       };
@@ -104,6 +104,9 @@ let
   ];
 
   enabledSpecs = builtins.filter (spec: builtins.elem spec.key cfg.components) serviceSpecs;
+  userOwnedSpecs = builtins.filter (spec: builtins.elem spec.key cfg.componentOwnership.user) enabledSpecs;
+  systemOwnedSpecs = builtins.filter (spec: !builtins.elem spec.key cfg.componentOwnership.user) enabledSpecs;
+  userOwnedServiceNames = map (spec: spec.name) userOwnedSpecs;
 
   urlFor = port: "http://${cfg.connectHost}:${toString port}";
 
@@ -118,7 +121,7 @@ let
     exec ${pkgs.systemd}/bin/systemctl restart openclaw-browser-runtime.service
   '';
 
-  commonEnvironment = {
+  commonEnvironment = stateDir: {
     OPENCLAW_CORE_URL = urlFor cfg.ports.core;
     OPENCLAW_EVENT_HUB_URL = urlFor cfg.ports.eventHub;
     OPENCLAW_SESSION_MANAGER_URL = urlFor cfg.ports.sessionManager;
@@ -127,41 +130,58 @@ let
     OPENCLAW_SCREEN_ACT_URL = urlFor cfg.ports.screenAct;
     OPENCLAW_SYSTEM_SENSE_URL = urlFor cfg.ports.systemSense;
     OPENCLAW_SYSTEM_HEAL_URL = urlFor cfg.ports.systemHeal;
-    OPENCLAW_CORE_STATE_FILE = "${cfg.stateDir}/openclaw-core-state.json";
-    OPENCLAW_SYSTEM_HEAL_STATE_FILE = "${cfg.stateDir}/openclaw-system-heal-state.json";
-    OPENCLAW_BROWSER_RUNTIME_STATE_FILE = "${cfg.stateDir}/openclaw-browser-runtime-state.json";
-    OPENCLAW_EVENT_LOG_FILE = "${cfg.stateDir}/openclaw-events.jsonl";
+    OPENCLAW_CORE_STATE_FILE = "${stateDir}/openclaw-core-state.json";
+    OPENCLAW_SYSTEM_HEAL_STATE_FILE = "${stateDir}/openclaw-system-heal-state.json";
+    OPENCLAW_BROWSER_RUNTIME_STATE_FILE = "${stateDir}/openclaw-browser-runtime-state.json";
+    OPENCLAW_EVENT_LOG_FILE = "${stateDir}/openclaw-events.jsonl";
   } // optionalAttrs cfg.systemdRepairAuthDelegation.enable {
     OPENCLAW_SYSTEMD_REPAIR_RESTART_HELPER = "${systemdRepairRestartHelper}/bin/openclaw-systemd-repair-restart-browser-runtime";
     OPENCLAW_SYSTEMD_REPAIR_RESTART_HELPER_SUDO = "/run/wrappers/bin/sudo";
     OPENCLAW_SYSTEMD_REPAIR_AUTH_DELEGATION = "sudo-nopasswd-fixed-helper";
   };
 
-  mkService = spec: {
-    inherit (spec) description;
-    wantedBy = [ "multi-user.target" ];
-    wants = [ "network-online.target" ] ++ map (name: "${name}.service") spec.after;
-    after = [ "network-online.target" ] ++ map (name: "${name}.service") spec.after;
-    environment = commonEnvironment // {
-      ${spec.hostEnv} = cfg.host;
-      ${spec.portEnv} = toString spec.port;
-      OPENCLAW_BODY_PROFILE = cfg.profile;
-      OPENCLAW_BODY_STATE_DIR = cfg.stateDir;
-      OPENCLAW_BODY_LOG_DIR = cfg.logDir;
-    } // (spec.extraEnvironment or { });
-    serviceConfig = {
-      Type = "simple";
-      WorkingDirectory = "${cfg.repoRoot}/${spec.path}";
-      ExecStart = "${cfg.nodePackage}/bin/node src/server.mjs";
-      Restart = "on-failure";
-      RestartSec = "2s";
-      StateDirectory = "openclaw";
-      LogsDirectory = "openclaw";
-    } // optionalAttrs (cfg.user != null) {
-      User = cfg.user;
-      Group = cfg.group;
+  mkService = scope: spec:
+    let
+      userScope = scope == "user";
+      stateDir = if userScope then cfg.userService.stateDir else cfg.stateDir;
+      logDir = if userScope then cfg.userService.logDir else cfg.logDir;
+      browserProfileDir = if userScope then "${stateDir}/browser-profile" else cfg.browserEngine.profileDir;
+      sameScopeAfter = builtins.filter
+        (name:
+          if userScope
+          then builtins.elem name userOwnedServiceNames
+          else !builtins.elem name userOwnedServiceNames
+        )
+        spec.after;
+      dependencyUnits = map (name: "${name}.service") sameScopeAfter;
+    in
+    {
+      inherit (spec) description;
+      wantedBy = [ (if userScope then "graphical-session.target" else "multi-user.target") ];
+      partOf = if userScope then [ "graphical-session.target" ] else [ ];
+      wants = (if userScope then [ ] else [ "network-online.target" ]) ++ dependencyUnits;
+      after = (if userScope then [ "graphical-session.target" ] else [ "network-online.target" ]) ++ dependencyUnits;
+      environment = commonEnvironment stateDir // {
+        ${spec.hostEnv} = cfg.host;
+        ${spec.portEnv} = toString spec.port;
+        OPENCLAW_BODY_PROFILE = cfg.profile;
+        OPENCLAW_BODY_COMPONENT_SCOPE = scope;
+        OPENCLAW_BODY_STATE_DIR = stateDir;
+        OPENCLAW_BODY_LOG_DIR = logDir;
+      } // (if spec ? extraEnvironment then spec.extraEnvironment browserProfileDir else { });
+      serviceConfig = {
+        Type = "simple";
+        WorkingDirectory = "${cfg.repoRoot}/${spec.path}";
+        ExecStart = "${cfg.nodePackage}/bin/node src/server.mjs";
+        Restart = "on-failure";
+        RestartSec = "2s";
+        StateDirectory = "openclaw";
+        LogsDirectory = "openclaw";
+      } // optionalAttrs (!userScope && cfg.user != null) {
+        User = cfg.user;
+        Group = cfg.group;
+      };
     };
-  };
 
   trustedSidecarUserService = {
     description = "OpenClaw trusted work-view sidecar instance %i";
@@ -214,6 +234,35 @@ in
       ]);
       default = [ ];
       description = "OpenClaw body components to materialize as systemd services.";
+    };
+
+    componentOwnership.user = mkOption {
+      type = types.listOf (types.enum [
+        "eventHub"
+        "core"
+        "sessionManager"
+        "browserRuntime"
+        "screenSense"
+        "screenAct"
+        "systemSense"
+        "systemHeal"
+        "observerUi"
+      ]);
+      default = [ ];
+      description = "Enabled components owned exclusively by the current login user's systemd manager.";
+    };
+
+    userService = {
+      stateDir = mkOption {
+        type = types.str;
+        default = "%S/openclaw";
+        description = "Per-user state directory for login-session-owned OpenClaw components.";
+      };
+      logDir = mkOption {
+        type = types.str;
+        default = "%L/openclaw";
+        description = "Per-user log directory for login-session-owned OpenClaw components.";
+      };
     };
 
     repoRoot = mkOption {
@@ -314,8 +363,23 @@ in
         message = "services.openclaw.components must enable at least one body component.";
       }
       {
+        assertion = builtins.all (component: builtins.elem component cfg.components) cfg.componentOwnership.user;
+        message = "services.openclaw.componentOwnership.user may contain only enabled components.";
+      }
+      {
+        assertion = cfg.browserEngine.mode != "firefox"
+          || !builtins.elem "browserRuntime" cfg.components
+          || builtins.elem "browserRuntime" cfg.componentOwnership.user
+          || cfg.user != null;
+        message = "Firefox browser runtime requires login-user ownership or a non-root system service user; root browser launch is not supported.";
+      }
+      {
         assertion = !cfg.systemdRepairAuthDelegation.enable || cfg.user != null;
         message = "services.openclaw.systemdRepairAuthDelegation.enable requires services.openclaw.user so delegation is scoped to one OpenClaw service account.";
+      }
+      {
+        assertion = !cfg.systemdRepairAuthDelegation.enable || !builtins.elem "browserRuntime" cfg.componentOwnership.user;
+        message = "systemd repair delegation targets the system browser unit and cannot be combined with user-owned browserRuntime.";
       }
     ];
 
@@ -337,12 +401,20 @@ in
       "d ${cfg.logDir} 0750 ${owner} ${group} - -"
     ];
 
-    systemd.services = builtins.listToAttrs (map (spec: {
-      name = spec.name;
-      value = mkService spec;
-    }) enabledSpecs);
+    systemd.services = builtins.listToAttrs (map
+      (spec: {
+        name = spec.name;
+        value = mkService "system" spec;
+      })
+      systemOwnedSpecs);
 
-    systemd.user.services = mkIf cfg.trustedSidecarUserUnit.enable {
+    systemd.user.services = builtins.listToAttrs
+      (map
+        (spec: {
+          name = spec.name;
+          value = mkService "user" spec;
+        })
+        userOwnedSpecs) // optionalAttrs cfg.trustedSidecarUserUnit.enable {
       "openclaw-trusted-sidecar@" = trustedSidecarUserService;
     };
 

@@ -6,6 +6,11 @@
   services.openclaw = {
     profile = "desktop-body";
     trustedSidecarUserUnit.enable = true;
+    componentOwnership.user = [
+      "sessionManager"
+      "browserRuntime"
+    ];
+    browserEngine.mode = "firefox";
     components = [
       "eventHub"
       "core"
