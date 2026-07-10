@@ -192,6 +192,71 @@ async function ensureBrowserWorkView(url = workViewState.entryUrl || defaultWork
   }
 }
 
+async function syncBrowserHelperLease() {
+  const trustedHelperLease = trustedWorkViewHelperRuntime.leaseEnvelope();
+  if (!trustedHelperLease) {
+    return { ok: true, synced: false, browser: null };
+  }
+  const response = await fetch(`${browserRuntimeUrl}/browser/trusted-helper-lease`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      sessionId: sessionState.sessionId,
+      trustedHelperLease,
+    }),
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok || data?.ok !== true) {
+    throw new Error(data?.error ?? "browser helper lease sync failed");
+  }
+  const helperRuntime = trustedWorkViewHelperRuntime.observeBrowserLease({
+    sessionId: data.browser?.sessionId,
+    trustedHelperLease: data.browser?.trustedHelperLease,
+  });
+  updateWorkViewState({
+    helperStatus: helperRuntime.status,
+    browserStatus: data.browser?.running ? "running" : workViewState.browserStatus,
+    browserSessionId: data.browser?.sessionId ?? workViewState.browserSessionId,
+  });
+  return { ok: true, synced: true, browser: data.browser ?? null, helperRuntime };
+}
+
+async function suspendHelperActionAuthority(reason) {
+  const helperRuntime = trustedWorkViewHelperRuntime.suspend({
+    sessionId: sessionState.sessionId,
+    reason,
+  });
+  if (!helperRuntime.leaseId) {
+    return { ok: true, synced: false, helperRuntime };
+  }
+  const sync = await syncBrowserHelperLease();
+  updateWorkViewState({
+    helperStatus: "suspended",
+  });
+  return { ...sync, helperRuntime: trustedWorkViewHelperRuntime.snapshot() };
+}
+
+async function resumeHelperActionAuthority(reason) {
+  const previousLeaseId = trustedWorkViewHelperRuntime.snapshot().leaseId;
+  const helperRuntime = trustedWorkViewHelperRuntime.rebind({
+    sessionId: sessionState.sessionId,
+    reason,
+  });
+  if (!helperRuntime.leaseId) {
+    return { ok: true, synced: false, previousLeaseId, helperRuntime };
+  }
+  const sync = await syncBrowserHelperLease();
+  updateWorkViewState({
+    helperStatus: "active",
+  });
+  return {
+    ...sync,
+    previousLeaseId,
+    rebound: previousLeaseId !== trustedWorkViewHelperRuntime.snapshot().leaseId,
+    helperRuntime: trustedWorkViewHelperRuntime.snapshot(),
+  };
+}
+
 async function startSession(displayTarget) {
   if (startDelayMs > 0) {
     await sleep(startDelayMs);
@@ -466,6 +531,60 @@ const server = http.createServer(async (req, res) => {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/work-view/helper-authority/suspend") {
+    try {
+      const body = await readJsonBody(req);
+      const previous = workViewActionSnapshot();
+      const authority = await suspendHelperActionAuthority(
+        stringOrNull(body.reason) ?? "operator_takeover",
+      );
+      recordWorkViewOperatorAction("suspend_helper_action_authority", {
+        source: body.operatorActionSource,
+        endpoint: "/work-view/helper-authority/suspend",
+        previous,
+      });
+      const workView = serialiseWorkViewState();
+      await publishEvent(createEventName("screen.updated"), {
+        service: "openclaw-session-manager",
+        action: "helper-action-authority-suspended",
+        workView,
+      });
+      sendJson(res, 200, { ok: true, authority, session: serialiseSessionState(), workView });
+    } catch (error) {
+      trustedWorkViewHelperRuntime.markDegraded(error instanceof Error ? error.message : "helper authority suspend failed");
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 409, { ok: false, error: message, workView: serialiseWorkViewState() });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && requestUrl.pathname === "/work-view/helper-authority/resume") {
+    try {
+      const body = await readJsonBody(req);
+      const previous = workViewActionSnapshot();
+      const authority = await resumeHelperActionAuthority(
+        stringOrNull(body.reason) ?? "operator_resume",
+      );
+      recordWorkViewOperatorAction("resume_helper_action_authority", {
+        source: body.operatorActionSource,
+        endpoint: "/work-view/helper-authority/resume",
+        previous,
+      });
+      const workView = serialiseWorkViewState();
+      await publishEvent(createEventName("screen.updated"), {
+        service: "openclaw-session-manager",
+        action: "helper-action-authority-resumed",
+        workView,
+      });
+      sendJson(res, 200, { ok: true, authority, session: serialiseSessionState(), workView });
+    } catch (error) {
+      trustedWorkViewHelperRuntime.markDegraded(error instanceof Error ? error.message : "helper authority resume failed");
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 409, { ok: false, error: message, workView: serialiseWorkViewState() });
     }
     return;
   }

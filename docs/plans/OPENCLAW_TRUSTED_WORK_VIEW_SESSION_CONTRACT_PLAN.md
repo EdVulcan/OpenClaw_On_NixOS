@@ -194,6 +194,34 @@ POST /work-view/trusted-sidecar/lifecycle-tasks/:taskId/start-probe
 Observer work-view and screen panels
 ```
 
+## Operator Takeover Action Authority
+
+The trusted helper lease now carries an explicit `actionAuthority` state. The
+existing operator controls close the user-sovereignty loop without adding a new
+public readiness route:
+
+```text
+POST /control/takeover
+-> session-manager suspends the current helper action authority
+-> browser-runtime stores the suspended lease
+-> screen-act blocks before browser mutation
+-> browser-runtime rejects even a directly submitted matching old lease
+
+POST /control/resume
+-> session-manager issues a new lease id
+-> browser-runtime explicitly rebinds the new lease
+-> the paused task returns to queued only after rebind succeeds
+-> browser input/click can continue with the new lease
+```
+
+The internal user-space propagation routes are
+`/work-view/helper-authority/suspend`,
+`/work-view/helper-authority/resume`, and
+`/browser/trusted-helper-lease`. They do not start an external process, mutate
+the host, capture the desktop, read credentials, or perform provider egress.
+The existing Phase 3 controls readback and Observer panel expose runtime status,
+action authority, suspension state, and current lease id.
+
 ## Evidence
 
 Runtime contract builder:
@@ -256,21 +284,26 @@ unreviewed endpoint invocation from recommendation payloads
 actual external trusted sidecar process start after approval
 trusted-lease mediation for keyboard hotkey/window-focus paths that do not yet
 mutate browser-runtime state
-operator takeover-driven lease suspension or revocation
+external helper ownership of the lease heartbeat; the current helper remains
+in-process and session-manager-owned
 ```
 
 ## Next Slice
 
-The matched helper lease is now enforced for browser input and click actions.
-The next high-density identity-upgrade slice should connect user sovereignty to
-that runtime:
+The matched helper lease is now enforced for browser input and click actions,
+and explicit operator takeover suspends that authority until resume rotates and
+rebinds the lease. The next Level 2 slice should move one real runtime
+responsibility out of the in-process placeholder:
 
 ```text
-operator takeover -> suspend AI helper action lease -> explicit resume/rebind
+approved user-space trusted helper process pilot
+-> session-manager supervision
+-> process heartbeat backs lease readiness
+-> explicit stop and recovery readback
 ```
 
-It should reuse existing operator controls and work-view state, block AI-owned
-browser mutations while takeover is active, and require explicit resume/rebind
-before actions continue. It should not add another readiness-only milestone.
-External process start, installation, root/system daemon work, desktop-wide
-capture, and provider egress remain deferred.
+It should reuse the existing trusted-sidecar lifecycle task and approval rather
+than add another readiness chain. The process must be bounded, user-space,
+session-manager-owned, non-installed, and unable to capture the desktop or
+mutate the host. Root/system daemon work, desktop-wide capture, graphics-stack
+integration, and provider egress remain deferred.

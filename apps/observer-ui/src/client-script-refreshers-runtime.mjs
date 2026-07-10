@@ -139,7 +139,7 @@ async function refreshWorkView() {
     }
     updateDesiredUrlHint(workView.activeUrl ?? workView.entryUrl ?? null);
     workViewJson.textContent = [
-      "Helper Runtime: " + (helperRuntime.status ?? "unknown") + " owner=" + (helperRuntime.owner ?? "unknown") + " lease=" + (helperRuntime.leaseId ?? "none") + " browserLease=" + (helperRuntime.browserLeaseId ?? "none") + " matched=" + Boolean(helperRuntime.leaseMatched),
+      "Helper Runtime: " + (helperRuntime.status ?? "unknown") + " authority=" + (helperRuntime.actionAuthority ?? "unknown") + " owner=" + (helperRuntime.owner ?? "unknown") + " lease=" + (helperRuntime.leaseId ?? "none") + " browserLease=" + (helperRuntime.browserLeaseId ?? "none") + " matched=" + Boolean(helperRuntime.leaseMatched),
       "Helper Runtime Boundary: inProcess=" + (helperRuntime.mode === "in_process_session_helper") + " externalProcess=" + Boolean(helperRuntime.externalProcessStarted) + " root=" + Boolean(helperRuntime.rootRequired) + " desktopWide=" + Boolean(helperRuntime.desktopWideCapture),
       \`Session: \${data.session?.status ?? "unknown"}\`,
       \`Session ID: \${data.session?.sessionId ?? "none"}\`,
@@ -191,7 +191,7 @@ async function refreshScreen() {
     const helperRuntime = trustedSession.helperRuntime ?? {};
     screenWorkViewSummary.textContent = workViewSummary
       ? [
-          "Helper Runtime: " + (helperRuntime.status ?? "unknown") + " owner=" + (helperRuntime.owner ?? "unknown") + " lease=" + (helperRuntime.leaseId ?? "none") + " browserLease=" + (helperRuntime.browserLeaseId ?? "none") + " matched=" + Boolean(helperRuntime.leaseMatched),
+          "Helper Runtime: " + (helperRuntime.status ?? "unknown") + " authority=" + (helperRuntime.actionAuthority ?? "unknown") + " owner=" + (helperRuntime.owner ?? "unknown") + " lease=" + (helperRuntime.leaseId ?? "none") + " browserLease=" + (helperRuntime.browserLeaseId ?? "none") + " matched=" + Boolean(helperRuntime.leaseMatched),
           "Summary: " + (workViewSummary.summaryText ?? "none"),
           "Title: " + (workViewSummary.title ?? "none"),
           "URL: " + (workViewSummary.url ?? "none"),

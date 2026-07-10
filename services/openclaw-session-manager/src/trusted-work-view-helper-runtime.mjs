@@ -36,6 +36,10 @@ export function createTrustedWorkViewHelperRuntime({
       issuedAt,
       heartbeatAt: issuedAt,
       heartbeatCount: 1,
+      actionAuthority: "active",
+      suspendedAt: null,
+      suspensionReason: null,
+      reboundAt: null,
       rootRequired: false,
       externalProcessStarted: false,
       desktopWideCapture: false,
@@ -60,6 +64,50 @@ export function createTrustedWorkViewHelperRuntime({
       lastVisibility: visibility,
       lastAction: action,
     };
+    if (lease.actionAuthority !== "suspended") {
+      degradedReason = null;
+    }
+    return snapshot();
+  }
+
+  function suspend({ sessionId, reason = "operator_takeover" } = {}) {
+    if (!lease) {
+      return snapshot();
+    }
+    if (requiredString(sessionId, "sessionId") !== lease.sessionId) {
+      throw new Error("Trusted work-view helper runtime session mismatch.");
+    }
+    lease = {
+      ...lease,
+      actionAuthority: "suspended",
+      suspendedAt: now(),
+      suspensionReason: requiredString(reason, "suspension reason"),
+    };
+    degradedReason = null;
+    return snapshot();
+  }
+
+  function rebind({ sessionId, reason = "operator_resume" } = {}) {
+    if (!lease) {
+      return snapshot();
+    }
+    if (requiredString(sessionId, "sessionId") !== lease.sessionId) {
+      throw new Error("Trusted work-view helper runtime session mismatch.");
+    }
+    const reboundAt = now();
+    lease = {
+      ...lease,
+      leaseId: createId(),
+      issuedAt: reboundAt,
+      heartbeatAt: reboundAt,
+      heartbeatCount: lease.heartbeatCount + 1,
+      actionAuthority: "active",
+      suspendedAt: null,
+      suspensionReason: null,
+      reboundAt,
+      lastAction: requiredString(reason, "rebind reason"),
+    };
+    browserObservation = null;
     degradedReason = null;
     return snapshot();
   }
@@ -108,6 +156,8 @@ export function createTrustedWorkViewHelperRuntime({
       ? "degraded"
       : !lease
         ? "inactive"
+        : lease.actionAuthority === "suspended" && leaseMatched
+          ? "suspended"
         : browserObservation
           ? leaseMatched ? "active" : "divergent"
           : "awaiting_browser";
@@ -126,6 +176,10 @@ export function createTrustedWorkViewHelperRuntime({
       leaseMatched,
       heartbeatAt: lease?.heartbeatAt ?? null,
       heartbeatCount: lease?.heartbeatCount ?? 0,
+      actionAuthority: lease?.actionAuthority ?? "inactive",
+      suspendedAt: lease?.suspendedAt ?? null,
+      suspensionReason: lease?.suspensionReason ?? null,
+      reboundAt: lease?.reboundAt ?? null,
       degradedReason,
       scope: "ai_owned_work_view_only",
       observerVisible: true,
@@ -140,6 +194,8 @@ export function createTrustedWorkViewHelperRuntime({
   return {
     start,
     heartbeat,
+    suspend,
+    rebind,
     observeBrowserLease,
     markDegraded,
     leaseEnvelope,

@@ -22,6 +22,17 @@ export function buildTrustedWorkViewActionLease(screen) {
     };
   }
 
+  if (helperRuntime.status === "suspended" || helperRuntime.actionAuthority === "suspended") {
+    return {
+      registry: "openclaw-trusted-work-view-action-mediation-v0",
+      required: true,
+      ready: false,
+      status: "blocked",
+      reason: "operator_takeover_active",
+      trustedHelperLease: null,
+    };
+  }
+
   if (
     helperRuntime.registry !== "openclaw-trusted-work-view-helper-runtime-v0"
     || helperRuntime.owner !== "openclaw-session-manager"

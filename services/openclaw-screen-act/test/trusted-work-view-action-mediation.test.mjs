@@ -47,3 +47,14 @@ test("screen-act blocks divergent helper state before browser mutation", () => {
   assert.equal(mediation.reason, "trusted_helper_lease_not_ready");
   assert.equal(mediation.trustedHelperLease, null);
 });
+
+test("screen-act blocks helper action while operator takeover is active", () => {
+  const mediation = buildTrustedWorkViewActionLease(trustedScreen({
+    status: "suspended",
+    actionAuthority: "suspended",
+  }));
+  assert.equal(mediation.required, true);
+  assert.equal(mediation.ready, false);
+  assert.equal(mediation.reason, "operator_takeover_active");
+  assert.equal(mediation.trustedHelperLease, null);
+});

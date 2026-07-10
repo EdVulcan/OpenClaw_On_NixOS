@@ -172,14 +172,14 @@ export function createPhase3WorkViewBuilders(deps) {
       trustedSession?.sessionIdentity?.alignment?.browserRuntime === "matched" &&
       trustedSession?.helperRuntime?.registry === "openclaw-trusted-work-view-helper-runtime-v0" &&
       trustedSession?.helperRuntime?.owner === "openclaw-session-manager" &&
-      trustedSession?.helperRuntime?.status === "active" &&
+      ["active", "suspended"].includes(trustedSession?.helperRuntime?.status) &&
       trustedSession?.helperRuntime?.leaseMatched === true &&
       trustedSession?.helperRuntime?.externalProcessStarted === false &&
       trustedSession?.helperRuntime?.rootRequired === false &&
       trustedSession?.helperRuntime?.desktopWideCapture === false &&
       trustedSession?.operatorGates?.reveal === "explicit_operator_action" &&
       trustedSession?.recoveryRecommendation?.rootRequired === false &&
-      ["none", "reveal_work_view", "prepare_work_view"].includes(trustedSession?.recoveryRecommendation?.action) &&
+      ["none", "reveal_work_view", "prepare_work_view", "resume_ai_action_authority"].includes(trustedSession?.recoveryRecommendation?.action) &&
       trustedSession?.sidecarContract?.status === "drafted_not_started" &&
       trustedSession?.sidecarContract?.lifecycle?.processStarted === false &&
       trustedSession?.sidecarContract?.lifecycle?.rootRequired === false &&
@@ -270,6 +270,7 @@ export function createPhase3WorkViewBuilders(deps) {
     const background = await buildPhase3BackgroundWorkView();
     const operator = buildOperatorState();
     const sidecarLifecycle = buildLatestSidecarLifecycleReadback();
+    const helperRuntime = background.workViewContract?.trustedSession?.helperRuntime ?? null;
     const controls = [
       { id: "pause", endpoint: "/control/pause", available: true, effect: "pause current active task" },
       { id: "resume", endpoint: "/control/resume", available: true, effect: "resume a paused task as queued work" },
@@ -324,6 +325,7 @@ export function createPhase3WorkViewBuilders(deps) {
       controls,
       operator,
       sidecarLifecycle,
+      helperRuntime,
       checks,
       summary: {
         ready: passed === checks.length,
@@ -331,6 +333,9 @@ export function createPhase3WorkViewBuilders(deps) {
         total: checks.length,
         completionPercent: Math.round((passed / checks.length) * 100),
         takeoverSupported: true,
+        actionAuthority: helperRuntime?.actionAuthority ?? "unavailable",
+        actionAuthoritySuspended: helperRuntime?.status === "suspended",
+        helperLeaseId: helperRuntime?.leaseId ?? null,
         hiddenAutomation: false,
         sidecarLifecycleTaskId: sidecarLifecycle.taskId,
         sidecarLifecycleApprovalStatus: sidecarLifecycle.approvalStatus,

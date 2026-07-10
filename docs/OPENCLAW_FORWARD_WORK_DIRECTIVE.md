@@ -235,9 +235,12 @@ readiness endpoint.
 
 That action-mediation follow-up is complete for browser input and click:
 screen-act derives the current trusted lease, browser-runtime rejects missing or
-mismatched leases before mutation, and Observer shows the mediation result. The
-next Level 2 slice should suspend this action authority during explicit operator
-takeover and require an explicit resume/rebind.
+mismatched leases before mutation, and Observer shows the mediation result.
+Operator takeover now suspends the same lease in session-manager and
+browser-runtime; explicit resume rotates and rebinds a new lease before actions
+continue. The next Level 2 slice should use the existing approved sidecar
+lifecycle to pilot a bounded user-space helper process whose heartbeat backs
+lease readiness. Do not turn that pilot into another readiness-only chain.
 
 ## Identity-Upgrade Alignment
 

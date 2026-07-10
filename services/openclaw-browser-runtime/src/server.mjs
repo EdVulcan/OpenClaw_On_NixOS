@@ -317,6 +317,42 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === "POST" && requestUrl.pathname === "/browser/trusted-helper-lease") {
+    try {
+      const body = await readJsonBody(req);
+      const sessionId = typeof body.sessionId === "string" && body.sessionId.trim()
+        ? body.sessionId.trim()
+        : browserState.sessionId;
+      if (!sessionId || (browserState.sessionId && browserState.sessionId !== sessionId)) {
+        sendJson(res, 409, { ok: false, error: "Browser runtime helper lease session mismatch." });
+        return;
+      }
+      const trustedHelperLease = normaliseTrustedWorkViewHelperLease(body.trustedHelperLease, {
+        expectedSessionId: sessionId,
+      });
+      if (!trustedHelperLease) {
+        sendJson(res, 400, { ok: false, error: "Browser runtime requires a trusted helper lease." });
+        return;
+      }
+      updateBrowserState({
+        sessionId,
+        sessionAuthority: "openclaw-session-manager",
+        trustedHelperLease,
+      });
+      const browser = serialiseBrowserState();
+      await publishEvent(createEventName("browser.updated"), {
+        browser,
+        action: "trusted-helper-lease-rebound",
+        actionAuthority: trustedHelperLease.actionAuthority,
+      });
+      sendJson(res, 200, { ok: true, browser, trustedHelperLease });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 400, { ok: false, error: message });
+    }
+    return;
+  }
+
   if (req.method === "POST" && requestUrl.pathname === "/browser/input") {
     try {
       if (!browserState.running) {

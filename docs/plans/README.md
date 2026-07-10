@@ -101,6 +101,17 @@ edit/write/verification task readback. The Level 1 engineering loop should not
 grow another evidence/readiness shell; continue with the smallest real Level 2
 trusted work-view/session-helper capability.
 
+The active Level 2 bridge is documented in:
+
+```text
+OPENCLAW_TRUSTED_WORK_VIEW_SESSION_CONTRACT_PLAN.md
+```
+
+It now closes browser action mediation through operator takeover suspension and
+explicit resume/rebind. The next real slice is a bounded, approval-gated
+user-space helper process pilot under the existing sidecar lifecycle, not a new
+readiness milestone.
+
 ## Historical Phase Plans
 
 `OPENCLAW_PHASE_2_PLAN.md` through `OPENCLAW_PHASE_136_PLAN.md` are retained

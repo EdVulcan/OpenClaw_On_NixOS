@@ -18,6 +18,7 @@ export OPENCLAW_SYSTEM_HEAL_STATE_FILE="${OPENCLAW_SYSTEM_HEAL_STATE_FILE:-$REPO
 
 CORE_URL="http://127.0.0.1:$OPENCLAW_CORE_PORT"
 SESSION_MANAGER_URL="http://127.0.0.1:$OPENCLAW_SESSION_MANAGER_PORT"
+BROWSER_RUNTIME_URL="http://127.0.0.1:$OPENCLAW_BROWSER_RUNTIME_PORT"
 LEDGER_DIR="$REPO_ROOT/.artifacts/openclaw-body-evidence-ledger"
 
 "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
@@ -25,7 +26,8 @@ rm -f "$OPENCLAW_CORE_STATE_FILE" "$OPENCLAW_CORE_STATE_FILE.tmp" "$OPENCLAW_SYS
 rm -rf "$LEDGER_DIR"
 
 cleanup() {
-  rm -f "${CONTROLS_FILE:-}" "${START_PROBE_FILE:-}" "${APPROVED_START_PROBE_FILE:-}" "${CONTROLS_AFTER_PROBE_FILE:-}"
+  rm -f "${CONTROLS_FILE:-}" "${START_PROBE_FILE:-}" "${APPROVED_START_PROBE_FILE:-}" "${CONTROLS_AFTER_PROBE_FILE:-}" \
+    "${SUSPENDED_STATE_FILE:-}" "${OLD_BROWSER_ACTION_FILE:-}" "${RESUMED_STATE_FILE:-}" "${RESUMED_BROWSER_ACTION_FILE:-}"
   "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -43,15 +45,32 @@ prepared_state="$(curl --silent --fail "$SESSION_MANAGER_URL/work-view/state")"
 attach_body="$(node -e 'const data=JSON.parse(process.argv[1]); const workView=data.workView??{}; process.stdout.write(JSON.stringify({sessionId:data.session?.sessionId??null,status:"ready",visibility:workView.visibility??"hidden",mode:workView.mode??"background",helperStatus:workView.helperStatus??"active",displayTarget:workView.displayTarget??"workspace-2",activeUrl:workView.activeUrl??"https://example.com/phase-3-controls"}));' "$prepared_state")"
 post_json "$CORE_URL/tasks/$task_id/attach-work-view" "$attach_body" >/dev/null
 takeover="$(post_json "$CORE_URL/control/takeover" '{}')"
+SUSPENDED_STATE_FILE="$(mktemp)"
+OLD_BROWSER_ACTION_FILE="$(mktemp)"
+curl --silent --fail "$SESSION_MANAGER_URL/work-view/state" > "$SUSPENDED_STATE_FILE"
+old_browser_action_body="$(node -e 'const data=JSON.parse(process.argv[1]); const r=data.workView?.helperRuntime??{}; const trustedHelperLease={registry:"openclaw-trusted-work-view-helper-lease-v0",owner:r.owner,mode:r.mode,scope:r.scope,leaseId:r.leaseId,sessionId:r.sessionId,workViewId:r.workViewId,heartbeatAt:r.heartbeatAt,actionAuthority:r.actionAuthority}; process.stdout.write(JSON.stringify({text:"must-stay-blocked",trustedHelperLease}));' "$prepared_state")"
+old_browser_action_status="$(curl --silent --output "$OLD_BROWSER_ACTION_FILE" --write-out "%{http_code}" \
+  -X POST "$BROWSER_RUNTIME_URL/browser/input" \
+  -H 'content-type: application/json' \
+  --data "$old_browser_action_body")"
+CONTROLS_FILE="$(mktemp)"
+curl --silent --fail "$CORE_URL/phase-3/operator-interrupt-controls" > "$CONTROLS_FILE"
+resume="$(post_json "$CORE_URL/control/resume" '{}')"
+RESUMED_STATE_FILE="$(mktemp)"
+RESUMED_BROWSER_ACTION_FILE="$(mktemp)"
+curl --silent --fail "$SESSION_MANAGER_URL/work-view/state" > "$RESUMED_STATE_FILE"
+resumed_browser_action_body="$(node -e 'const data=JSON.parse(process.argv[1]); const r=data.workView?.helperRuntime??{}; const trustedHelperLease={registry:"openclaw-trusted-work-view-helper-lease-v0",owner:r.owner,mode:r.mode,scope:r.scope,leaseId:r.leaseId,sessionId:r.sessionId,workViewId:r.workViewId,heartbeatAt:r.heartbeatAt,actionAuthority:r.actionAuthority}; process.stdout.write(JSON.stringify({text:"allowed-after-explicit-resume",trustedHelperLease}));' "$(cat "$RESUMED_STATE_FILE")")"
+curl --silent --fail \
+  -X POST "$BROWSER_RUNTIME_URL/browser/input" \
+  -H 'content-type: application/json' \
+  --data "$resumed_browser_action_body" > "$RESUMED_BROWSER_ACTION_FILE"
 sidecar_task="$(post_json "$CORE_URL/work-view/trusted-sidecar/lifecycle-tasks" '{"confirm":true}')"
 sidecar_task_id="$(node -e 'const data = JSON.parse(process.argv[1]); process.stdout.write(data.task.id)' "$sidecar_task")"
 sidecar_approval_id="$(node -e 'const data = JSON.parse(process.argv[1]); process.stdout.write(data.approval.id)' "$sidecar_task")"
 
-CONTROLS_FILE="$(mktemp)"
 START_PROBE_FILE="$(mktemp)"
 APPROVED_START_PROBE_FILE="$(mktemp)"
 CONTROLS_AFTER_PROBE_FILE="$(mktemp)"
-curl --silent --fail "$CORE_URL/phase-3/operator-interrupt-controls" > "$CONTROLS_FILE"
 start_probe_status="$(curl --silent --output "$START_PROBE_FILE" --write-out "%{http_code}" \
   -X POST "$CORE_URL/work-view/trusted-sidecar/lifecycle-tasks/$sidecar_task_id/start-probe" \
   -H 'content-type: application/json' \
@@ -63,7 +82,7 @@ approved_start_probe_status="$(curl --silent --output "$APPROVED_START_PROBE_FIL
   --data '{}')"
 curl --silent --fail "$CORE_URL/phase-3/operator-interrupt-controls" > "$CONTROLS_AFTER_PROBE_FILE"
 
-node - <<'EOF' "$CONTROLS_FILE" "$takeover" "$sidecar_task" "$start_probe_status" "$START_PROBE_FILE" "$approved_sidecar" "$approved_start_probe_status" "$APPROVED_START_PROBE_FILE" "$CONTROLS_AFTER_PROBE_FILE"
+node - <<'EOF' "$CONTROLS_FILE" "$takeover" "$sidecar_task" "$start_probe_status" "$START_PROBE_FILE" "$approved_sidecar" "$approved_start_probe_status" "$APPROVED_START_PROBE_FILE" "$CONTROLS_AFTER_PROBE_FILE" "$SUSPENDED_STATE_FILE" "$old_browser_action_status" "$OLD_BROWSER_ACTION_FILE" "$resume" "$RESUMED_STATE_FILE" "$RESUMED_BROWSER_ACTION_FILE"
 const fs = require("node:fs");
 const controls = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
 const takeover = JSON.parse(process.argv[3]);
@@ -74,6 +93,12 @@ const approvedSidecar = JSON.parse(process.argv[7]);
 const approvedStartProbeStatus = process.argv[8];
 const approvedStartProbe = JSON.parse(fs.readFileSync(process.argv[9], "utf8"));
 const controlsAfterProbe = JSON.parse(fs.readFileSync(process.argv[10], "utf8"));
+const suspendedState = JSON.parse(fs.readFileSync(process.argv[11], "utf8"));
+const oldBrowserActionStatus = process.argv[12];
+const oldBrowserAction = JSON.parse(fs.readFileSync(process.argv[13], "utf8"));
+const resume = JSON.parse(process.argv[14]);
+const resumedState = JSON.parse(fs.readFileSync(process.argv[15], "utf8"));
+const resumedBrowserAction = JSON.parse(fs.readFileSync(process.argv[16], "utf8"));
 
 if (!controls.ok
   || controls.registry !== "openclaw-phase-3-operator-interrupt-controls-v0"
@@ -91,8 +116,39 @@ for (const id of ["pause", "resume", "stop", "takeover"]) {
 if (!takeover.ok
   || takeover.task?.status !== "paused"
   || takeover.task?.operatorTakeover?.status !== "operator_controlled"
-  || takeover.task?.workView?.mode !== "operator-takeover") {
+  || takeover.task?.workView?.mode !== "operator-takeover"
+  || takeover.workViewAuthority?.workView?.helperRuntime?.status !== "suspended"
+  || takeover.workViewAuthority?.workView?.helperRuntime?.actionAuthority !== "suspended") {
   throw new Error(`takeover should pause task and mark operator control: ${JSON.stringify(takeover.task)}`);
+}
+const suspendedRuntime = suspendedState.workView?.helperRuntime ?? {};
+if (suspendedRuntime.status !== "suspended"
+  || suspendedRuntime.actionAuthority !== "suspended"
+  || suspendedRuntime.leaseMatched !== true
+  || controls.helperRuntime?.status !== "suspended"
+  || controls.summary?.actionAuthoritySuspended !== true
+  || controls.summary?.actionAuthority !== "suspended") {
+  throw new Error(`takeover should suspend trusted helper action authority visibly: ${JSON.stringify({ suspendedRuntime, controls: controls.summary })}`);
+}
+if (oldBrowserActionStatus !== "409"
+  || oldBrowserAction.ok !== false
+  || oldBrowserAction.mediation?.accepted !== false
+  || oldBrowserAction.mediation?.reason !== "trusted_helper_action_authority_suspended") {
+  throw new Error(`browser should reject the pre-takeover lease while authority is suspended: ${oldBrowserActionStatus} ${JSON.stringify(oldBrowserAction)}`);
+}
+const resumedRuntime = resumedState.workView?.helperRuntime ?? {};
+if (!resume.ok
+  || resume.task?.status !== "queued"
+  || resume.task?.operatorTakeover?.status !== "resumed"
+  || resume.workViewAuthority?.authority?.rebound !== true
+  || resumedRuntime.status !== "active"
+  || resumedRuntime.actionAuthority !== "active"
+  || resumedRuntime.leaseMatched !== true
+  || resumedRuntime.leaseId === suspendedRuntime.leaseId
+  || resumedBrowserAction.ok !== true
+  || resumedBrowserAction.mediation?.accepted !== true
+  || resumedBrowserAction.mediation?.leaseMatched !== true) {
+  throw new Error(`explicit resume should rebind a fresh lease before browser actions continue: ${JSON.stringify({ resume, resumedRuntime, resumedBrowserAction })}`);
 }
 if (!sidecarTask.ok
   || sidecarTask.registry !== "openclaw-work-view-trusted-sidecar-lifecycle-task-v0"
@@ -155,6 +211,10 @@ console.log(JSON.stringify({
     registry: controls.registry,
     controls: controls.controls.map((control) => control.id),
     takeoverTaskStatus: takeover.task.status,
+    suspendedLease: suspendedRuntime.leaseId,
+    oldLeaseActionStatus: oldBrowserActionStatus,
+    resumedLease: resumedRuntime.leaseId,
+    resumedActionAccepted: resumedBrowserAction.mediation.accepted,
     sidecarTask: sidecarTask.task.id,
     approval: sidecarTask.approval.id,
     startProbeBeforeApproval: startProbe.readback.status,

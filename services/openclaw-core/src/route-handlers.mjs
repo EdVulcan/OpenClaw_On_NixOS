@@ -65,7 +65,17 @@ export function registerRoutes(deps) {
       return;
     }
 
-    if (await handleOperatorControlRoute({ req, res, requestUrl, state, taskManager, executor, publishEvent })) {
+    if (await handleOperatorControlRoute({
+      req,
+      res,
+      requestUrl,
+      state,
+      taskManager,
+      executor,
+      publishEvent,
+      postJson: client.postJson,
+      sessionManagerUrl,
+    })) {
       return;
     }
 

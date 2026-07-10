@@ -81,7 +81,7 @@ for (const token of ["Phase 3 Operator Interrupt Controls", "phase3-operator-int
     throw new Error(`Observer HTML missing ${token}`);
   }
 }
-for (const token of ["/phase-3/operator-interrupt-controls", "refreshPhase3OperatorInterruptControls", "openclaw-phase-3-operator-interrupt-controls-v0", "/control/takeover", "/work-view/trusted-sidecar/lifecycle-tasks", "/start-probe", "createTrustedSidecarLifecycleTask", "startTrustedSidecarLifecycleProbe", "sidecarLifecycle", "latestProbe", "workViewRecoveryAction", "trustedSession.helperReadiness"]) {
+for (const token of ["/phase-3/operator-interrupt-controls", "refreshPhase3OperatorInterruptControls", "openclaw-phase-3-operator-interrupt-controls-v0", "/control/takeover", "/control/resume", "/work-view/trusted-sidecar/lifecycle-tasks", "/start-probe", "createTrustedSidecarLifecycleTask", "startTrustedSidecarLifecycleProbe", "sidecarLifecycle", "latestProbe", "workViewRecoveryAction", "trustedSession.helperReadiness", "Action Authority", "actionAuthoritySuspended", "helperRuntime.actionAuthority"]) {
   if (!client.includes(token)) {
     throw new Error(`Observer client missing ${token}`);
   }

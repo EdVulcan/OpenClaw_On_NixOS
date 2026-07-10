@@ -117,12 +117,67 @@ test("trusted work-view action mediation requires the browser-owned helper lease
   assert.equal(rejected.accepted, false);
   assert.equal(rejected.reason, "trusted_helper_lease_mismatch");
 
+  const suspended = validateTrustedWorkViewActionLease({
+    candidate: lease,
+    browserSessionId: "session-action",
+    browserSessionAuthority: "openclaw-session-manager",
+    browserLease: { ...lease, actionAuthority: "suspended" },
+  });
+  assert.equal(suspended.accepted, false);
+  assert.equal(suspended.leaseMatched, true);
+  assert.equal(suspended.reason, "trusted_helper_action_authority_suspended");
+
   const fallback = validateTrustedWorkViewActionLease({
     browserSessionId: "browser-local",
     browserSessionAuthority: "browser-runtime-local",
   });
   assert.equal(fallback.accepted, true);
   assert.equal(fallback.required, false);
+});
+
+test("trusted work-view contract exposes operator takeover suspension without treating it as divergence", () => {
+  const lease = {
+    registry: "openclaw-trusted-work-view-helper-lease-v0",
+    owner: "openclaw-session-manager",
+    mode: "in_process_session_helper",
+    scope: "ai_owned_work_view_only",
+    leaseId: "lease-suspended",
+    sessionId: "session-suspended",
+    workViewId: "work-view-primary",
+    actionAuthority: "suspended",
+    suspendedAt: "2026-07-10T11:00:00.000Z",
+    suspensionReason: "operator_takeover",
+  };
+  const contract = buildTrustedWorkViewContract({
+    source: "session-manager",
+    sessionAuthority: "openclaw-session-manager",
+    authoritativeSessionId: "session-suspended",
+    componentSessionId: "session-suspended",
+    browserRuntimeSessionId: "session-suspended",
+    session: { sessionId: "session-suspended", status: "running" },
+    workView: {
+      status: "prepared",
+      visibility: "hidden",
+      helperStatus: "suspended",
+      browserStatus: "running",
+      activeUrl: "https://example.com/takeover",
+      helperRuntime: {
+        ...lease,
+        registry: "openclaw-trusted-work-view-helper-runtime-v0",
+        status: "suspended",
+        browserLeaseId: "lease-suspended",
+        leaseMatched: true,
+      },
+    },
+    browser: { running: true, trustedHelperLease: lease },
+  });
+
+  assert.equal(contract.readiness, "operator_controlled");
+  assert.equal(contract.helperRuntime.status, "suspended");
+  assert.equal(contract.helperRuntime.actionAuthority, "suspended");
+  assert.equal(contract.helperReadiness.state, "operator_controlled");
+  assert.equal(contract.recoveryRecommendation.action, "resume_ai_action_authority");
+  assert.equal(contract.recoveryRecommendation.endpoint, "/control/resume");
 });
 
 test("trusted work-view contract detects divergent browser runtime session identity", () => {

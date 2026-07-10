@@ -48,6 +48,7 @@ export function normaliseTrustedWorkViewHelperLease(value, { expectedSessionId =
   if (expectedSessionId && sessionId !== expectedSessionId) {
     throw new Error("Trusted work-view helper lease session mismatch.");
   }
+  const actionAuthority = value.actionAuthority === "suspended" ? "suspended" : "active";
   return {
     registry: TRUSTED_WORK_VIEW_HELPER_LEASE_REGISTRY,
     owner: "openclaw-session-manager",
@@ -58,6 +59,10 @@ export function normaliseTrustedWorkViewHelperLease(value, { expectedSessionId =
     workViewId,
     issuedAt: firstString(value.issuedAt),
     heartbeatAt: firstString(value.heartbeatAt),
+    actionAuthority,
+    suspendedAt: firstString(value.suspendedAt),
+    suspensionReason: firstString(value.suspensionReason),
+    reboundAt: firstString(value.reboundAt),
     rootRequired: false,
     externalProcessStarted: false,
     desktopWideCapture: false,
@@ -92,6 +97,18 @@ export function validateTrustedWorkViewActionLease({
     const provided = normaliseTrustedWorkViewHelperLease(candidate, {
       expectedSessionId: browserSessionId,
     });
+    if (expected?.actionAuthority === "suspended") {
+      return {
+        registry: "openclaw-trusted-work-view-action-mediation-v0",
+        required: true,
+        accepted: false,
+        status: "rejected",
+        reason: "trusted_helper_action_authority_suspended",
+        sessionId: browserSessionId,
+        leaseId: provided?.leaseId ?? null,
+        leaseMatched: Boolean(expected?.leaseId && provided?.leaseId === expected.leaseId),
+      };
+    }
     const leaseMatched = Boolean(expected?.leaseId && provided?.leaseId === expected.leaseId);
     return {
       registry: "openclaw-trusted-work-view-action-mediation-v0",
@@ -135,7 +152,10 @@ function deriveHelperRuntime({ input, workView, browser, capture, authoritativeS
   const leaseMatched = Boolean(leaseId && browserLeaseId && leaseId === browserLeaseId && sessionAligned && browserSessionAligned);
   const explicitlyDivergent = supplied?.status === "divergent" || supplied?.leaseMatched === false;
   const explicitlyDegraded = supplied?.status === "degraded";
-  const status = explicitlyDivergent || (leaseId && browserLeaseId && !leaseMatched)
+  const actionAuthority = firstString(supplied?.actionAuthority, browserLease?.actionAuthority, "active");
+  const status = actionAuthority === "suspended" && leaseMatched
+    ? "suspended"
+    : explicitlyDivergent || (leaseId && browserLeaseId && !leaseMatched)
     ? "divergent"
     : explicitlyDegraded
       ? "degraded"
@@ -158,6 +178,10 @@ function deriveHelperRuntime({ input, workView, browser, capture, authoritativeS
     heartbeatAt: firstString(supplied?.heartbeatAt, browserLease?.heartbeatAt),
     heartbeatCount: Number.isInteger(supplied?.heartbeatCount) ? supplied.heartbeatCount : 0,
     browserObservedAt: firstString(supplied?.browserObservedAt),
+    actionAuthority,
+    suspendedAt: firstString(supplied?.suspendedAt, browserLease?.suspendedAt),
+    suspensionReason: firstString(supplied?.suspensionReason, browserLease?.suspensionReason),
+    reboundAt: firstString(supplied?.reboundAt, browserLease?.reboundAt),
     scope: TRUSTED_WORK_VIEW_SCOPE,
     observerVisible: true,
     rootRequired: false,
@@ -194,6 +218,20 @@ function helperActions() {
 }
 
 function deriveHelperReadiness({ readiness, helperStatus, browserStatus, browserRunning, activeUrl, visibility, sessionIdentityStatus, helperRuntimeStatus }) {
+  if (helperRuntimeStatus === "suspended") {
+    return {
+      state: "operator_controlled",
+      reason: "operator_takeover_active",
+      recommendedOperatorAction: "resume_ai_action_authority",
+      recoveryEndpoint: "/control/resume",
+      approvalRequired: false,
+      rootRequired: false,
+      canRecoverWithoutRoot: true,
+      observerVisible: true,
+      availableOperatorActions: helperActions(),
+    };
+  }
+
   if (sessionIdentityStatus === "divergent") {
     return {
       state: "degraded",
@@ -425,7 +463,9 @@ export function buildTrustedWorkViewContract(input = {}) {
     workViewStatus: workView.status,
     activeUrl,
   });
-  const readiness = sessionIdentity.status === "divergent" || ["divergent", "degraded"].includes(helperRuntime.status)
+  const readiness = helperRuntime.status === "suspended"
+    ? "operator_controlled"
+    : sessionIdentity.status === "divergent" || ["divergent", "degraded"].includes(helperRuntime.status)
     ? "degraded"
     : baseReadiness;
   const helperReadiness = deriveHelperReadiness({

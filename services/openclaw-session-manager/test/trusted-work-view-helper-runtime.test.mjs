@@ -61,3 +61,47 @@ test("trusted work-view helper runtime exposes divergent browser lease without r
   assert.equal(divergent.leaseMatched, false);
   assert.equal(divergent.externalProcessStarted, false);
 });
+
+test("trusted work-view helper runtime suspends action authority and rebinds a new lease on resume", () => {
+  const leaseIds = ["lease-before-takeover", "lease-after-resume"];
+  let tick = 0;
+  const runtime = createTrustedWorkViewHelperRuntime({
+    createId: () => leaseIds.shift(),
+    now: () => `2026-07-10T11:00:0${tick++}.000Z`,
+  });
+  runtime.start({
+    sessionId: "session-1",
+    workViewId: "work-view-primary",
+    displayTarget: "workspace-2",
+  });
+  runtime.observeBrowserLease({
+    sessionId: "session-1",
+    trustedHelperLease: runtime.leaseEnvelope(),
+  });
+
+  const suspended = runtime.suspend({
+    sessionId: "session-1",
+    reason: "operator_takeover",
+  });
+  assert.equal(suspended.status, "suspended");
+  assert.equal(suspended.actionAuthority, "suspended");
+  assert.equal(suspended.leaseId, "lease-before-takeover");
+  assert.equal(runtime.leaseEnvelope().actionAuthority, "suspended");
+
+  const awaitingBrowser = runtime.rebind({
+    sessionId: "session-1",
+    reason: "operator_resume",
+  });
+  assert.equal(awaitingBrowser.status, "awaiting_browser");
+  assert.equal(awaitingBrowser.actionAuthority, "active");
+  assert.equal(awaitingBrowser.leaseId, "lease-after-resume");
+  assert.equal(awaitingBrowser.browserLeaseId, null);
+
+  const resumed = runtime.observeBrowserLease({
+    sessionId: "session-1",
+    trustedHelperLease: runtime.leaseEnvelope(),
+  });
+  assert.equal(resumed.status, "active");
+  assert.equal(resumed.leaseMatched, true);
+  assert.equal(resumed.reboundAt, "2026-07-10T11:00:03.000Z");
+});

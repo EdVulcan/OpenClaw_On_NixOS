@@ -17,7 +17,17 @@ function serialiseOperatorStep(step, { serialiseTask, serialiseExecutionResult, 
   };
 }
 
-export async function handleOperatorControlRoute({ req, res, requestUrl, state, taskManager, executor, publishEvent }) {
+export async function handleOperatorControlRoute({
+  req,
+  res,
+  requestUrl,
+  state,
+  taskManager,
+  executor,
+  publishEvent,
+  postJson,
+  sessionManagerUrl,
+}) {
   const { tasks, runtimeState, getCurrentTask } = state;
   const {
     getTaskById,
@@ -115,12 +125,39 @@ export async function handleOperatorControlRoute({ req, res, requestUrl, state, 
       return true;
     }
 
+    let workViewAuthority = null;
+    if (task.operatorTakeover?.status === "operator_controlled") {
+      try {
+        workViewAuthority = await postJson(`${sessionManagerUrl}/work-view/helper-authority/resume`, {
+          reason: "operator_resume",
+          operatorActionSource: "openclaw-core-control-resume",
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unable to resume trusted work-view action authority.";
+        sendJson(res, 409, { ok: false, error: message, task: serialiseTask(task) });
+        return true;
+      }
+    }
+
     task.status = "queued";
+    if (task.operatorTakeover?.status === "operator_controlled") {
+      task.operatorTakeover = {
+        ...task.operatorTakeover,
+        status: "resumed",
+        resumedAt: new Date().toISOString(),
+        actionAuthority: workViewAuthority?.workView?.helperRuntime ?? null,
+      };
+    }
     appendTaskPhase(task, "resumed", { reason: "Resumed by operator." });
     reconcileRuntimeState();
 
     await publishEvent(createEventName("task.resumed"), { task: serialiseTask(task) });
-    sendJson(res, 200, { ok: true, task: serialiseTask(task), runtime: runtimeState });
+    sendJson(res, 200, {
+      ok: true,
+      task: serialiseTask(task),
+      runtime: runtimeState,
+      workViewAuthority,
+    });
     return true;
   }
 
@@ -136,6 +173,18 @@ export async function handleOperatorControlRoute({ req, res, requestUrl, state, 
       return true;
     }
 
+    let workViewAuthority;
+    try {
+      workViewAuthority = await postJson(`${sessionManagerUrl}/work-view/helper-authority/suspend`, {
+        reason: "operator_takeover",
+        operatorActionSource: "openclaw-core-control-takeover",
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to suspend trusted work-view action authority.";
+      sendJson(res, 409, { ok: false, error: message, task: serialiseTask(task) });
+      return true;
+    }
+
     const now = new Date().toISOString();
     task.status = "paused";
     task.operatorTakeover = {
@@ -144,6 +193,7 @@ export async function handleOperatorControlRoute({ req, res, requestUrl, state, 
       reason: "Taken over by operator.",
       resumesThrough: "/control/resume",
       stopsThrough: "/control/stop",
+      actionAuthority: workViewAuthority?.workView?.helperRuntime ?? null,
     };
     task.workView = {
       ...(task.workView ?? {}),
@@ -155,7 +205,12 @@ export async function handleOperatorControlRoute({ req, res, requestUrl, state, 
 
     const takeoverTask = serialiseTask(task);
     await publishEvent(createEventName("task.operator_takeover"), { task: takeoverTask });
-    sendJson(res, 200, { ok: true, task: takeoverTask, runtime: runtimeState });
+    sendJson(res, 200, {
+      ok: true,
+      task: takeoverTask,
+      runtime: runtimeState,
+      workViewAuthority,
+    });
     return true;
   }
 
