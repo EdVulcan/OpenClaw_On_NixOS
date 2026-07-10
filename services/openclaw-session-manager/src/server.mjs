@@ -35,6 +35,7 @@ const workViewState = {
   entryUrl: defaultWorkViewUrl,
   activeUrl: null,
   lastOperatorAction: null,
+  lastSidecarFailure: null,
   preparedAt: null,
   lastRevealedAt: null,
   lastHiddenAt: null,
@@ -53,6 +54,9 @@ const trustedWorkViewSidecarSupervisor = createTrustedWorkViewSidecarSupervisor(
         action: "trusted_sidecar_heartbeat",
       });
     }
+  },
+  onFailure(failure) {
+    handleTrustedSidecarFailure(failure).catch(() => {});
   },
 });
 
@@ -255,6 +259,33 @@ async function suspendHelperActionAuthority(reason) {
     helperStatus: "suspended",
   });
   return { ...sync, helperRuntime: trustedWorkViewHelperRuntime.snapshot() };
+}
+
+async function handleTrustedSidecarFailure(failure) {
+  const previous = workViewActionSnapshot();
+  trustedWorkViewHelperRuntime.suspend({
+    sessionId: sessionState.sessionId,
+    reason: failure.degradedReason ?? "trusted_sidecar_failure",
+  });
+  updateWorkViewState({
+    helperStatus: "suspended",
+    lastSidecarFailure: {
+      status: failure.status,
+      reason: failure.degradedReason ?? "trusted_sidecar_failure",
+      pid: failure.pid ?? null,
+      taskId: failure.taskId ?? null,
+      heartbeatAt: failure.heartbeatAt ?? null,
+      detectedAt: new Date().toISOString(),
+      automaticRestart: false,
+      recoveryAction: "restart_approved_trusted_sidecar",
+      previous,
+    },
+  });
+  try {
+    await syncBrowserHelperLease();
+  } catch (error) {
+    trustedWorkViewHelperRuntime.markDegraded(error instanceof Error ? error.message : "sidecar failure lease sync failed");
+  }
 }
 
 async function resumeHelperActionAuthority(reason) {
@@ -630,6 +661,10 @@ const server = http.createServer(async (req, res) => {
         approvalId: body.approvalId,
         approvalStatus: body.approvalStatus,
       });
+      let authority = null;
+      if (trustedWorkViewHelperRuntime.snapshot().actionAuthority === "suspended") {
+        authority = await resumeHelperActionAuthority("approved_trusted_sidecar_restart");
+      }
       updateWorkViewState({ helperStatus: trustedWorkViewHelperRuntime.snapshot().status });
       const workView = serialiseWorkViewState();
       await publishEvent(createEventName("screen.updated"), {
@@ -637,7 +672,7 @@ const server = http.createServer(async (req, res) => {
         action: "trusted-sidecar-started",
         workView,
       });
-      sendJson(res, 200, { ok: true, sidecar, session: serialiseSessionState(), workView });
+      sendJson(res, 200, { ok: true, sidecar, authority, session: serialiseSessionState(), workView });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       sendJson(res, 409, { ok: false, error: message, workView: serialiseWorkViewState() });
@@ -649,13 +684,14 @@ const server = http.createServer(async (req, res) => {
     try {
       const body = await readJsonBody(req);
       const sidecar = await trustedWorkViewSidecarSupervisor.stop({ taskId: body.taskId });
+      const authority = await suspendHelperActionAuthority("trusted_sidecar_stopped");
       const workView = serialiseWorkViewState();
       await publishEvent(createEventName("screen.updated"), {
         service: "openclaw-session-manager",
         action: "trusted-sidecar-stopped",
         workView,
       });
-      sendJson(res, 200, { ok: true, sidecar, session: serialiseSessionState(), workView });
+      sendJson(res, 200, { ok: true, sidecar, authority, session: serialiseSessionState(), workView });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       sendJson(res, 409, { ok: false, error: message, workView: serialiseWorkViewState() });

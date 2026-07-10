@@ -29,6 +29,7 @@ cleanup() {
   rm -f "${CONTROLS_FILE:-}" "${START_PROBE_FILE:-}" "${APPROVED_START_PROBE_FILE:-}" "${CONTROLS_AFTER_PROBE_FILE:-}" \
     "${SUSPENDED_STATE_FILE:-}" "${OLD_BROWSER_ACTION_FILE:-}" "${RESUMED_STATE_FILE:-}" "${RESUMED_BROWSER_ACTION_FILE:-}"
   rm -f "${STOP_SIDECAR_FILE:-}" "${CONTROLS_AFTER_STOP_FILE:-}"
+  rm -f "${SIDECAR_FAILURE_STATE_FILE:-}" "${SIDECAR_FAILURE_ACTION_FILE:-}" "${RESTART_SIDECAR_FILE:-}" "${RESTARTED_STATE_FILE:-}"
   "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -82,6 +83,25 @@ approved_start_probe_status="$(curl --silent --output "$APPROVED_START_PROBE_FIL
   -H 'content-type: application/json' \
   --data '{}')"
 curl --silent --fail "$CORE_URL/phase-3/operator-interrupt-controls" > "$CONTROLS_AFTER_PROBE_FILE"
+sidecar_pid="$(node -e 'const data=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8")); process.stdout.write(String(data.readback.execution.pid));' "$APPROVED_START_PROBE_FILE")"
+kill -TERM "$sidecar_pid"
+SIDECAR_FAILURE_STATE_FILE="$(mktemp)"
+for _ in $(seq 1 50); do
+  curl --silent --fail "$SESSION_MANAGER_URL/work-view/state" > "$SIDECAR_FAILURE_STATE_FILE"
+  if node -e 'const data=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8")); process.exit(data.workView?.helperRuntime?.actionAuthority==="suspended" && data.workView?.helperRuntime?.sidecar?.status==="degraded" ? 0 : 1);' "$SIDECAR_FAILURE_STATE_FILE"; then
+    break
+  fi
+  sleep 0.1
+done
+SIDECAR_FAILURE_ACTION_FILE="$(mktemp)"
+failure_action_body="$(node -e 'const data=JSON.parse(process.argv[1]); const r=data.workView?.helperRuntime??{}; const trustedHelperLease={registry:"openclaw-trusted-work-view-helper-lease-v0",owner:r.owner,mode:r.mode,scope:r.scope,leaseId:r.leaseId,sessionId:r.sessionId,workViewId:r.workViewId,heartbeatAt:r.heartbeatAt,actionAuthority:"active"}; process.stdout.write(JSON.stringify({text:"blocked-after-sidecar-failure",trustedHelperLease}));' "$(cat "$SIDECAR_FAILURE_STATE_FILE")")"
+failure_action_status="$(curl --silent --output "$SIDECAR_FAILURE_ACTION_FILE" --write-out "%{http_code}" \
+  -X POST "$BROWSER_RUNTIME_URL/browser/input" -H 'content-type: application/json' --data "$failure_action_body")"
+RESTART_SIDECAR_FILE="$(mktemp)"
+RESTARTED_STATE_FILE="$(mktemp)"
+curl --silent --fail -X POST "$CORE_URL/work-view/trusted-sidecar/lifecycle-tasks/$sidecar_task_id/start-probe" \
+  -H 'content-type: application/json' --data '{}' > "$RESTART_SIDECAR_FILE"
+curl --silent --fail "$SESSION_MANAGER_URL/work-view/state" > "$RESTARTED_STATE_FILE"
 STOP_SIDECAR_FILE="$(mktemp)"
 CONTROLS_AFTER_STOP_FILE="$(mktemp)"
 curl --silent --fail \
@@ -90,7 +110,7 @@ curl --silent --fail \
   --data '{}' > "$STOP_SIDECAR_FILE"
 curl --silent --fail "$CORE_URL/phase-3/operator-interrupt-controls" > "$CONTROLS_AFTER_STOP_FILE"
 
-node - <<'EOF' "$CONTROLS_FILE" "$takeover" "$sidecar_task" "$start_probe_status" "$START_PROBE_FILE" "$approved_sidecar" "$approved_start_probe_status" "$APPROVED_START_PROBE_FILE" "$CONTROLS_AFTER_PROBE_FILE" "$SUSPENDED_STATE_FILE" "$old_browser_action_status" "$OLD_BROWSER_ACTION_FILE" "$resume" "$RESUMED_STATE_FILE" "$RESUMED_BROWSER_ACTION_FILE" "$STOP_SIDECAR_FILE" "$CONTROLS_AFTER_STOP_FILE"
+node - <<'EOF' "$CONTROLS_FILE" "$takeover" "$sidecar_task" "$start_probe_status" "$START_PROBE_FILE" "$approved_sidecar" "$approved_start_probe_status" "$APPROVED_START_PROBE_FILE" "$CONTROLS_AFTER_PROBE_FILE" "$SUSPENDED_STATE_FILE" "$old_browser_action_status" "$OLD_BROWSER_ACTION_FILE" "$resume" "$RESUMED_STATE_FILE" "$RESUMED_BROWSER_ACTION_FILE" "$STOP_SIDECAR_FILE" "$CONTROLS_AFTER_STOP_FILE" "$SIDECAR_FAILURE_STATE_FILE" "$failure_action_status" "$SIDECAR_FAILURE_ACTION_FILE" "$RESTART_SIDECAR_FILE" "$RESTARTED_STATE_FILE"
 const fs = require("node:fs");
 const controls = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
 const takeover = JSON.parse(process.argv[3]);
@@ -109,6 +129,11 @@ const resumedState = JSON.parse(fs.readFileSync(process.argv[15], "utf8"));
 const resumedBrowserAction = JSON.parse(fs.readFileSync(process.argv[16], "utf8"));
 const stoppedSidecar = JSON.parse(fs.readFileSync(process.argv[17], "utf8"));
 const controlsAfterStop = JSON.parse(fs.readFileSync(process.argv[18], "utf8"));
+const failureState = JSON.parse(fs.readFileSync(process.argv[19], "utf8"));
+const failureActionStatus = process.argv[20];
+const failureAction = JSON.parse(fs.readFileSync(process.argv[21], "utf8"));
+const restartedSidecar = JSON.parse(fs.readFileSync(process.argv[22], "utf8"));
+const restartedState = JSON.parse(fs.readFileSync(process.argv[23], "utf8"));
 
 if (!controls.ok
   || controls.registry !== "openclaw-phase-3-operator-interrupt-controls-v0"
@@ -225,6 +250,26 @@ if (controlsAfterProbe.sidecarLifecycle?.taskId !== sidecarTask.task.id
   || controlsAfterProbe.summary?.sidecarSupervisorStatus !== "running") {
   throw new Error(`operator controls should consolidate sidecar lifecycle readback: ${JSON.stringify(controlsAfterProbe.sidecarLifecycle)}`);
 }
+const failedRuntime = failureState.workView?.helperRuntime ?? {};
+if (failedRuntime.sidecar?.status !== "degraded"
+  || failedRuntime.actionAuthority !== "suspended"
+  || !String(failedRuntime.suspensionReason).startsWith("trusted_sidecar_exited_")
+  || failureState.workView?.lastSidecarFailure?.automaticRestart !== false
+  || failureState.workView?.trustedSession?.recoveryRecommendation?.action !== "restart_approved_trusted_sidecar"
+  || failureActionStatus !== "409"
+  || failureAction.mediation?.reason !== "trusted_helper_action_authority_suspended") {
+  throw new Error(`unexpected sidecar exit should fail closed without automatic restart: ${JSON.stringify({ failedRuntime, failure: failureState.workView?.lastSidecarFailure, failureActionStatus, failureAction })}`);
+}
+const restartedRuntime = restartedState.workView?.helperRuntime ?? {};
+if (!restartedSidecar.ok
+  || restartedSidecar.readback?.status !== "running_after_approval"
+  || restartedSidecar.readback?.execution?.pid === approvedStartProbe.readback.execution.pid
+  || restartedRuntime.sidecar?.status !== "running"
+  || restartedRuntime.actionAuthority !== "active"
+  || restartedRuntime.leaseMatched !== true
+  || restartedRuntime.leaseId === failedRuntime.leaseId) {
+  throw new Error(`explicit approved restart should launch a new process and rebind action authority: ${JSON.stringify({ restartedSidecar, restartedRuntime, failedRuntime })}`);
+}
 if (!stoppedSidecar.ok
   || stoppedSidecar.mode !== "trusted-sidecar-stopped-after-operator-action"
   || stoppedSidecar.readback?.status !== "stopped_after_operator_action"
@@ -254,6 +299,8 @@ console.log(JSON.stringify({
     sidecarPid: approvedStartProbe.readback.execution.pid,
     heartbeatCount: approvedStartProbe.readback.execution.heartbeatCount,
     controlsSidecarProbe: controlsAfterProbe.sidecarLifecycle.latestProbe.status,
+    failClosedReason: failedRuntime.suspensionReason,
+    restartPid: restartedSidecar.readback.execution.pid,
     stoppedSidecar: stoppedSidecar.readback.status,
   },
 }, null, 2));

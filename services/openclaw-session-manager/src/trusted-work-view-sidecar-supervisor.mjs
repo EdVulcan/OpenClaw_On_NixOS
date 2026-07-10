@@ -16,9 +16,11 @@ export function createTrustedWorkViewSidecarSupervisor({
   spawnProcess = spawn,
   now = () => new Date().toISOString(),
   heartbeatIntervalMs = 250,
+  heartbeatTimeoutMs = 1_500,
   startTimeoutMs = 2_000,
   stopTimeoutMs = 1_000,
   onHeartbeat = () => {},
+  onFailure = () => {},
 } = {}) {
   let child = null;
   let status = "inactive";
@@ -30,6 +32,34 @@ export function createTrustedWorkViewSidecarSupervisor({
   let exitCode = null;
   let exitSignal = null;
   let degradedReason = null;
+  let heartbeatTimer = null;
+  let failureReported = false;
+
+  function clearHeartbeatTimer() {
+    if (heartbeatTimer) {
+      clearTimeout(heartbeatTimer);
+      heartbeatTimer = null;
+    }
+  }
+
+  function reportFailure() {
+    if (!failureReported) {
+      failureReported = true;
+      onFailure(snapshot());
+    }
+  }
+
+  function armHeartbeatTimer(processHandle) {
+    clearHeartbeatTimer();
+    heartbeatTimer = setTimeout(() => {
+      if (child === processHandle && status === "running") {
+        status = "degraded";
+        degradedReason = "trusted_sidecar_heartbeat_timeout";
+        reportFailure();
+        processHandle.kill("SIGTERM");
+      }
+    }, heartbeatTimeoutMs);
+  }
 
   function snapshot() {
     return {
@@ -81,6 +111,7 @@ export function createTrustedWorkViewSidecarSupervisor({
         : heartbeatCount + 1;
       degradedReason = null;
       onHeartbeat({ ...message, leaseId: owner.leaseId });
+      armHeartbeatTimer(child);
     }
   }
 
@@ -111,6 +142,7 @@ export function createTrustedWorkViewSidecarSupervisor({
     exitCode = null;
     exitSignal = null;
     degradedReason = null;
+    failureReported = false;
 
     const processHandle = spawnProcess(process.execPath, [sidecarPath.pathname], {
       stdio: ["ignore", "ignore", "ignore", "ipc"],
@@ -128,18 +160,19 @@ export function createTrustedWorkViewSidecarSupervisor({
       degradedReason = error instanceof Error ? error.message : "sidecar_process_error";
     });
     processHandle.on("exit", (code, signal) => {
+      clearHeartbeatTimer();
       exitCode = code;
       exitSignal = signal;
       stoppedAt = now();
       if (status !== "stopping") {
-        status = code === 0 ? "stopped" : "degraded";
-        if (code !== 0) {
-          degradedReason = `sidecar_exited_${code ?? signal ?? "unknown"}`;
-        }
+        status = "degraded";
+        degradedReason ??= `trusted_sidecar_exited_${code ?? signal ?? "unknown"}`;
+        reportFailure();
+        child = null;
       } else {
         status = "stopped";
+        child = null;
       }
-      child = null;
     });
 
     await new Promise((resolve, reject) => {
@@ -176,6 +209,7 @@ export function createTrustedWorkViewSidecarSupervisor({
     }
     const processHandle = child;
     status = "stopping";
+    clearHeartbeatTimer();
     await new Promise((resolve) => {
       const timeout = setTimeout(() => {
         processHandle.kill("SIGTERM");

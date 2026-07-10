@@ -217,17 +217,20 @@ function helperActions() {
     { id: "reveal_work_view", endpoint: "/work-view/reveal", approvalRequired: false },
     { id: "hide_work_view", endpoint: "/work-view/hide", approvalRequired: false },
     { id: "operator_takeover", endpoint: "/control/takeover", approvalRequired: false },
+    { id: "restart_approved_trusted_sidecar", endpoint: "/work-view/trusted-sidecar/lifecycle-tasks/:taskId/start-probe", approvalRequired: true },
   ];
 }
 
-function deriveHelperReadiness({ readiness, helperStatus, browserStatus, browserRunning, activeUrl, visibility, sessionIdentityStatus, helperRuntimeStatus }) {
+function deriveHelperReadiness({ readiness, helperStatus, browserStatus, browserRunning, activeUrl, visibility, sessionIdentityStatus, helperRuntimeStatus, helperRuntimeSuspensionReason }) {
   if (helperRuntimeStatus === "suspended") {
+    const sidecarFailure = typeof helperRuntimeSuspensionReason === "string"
+      && helperRuntimeSuspensionReason.startsWith("trusted_sidecar");
     return {
       state: "operator_controlled",
-      reason: "operator_takeover_active",
-      recommendedOperatorAction: "resume_ai_action_authority",
-      recoveryEndpoint: "/control/resume",
-      approvalRequired: false,
+      reason: sidecarFailure ? helperRuntimeSuspensionReason : "operator_takeover_active",
+      recommendedOperatorAction: sidecarFailure ? "restart_approved_trusted_sidecar" : "resume_ai_action_authority",
+      recoveryEndpoint: sidecarFailure ? null : "/control/resume",
+      approvalRequired: sidecarFailure,
       rootRequired: false,
       canRecoverWithoutRoot: true,
       observerVisible: true,
@@ -491,6 +494,7 @@ export function buildTrustedWorkViewContract(input = {}) {
     visibility,
     sessionIdentityStatus: sessionIdentity.status,
     helperRuntimeStatus: helperRuntime.status,
+    helperRuntimeSuspensionReason: helperRuntime.suspensionReason,
   });
 
   return {

@@ -46,3 +46,29 @@ test("trusted work-view sidecar supervisor rejects unapproved process start", as
   }), /approved lifecycle authority/u);
   assert.equal(supervisor.snapshot().running, false);
 });
+
+test("trusted work-view sidecar supervisor reports heartbeat timeout without automatic restart", async () => {
+  let resolveFailure;
+  const failed = new Promise((resolve) => {
+    resolveFailure = resolve;
+  });
+  const supervisor = createTrustedWorkViewSidecarSupervisor({
+    heartbeatIntervalMs: 1_000,
+    heartbeatTimeoutMs: 50,
+    onFailure: resolveFailure,
+  });
+  await supervisor.start({
+    sessionId: "session-timeout",
+    workViewId: "work-view-primary",
+    leaseId: "lease-timeout",
+    taskId: "task-timeout",
+    approvalId: "approval-timeout",
+    approvalStatus: "approved",
+  });
+  const failure = await failed;
+  assert.equal(failure.status, "degraded");
+  assert.equal(failure.degradedReason, "trusted_sidecar_heartbeat_timeout");
+  assert.equal(failure.running, false);
+  assert.equal(failure.pid > 0, true);
+  assert.equal(failure.automaticRestart, undefined);
+});

@@ -206,7 +206,7 @@ export function createPhase3WorkViewBuilders(deps) {
       trustedSession?.helperRuntime?.desktopWideCapture === false &&
       trustedSession?.operatorGates?.reveal === "explicit_operator_action" &&
       trustedSession?.recoveryRecommendation?.rootRequired === false &&
-      ["none", "reveal_work_view", "prepare_work_view", "resume_ai_action_authority"].includes(trustedSession?.recoveryRecommendation?.action) &&
+      ["none", "reveal_work_view", "prepare_work_view", "resume_ai_action_authority", "restart_approved_trusted_sidecar"].includes(trustedSession?.recoveryRecommendation?.action) &&
       ["drafted_not_started", "running_user_space_pilot", "stopped_user_space_pilot"].includes(trustedSession?.sidecarContract?.status) &&
       trustedSession?.sidecarContract?.lifecycle?.processStarted === (trustedSession?.helperRuntime?.externalProcessStarted === true) &&
       trustedSession?.sidecarContract?.lifecycle?.rootRequired === false &&

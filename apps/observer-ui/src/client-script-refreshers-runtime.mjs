@@ -145,6 +145,7 @@ async function refreshWorkView() {
       \`Session ID: \${data.session?.sessionId ?? "none"}\`,
       \`Display: \${workView.displayTarget ?? "unknown"}\`,
       \`Browser: \${workView.browserStatus ?? "unknown"}\`,
+      "Sidecar Failure: " + (workView.lastSidecarFailure?.reason ?? "none") + " autoRestart=" + Boolean(workView.lastSidecarFailure?.automaticRestart) + " recovery=" + (workView.lastSidecarFailure?.recoveryAction ?? "none"),
       \`Trusted Session: \${trustedSession.identityLevel ?? "unknown"} readiness=\${trustedSession.readiness ?? "unknown"}\`,
       \`Session Identity: \${sessionIdentity.status ?? "unknown"} authority=\${sessionIdentity.authority ?? "unknown"} authoritative=\${sessionIdentity.authoritativeSessionId ?? "none"} browser=\${sessionIdentity.browserRuntimeSessionId ?? "none"}\`,
       \`Trusted Boundary: \${trustedSession.boundary?.workViewScope ?? "unknown"} root=\${String(Boolean(trustedSession.boundary?.rootRequired))} desktopWide=\${String(Boolean(trustedSession.boundary?.desktopWideCapture))}\`,

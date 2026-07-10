@@ -237,6 +237,20 @@ contains no filesystem, network, browser, provider, desktop-capture, or host
 mutation implementation. Parent IPC disconnect also terminates it, so it cannot
 remain orphaned after session-manager exits.
 
+## Fail-Closed Liveness And Recovery
+
+The supervisor now owns a heartbeat deadline as well as process exit handling.
+Unexpected exit or heartbeat timeout records `lastSidecarFailure`, suspends the
+authoritative helper action lease, synchronizes the suspended lease into
+browser-runtime, and exposes `restart_approved_trusted_sidecar` through the
+trusted-session recovery recommendation. Matching stale leases are rejected by
+browser-runtime while the sidecar is unavailable.
+
+There is no automatic restart. Reusing the existing approved lifecycle start
+action launches a new child, rotates and rebinds the helper lease, and only then
+restores browser action authority. Explicit stop also suspends action authority,
+so stopping the heartbeat process cannot leave AI actions enabled accidentally.
+
 ## Evidence
 
 Runtime contract builder:
@@ -301,25 +315,28 @@ automatic recovery execution; the contract recommends existing operator actions
 unreviewed endpoint invocation from recommendation payloads
 trusted-lease mediation for keyboard hotkey/window-focus paths that do not yet
 mutate browser-runtime state
-sidecar-owned browser capture/action transport; this pilot owns heartbeat only
-automatic sidecar restart after crash or heartbeat timeout
+sidecar-owned browser capture/action transport; the process currently owns
+heartbeat and liveness only
+automatic sidecar restart after crash or heartbeat timeout; recovery remains an
+explicit approved operator action
 ```
 
 ## Next Slice
 
 The approved user-space sidecar now backs helper readiness with a real IPC
-heartbeat and supports explicit stop. The next Level 2 slice should make loss of
-that heartbeat fail closed:
+heartbeat, fails closed on liveness loss, and supports explicit approved
+restart. The next Level 2 slice should move bounded capture observation into the
+sidecar process:
 
 ```text
-unexpected sidecar exit or heartbeat timeout
--> helper readiness becomes degraded
--> AI action authority is suspended
--> Observer recommends explicit approved restart
--> no automatic restart
+sidecar-owned browser capture observation
+-> loopback-only bounded capture source
+-> session/work-view/lease identity attached by the sidecar
+-> Observer reads the same trusted-session contract
+-> no desktop-wide capture or input authority expansion
 ```
 
 It should extend the same supervisor, lifecycle task, work-view contract, and
-Observer controls rather than add another readiness chain. Root/system daemon
-work, desktop-wide capture, graphics-stack integration, automatic restart, and
-provider egress remain deferred.
+Observer readback rather than add another readiness chain. Root/system daemon
+work, desktop-wide capture, graphics-stack integration, arbitrary input,
+automatic restart, and provider egress remain deferred.

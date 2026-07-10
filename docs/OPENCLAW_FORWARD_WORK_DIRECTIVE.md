@@ -239,9 +239,12 @@ Operator takeover now suspends the same lease in session-manager and
 browser-runtime; explicit resume rotates and rebinds a new lease before actions
 continue. The existing approved sidecar lifecycle now starts and stops one
 bounded session-manager-owned user-space process whose IPC heartbeat backs lease
-readiness. The next Level 2 slice should fail closed on unexpected sidecar exit
-or heartbeat timeout and require an explicit approved restart; do not add a
-readiness-only chain or automatic restart loop.
+readiness. Unexpected exit and heartbeat timeout now fail closed by suspending
+browser action authority; the same approved lifecycle action explicitly starts
+a new process and rebinds a new lease, with no automatic restart. The next Level
+2 slice should move bounded browser capture observation into the sidecar over a
+loopback-only source while preserving the same trusted-session contract. Do not
+add a readiness-only chain or desktop-wide capture.
 
 ## Identity-Upgrade Alignment
 
