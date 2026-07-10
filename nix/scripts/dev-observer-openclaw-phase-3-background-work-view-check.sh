@@ -49,7 +49,7 @@ const html = fs.readFileSync(process.argv[2], "utf8");
 const client = fs.readFileSync(process.argv[3], "utf8");
 const background = JSON.parse(fs.readFileSync(process.argv[4], "utf8"));
 
-for (const token of ["Phase 3 Background Work View", "phase3-background-work-view-panel", "phase3-background-visibility", "phase3-background-mode", "run-recommended-work-view-action-button"]) {
+for (const token of ["Phase 3 Background Work View", "phase3-background-work-view-panel", "phase3-background-visibility", "phase3-background-mode", "work-view-session-identity", "run-recommended-work-view-action-button"]) {
   if (!html.includes(token)) {
     throw new Error(`Observer HTML missing ${token}`);
   }

@@ -245,6 +245,7 @@ const revealWorkViewButton = document.querySelector("#reveal-work-view-button");
 const hideWorkViewButton = document.querySelector("#hide-work-view-button");
 const runRecommendedWorkViewActionButton = document.querySelector("#run-recommended-work-view-action-button");
 const createTrustedSidecarLifecycleTaskButton = document.querySelector("#create-trusted-sidecar-lifecycle-task-button");
+const workViewSessionIdentity = document.querySelector("#work-view-session-identity");
 const refreshScreenButton = document.querySelector("#refresh-screen-button");
 const clickActionButton = document.querySelector("#click-action-button");
 const typeActionButton = document.querySelector("#type-action-button");

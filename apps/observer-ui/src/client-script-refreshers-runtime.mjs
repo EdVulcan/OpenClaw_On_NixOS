@@ -129,13 +129,14 @@ async function refreshWorkView() {
     workViewHelper.textContent = workView.helperStatus ?? "unknown";
     workViewCapture.textContent = workView.captureStrategy ?? "unknown";
     const trustedSession = workView.trustedSession ?? data.trustedSession ?? {};
+    const sessionIdentity = trustedSession.sessionIdentity ?? {};
+    workViewSessionIdentity.textContent = sessionIdentity.status ?? "unknown";
     if (!desiredWorkViewUrlPinned && document.activeElement !== workViewUrlInput) {
       setDesiredWorkViewUrl(workView.activeUrl ?? workView.entryUrl ?? "https://example.com/work-view", {
         pinned: false,
       });
     }
     updateDesiredUrlHint(workView.activeUrl ?? workView.entryUrl ?? null);
-    const sessionIdentity = trustedSession.sessionIdentity ?? {};
     workViewJson.textContent = [
       \`Session: \${data.session?.status ?? "unknown"}\`,
       \`Session ID: \${data.session?.sessionId ?? "none"}\`,
@@ -165,6 +166,7 @@ async function refreshWorkView() {
     workViewMode.textContent = "offline";
     workViewHelper.textContent = "offline";
     workViewCapture.textContent = "offline";
+    workViewSessionIdentity.textContent = "offline";
     workViewJson.textContent = "Unable to read work view state.";
     updateDesiredUrlHint(null);
   }

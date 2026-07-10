@@ -52,6 +52,7 @@ const requiredHtml = [
   "screen-capture-source",
   "screen-capture-strategy",
   "screen-work-view-url",
+  "work-view-session-identity",
   "screen-snapshot",
   "run-recommended-work-view-action-button",
 ];
@@ -61,6 +62,8 @@ const requiredClient = [
   "screen.workView?.activeUrl",
   "screen.captureMetadata?.activeUrl",
   "trustedSession.identityLevel",
+  "sessionIdentity",
+  "Session Identity",
   "trustedSession.helperReadiness",
   "trustedSession.recoveryRecommendation",
   "runRecommendedWorkViewAction",

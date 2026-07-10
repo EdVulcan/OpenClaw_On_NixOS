@@ -43,6 +43,7 @@ export function observerOperationsPanels() {
           <div class="metric"><span>Mode</span><span id="work-view-mode">background</span></div>
           <div class="metric"><span>Helper</span><span id="work-view-helper">idle</span></div>
           <div class="metric"><span>Capture</span><span id="work-view-capture">browser-runtime</span></div>
+          <div class="metric"><span>Session Identity</span><span id="work-view-session-identity">pending</span></div>
           <pre id="work-view-json">Loading work view state...</pre>
         </section>
         <section class="panel">

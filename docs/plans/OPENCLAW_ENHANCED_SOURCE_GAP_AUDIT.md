@@ -352,17 +352,19 @@ Enhanced source:
 
 Current OpenClaw:
 
-- Tool catalog and semantic index scan selected roots and derive metadata.
-- Existing system file search capability is not the same as a native codebase
-  grep/glob engineering surface.
+- `sense.openclaw.engineering_tool.glob` performs bounded workspace file
+  discovery with skipped hidden/generated/cache/dependency directories and
+  result caps.
+- `sense.openclaw.engineering_tool.grep` performs bounded workspace text search
+  with literal/regex mode, include filters, result/output caps, binary skips,
+  audit evidence, and Observer readback.
 
-Classification: not absorbed.
+Classification: absorbed.
 
 Recommendation:
 
-- After inventory/contract mapping, migrate these as the first real read/search
-  execution slice. Preserve result caps, ignored directories, workspace bounds,
-  and Observer readback.
+- Continue using the native bounded read/search surface. Do not execute the
+  enhanced `GlobTool.ts` or `GrepTool.ts` directly.
 
 ### `cc_lsp`
 
