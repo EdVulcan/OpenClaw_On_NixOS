@@ -256,14 +256,17 @@ resurrects the child. Browser-runtime restart recovery is also complete: an
 unavailable browser capture source becomes
 `recovery_required`, screen-act blocks before dispatch, Observer recommends the
 existing prepare action, and a fresh bounded capture restores sidecar IPC
-without restarting the helper. The next slice should carry one bounded browser
-navigation/new-tab action through the same trusted sidecar transport. That
-operator-facing action is now complete with bounded HTTP(S) URL validation,
+without restarting the helper. A bounded browser navigation/new-tab action is
+now complete on the same trusted sidecar transport, with HTTP(S) URL validation,
 lease/capture gates, sidecar IPC, browser mutation, refreshed capture, audit,
-and an Observer control. The next slice should map `browser.new_tab` into the
-existing core planner/task-executor action path so autonomous browser tasks can
-use the proven transport. Do not add horizontal navigation variants, a
-readiness-only chain, or desktop-wide capture.
+and an Observer control. Its core planner/task-executor bridge is also complete:
+planner and executor use
+one production action descriptor, task evidence retains the bounded sidecar
+effect, and verification prefers the post-action capture URL over stale session
+metadata. The next slice should make an in-flight browser task recover across a
+capture-source interruption using the existing recovery loop. Do not add
+horizontal navigation variants, a readiness-only chain, or desktop-wide
+capture.
 
 ## Identity-Upgrade Alignment
 

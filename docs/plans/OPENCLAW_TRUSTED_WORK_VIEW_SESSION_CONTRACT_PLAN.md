@@ -365,9 +365,9 @@ trusted-lease mediation for keyboard hotkey/window-focus paths that do not yet
 mutate browser-runtime state
 automatic sidecar restart after crash or heartbeat timeout; recovery remains an
 explicit approved operator action
-core planner/task-executor selection of `browser.new_tab`; the operator-facing
-action is real, but autonomous tasks do not yet map this action to the new
-screen-act route and capability descriptor
+in-flight browser task continuity when the capture source becomes unavailable;
+the runtime can recover before or between tasks, but a task interrupted during
+its action loop still completes through the generic failure/retry path
 ```
 
 ## Next Slice
@@ -395,7 +395,7 @@ requires the current trusted lease, and Observer exposes an `Open New Tab`
 control. The real milestone proves the tab count and active URL changed and a
 newer sidecar capture observed the result.
 
-The next slice should make the capability usable by autonomous browser tasks:
+The capability is also available to autonomous browser tasks:
 
 ```text
 browser task action kind browser.new_tab
@@ -405,7 +405,26 @@ browser task action kind browser.new_tab
 -> task action evidence includes the bounded effect summary
 ```
 
-It should extend the existing planner/executor action dispatch and the same
-sidecar transport rather than add another readiness chain. Root/system
-daemon work, desktop-wide capture, graphics-stack integration, broader input,
+This autonomous bridge is now complete. Planner and executor share one
+production action descriptor for capability and screen-act route selection,
+task evidence retains the compact sidecar effect, and verifier URL selection
+prefers the post-action bounded observation over stale session metadata. The
+real milestone completes a planned browser task whose `browser.new_tab` action
+is observed at the requested URL.
+
+The next Level 2 slice should address interrupted long-running work rather than
+add another navigation variant:
+
+```text
+in-flight browser task
+-> capture source becomes unavailable
+-> action fails closed with recoverable evidence
+-> operator/runtime restores the bounded work view
+-> existing task recovery retries from fresh observation
+-> completion evidence links both interruption and recovered action
+```
+
+It should extend the existing task recovery loop and the same sidecar transport
+rather than add another readiness chain. Root/system daemon work, desktop-wide
+capture, graphics-stack integration, broader input,
 automatic restart, and provider egress remain deferred.

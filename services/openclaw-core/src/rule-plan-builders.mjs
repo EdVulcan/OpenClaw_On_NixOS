@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { capabilityIdForBrowserTaskAction } from "./browser-task-action-contract.mjs";
 
 function redactPublicParams(params) {
   if (!params || typeof params !== "object" || Array.isArray(params)) {
@@ -100,6 +101,10 @@ export function createRulePlanBuilders(deps) {
 
   function resolvePlanCapabilityId({ kind, intent, plannerIntent }) {
     const candidate = intent || kind || plannerIntent || "";
+    const browserTaskCapabilityId = capabilityIdForBrowserTaskAction(candidate);
+    if (browserTaskCapabilityId) {
+      return browserTaskCapabilityId;
+    }
     const directMap = {
       "work_view.prepare": "act.work_view.control",
       "work_view.reveal": "act.work_view.control",
@@ -107,9 +112,6 @@ export function createRulePlanBuilders(deps) {
       "browser.open": "act.browser.open",
       "network.navigate": "act.browser.open",
       "screen.observe": "sense.screen.observe",
-      "keyboard.type": "act.screen.pointer_keyboard",
-      "keyboard.hotkey": "act.screen.pointer_keyboard",
-      "mouse.click": "act.screen.pointer_keyboard",
       "result.verify": "sense.screen.observe",
       "task.complete": "operate.task.loop",
       "policy.evaluate": "govern.policy.evaluate",

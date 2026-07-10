@@ -42,6 +42,7 @@ cleanup() {
   rm -f "${BROWSER_FAILURE_STATE_FILE:-}" "${BROWSER_FAILURE_ACTION_FILE:-}" \
     "${BROWSER_RECOVERED_STATE_FILE:-}" "${BROWSER_RECOVERED_ACTION_FILE:-}"
   rm -f "${NEW_TAB_ACTION_FILE:-}" "${NEW_TAB_BROWSER_STATE_FILE:-}" "${NEW_TAB_CAPTURE_STATE_FILE:-}"
+  rm -f "${AUTONOMOUS_NEW_TAB_RESULT_FILE:-}"
   if [[ -n "${RESTARTED_SESSION_MANAGER_PID:-}" ]]; then
     kill -TERM "$RESTARTED_SESSION_MANAGER_PID" >/dev/null 2>&1 || true
   fi
@@ -238,6 +239,9 @@ for _ in $(seq 1 50); do
   fi
   sleep 0.1
 done
+AUTONOMOUS_NEW_TAB_URL="https://example.com/phase-3-autonomous-new-tab"
+AUTONOMOUS_NEW_TAB_RESULT_FILE="$(mktemp)"
+post_json "$CORE_URL/tasks/execute" "{\"goal\":\"Open a bounded autonomous browser tab\",\"type\":\"browser_task\",\"targetUrl\":\"https://example.com/phase-3-autonomous-origin\",\"expectedUrl\":\"$AUTONOMOUS_NEW_TAB_URL\",\"workViewStrategy\":\"ai-work-view\",\"planStrategy\":\"rule-v1\",\"actions\":[{\"kind\":\"browser.new_tab\",\"params\":{\"url\":\"$AUTONOMOUS_NEW_TAB_URL\"}}]}" > "$AUTONOMOUS_NEW_TAB_RESULT_FILE"
 STOP_SIDECAR_FILE="$(mktemp)"
 CONTROLS_AFTER_STOP_FILE="$(mktemp)"
 curl --silent --fail \
@@ -246,7 +250,7 @@ curl --silent --fail \
   --data '{}' > "$STOP_SIDECAR_FILE"
 curl --silent --fail "$CORE_URL/phase-3/operator-interrupt-controls" > "$CONTROLS_AFTER_STOP_FILE"
 
-node - <<'EOF' "$CONTROLS_FILE" "$takeover" "$sidecar_task" "$start_probe_status" "$START_PROBE_FILE" "$approved_sidecar" "$approved_start_probe_status" "$APPROVED_START_PROBE_FILE" "$CONTROLS_AFTER_PROBE_FILE" "$SUSPENDED_STATE_FILE" "$old_browser_action_status" "$OLD_BROWSER_ACTION_FILE" "$resume" "$RESUMED_STATE_FILE" "$RESUMED_BROWSER_ACTION_FILE" "$STOP_SIDECAR_FILE" "$CONTROLS_AFTER_STOP_FILE" "$RECOVERY_REQUIRED_STATE_FILE" "$recovery_action_status" "$RECOVERY_BROWSER_ACTION_FILE" "$RESTART_SIDECAR_FILE" "$RESTARTED_STATE_FILE" "$CAPTURE_REFRESH_STATE_FILE" "$BROWSER_FAILURE_STATE_FILE" "$BROWSER_FAILURE_ACTION_FILE" "$BROWSER_RECOVERED_STATE_FILE" "$BROWSER_RECOVERED_ACTION_FILE" "$NEW_TAB_ACTION_FILE" "$NEW_TAB_BROWSER_STATE_FILE" "$NEW_TAB_CAPTURE_STATE_FILE" "$NEW_TAB_URL"
+node - <<'EOF' "$CONTROLS_FILE" "$takeover" "$sidecar_task" "$start_probe_status" "$START_PROBE_FILE" "$approved_sidecar" "$approved_start_probe_status" "$APPROVED_START_PROBE_FILE" "$CONTROLS_AFTER_PROBE_FILE" "$SUSPENDED_STATE_FILE" "$old_browser_action_status" "$OLD_BROWSER_ACTION_FILE" "$resume" "$RESUMED_STATE_FILE" "$RESUMED_BROWSER_ACTION_FILE" "$STOP_SIDECAR_FILE" "$CONTROLS_AFTER_STOP_FILE" "$RECOVERY_REQUIRED_STATE_FILE" "$recovery_action_status" "$RECOVERY_BROWSER_ACTION_FILE" "$RESTART_SIDECAR_FILE" "$RESTARTED_STATE_FILE" "$CAPTURE_REFRESH_STATE_FILE" "$BROWSER_FAILURE_STATE_FILE" "$BROWSER_FAILURE_ACTION_FILE" "$BROWSER_RECOVERED_STATE_FILE" "$BROWSER_RECOVERED_ACTION_FILE" "$NEW_TAB_ACTION_FILE" "$NEW_TAB_BROWSER_STATE_FILE" "$NEW_TAB_CAPTURE_STATE_FILE" "$NEW_TAB_URL" "$AUTONOMOUS_NEW_TAB_RESULT_FILE" "$AUTONOMOUS_NEW_TAB_URL"
 const fs = require("node:fs");
 const controls = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
 const takeover = JSON.parse(process.argv[3]);
@@ -279,6 +283,8 @@ const newTabAction = JSON.parse(fs.readFileSync(process.argv[29], "utf8"));
 const newTabBrowserState = JSON.parse(fs.readFileSync(process.argv[30], "utf8"));
 const newTabCaptureState = JSON.parse(fs.readFileSync(process.argv[31], "utf8"));
 const newTabUrl = process.argv[32];
+const autonomousNewTabResult = JSON.parse(fs.readFileSync(process.argv[33], "utf8"));
+const autonomousNewTabUrl = process.argv[34];
 
 if (!controls.ok
   || controls.registry !== "openclaw-phase-3-operator-interrupt-controls-v0"
@@ -477,6 +483,21 @@ if (newTabAction.action?.kind !== "browser.new_tab"
   || newTabCapture.sequence <= browserRecoveredSidecar.captureObservation.sequence) {
   throw new Error(`bounded new-tab action should mutate only the trusted AI browser and refresh capture: ${JSON.stringify({ newTabAction, browser: newTabBrowserState.browser, newTabCapture })}`);
 }
+const autonomousPlanStep = autonomousNewTabResult.task?.plan?.steps?.find((step) => step.kind === "browser.new_tab");
+const autonomousEvidence = autonomousNewTabResult.execution?.actionEvidence;
+const autonomousAction = autonomousEvidence?.actions?.[0] ?? {};
+if (autonomousNewTabResult.task?.status !== "completed"
+  || autonomousPlanStep?.capabilityId !== "act.browser.open"
+  || autonomousEvidence?.kind !== "eye-hand-action-evidence"
+  || autonomousEvidence?.actionCount !== 1
+  || autonomousEvidence?.degradedCount !== 0
+  || autonomousAction.kind !== "browser.new_tab"
+  || autonomousAction.mediation?.accepted !== true
+  || autonomousAction.mediation?.transport !== "trusted-sidecar-ipc"
+  || autonomousAction.mediation?.effect?.url !== autonomousNewTabUrl
+  || autonomousEvidence.observedAfterActions?.url !== autonomousNewTabUrl) {
+  throw new Error(`autonomous browser task should plan, execute, and observe bounded new-tab evidence: ${JSON.stringify(autonomousNewTabResult)}`);
+}
 if (!stoppedSidecar.ok
   || stoppedSidecar.mode !== "trusted-sidecar-stopped-after-operator-action"
   || stoppedSidecar.readback?.status !== "stopped_after_operator_action"
@@ -516,6 +537,8 @@ console.log(JSON.stringify({
     newTabUrl,
     newTabCount: newTabMediation.effect.tabCount,
     newTabCaptureSequence: newTabCapture.sequence,
+    autonomousNewTabTask: autonomousNewTabResult.task.id,
+    autonomousNewTabCapability: autonomousPlanStep.capabilityId,
     stoppedSidecar: stoppedSidecar.readback.status,
   },
 }, null, 2));

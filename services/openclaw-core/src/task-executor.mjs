@@ -6,6 +6,7 @@ import { createNativeAcpxCodexBridgeTaskHandlers } from "./task-executor-native-
 import { createNativeEngineeringLspLifecycleTaskHandlers } from "./native-engineering-lsp-lifecycle-tasks.mjs";
 import { createSystemBodyTaskHandlers } from "./task-executor-system-body-handlers.mjs";
 import { planCapabilityActionSteps } from "./task-recovery.mjs";
+import { observedBrowserTaskUrl, screenActEndpointForBrowserTaskAction } from "./browser-task-action-contract.mjs";
 
 export function createTaskExecutor(deps) {
   const { client, state, taskManager, planBuilder, approvalEngine, workspaceOps, policyEvaluator, publishEvent } = deps;
@@ -513,6 +514,11 @@ function buildActionEvidence(actionResults, workViewSummary) {
     result: action?.result ?? null,
     executedAt: action?.executedAt ?? null,
     screenContext: action?.screenContext ?? null,
+    mediation: action?.mediation ? {
+      accepted: action.mediation.accepted === true,
+      transport: action.mediation.transport ?? null,
+      effect: action.mediation.effect ?? null,
+    } : null,
   }));
 
   return {
@@ -540,9 +546,13 @@ function buildExecutionVerification({ targetUrl, options, verifiedScreen, action
     typeof options.expectedReadiness === "string" && options.expectedReadiness.trim()
       ? options.expectedReadiness.trim()
       : "ready";
-  const activeUrl = workView?.activeUrl ?? verifiedScreen?.screen?.snapshotText?.match(/^URL: (.+)$/m)?.[1] ?? null;
-  const readiness = verifiedScreen?.screen?.readiness ?? null;
   const workViewSummary = verifiedScreen?.screen?.workViewSummary ?? null;
+  const activeUrl = observedBrowserTaskUrl({
+    workViewSummary,
+    workView,
+    snapshotText: verifiedScreen?.screen?.snapshotText,
+  });
+  const readiness = verifiedScreen?.screen?.readiness ?? null;
   const actionEvidence = buildActionEvidence(actionResults, workViewSummary);
   const degradedActions = actionResults.filter((action) => action?.degraded);
   const checks = [
@@ -668,11 +678,7 @@ async function executeTask(task, options = {}) {
     const initialScreen = await fetchJson(`${screenSenseUrl}/screen/current`);
 
     for (const action of actions) {
-      const endpoint = action.kind === "keyboard.type"
-        ? "/act/keyboard/type"
-        : action.kind === "keyboard.hotkey"
-          ? "/act/keyboard/hotkey"
-          : "/act/mouse/click";
+      const endpoint = screenActEndpointForBrowserTaskAction(action.kind);
       const actionData = await postJson(`${screenActUrl}${endpoint}`, action.params);
       actionResults.push(actionData.action);
       await setTaskPhase(task, "acting_on_target", {
@@ -760,6 +766,11 @@ async function executeTask(task, options = {}) {
         degraded: Boolean(action?.degraded),
         result: action?.result ?? null,
         screenContext: action?.screenContext ?? null,
+        mediation: action?.mediation ? {
+          accepted: action.mediation.accepted === true,
+          transport: action.mediation.transport ?? null,
+          effect: action.mediation.effect ?? null,
+        } : null,
       })),
       workView: {
         status: workView.status ?? null,

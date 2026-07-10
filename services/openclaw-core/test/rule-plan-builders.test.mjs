@@ -134,6 +134,18 @@ test("rule plan builders preserve default planning and build decision contracts"
   assert.equal(plan.steps.some((step) => step.kind === "mouse.click"), true);
 });
 
+test("rule plan builders map browser new-tab to the existing browser capability", () => {
+  const builders = createRulePlanHarness();
+  const plan = builders.buildRulePlan({
+    goal: "Open documentation in a new tab",
+    targetUrl: "https://example.com/work",
+    actions: [{ kind: "browser.new_tab", params: { url: "https://example.com/docs" } }],
+  });
+  const actionStep = plan.steps.find((step) => step.kind === "browser.new_tab");
+  assert.equal(actionStep.capabilityId, "act.browser.open");
+  assert.equal(plan.capabilitySummary.ids.includes("act.browser.open"), true);
+});
+
 test("rule plan builders update phase status without task lifecycle coupling", () => {
   const builders = createRulePlanHarness();
   const task = {

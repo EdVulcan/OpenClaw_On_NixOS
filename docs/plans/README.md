@@ -118,9 +118,11 @@ and recovers capture plus sidecar IPC without restarting the helper. The next
 real slice is bounded browser navigation/new-tab through the same trusted
 transport. That operator-facing action is now complete with bounded URL
 validation, lease/capture gates, real tab mutation, refreshed capture, and an
-Observer control. The next slice should map `browser.new_tab` into the existing
-core planner/task-executor path instead of adding more navigation variants. Do
-not add a readiness milestone, automatic restart loop, or desktop-wide capture.
+Observer control. Its core planner/task-executor bridge is complete with shared
+production descriptors, compact sidecar
+effect evidence, and post-action capture verification. The next real slice is
+in-flight browser task recovery across capture-source interruption. Do not add
+a readiness milestone, automatic restart loop, or desktop-wide capture.
 
 ## Historical Phase Plans
 
