@@ -238,21 +238,22 @@ mismatched leases before mutation, and Observer shows the mediation result.
 Operator takeover now suspends the same lease in session-manager and
 browser-runtime; explicit resume rotates and rebinds a new lease before actions
 continue. The existing approved sidecar lifecycle now starts and stops one
-bounded session-manager-owned user-space process whose IPC heartbeat backs lease
-readiness. Unexpected exit and heartbeat timeout now fail closed by suspending
-browser action authority; the same approved lifecycle action explicitly starts
-a new process and rebinds a new lease, with no automatic restart. The Level 2
+bounded independent user-session process whose current-user socket heartbeat
+backs lease readiness. Unexpected exit and heartbeat timeout fail closed by
+suspending browser action authority; the same approved lifecycle action
+explicitly reconnects a survivor or starts a replacement and rebinds a new
+lease, with no automatic restart or reconnect. The Level 2
 sidecar now continuously refreshes a bounded browser observation over an
 allowlisted loopback-only source, with single-flight polling, sequence, and
 fresh/stale state but no retained full payload. Screen-act now requires a fresh
 same-session sidecar observation alongside the helper lease after sidecar
-lifecycle activation. Bounded browser input/click now travels through sidecar
-IPC, rechecks capture/session, and returns through screen-act audit.
-Session-manager restart now persists only compact lifecycle intent, exits the
-owned child with its parent, revokes the surviving browser lease before
-listening, reports `recovery_required`, and reuses the existing approved task
-for explicit restart under a new session lease. It never automatically
-resurrects the child. Browser-runtime restart recovery is also complete: an
+lifecycle activation. Bounded browser input/click now travels through the
+sidecar socket, rechecks capture/session, and returns through screen-act audit.
+Session-manager restart persists only compact lifecycle intent; the sidecar
+survives but clears its authority binding and capture, while the new manager
+revokes the stale browser lease before listening and reports
+`recovery_required`. The existing approved task explicitly reconnects the same
+PID under a fresh session lease. Browser-runtime restart recovery is also complete: an
 unavailable browser capture source becomes
 `recovery_required`, screen-act blocks before dispatch, Observer recommends the
 existing prepare action, and a fresh bounded capture restores sidecar IPC
@@ -280,6 +281,14 @@ independently supervised user-session sidecar ownership with fail-closed
 authority disconnect and explicit fresh-lease reconnect. Do not add horizontal
 navigation variants, a readiness-only chain, fault-injection endpoints,
 automatic action restart, root/system daemon ownership, or desktop-wide capture.
+
+That independent sidecar slice is now complete. The current-user socket process
+survives session-manager restart, clears binding/capture on disconnect, retains
+no reconnect lease, and requires the existing approved action to bind a fresh
+session. The milestone proves same-PID reconnect and stale-lease rejection. The
+next Level 2 reliability gap is explicit replacement after the sidecar process
+itself exits unexpectedly; it must reuse the existing lifecycle and must not
+auto-start a replacement.
 
 ## Identity-Upgrade Alignment
 

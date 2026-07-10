@@ -302,6 +302,7 @@ async function refreshPhase3BackgroundWorkView() {
       "Last Operator Action: " + (workView.lastOperatorAction?.action ?? "none") + " source=" + (workView.lastOperatorAction?.source ?? "none"),
       "Sidecar Contract: " + (trustedSession.sidecarContract?.status ?? "unknown") + " processStarted=" + String(Boolean(trustedSession.sidecarContract?.lifecycle?.processStarted)) + " supervisor=" + (trustedSession.sidecarContract?.lifecycle?.supervisorStatus ?? "unknown") + " heartbeat=" + (trustedSession.sidecarContract?.lifecycle?.heartbeatCount ?? 0),
       "Sidecar Recovery: status=" + (sidecar.status ?? "inactive") + " required=" + Boolean(sidecar.recoveryRequired) + " automaticRestart=" + Boolean(sidecar.automaticRestart),
+      "Sidecar Authority: owner=" + (sidecar.userSessionOwned ? "user-session" : sidecar.sessionManagerOwned ? "session-manager" : "none") + " connected=" + Boolean(sidecar.authorityConnected) + " reconnectable=" + Boolean(sidecar.reconnectable),
       "Capture Source: status=" + (sidecar.captureSourceStatus ?? "waiting") + " recoveryRequired=" + Boolean(sidecar.captureRecoveryRequired) + " failure=" + (sidecar.captureFailure ?? "none"),
       "Sidecar Lifecycle: " + (trustedSession.sidecarContract?.lifecycleProposal?.status ?? "unknown") + " execution=" + (trustedSession.sidecarContract?.lifecycleProposal?.executionStatus ?? "unknown"),
       "Sidecar Approval Draft: " + (trustedSession.sidecarContract?.approvalTaskDraft?.status ?? "unknown") + " createsTask=" + String(Boolean(trustedSession.sidecarContract?.approvalTaskDraft?.createsTaskNow)),
@@ -332,6 +333,7 @@ async function refreshPhase3OperatorInterruptControls() {
       "Operator: status=" + (data.operator?.status ?? "unknown") + " blocked=" + Boolean(data.operator?.blocked),
       "Action Authority: " + (summary.actionAuthority ?? helperRuntime.actionAuthority ?? "unknown") + " runtime=" + (helperRuntime.status ?? "unknown") + " suspended=" + Boolean(summary.actionAuthoritySuspended) + " lease=" + (summary.helperLeaseId ?? "none"),
       "Sidecar: task=" + (sidecarLifecycle.taskId ?? "none") + " approval=" + (sidecarLifecycle.approvalStatus ?? "none") + " lifecycle=" + (latestProbe.status ?? "none") + " supervisor=" + (safety.supervisorStatus ?? "none") + " pid=" + (safety.pid ?? "none") + " heartbeat=" + (safety.heartbeatCount ?? 0) + " capture=" + (safety.captureFreshness ?? "missing") + " processStarted=" + Boolean(safety.processStarted),
+      "Sidecar Authority: userSessionOwned=" + Boolean(safety.userSessionOwned) + " connected=" + Boolean(safety.authorityConnected) + " reconnectable=" + Boolean(safety.reconnectable) + " reconnected=" + Boolean(safety.reconnected),
       "Next: " + (data.next?.recommendedSlice ?? "unknown"),
     ].join("\\n");
   } catch {

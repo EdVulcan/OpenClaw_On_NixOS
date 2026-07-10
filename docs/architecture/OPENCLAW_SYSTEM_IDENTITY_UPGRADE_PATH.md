@@ -300,7 +300,7 @@
 | 身份层级 | 当前成熟度 | 证据与主要缺口 |
 | --- | --- | --- |
 | Level 1 用户态控制平面 | 约 90% | 本地服务、任务/审批/审计、工程读写验证恢复、记忆与 provider 治理面已形成；仍需少量整合与产品化。 |
-| Level 2 受信会话组件 | 约 94% | trusted-session 契约、takeover suspend/resume-rebind、sidecar lifecycle/fail-closed recovery、持续 bounded capture、fresh-capture 门禁、sidecar IPC browser input/click/new-tab transport、autonomous task dispatch、bounded capture-interruption retry，以及 session-manager/browser-runtime/core restart recovery 已有；authority/core 中断会形成可恢复任务并仅继续未完成动作，独立 user-session sidecar 所有权/重连和更稳定图形 runtime 尚未落地。 |
+| Level 2 受信会话组件 | 约 96% | trusted-session 契约、takeover suspend/resume-rebind、独立 user-session sidecar、fail-closed authority disconnect、显式 fresh-lease reconnect、持续 bounded capture、sidecar socket browser input/click/new-tab transport、autonomous task dispatch，以及 session-manager/browser-runtime/core restart recovery 已有；sidecar 自身崩溃后的显式 replacement 证明、login-session 安装和更稳定图形 runtime 尚未落地。 |
 | Level 3 系统级特权组件 | 约 10-15% | 已有 systemd 感知、提案和有限执行证据；独立 `openclaw-hostd`、D-Bus/Polkit RPC 和受控特权边界尚未建立。 |
 | Level 4 图形栈内生组件 | 约 0-5% | 只有 AI-owned work-view 方向与接口预留；专属 session、nested compositor、原生图形输入输出尚未实现。 |
 

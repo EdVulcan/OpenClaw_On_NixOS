@@ -1,5 +1,14 @@
 import { spawn } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import { chmodSync, mkdirSync, rmSync } from "node:fs";
+import net from "node:net";
+import { tmpdir } from "node:os";
+import path from "node:path";
+
+import {
+  createSidecarMessageDecoder,
+  encodeSidecarMessage,
+} from "./trusted-work-view-sidecar-channel.mjs";
 
 const HEARTBEAT_REGISTRY = "openclaw-trusted-work-view-sidecar-heartbeat-v0";
 const SIDECAR_REGISTRY = "openclaw-trusted-work-view-sidecar-supervisor-v0";
@@ -7,10 +16,37 @@ const sidecarPath = new URL("./trusted-work-view-sidecar.mjs", import.meta.url);
 
 function requiredString(value, label) {
   const text = typeof value === "string" ? value.trim() : "";
-  if (!text) {
-    throw new Error(`Trusted work-view sidecar requires ${label}.`);
-  }
+  if (!text) throw new Error(`Trusted work-view sidecar requires ${label}.`);
   return text;
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function connectSocket(socketPath, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const socket = net.createConnection(socketPath);
+    const timeout = setTimeout(() => {
+      socket.destroy();
+      reject(new Error("Trusted work-view sidecar socket connection timed out."));
+    }, timeoutMs);
+    socket.once("connect", () => {
+      clearTimeout(timeout);
+      socket.removeListener("error", rejectConnection);
+      resolve(socket);
+    });
+    function rejectConnection(error) {
+      clearTimeout(timeout);
+      reject(error);
+    }
+    socket.once("error", rejectConnection);
+  });
+}
+
+function sidecarSocketPath(socketDirectory, taskId) {
+  const digest = createHash("sha256").update(taskId).digest("hex").slice(0, 24);
+  return path.join(socketDirectory, `openclaw-sidecar-${digest}.sock`);
 }
 
 export function createTrustedWorkViewSidecarSupervisor({
@@ -22,12 +58,17 @@ export function createTrustedWorkViewSidecarSupervisor({
   heartbeatTimeoutMs = 1_500,
   startTimeoutMs = 2_000,
   stopTimeoutMs = 1_000,
+  reconnectTimeoutMs = 30_000,
+  socketDirectory = path.join(process.env.XDG_RUNTIME_DIR ?? tmpdir(), "openclaw-sidecars"),
   onHeartbeat = () => {},
   onFailure = () => {},
 } = {}) {
-  let child = null;
+  let transport = null;
+  let spawnedProcess = null;
   let status = "inactive";
   let owner = null;
+  let socketPath = null;
+  let pid = null;
   let startedAt = null;
   let stoppedAt = null;
   let heartbeatAt = null;
@@ -41,13 +82,21 @@ export function createTrustedWorkViewSidecarSupervisor({
   let captureFailure = null;
   let captureFailedAt = null;
   let captureResolver = null;
+  let startResolver = null;
+  let startRejecter = null;
+  let stopResolver = null;
   const pendingActions = new Map();
 
   function clearHeartbeatTimer() {
-    if (heartbeatTimer) {
-      clearTimeout(heartbeatTimer);
-      heartbeatTimer = null;
+    if (heartbeatTimer) clearTimeout(heartbeatTimer);
+    heartbeatTimer = null;
+  }
+
+  function rejectPendingActions(reason) {
+    for (const pending of pendingActions.values()) {
+      pending.reject(new Error(reason));
     }
+    pendingActions.clear();
   }
 
   function reportFailure() {
@@ -57,14 +106,14 @@ export function createTrustedWorkViewSidecarSupervisor({
     }
   }
 
-  function armHeartbeatTimer(processHandle) {
+  function armHeartbeatTimer() {
     clearHeartbeatTimer();
     heartbeatTimer = setTimeout(() => {
-      if (child === processHandle && status === "running") {
+      if (transport && status === "running") {
         status = "degraded";
         degradedReason = "trusted_sidecar_heartbeat_timeout";
         reportFailure();
-        processHandle.kill("SIGTERM");
+        transport.destroy();
       }
     }, heartbeatTimeoutMs);
   }
@@ -80,8 +129,9 @@ export function createTrustedWorkViewSidecarSupervisor({
     return {
       registry: SIDECAR_REGISTRY,
       status,
-      running: status === "running" && Boolean(child),
-      pid: child?.pid ?? null,
+      running: status === "running" && Boolean(transport),
+      authorityConnected: Boolean(transport),
+      pid,
       sessionId: owner?.sessionId ?? null,
       workViewId: owner?.workViewId ?? null,
       leaseId: owner?.leaseId ?? null,
@@ -104,8 +154,10 @@ export function createTrustedWorkViewSidecarSupervisor({
       captureFreshness,
       captureAgeMs,
       captureStaleAfterMs,
-      mode: "supervised_user_space_ipc_heartbeat",
-      sessionManagerOwned: true,
+      mode: "supervised_user_session_socket",
+      sessionManagerOwned: false,
+      userSessionOwned: true,
+      reconnectable: true,
       boundedProcess: true,
       installRequired: false,
       credentialEnvironmentInherited: false,
@@ -121,6 +173,10 @@ export function createTrustedWorkViewSidecarSupervisor({
   }
 
   function handleMessage(message) {
+    if (message?.ok === false) {
+      startRejecter?.(new Error(message.reason ?? "Trusted sidecar rejected authority binding."));
+      return;
+    }
     if (
       message?.registry !== HEARTBEAT_REGISTRY
       || message.sessionId !== owner?.sessionId
@@ -131,13 +187,14 @@ export function createTrustedWorkViewSidecarSupervisor({
     }
     if (message.type === "ready" || message.type === "heartbeat") {
       status = "running";
+      pid = Number.isInteger(message.pid) ? message.pid : pid;
+      startedAt = message.processStartedAt ?? startedAt ?? now();
       heartbeatAt = message.emittedAt ?? now();
-      heartbeatCount = Number.isInteger(message.heartbeatCount)
-        ? message.heartbeatCount
-        : heartbeatCount + 1;
+      heartbeatCount = Number.isInteger(message.heartbeatCount) ? message.heartbeatCount : heartbeatCount + 1;
       degradedReason = null;
       onHeartbeat({ ...message, leaseId: owner.leaseId });
-      armHeartbeatTimer(child);
+      armHeartbeatTimer();
+      if (message.type === "ready") startResolver?.();
     } else if (message.type === "capture_observation") {
       captureObservation = message.observation ?? null;
       captureFailure = null;
@@ -155,7 +212,110 @@ export function createTrustedWorkViewSidecarSupervisor({
         pendingActions.delete(message.requestId);
         pending.resolve(message.result ?? { ok: false, reason: "missing_action_result" });
       }
+    } else if (message.type === "stopped") {
+      status = "stopped";
+      exitCode = 0;
+      stoppedAt = message.emittedAt ?? now();
+      stopResolver?.();
     }
+  }
+
+  function attachTransport(socket) {
+    transport = socket;
+    const decoder = createSidecarMessageDecoder({
+      onMessage: handleMessage,
+      onError(error) {
+        degradedReason = error.message;
+        socket.destroy();
+      },
+    });
+    socket.on("data", decoder.push);
+    socket.on("close", () => {
+      if (transport !== socket) return;
+      clearHeartbeatTimer();
+      transport = null;
+      captureObservation = null;
+      captureFailure = "sidecar_authority_disconnected";
+      captureFailedAt = now();
+      rejectPendingActions("Trusted work-view sidecar authority disconnected.");
+      if (status !== "stopping" && status !== "stopped") {
+        status = "recovery_required";
+        degradedReason ??= "trusted_sidecar_authority_disconnected";
+        reportFailure();
+      }
+      stopResolver?.();
+    });
+    socket.on("error", (error) => {
+      degradedReason = error instanceof Error ? error.message : "sidecar_socket_error";
+    });
+  }
+
+  async function openExistingSocket(targetPath) {
+    try {
+      const socket = await connectSocket(targetPath, Math.min(startTimeoutMs, 250));
+      attachTransport(socket);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async function spawnAndConnect(targetPath) {
+    mkdirSync(path.dirname(targetPath), { recursive: true, mode: 0o700 });
+    chmodSync(path.dirname(targetPath), 0o700);
+    rmSync(targetPath, { force: true });
+    const processHandle = spawnProcess(process.execPath, [sidecarPath.pathname], {
+      detached: true,
+      stdio: ["ignore", "ignore", "ignore"],
+      env: {
+        NODE_NO_WARNINGS: "1",
+        OPENCLAW_SIDECAR_SOCKET_PATH: targetPath,
+        OPENCLAW_SIDECAR_TASK_ID: owner.taskId,
+        OPENCLAW_SIDECAR_APPROVAL_ID: owner.approvalId,
+        OPENCLAW_SIDECAR_HEARTBEAT_INTERVAL_MS: String(heartbeatIntervalMs),
+        OPENCLAW_SIDECAR_CAPTURE_INTERVAL_MS: String(captureIntervalMs),
+        OPENCLAW_SIDECAR_RECONNECT_TIMEOUT_MS: String(reconnectTimeoutMs),
+      },
+    });
+    spawnedProcess = processHandle;
+    pid = processHandle.pid ?? null;
+    processHandle.once("error", (error) => startRejecter?.(error));
+    processHandle.once("exit", (code, signal) => {
+      exitCode = code;
+      exitSignal = signal;
+      stoppedAt = now();
+      if (status !== "stopping" && status !== "stopped") {
+        status = "degraded";
+        degradedReason ??= `trusted_sidecar_exited_${code ?? signal ?? "unknown"}`;
+        reportFailure();
+      }
+      spawnedProcess = null;
+    });
+    processHandle.unref?.();
+
+    const deadline = Date.now() + startTimeoutMs;
+    while (Date.now() < deadline) {
+      if (await openExistingSocket(targetPath)) return;
+      await delay(25);
+    }
+    throw new Error("Trusted work-view sidecar socket did not become ready.");
+  }
+
+  async function waitForReady() {
+    await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error("Trusted work-view sidecar heartbeat timed out.")), startTimeoutMs);
+      startResolver = () => {
+        clearTimeout(timeout);
+        resolve();
+      };
+      startRejecter = (error) => {
+        clearTimeout(timeout);
+        reject(error);
+      };
+    }).finally(() => {
+      startResolver = null;
+      startRejecter = null;
+    });
   }
 
   async function start(input = {}) {
@@ -167,6 +327,9 @@ export function createTrustedWorkViewSidecarSupervisor({
       approvalId: requiredString(input.approvalId, "approvalId"),
       browserRuntimeUrl: null,
     };
+    if (input.approvalStatus !== "approved") {
+      throw new Error("Trusted work-view sidecar requires approved lifecycle authority.");
+    }
     if (input.browserRuntimeUrl) {
       const browserUrl = new URL(input.browserRuntimeUrl);
       if (!["127.0.0.1", "localhost"].includes(browserUrl.hostname)) {
@@ -174,20 +337,16 @@ export function createTrustedWorkViewSidecarSupervisor({
       }
       nextOwner.browserRuntimeUrl = browserUrl.origin;
     }
-    if (input.approvalStatus !== "approved") {
-      throw new Error("Trusted work-view sidecar requires approved lifecycle authority.");
-    }
-    if (child && status === "running") {
+    if (transport && status === "running") {
       if (owner?.taskId !== nextOwner.taskId || owner?.sessionId !== nextOwner.sessionId) {
         throw new Error("A trusted work-view sidecar is already owned by another lifecycle task.");
       }
-      return { ...snapshot(), reused: true };
+      return { ...snapshot(), reused: true, reconnected: false };
     }
 
     owner = nextOwner;
+    socketPath = sidecarSocketPath(socketDirectory, nextOwner.taskId);
     status = "starting";
-    startedAt = now();
-    stoppedAt = null;
     heartbeatAt = null;
     heartbeatCount = 0;
     exitCode = null;
@@ -198,62 +357,26 @@ export function createTrustedWorkViewSidecarSupervisor({
     captureFailure = null;
     captureFailedAt = null;
 
-    const processHandle = spawnProcess(process.execPath, [sidecarPath.pathname], {
-      stdio: ["ignore", "ignore", "ignore", "ipc"],
-      env: {
-        NODE_NO_WARNINGS: "1",
-        OPENCLAW_SIDECAR_SESSION_ID: nextOwner.sessionId,
-        OPENCLAW_SIDECAR_WORK_VIEW_ID: nextOwner.workViewId,
-        OPENCLAW_SIDECAR_HEARTBEAT_INTERVAL_MS: String(heartbeatIntervalMs),
-        OPENCLAW_SIDECAR_CAPTURE_INTERVAL_MS: String(captureIntervalMs),
-        ...(nextOwner.browserRuntimeUrl
-          ? { OPENCLAW_SIDECAR_BROWSER_RUNTIME_URL: nextOwner.browserRuntimeUrl }
-          : {}),
-      },
-    });
-    child = processHandle;
-    processHandle.on("message", handleMessage);
-    processHandle.on("error", (error) => {
-      status = "degraded";
-      degradedReason = error instanceof Error ? error.message : "sidecar_process_error";
-    });
-    processHandle.on("exit", (code, signal) => {
-      clearHeartbeatTimer();
-      exitCode = code;
-      exitSignal = signal;
-      stoppedAt = now();
-      if (status !== "stopping") {
-        status = "degraded";
-        degradedReason ??= `trusted_sidecar_exited_${code ?? signal ?? "unknown"}`;
-        reportFailure();
-        child = null;
-      } else {
-        status = "stopped";
-        child = null;
-      }
-    });
-
-    await new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error("Trusted work-view sidecar heartbeat timed out.")), startTimeoutMs);
-      const onMessage = (message) => {
-        if (message?.registry === HEARTBEAT_REGISTRY && message.type === "ready") {
-          clearTimeout(timeout);
-          processHandle.off("message", onMessage);
-          resolve();
-        }
-      };
-      processHandle.on("message", onMessage);
-      processHandle.once("error", (error) => {
-        clearTimeout(timeout);
-        processHandle.off("message", onMessage);
-        reject(error);
-      });
-    }).catch((error) => {
-      processHandle.kill("SIGTERM");
+    let reconnected = await openExistingSocket(socketPath);
+    try {
+      if (!reconnected) await spawnAndConnect(socketPath);
+      const ready = waitForReady();
+      transport.write(encodeSidecarMessage({
+        type: "bind",
+        taskId: nextOwner.taskId,
+        approvalId: nextOwner.approvalId,
+        sessionId: nextOwner.sessionId,
+        workViewId: nextOwner.workViewId,
+        browserRuntimeUrl: nextOwner.browserRuntimeUrl,
+      }));
+      await ready;
+    } catch (error) {
+      transport?.destroy();
+      if (!reconnected) spawnedProcess?.kill("SIGTERM");
       status = "degraded";
       degradedReason = error instanceof Error ? error.message : "sidecar_start_failed";
       throw error;
-    });
+    }
 
     if (nextOwner.browserRuntimeUrl && !captureObservation && !captureFailure) {
       await new Promise((resolve) => {
@@ -264,48 +387,58 @@ export function createTrustedWorkViewSidecarSupervisor({
         };
       });
     }
-    return { ...snapshot(), reused: false };
+    return { ...snapshot(), reused: false, reconnected };
   }
 
-  async function stop({ taskId } = {}) {
-    if (!child) {
-      return { ...snapshot(), stopped: false };
-    }
+  async function disconnectAuthority({ taskId } = {}) {
+    if (!transport) return { ...snapshot(), disconnected: false };
     if (requiredString(taskId, "taskId") !== owner?.taskId) {
       throw new Error("Trusted work-view sidecar lifecycle task mismatch.");
     }
-    const processHandle = child;
+    const socket = transport;
+    await new Promise((resolve) => {
+      socket.once("close", resolve);
+      socket.destroy();
+    });
+    return { ...snapshot(), disconnected: true };
+  }
+
+  async function stop({ taskId } = {}) {
+    if (!transport) return { ...snapshot(), stopped: false };
+    if (requiredString(taskId, "taskId") !== owner?.taskId) {
+      throw new Error("Trusted work-view sidecar lifecycle task mismatch.");
+    }
     status = "stopping";
     clearHeartbeatTimer();
     await new Promise((resolve) => {
       const timeout = setTimeout(() => {
-        processHandle.kill("SIGTERM");
+        transport?.destroy();
+        spawnedProcess?.kill("SIGTERM");
+        resolve();
       }, stopTimeoutMs);
-      processHandle.once("exit", () => {
+      stopResolver = () => {
         clearTimeout(timeout);
         resolve();
-      });
-      processHandle.send({ type: "shutdown" });
+      };
+      transport.write(encodeSidecarMessage({ type: "shutdown" }));
     });
+    stopResolver = null;
+    status = "stopped";
+    pid = null;
     return { ...snapshot(), stopped: true };
   }
 
   function rebindLease({ sessionId, leaseId } = {}) {
-    if (!owner) {
-      return snapshot();
-    }
+    if (!owner) return snapshot();
     if (requiredString(sessionId, "sessionId") !== owner.sessionId) {
       throw new Error("Trusted work-view sidecar session mismatch during lease rebind.");
     }
-    owner = {
-      ...owner,
-      leaseId: requiredString(leaseId, "leaseId"),
-    };
+    owner = { ...owner, leaseId: requiredString(leaseId, "leaseId") };
     return snapshot();
   }
 
   async function executeBrowserAction({ kind, payload, trustedHelperLease } = {}) {
-    if (!child || status !== "running" || captureObservation?.sessionId !== owner?.sessionId) {
+    if (!transport || status !== "running" || captureObservation?.sessionId !== owner?.sessionId) {
       throw new Error("Trusted work-view sidecar action transport is not ready.");
     }
     const requestId = randomUUID();
@@ -319,10 +452,20 @@ export function createTrustedWorkViewSidecarSupervisor({
           clearTimeout(timeout);
           resolve(result);
         },
+        reject(error) {
+          clearTimeout(timeout);
+          reject(error);
+        },
       });
-      child.send({ type: "browser_action", requestId, kind, payload, trustedHelperLease });
+      transport.write(encodeSidecarMessage({
+        type: "browser_action",
+        requestId,
+        kind,
+        payload,
+        trustedHelperLease,
+      }));
     });
   }
 
-  return { start, stop, rebindLease, executeBrowserAction, snapshot };
+  return { start, stop, disconnectAuthority, rebindLease, executeBrowserAction, snapshot };
 }

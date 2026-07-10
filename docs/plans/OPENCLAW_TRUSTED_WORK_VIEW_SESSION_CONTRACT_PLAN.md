@@ -119,10 +119,11 @@ intentionally accepts the pre-approval HTTP 409 response as a valid readback so
 the operator can see `blocked_before_approval`; after manual approval it reads
 `running_after_approval` with bounded PID and heartbeat evidence.
 
-The contract carries the Level 2 sidecar lifecycle and keeps process start
-disabled until an explicit task approval. It names the helper's future
-capture/action/recovery responsibilities while the current pilot performs only
-IPC heartbeat. No installation or root/system daemon is used.
+The contract carries the Level 2 sidecar lifecycle and keeps process start or
+reconnect disabled until an explicit task approval. It names the helper's future
+capture/action/recovery responsibilities. The current runtime uses a bounded
+current-user Unix socket for heartbeat, capture, and action transport. No
+installation or root/system daemon is used.
 
 The materialized lifecycle task exposes the approved bounded start action on the
 same route group:
@@ -135,12 +136,14 @@ Before approval the probe returns `blocked_before_approval` with HTTP 409 and
 records that no process was started, no root/system daemon is required, no
 desktop-wide capture is used, no host mutation occurs, and no provider egress is
 performed. After the operator approves the lifecycle task, the same action
-starts one session-manager-owned user-space process and returns
-`running_after_approval` with its PID and IPC heartbeat. The process receives a
-sanitized environment, performs no filesystem or network operation, requires no
-installation or root authority, and exits through the task-scoped `/stop`
-action. Start and stop are recorded on the existing lifecycle task and
-consolidated into `/phase-3/operator-interrupt-controls`.
+starts one detached user-session process and returns `running_after_approval`
+with its PID and socket heartbeat. Its sanitized environment contains only the
+socket path, non-secret lifecycle task/approval ids, and bounded timing values;
+it contains no lease, session, credential, or provider material. The process
+uses only the allowlisted loopback browser-runtime origin after authority bind,
+requires no installation or root authority, and exits through the task-scoped
+`/stop` action. Start, reconnect, and stop are recorded on the existing
+lifecycle task and consolidated into `/phase-3/operator-interrupt-controls`.
 
 Every work-view prepare/reveal/hide call now records `lastOperatorAction` in the
 existing work-view state. The record includes:
@@ -225,17 +228,19 @@ The approved lifecycle task now owns a real bounded process:
 
 ```text
 core lifecycle task + approved approval id
--> session-manager sidecar supervisor
--> minimal Node child with IPC only
+-> session-manager lifecycle supervisor
+-> minimal detached user-session Node process with a mode-0600 Unix socket
 -> ready/heartbeat messages update the authoritative helper lease
 -> work-view state and Observer show PID, supervisor status, and heartbeat count
--> explicit task-scoped stop terminates the child and records stopped readback
+-> authority disconnect clears binding/capture but leaves the process fail-closed
+-> explicit task-scoped stop terminates the process and records stopped readback
 ```
 
-The supervisor does not inherit the parent credential environment. The child
-contains no filesystem, network, browser, provider, desktop-capture, or host
-mutation implementation. Parent IPC disconnect also terminates it, so it cannot
-remain orphaned after session-manager exits.
+The supervisor does not inherit the parent credential environment. The process
+has no general filesystem, provider, desktop-capture, or host-mutation
+implementation; its only network scope is the allowlisted loopback browser
+runtime. Authority disconnect clears binding and capture immediately, and a
+bounded reconnect timeout prevents an indefinite unattached process.
 
 ## Fail-Closed Liveness And Recovery
 
@@ -246,10 +251,11 @@ browser-runtime, and exposes `restart_approved_trusted_sidecar` through the
 trusted-session recovery recommendation. Matching stale leases are rejected by
 browser-runtime while the sidecar is unavailable.
 
-There is no automatic restart. Reusing the existing approved lifecycle start
-action launches a new child, rotates and rebinds the helper lease, and only then
-restores browser action authority. Explicit stop also suspends action authority,
-so stopping the heartbeat process cannot leave AI actions enabled accidentally.
+There is no automatic restart or reconnect. Reusing the existing approved
+lifecycle start action reconnects a surviving user-session process, or launches
+a replacement after process failure, rotates and rebinds the helper lease, and
+only then restores browser action authority. Explicit stop also suspends action
+authority, so stopping the heartbeat process cannot leave AI actions enabled.
 
 ## Sidecar-Owned Bounded Capture
 
@@ -275,8 +281,8 @@ legacy helper-lease path remains compatible until a sidecar lifecycle is
 activated.
 
 For an active lifecycle, screen-act now sends bounded keyboard-type or click
-envelopes to session-manager, which forwards them over the supervised IPC
-channel. The sidecar rechecks its local capture freshness and session identity,
+envelopes to session-manager, which forwards them over the bounded user-session
+socket. The sidecar rechecks its local capture freshness and session identity,
 then performs the loopback browser-runtime request with the current helper
 lease. Browser-runtime remains the final lease validator, while the resulting
 mediation is returned through the existing screen-act audit event and action
@@ -290,6 +296,7 @@ Runtime contract builder:
 packages/shared-utils/src/work-view-trust.mjs
 packages/shared-utils/test/work-view-trust.test.mjs
 services/openclaw-session-manager/src/trusted-work-view-helper-runtime.mjs
+services/openclaw-session-manager/src/trusted-work-view-sidecar-channel.mjs
 services/openclaw-session-manager/src/trusted-work-view-sidecar-supervisor.mjs
 services/openclaw-session-manager/src/trusted-work-view-sidecar.mjs
 services/openclaw-session-manager/test/trusted-work-view-helper-runtime.test.mjs
@@ -339,12 +346,12 @@ Session-manager restart recovery is now part of the same Level 2 lifecycle:
 ```text
 approved sidecar start
 -> synchronously persist compact task/approval/status intent
--> session-manager stops and the owned child exits on IPC disconnect
+-> session-manager stops and the sidecar clears authority/capture but survives
 -> restart projects prior running intent as recovery_required
 -> browser-runtime suspends the surviving old lease before session-manager listens
--> no child is started automatically
+-> no reconnect or action is performed automatically
 -> work-view prepare establishes a new session lease
--> the existing approved lifecycle task explicitly starts a new child
+-> the existing approved lifecycle task explicitly reconnects the same PID
 ```
 
 The persisted record excludes lease values, capture payloads, input text,
@@ -371,9 +378,9 @@ explicit approved operator action
 automatic task or sidecar restart after session authority loss; recovery remains
 an explicit operator action using the existing approved lifecycle and task
 recovery routes
-independently supervised user-session sidecar ownership and reconnect; the
-current bounded helper remains a session-manager-owned child and exits with its
-authority process
+login-session installation or persistence beyond the bounded reconnect timeout;
+the current user-session process is runtime-scoped and self-terminates if no
+authority reconnects
 ```
 
 ## Next Slice
@@ -444,7 +451,7 @@ service itself restarts during work:
 
 ```text
 active browser task
--> session-manager process exits and sidecar exits with it
+-> session-manager process exits and sidecar clears authority but survives
 -> core records a recoverable authority interruption
 -> session-manager returns as recovery_required
 -> approved sidecar and fresh session are explicitly restored
@@ -458,9 +465,9 @@ persists a failed task with `work-view-authority-recovery-evidence`; after the
 operator restores the session and approved sidecar, the existing recovery route
 preserves the browser plan and the existing execute route runs only unfinished
 action steps. Completed side-effecting steps are not replayed. The real Phase 3
-milestone stops session-manager and its sidecar, creates the interrupted task,
-restores both explicitly, and proves the recovered `browser.new_tab` completes
-through `trusted-sidecar-ipc` with linked task ids.
+milestone stops session-manager while the sidecar survives fail-closed, creates
+the interrupted task, restores authority explicitly, and proves the recovered
+`browser.new_tab` completes through `trusted-sidecar-ipc` with linked task ids.
 
 The next smallest continuity gap is a Level 1/Level 2 exit-gate behavior across
 core process restart:
@@ -503,3 +510,24 @@ approved user-space sidecar
 This must remain user-space and fail closed. It must not become a root/system
 daemon, automatic action restart, login installation, desktop-wide capture, or
 provider route.
+
+This independent ownership and reconnect slice is now complete. The detached
+sidecar accepts one bounded current-user socket authority, retains no lease in
+its environment or reconnect state, clears session/capture immediately when the
+authority socket closes, and exits after a bounded reconnect timeout. A new
+session-manager cannot resume actions merely by starting; it must prepare a new
+work view and reuse the existing approved lifecycle action. The real milestone
+proves the same PID reconnects under a fresh session/lease while the stale lease
+remains rejected. Observer shows user-session ownership, connection, and
+reconnect state through the existing Phase 3 panels.
+
+The next real Level 2 reliability slice should prove sidecar process failure,
+not authority failure:
+
+```text
+running user-session sidecar process exits unexpectedly
+-> helper action authority is suspended and recovery_required is visible
+-> no replacement starts automatically
+-> existing approved lifecycle action starts one replacement PID
+-> fresh capture and trusted actions resume under a rotated lease
+```

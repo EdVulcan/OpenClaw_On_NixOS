@@ -54,6 +54,9 @@ export function createPhase3WorkViewBuilders(deps) {
           processStarted: false,
           processStartEnabled: false,
           sessionManagerOwned: false,
+          userSessionOwned: false,
+          authorityConnected: false,
+          reconnectable: false,
           boundedProcess: false,
           credentialEnvironmentInherited: false,
           networkAccessRequired: false,
@@ -94,6 +97,10 @@ export function createPhase3WorkViewBuilders(deps) {
         heartbeatAt: execution.heartbeatAt ?? null,
         heartbeatCount: Number.isInteger(execution.heartbeatCount) ? execution.heartbeatCount : 0,
         sessionManagerOwned: Boolean(execution.sessionManagerOwned),
+        userSessionOwned: Boolean(execution.userSessionOwned),
+        authorityConnected: Boolean(execution.authorityConnected),
+        reconnectable: Boolean(execution.reconnectable),
+        reconnected: Boolean(execution.reconnected),
         boundedProcess: Boolean(execution.boundedProcess),
         credentialEnvironmentInherited: Boolean(execution.credentialEnvironmentInherited),
         networkAccessRequired: Boolean(execution.networkAccessRequired),
@@ -184,7 +191,11 @@ export function createPhase3WorkViewBuilders(deps) {
     const helperProcessSafe = trustedSession?.helperRuntime?.externalProcessStarted !== true
       || (
         helperSidecar?.running === true
-        && helperSidecar?.sessionManagerOwned === true
+        && (
+          helperSidecar?.sessionManagerOwned === true
+          || (helperSidecar?.userSessionOwned === true && helperSidecar?.reconnectable === true)
+        )
+        && helperSidecar?.authorityConnected !== false
         && helperSidecar?.boundedProcess === true
         && helperSidecar?.credentialEnvironmentInherited === false
         && helperSidecar?.rootRequired === false
@@ -305,7 +316,11 @@ export function createPhase3WorkViewBuilders(deps) {
     const sidecarProcessSafe = sidecarLifecycle.safety.processStarted === false
       || (
         sidecarLifecycle.safety.processStartEnabled === true
-        && sidecarLifecycle.safety.sessionManagerOwned === true
+        && (
+          sidecarLifecycle.safety.sessionManagerOwned === true
+          || (sidecarLifecycle.safety.userSessionOwned === true && sidecarLifecycle.safety.reconnectable === true)
+        )
+        && sidecarLifecycle.safety.authorityConnected !== false
         && sidecarLifecycle.safety.boundedProcess === true
         && sidecarLifecycle.safety.credentialEnvironmentInherited === false
         && sidecarLifecycle.safety.networkAccessRequired === true

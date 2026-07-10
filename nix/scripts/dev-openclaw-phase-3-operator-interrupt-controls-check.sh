@@ -223,14 +223,8 @@ if kill -0 "$old_session_manager_pid" >/dev/null 2>&1; then
   echo "session-manager did not stop during restart recovery check" >&2
   exit 1
 fi
-for _ in $(seq 1 50); do
-  if ! kill -0 "$sidecar_pid" >/dev/null 2>&1; then
-    break
-  fi
-  sleep 0.1
-done
-if kill -0 "$sidecar_pid" >/dev/null 2>&1; then
-  echo "trusted sidecar survived its owning session-manager" >&2
+if ! kill -0 "$sidecar_pid" >/dev/null 2>&1; then
+  echo "user-session sidecar did not survive session-manager authority loss" >&2
   exit 1
 fi
 AUTHORITY_INTERRUPTED_NEW_TAB_URL="https://example.com/phase-3-authority-recovered-new-tab"
@@ -480,7 +474,10 @@ if (approvedStartProbeStatus !== "200"
   || !Number.isInteger(approvedStartProbe.readback?.execution?.pid)
   || approvedStartProbe.readback?.execution?.supervisorStatus !== "running"
   || approvedStartProbe.readback?.execution?.heartbeatCount < 1
-  || approvedStartProbe.readback?.execution?.sessionManagerOwned !== true
+  || approvedStartProbe.readback?.execution?.sessionManagerOwned !== false
+  || approvedStartProbe.readback?.execution?.userSessionOwned !== true
+  || approvedStartProbe.readback?.execution?.authorityConnected !== true
+  || approvedStartProbe.readback?.execution?.reconnectable !== true
   || approvedStartProbe.readback?.execution?.boundedProcess !== true
   || approvedStartProbe.readback?.execution?.credentialEnvironmentInherited !== false
   || approvedStartProbe.readback?.execution?.networkAccessRequired !== true
@@ -546,12 +543,16 @@ if (recoveryRuntime.sidecar?.status !== "recovery_required"
 const restartedRuntime = restartedState.workView?.helperRuntime ?? {};
 if (!restartedSidecar.ok
   || restartedSidecar.readback?.status !== "running_after_approval"
-  || restartedSidecar.readback?.execution?.pid === approvedStartProbe.readback.execution.pid
+  || restartedSidecar.readback?.execution?.pid !== approvedStartProbe.readback.execution.pid
+  || restartedSidecar.readback?.execution?.userSessionOwned !== true
+  || restartedSidecar.readback?.execution?.authorityConnected !== true
+  || restartedSidecar.readback?.execution?.reconnected !== true
   || restartedRuntime.sidecar?.status !== "running"
+  || restartedRuntime.sidecar?.pid !== approvedStartProbe.readback.execution.pid
   || restartedRuntime.actionAuthority !== "active"
   || restartedRuntime.leaseMatched !== true
   || restartedRuntime.leaseId === resumedRuntime.leaseId) {
-  throw new Error(`explicit approved recovery should launch a new process under a new session lease: ${JSON.stringify({ restartedSidecar, restartedRuntime, resumedRuntime })}`);
+  throw new Error(`explicit approved recovery should reconnect the surviving user-session process under a new session lease: ${JSON.stringify({ restartedSidecar, restartedRuntime, resumedRuntime })}`);
 }
 const recoveredPlanStep = authorityRecoveredTask.task?.plan?.steps?.find((step) => step.phase === "acting_on_target");
 const recoveredExecutionPlanStep = authorityRecoveredExecution.task?.plan?.steps?.find((step) => step.phase === "acting_on_target");

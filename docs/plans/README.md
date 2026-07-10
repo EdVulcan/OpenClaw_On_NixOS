@@ -135,6 +135,13 @@ ownership with fail-closed disconnect and explicit fresh-lease reconnect. Do
 not add a readiness milestone, automatic action restart, root/system daemon,
 fault-injection endpoint, or desktop-wide capture.
 
+That slice is complete: the bounded current-user socket sidecar survives
+session-manager restart without retaining action authority, and the existing
+approved lifecycle action reconnects the same PID only after a fresh work-view
+session exists. The next real reliability slice is explicit approved
+replacement after the sidecar process itself exits; no automatic replacement,
+new panel, or readiness chain is needed.
+
 ## Historical Phase Plans
 
 `OPENCLAW_PHASE_2_PLAN.md` through `OPENCLAW_PHASE_136_PLAN.md` are retained
