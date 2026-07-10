@@ -304,6 +304,7 @@ async function refreshPhase3BackgroundWorkView() {
       "Sidecar Recovery: status=" + (sidecar.status ?? "inactive") + " required=" + Boolean(sidecar.recoveryRequired) + " automaticRestart=" + Boolean(sidecar.automaticRestart),
       "Sidecar Authority: owner=" + (sidecar.userSessionOwned ? "user-session" : sidecar.sessionManagerOwned ? "session-manager" : "none") + " connected=" + Boolean(sidecar.authorityConnected) + " reconnectable=" + Boolean(sidecar.reconnectable),
       "Capture Source: status=" + (sidecar.captureSourceStatus ?? "waiting") + " recoveryRequired=" + Boolean(sidecar.captureRecoveryRequired) + " failure=" + (sidecar.captureFailure ?? "none"),
+      "Workspace Recovery: status=" + (sidecar.captureObservation?.workspaceRecoveryStatus ?? "none") + " restoredTabs=" + (sidecar.captureObservation?.restoredTabCount ?? 0) + " freshAuthority=" + Boolean(sidecar.captureObservation?.freshAuthorityBound) + " automaticReplay=" + Boolean(sidecar.captureObservation?.automaticActionReplay),
       "Sidecar Lifecycle: " + (trustedSession.sidecarContract?.lifecycleProposal?.status ?? "unknown") + " execution=" + (trustedSession.sidecarContract?.lifecycleProposal?.executionStatus ?? "unknown"),
       "Sidecar Approval Draft: " + (trustedSession.sidecarContract?.approvalTaskDraft?.status ?? "unknown") + " createsTask=" + String(Boolean(trustedSession.sidecarContract?.approvalTaskDraft?.createsTaskNow)),
     ].join("\\n");

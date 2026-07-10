@@ -16,6 +16,7 @@ export OBSERVER_UI_PORT="${OBSERVER_UI_PORT:-6718}"
 export OPENCLAW_CORE_STATE_FILE="${OPENCLAW_CORE_STATE_FILE:-$REPO_ROOT/.artifacts/openclaw-core-phase-3-operator-interrupt-controls-check.json}"
 export OPENCLAW_SYSTEM_HEAL_STATE_FILE="${OPENCLAW_SYSTEM_HEAL_STATE_FILE:-$REPO_ROOT/.artifacts/openclaw-system-heal-phase-3-operator-interrupt-controls-check.json}"
 export OPENCLAW_SESSION_MANAGER_STATE_FILE="${OPENCLAW_SESSION_MANAGER_STATE_FILE:-$REPO_ROOT/.artifacts/openclaw-session-manager-phase-3-operator-interrupt-controls-check.json}"
+export OPENCLAW_BROWSER_RUNTIME_STATE_FILE="${OPENCLAW_BROWSER_RUNTIME_STATE_FILE:-$REPO_ROOT/.artifacts/openclaw-browser-runtime-phase-3-operator-interrupt-controls-check.json}"
 export OPENCLAW_TRUSTED_SIDECAR_LAUNCHER_MODE="systemd-user"
 export OPENCLAW_TRUSTED_SIDECAR_UNIT_INSTANCE="primary"
 
@@ -38,6 +39,7 @@ SIDECAR_ENV_FILE="$XDG_RUNTIME_DIR/openclaw-sidecars/${OPENCLAW_TRUSTED_SIDECAR_
 "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 rm -f "$OPENCLAW_CORE_STATE_FILE" "$OPENCLAW_CORE_STATE_FILE.tmp" "$OPENCLAW_SYSTEM_HEAL_STATE_FILE" "$OPENCLAW_SYSTEM_HEAL_STATE_FILE.tmp" \
   "$OPENCLAW_SESSION_MANAGER_STATE_FILE" "$OPENCLAW_SESSION_MANAGER_STATE_FILE.tmp"
+rm -f "$OPENCLAW_BROWSER_RUNTIME_STATE_FILE" "$OPENCLAW_BROWSER_RUNTIME_STATE_FILE.tmp-"*
 rm -rf "$LEDGER_DIR"
 
 cleanup() {
@@ -48,7 +50,8 @@ cleanup() {
   rm -f "${CAPTURE_REFRESH_STATE_FILE:-}"
   rm -f "${FRESH_CAPTURE_ACTION_FILE:-}"
   rm -f "${BROWSER_FAILURE_STATE_FILE:-}" "${BROWSER_FAILURE_ACTION_FILE:-}" \
-    "${BROWSER_RECOVERED_STATE_FILE:-}" "${BROWSER_RECOVERED_ACTION_FILE:-}"
+    "${BROWSER_RECOVERED_STATE_FILE:-}" "${BROWSER_RECOVERED_ACTION_FILE:-}" \
+    "${BROWSER_BEFORE_RESTART_STATE_FILE:-}" "${BROWSER_RESTORED_STATE_FILE:-}" "${BROWSER_REBOUND_STATE_FILE:-}"
   rm -f "${NEW_TAB_ACTION_FILE:-}" "${NEW_TAB_BROWSER_STATE_FILE:-}" "${NEW_TAB_CAPTURE_STATE_FILE:-}"
   rm -f "${AUTONOMOUS_NEW_TAB_RESULT_FILE:-}"
   rm -f "${AUTHORITY_INTERRUPTED_TASK_FILE:-}" "${AUTHORITY_RECOVERED_TASK_FILE:-}" \
@@ -72,6 +75,7 @@ cleanup() {
   systemctl --user daemon-reload >/dev/null 2>&1 || true
   "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
   rm -f "$OPENCLAW_SESSION_MANAGER_STATE_FILE" "$OPENCLAW_SESSION_MANAGER_STATE_FILE.tmp"
+  rm -f "$OPENCLAW_BROWSER_RUNTIME_STATE_FILE" "$OPENCLAW_BROWSER_RUNTIME_STATE_FILE.tmp-"*
 }
 trap cleanup EXIT
 
@@ -384,6 +388,8 @@ console.log(JSON.stringify({
 }, null, 2));
 EOF
 restarted_capture_sequence="$(node -e 'const data=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8")); process.stdout.write(String(data.workView.helperRuntime.sidecar.captureObservation.sequence));' "$REPLACED_STATE_FILE")"
+BROWSER_BEFORE_RESTART_STATE_FILE="$(mktemp)"
+curl --silent --fail "$BROWSER_RUNTIME_URL/browser/state" > "$BROWSER_BEFORE_RESTART_STATE_FILE"
 old_browser_runtime_pid="$(cat "$BROWSER_RUNTIME_PID_FILE")"
 kill -TERM "$old_browser_runtime_pid"
 for _ in $(seq 1 50); do
@@ -403,6 +409,7 @@ fi
     OPENCLAW_BROWSER_RUNTIME_PORT="$OPENCLAW_BROWSER_RUNTIME_PORT" \
     OPENCLAW_EVENT_HUB_URL="http://127.0.0.1:$OPENCLAW_EVENT_HUB_PORT" \
     OPENCLAW_SESSION_MANAGER_URL="$SESSION_MANAGER_URL" \
+    OPENCLAW_BROWSER_RUNTIME_STATE_FILE="$OPENCLAW_BROWSER_RUNTIME_STATE_FILE" \
     node src/server.mjs >> "$BROWSER_RUNTIME_LOG_FILE" 2>&1 &
   echo $! > "$BROWSER_RUNTIME_PID_FILE"
 )
@@ -414,6 +421,46 @@ for _ in $(seq 1 50); do
   sleep 0.1
 done
 curl --silent --fail "$BROWSER_RUNTIME_URL/health" >/dev/null
+BROWSER_RESTORED_STATE_FILE="$(mktemp)"
+curl --silent --fail "$BROWSER_RUNTIME_URL/browser/state" > "$BROWSER_RESTORED_STATE_FILE"
+node - <<'EOF' "$BROWSER_BEFORE_RESTART_STATE_FILE" "$BROWSER_RESTORED_STATE_FILE" "$OPENCLAW_BROWSER_RUNTIME_STATE_FILE"
+const fs = require("node:fs");
+const before = JSON.parse(fs.readFileSync(process.argv[2], "utf8")).browser ?? {};
+const restored = JSON.parse(fs.readFileSync(process.argv[3], "utf8")).browser ?? {};
+const persistedText = fs.readFileSync(process.argv[4], "utf8");
+const persisted = JSON.parse(persistedText);
+const beforeIds = new Set((before.tabs ?? []).map((tab) => tab.id));
+if (beforeIds.size < 1
+  || restored.running !== false
+  || restored.browserPid !== null
+  || restored.trustedHelperLease !== null
+  || restored.lastInput !== null
+  || restored.lastClick !== null
+  || restored.workspaceRecovery?.restored !== true
+  || restored.workspaceRecovery?.status !== "restored_requires_explicit_prepare"
+  || restored.workspaceRecovery?.restoredTabCount !== beforeIds.size
+  || restored.workspaceRecovery?.freshAuthorityBound !== false
+  || restored.workspaceRecovery?.automaticActionReplay !== false
+  || (restored.tabs ?? []).length !== beforeIds.size
+  || !restored.tabs.every((tab) => beforeIds.has(tab.id))
+  || persisted.safety?.trustedHelperLeasePersisted !== false
+  || persisted.safety?.inputPersisted !== false
+  || persisted.safety?.clickPersisted !== false
+  || persisted.safety?.capturePersisted !== false
+  || ["trustedHelperLease", "lastInput", "lastClick", "browserPid", "capture"].some((field) => Object.hasOwn(persisted.workspace ?? {}, field))
+  || persistedText.includes("allowed-after-explicit-sidecar-replacement")) {
+  throw new Error(`browser workspace should restore bounded intent without action authority: ${JSON.stringify({ before, restored, persisted })}`);
+}
+console.log(JSON.stringify({
+  browserWorkspaceRestore: {
+    status: restored.workspaceRecovery.status,
+    restoredTabs: restored.tabs.length,
+    running: restored.running,
+    leaseRestored: restored.trustedHelperLease !== null,
+    automaticActionReplay: restored.workspaceRecovery.automaticActionReplay,
+  },
+}, null, 2));
+EOF
 BROWSER_FAILURE_STATE_FILE="$(mktemp)"
 for _ in $(seq 1 50); do
   curl --silent --fail "$SESSION_MANAGER_URL/work-view/state" > "$BROWSER_FAILURE_STATE_FILE"
@@ -434,6 +481,36 @@ for _ in $(seq 1 50); do
   fi
   sleep 0.1
 done
+BROWSER_REBOUND_STATE_FILE="$(mktemp)"
+curl --silent --fail "$BROWSER_RUNTIME_URL/browser/state" > "$BROWSER_REBOUND_STATE_FILE"
+node - <<'EOF' "$BROWSER_BEFORE_RESTART_STATE_FILE" "$BROWSER_REBOUND_STATE_FILE" "$BROWSER_RECOVERED_STATE_FILE"
+const fs = require("node:fs");
+const before = JSON.parse(fs.readFileSync(process.argv[2], "utf8")).browser ?? {};
+const rebound = JSON.parse(fs.readFileSync(process.argv[3], "utf8")).browser ?? {};
+const observed = JSON.parse(fs.readFileSync(process.argv[4], "utf8")).workView?.helperRuntime?.sidecar?.captureObservation ?? {};
+const restoredIds = new Set((rebound.tabs ?? []).map((tab) => tab.id));
+if (rebound.running !== true
+  || rebound.trustedHelperLease?.actionAuthority !== "active"
+  || rebound.workspaceRecovery?.status !== "rebound_after_explicit_prepare"
+  || rebound.workspaceRecovery?.freshAuthorityBound !== true
+  || rebound.workspaceRecovery?.actionAuthorityRestored !== false
+  || rebound.workspaceRecovery?.automaticActionReplay !== false
+  || !(before.tabs ?? []).every((tab) => restoredIds.has(tab.id))
+  || observed.workspaceRecoveryStatus !== "rebound_after_explicit_prepare"
+  || observed.restoredTabCount !== before.tabs.length
+  || observed.freshAuthorityBound !== true
+  || observed.automaticActionReplay !== false) {
+  throw new Error(`explicit prepare should rebind restored browser workspace without replay: ${JSON.stringify({ before, rebound, observed })}`);
+}
+console.log(JSON.stringify({
+  browserWorkspaceRebind: {
+    status: rebound.workspaceRecovery.status,
+    restoredTabs: rebound.workspaceRecovery.restoredTabCount,
+    currentTabs: rebound.tabs.length,
+    freshAuthorityBound: rebound.workspaceRecovery.freshAuthorityBound,
+  },
+}, null, 2));
+EOF
 BROWSER_RECOVERED_ACTION_FILE="$(mktemp)"
 curl --silent --fail -X POST "$SCREEN_ACT_URL/act/keyboard/type" \
   -H 'content-type: application/json' --data '{"text":"allowed-after-explicit-browser-prepare"}' > "$BROWSER_RECOVERED_ACTION_FILE"
@@ -750,12 +827,12 @@ if (newTabAction.action?.kind !== "browser.new_tab"
   || newTabMediation.leaseMatched !== true
   || newTabMediation.transport !== "trusted-sidecar-ipc"
   || newTabMediation.effect?.url !== newTabUrl
-  || newTabMediation.effect?.tabCount !== 2
+  || newTabMediation.effect?.tabCount !== newTabBrowserState.browser?.tabs?.length
   || newTabBrowserState.browser?.activeUrl !== newTabUrl
-  || newTabBrowserState.browser?.tabs?.length !== 2
+  || newTabBrowserState.browser?.tabs?.length < 2
   || !newTabBrowserState.browser.tabs.some((tab) => tab.url === newTabUrl)
   || newTabCapture.activeUrl !== newTabUrl
-  || newTabCapture.tabCount !== 2
+  || newTabCapture.tabCount !== newTabBrowserState.browser.tabs.length
   || newTabCapture.sequence <= browserRecoveredSidecar.captureObservation.sequence) {
   throw new Error(`bounded new-tab action should mutate only the trusted AI browser and refresh capture: ${JSON.stringify({ newTabAction, browser: newTabBrowserState.browser, newTabCapture })}`);
 }

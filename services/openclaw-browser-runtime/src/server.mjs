@@ -8,27 +8,42 @@ import {
   validateTrustedWorkViewActionLease,
 } from "../../../packages/shared-utils/src/work-view-trust.mjs";
 import { normaliseBoundedBrowserUrl } from "./browser-navigation.mjs";
+import { createBrowserWorkspaceStore } from "./browser-workspace-store.mjs";
 
 
 const host = process.env.OPENCLAW_BROWSER_RUNTIME_HOST ?? "127.0.0.1";
 const port = Number.parseInt(process.env.OPENCLAW_BROWSER_RUNTIME_PORT ?? "4103", 10);
 const eventHubUrl = process.env.OPENCLAW_EVENT_HUB_URL ?? "http://127.0.0.1:4101";
 const sessionManagerUrl = process.env.OPENCLAW_SESSION_MANAGER_URL ?? "http://127.0.0.1:4102";
+const stateFilePath = process.env.OPENCLAW_BROWSER_RUNTIME_STATE_FILE ?? `/tmp/openclaw-browser-runtime-${port}.json`;
 
 const publishEvent = createEventPublisher(eventHubUrl, "openclaw-browser-runtime");
 
+const workspaceStore = createBrowserWorkspaceStore({ stateFilePath });
+const restoredWorkspace = workspaceStore.restore();
+const restoredIntent = restoredWorkspace.intent?.workspace ?? null;
 const browserState = {
   running: false,
   browserPid: null,
-  profile: "ai-browser-profile",
-  activeTitle: null,
-  activeUrl: null,
-  sessionId: null,
-  sessionAuthority: "browser-runtime-local",
+  profile: restoredIntent?.profile ?? "ai-browser-profile",
+  activeTitle: restoredIntent?.activeTitle ?? null,
+  activeUrl: restoredIntent?.activeUrl ?? null,
+  sessionId: restoredIntent?.sessionId ?? null,
+  sessionAuthority: restoredIntent?.sessionAuthority ?? "browser-runtime-local",
   trustedHelperLease: null,
-  tabs: [],
+  tabs: restoredIntent?.tabs ?? [],
   lastInput: null,
   lastClick: null,
+  workspaceRecovery: {
+    restored: restoredWorkspace.restored,
+    status: restoredWorkspace.status,
+    persistedAt: restoredWorkspace.intent?.persistedAt ?? null,
+    restoredTabCount: restoredIntent?.tabs?.length ?? 0,
+    freshAuthorityBound: false,
+    actionAuthorityRestored: false,
+    automaticActionReplay: false,
+    sensitiveInteractionRestored: false,
+  },
   updatedAt: new Date().toISOString(),
 };
 
@@ -97,6 +112,7 @@ function addTab(url) {
     activeUrl: tab.url,
     activeTitle: tab.title,
   });
+  workspaceStore.persist(browserState);
   return tab;
 }
 
@@ -128,6 +144,7 @@ function buildBrowserCapture() {
     recentInteraction: lastInteraction,
     summaryText: `AI work view is focused on ${activeTitle} at ${activeUrl} with ${tabs.length} tab(s).`,
     updatedAt: browserState.updatedAt,
+    workspaceRecovery: { ...browserState.workspaceRecovery },
   };
   const trustedSession = buildTrustedWorkViewContract({
     source: "browser-runtime",
@@ -275,6 +292,15 @@ const server = http.createServer(async (req, res) => {
               ? body.sessionAuthority.trim()
               : browserState.sessionAuthority,
           trustedHelperLease,
+          workspaceRecovery: browserState.workspaceRecovery.restored ? {
+            ...browserState.workspaceRecovery,
+            status: trustedHelperLease
+              ? "rebound_after_explicit_prepare"
+              : "restored_without_action_authority",
+            freshAuthorityBound: Boolean(trustedHelperLease),
+            actionAuthorityRestored: false,
+            reboundAt: new Date().toISOString(),
+          } : browserState.workspaceRecovery,
         });
       } else if (typeof body.sessionId === "string" && body.sessionId.trim()) {
         updateBrowserState({
@@ -344,7 +370,15 @@ const server = http.createServer(async (req, res) => {
         sessionId,
         sessionAuthority: "openclaw-session-manager",
         trustedHelperLease,
+        workspaceRecovery: browserState.workspaceRecovery.restored ? {
+          ...browserState.workspaceRecovery,
+          status: "rebound_after_explicit_prepare",
+          freshAuthorityBound: true,
+          actionAuthorityRestored: false,
+          reboundAt: new Date().toISOString(),
+        } : browserState.workspaceRecovery,
       });
+      workspaceStore.persist(browserState);
       const browser = serialiseBrowserState();
       await publishEvent(createEventName("browser.updated"), {
         browser,

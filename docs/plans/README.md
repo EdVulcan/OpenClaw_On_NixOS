@@ -163,6 +163,12 @@ is an explicit development fallback. The next slice is bounded AI-owned browser
 workspace continuity across browser-runtime restart, not a Level 2 readiness
 wrapper.
 
+Bounded browser workspace continuity is now complete through the same Phase 3
+lane: compact tabs/session intent survives browser-runtime restart without
+restoring lease or actions, and explicit prepare rebinds fresh authority. The
+next real slice is a local real-browser-engine adapter behind the existing
+browser API and sidecar, replacing the synthetic PID/in-memory capture model.
+
 ## Historical Phase Plans
 
 `OPENCLAW_PHASE_2_PLAN.md` through `OPENCLAW_PHASE_136_PLAN.md` are retained

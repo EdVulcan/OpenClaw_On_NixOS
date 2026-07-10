@@ -131,6 +131,14 @@ async function observeBrowserCapture() {
       capturedAt: capture.capturedAt ?? new Date().toISOString(),
       observedAt: new Date().toISOString(),
       sequence: captureSequence,
+      workspaceRecoveryStatus: typeof summary.workspaceRecovery?.status === "string"
+        ? summary.workspaceRecovery.status.slice(0, 80)
+        : null,
+      restoredTabCount: Number.isInteger(summary.workspaceRecovery?.restoredTabCount)
+        ? summary.workspaceRecovery.restoredTabCount
+        : 0,
+      freshAuthorityBound: summary.workspaceRecovery?.freshAuthorityBound === true,
+      automaticActionReplay: false,
       fullPayloadRetained: false,
       desktopWideCapture: false,
     };

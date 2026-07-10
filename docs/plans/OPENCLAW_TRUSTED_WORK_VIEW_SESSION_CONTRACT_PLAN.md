@@ -610,3 +610,27 @@ existing prepare/lease rebind before actions resume, and expose recovery through
 the existing Observer surface. Lease values, input text, click data, capture
 payloads, credentials, provider data, and automatic action replay remain
 deferred.
+
+That bounded workspace-continuity slice is now complete. Browser runtime writes
+one mode-0600, size-bounded atomic intent containing at most 32 normalized tabs,
+active URL/title, profile, and compact session identity. Startup restores those
+tabs with `running:false`, no process ID, no helper lease, no interaction data,
+and `automaticActionReplay:false`. The existing prepare route binds a fresh
+lease, preserves the restored tabs, and projects
+`rebound_after_explicit_prepare` through the sidecar capture and existing
+Observer panel.
+
+The real Phase 3 milestone now kills browser-runtime after eight tabs exist,
+proves all eight return before prepare while actions remain unavailable, then
+explicitly prepares the work view and continues governed input/new-tab actions.
+The persisted JSON is also inspected to prove it contains no lease, input,
+click, capture, process ID, or known interaction text.
+
+The next real Level 2 slice should replace the simulated browser process behind
+the same contract with a real local AI-owned browser engine adapter. The
+current runtime still assigns a synthetic browser PID and derives title, tabs,
+and capture from its in-memory model. Use a proven browser automation engine,
+launch one bounded user-space profile, prove one HTTP(S) navigation and compact
+capture, and keep the existing lease/sidecar/Observer/recovery contracts. Do not
+expand to desktop-wide capture, arbitrary executable launch, automatic action
+replay, root ownership, or a parallel browser API.

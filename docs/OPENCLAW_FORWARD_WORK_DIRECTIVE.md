@@ -327,6 +327,20 @@ browser-runtime restart. Preserve only compact AI-owned tab/active-URL/session
 intent; restore it fail-closed without a lease or automatic action replay, and
 reuse the existing prepare/rebind/recovery and Observer surfaces.
 
+That workspace-continuity behavior is now complete. Browser runtime atomically
+persists a bounded, mode-0600 navigation intent and restores tabs/session intent
+without running state, PID, lease, input/click data, capture payload, or action
+replay. Existing prepare supplies fresh authority, the sidecar reports recovery
+status, and the real Phase 3 milestone proves eight tabs survive a process
+restart before governed actions continue.
+
+The next product gap is no longer continuity metadata. Browser runtime remains
+a simulated in-memory browser with a synthetic PID. The next real Level 2 slice
+should put a proven local browser engine behind the current bounded API and
+sidecar contract, starting with one user-space profile, one governed HTTP(S)
+navigation, and compact real-engine capture. Do not add a readiness endpoint or
+broaden into desktop capture.
+
 ## Identity-Upgrade Alignment
 
 Every new capability must state which identity level it serves:

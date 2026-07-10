@@ -123,6 +123,7 @@ let
     OPENCLAW_SYSTEM_HEAL_URL = urlFor cfg.ports.systemHeal;
     OPENCLAW_CORE_STATE_FILE = "${cfg.stateDir}/openclaw-core-state.json";
     OPENCLAW_SYSTEM_HEAL_STATE_FILE = "${cfg.stateDir}/openclaw-system-heal-state.json";
+    OPENCLAW_BROWSER_RUNTIME_STATE_FILE = "${cfg.stateDir}/openclaw-browser-runtime-state.json";
     OPENCLAW_EVENT_LOG_FILE = "${cfg.stateDir}/openclaw-events.jsonl";
   } // optionalAttrs cfg.systemdRepairAuthDelegation.enable {
     OPENCLAW_SYSTEMD_REPAIR_RESTART_HELPER = "${systemdRepairRestartHelper}/bin/openclaw-systemd-repair-restart-browser-runtime";
