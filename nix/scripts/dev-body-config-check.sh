@@ -92,6 +92,12 @@ function requireIncludes(label, content, tokens) {
 requireIncludes("openclaw-body module", bodyModule, [
   "options.services.openclaw",
   "systemd.services",
+  "systemd.user.services",
+  "openclaw-trusted-sidecar@",
+  "trustedSidecarUserUnit",
+  "EnvironmentFile = \"%t/openclaw-sidecars/%i.env\"",
+  "ExecStart = \"${cfg.nodePackage}/bin/node src/trusted-work-view-sidecar.mjs\"",
+  "Restart = \"no\"",
   "systemd.tmpfiles.rules",
   "StateDirectory = \"openclaw\"",
   "LogsDirectory = \"openclaw\"",
@@ -132,6 +138,7 @@ requireIncludes("dev-body profile", devProfile, [
 requireIncludes("desktop-body profile", desktopProfile, [
   "./dev-body.nix",
   "profile = \"desktop-body\"",
+  "trustedSidecarUserUnit.enable = true",
   ...componentKeys,
 ]);
 
@@ -163,3 +170,42 @@ console.log(JSON.stringify({
   },
 }, null, 2));
 EOF
+
+if command -v nix >/dev/null 2>&1; then
+  user_unit_json="$(nix --extra-experimental-features 'nix-command flakes' eval \
+    --no-update-lock-file --json \
+    .#nixosConfigurations.openclaw-local-dev.config.systemd.user.services \
+    --apply 'services: let unit = services."openclaw-trusted-sidecar@"; service = unit.serviceConfig; in {
+      wantedBy = unit.wantedBy;
+      serviceConfig = {
+        inherit (service) Restart EnvironmentFile ExecStart NoNewPrivileges PrivateTmp ProtectSystem ProtectHome RestrictAddressFamilies;
+      };
+    }')"
+  node - <<'EOF' "$user_unit_json"
+const unit = JSON.parse(process.argv[2]);
+const service = unit.serviceConfig ?? {};
+if ((unit.wantedBy ?? []).length !== 0
+  || service.Restart !== "no"
+  || service.EnvironmentFile !== "%t/openclaw-sidecars/%i.env"
+  || !String(service.ExecStart ?? "").endsWith("/bin/node src/trusted-work-view-sidecar.mjs")
+  || service.NoNewPrivileges !== true
+  || service.PrivateTmp !== true
+  || service.ProtectSystem !== "strict"
+  || service.ProtectHome !== true
+  || !Array.isArray(service.RestrictAddressFamilies)
+  || !service.RestrictAddressFamilies.includes("AF_UNIX")
+  || !service.RestrictAddressFamilies.includes("AF_INET")) {
+  throw new Error(`unexpected trusted sidecar user unit: ${JSON.stringify(unit)}`);
+}
+console.log(JSON.stringify({
+  trustedSidecarUserUnit: {
+    materialized: true,
+    autoStarted: false,
+    restart: service.Restart,
+    environmentFile: service.EnvironmentFile,
+    noNewPrivileges: service.NoNewPrivileges,
+    addressFamilies: service.RestrictAddressFamilies,
+  },
+}, null, 2));
+EOF
+fi

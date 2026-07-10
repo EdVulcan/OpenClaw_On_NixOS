@@ -149,6 +149,12 @@ non-auto-started `systemd --user` unit path for the same sidecar process. It mus
 reuse the current approval/socket/recovery contracts and must not create a root
 service or parallel lifecycle API.
 
+The non-auto-started user-unit contract is now present in the desktop-body Nix
+profile and proven through the existing `body-config` milestone. Runtime still
+uses direct spawn. The next slice is the approval-preserving launcher bridge to
+that fixed template instance, including explicit stop and existing Observer
+readback; it is not another unit/readiness document.
+
 ## Historical Phase Plans
 
 `OPENCLAW_PHASE_2_PLAN.md` through `OPENCLAW_PHASE_136_PLAN.md` are retained

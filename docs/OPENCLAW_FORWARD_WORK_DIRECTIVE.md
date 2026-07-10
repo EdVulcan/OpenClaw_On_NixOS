@@ -297,6 +297,14 @@ remaining Level 2 runtime-ownership step is a declarative, non-auto-started
 `systemd --user` unit path for this same sidecar contract. Do not turn it into a
 root service, login auto-start, or a second lifecycle API.
 
+The unit contract is now materialized and evaluated through the existing Nix
+body-config milestone: desktop-body defines a hardened
+`openclaw-trusted-sidecar@` user unit with no `wantedBy` and `Restart=no`. This
+does not yet change runtime ownership. The next real slice is to make the
+existing approved lifecycle action launch/stop that fixed user-unit instance,
+while retaining direct spawn only as an explicit development fallback and
+keeping lease/session values out of the environment file.
+
 ## Identity-Upgrade Alignment
 
 Every new capability must state which identity level it serves:

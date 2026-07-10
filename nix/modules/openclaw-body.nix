@@ -156,6 +156,28 @@ let
     };
   };
 
+  trustedSidecarUserService = {
+    description = "OpenClaw trusted work-view sidecar instance %i";
+    environment = {
+      NODE_NO_WARNINGS = "1";
+    };
+    serviceConfig = {
+      Type = "simple";
+      WorkingDirectory = "${cfg.repoRoot}/services/openclaw-session-manager";
+      EnvironmentFile = "%t/openclaw-sidecars/%i.env";
+      ExecStart = "${cfg.nodePackage}/bin/node src/trusted-work-view-sidecar.mjs";
+      Restart = "no";
+      KillMode = "process";
+      TimeoutStopSec = "5s";
+      UMask = "0077";
+      NoNewPrivileges = true;
+      PrivateTmp = true;
+      ProtectSystem = "strict";
+      ProtectHome = true;
+      RestrictAddressFamilies = [ "AF_UNIX" "AF_INET" "AF_INET6" ];
+    };
+  };
+
   owner = if cfg.user == null then "root" else cfg.user;
   group = if cfg.user == null then "root" else cfg.group;
   delegationUser = if cfg.user == null then "openclaw" else cfg.user;
@@ -238,6 +260,10 @@ in
       enable = mkEnableOption "passwordless OpenClaw-owned systemd repair delegation";
     };
 
+    trustedSidecarUserUnit = {
+      enable = mkEnableOption "non-auto-started trusted work-view sidecar user unit";
+    };
+
     ports = {
       core = mkOption { type = types.port; default = 4100; };
       eventHub = mkOption { type = types.port; default = 4101; };
@@ -289,6 +315,10 @@ in
       name = spec.name;
       value = mkService spec;
     }) enabledSpecs);
+
+    systemd.user.services = mkIf cfg.trustedSidecarUserUnit.enable {
+      "openclaw-trusted-sidecar@" = trustedSidecarUserService;
+    };
 
     security.sudo.extraRules = mkIf cfg.systemdRepairAuthDelegation.enable [
       {

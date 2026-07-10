@@ -5,6 +5,7 @@
 
   services.openclaw = {
     profile = "desktop-body";
+    trustedSidecarUserUnit.enable = true;
     components = [
       "eventHub"
       "core"

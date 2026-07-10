@@ -553,3 +553,27 @@ approved lifecycle action
 This is user-session packaging, not Level 3 hostd work. It must preserve the
 same approval, fail-closed disconnect, bounded reconnect, audit, and Observer
 contracts before Level 2 can be considered ready to exit.
+
+The declarative unit contract is now materialized by
+`services.openclaw.trustedSidecarUserUnit.enable` and enabled in the desktop-body
+profile. It defines `openclaw-trusted-sidecar@.service` without `wantedBy`, with
+`Restart=no`, a per-instance `%t/openclaw-sidecars/%i.env`, current-user umask,
+no-new-privileges, protected system/home paths, and only Unix/loopback address
+families. The existing `body-config` milestone performs a real `nix eval` of
+these fields. No service is installed, enabled, started, or connected by this
+slice, and the runtime still uses the validated direct-spawn fallback.
+
+The next smallest real Level 2 slice is the approved launcher bridge:
+
+```text
+existing approved sidecar lifecycle start
+-> write one bounded current-user instance environment file
+-> invoke the fixed systemd --user template instance
+-> connect through the existing deterministic socket contract
+-> retain direct spawn only as explicit development fallback
+-> explicit lifecycle stop stops the same user unit instance
+```
+
+This bridge must expose launcher mode and unit instance in existing lifecycle
+readback, must not pass lease/session/credential values through the environment,
+and must not auto-enable or auto-restart the unit.
