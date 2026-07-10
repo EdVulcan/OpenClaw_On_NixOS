@@ -112,6 +112,12 @@ engineeringPlanTodoBridgeButton.addEventListener("click", () => {
   });
 });
 
+engineeringPlanTodoSaveButton.addEventListener("click", () => {
+  saveEngineeringPlanningWorkbenchState().catch((error) => {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  });
+});
+
 nativePluginInvokeTaskButton.addEventListener("click", () => {
   createNativePluginInvokeApprovalTask().catch((error) => {
     setControlMessage(\`Request failed: \${formatError(error)}\`);

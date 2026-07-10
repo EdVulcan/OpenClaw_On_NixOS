@@ -71,6 +71,54 @@ test("native engineering plan/todo evidence reads task plan steps as todo eviden
   assert.equal(response.planningEvidence.todoWrite.items[1].taskId, "task-plan-1");
 });
 
+test("native engineering plan/todo evidence reads governed workbench storage before task plan steps", () => {
+  const response = buildNativeEngineeringPlanTodoEvidence({
+    tasks: new Map([
+      ["task-plan-2", {
+        id: "task-plan-2",
+        type: "system_task",
+        status: "running",
+        goal: "Validate persisted workbench state",
+        plan: {
+          planner: "rule-v1",
+          strategy: "native-engineering-plan-todo-evidence",
+          status: "running",
+          summary: "Plan a persisted workbench state.",
+          steps: [
+            { id: "task-step", title: "Task plan step should remain fallback", status: "planned" },
+          ],
+        },
+      }],
+    ]),
+    runtimeState: { currentTaskId: "task-plan-2" },
+    workbenchRecords: new Map([
+      ["task-plan-2", {
+        key: "task-plan-2",
+        recordId: "record-2",
+        taskId: "task-plan-2",
+        revision: 3,
+        updatedAt: "2026-07-10T00:00:00.000Z",
+        planSummaryPreview: "Stored planning summary",
+        confirmedPlanPreview: "Stored confirmed plan",
+        todos: [
+          { id: "stored", description: "Use persisted workbench todo state", status: "in_progress" },
+        ],
+      }],
+    ]),
+  });
+
+  assert.equal(response.summary.todoSource, "workbench_storage");
+  assert.equal(response.summary.workbenchTodoCount, 1);
+  assert.equal(response.summary.evidenceTodoCounts.in_progress, 1);
+  assert.equal(response.planningEvidence.enter.observed, true);
+  assert.equal(response.planningEvidence.todoWrite.workbenchStatePersisted, true);
+  assert.equal(response.planningEvidence.todoWrite.items[0].source, "workbench_storage");
+  assert.equal(response.workbenchStorage.persisted, true);
+  assert.equal(response.workbenchStorage.revision, 3);
+  assert.equal(response.governance.canReadPersistedWorkbenchStorage, true);
+  assert.equal(response.governance.canWriteTodoFile, false);
+});
+
 test("native engineering plan/todo evidence clamps query data and reports invalid todo JSON", () => {
   const response = buildNativeEngineeringPlanTodoEvidence({
     planSummary: "S".repeat(500),

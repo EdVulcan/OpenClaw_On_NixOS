@@ -115,3 +115,15 @@ OPENCLAW_NATIVE_ENGINEERING_PLANNING_WORKBENCH_STATE_BRIDGE_PLAN.md
 That slice connects this evidence to the Engineering Loop State as
 operator-visible workbench state while keeping hidden planning mode, todo-file
 write, and task mutation deferred.
+
+The governed workbench storage follow-up was completed as:
+
+```text
+OPENCLAW_NATIVE_ENGINEERING_PLAN_TODO_WORKBENCH_STORAGE_PLAN.md
+```
+
+That slice stores bounded, visible plan/todo state in OpenClaw core state and
+feeds it back into the existing evidence endpoint with
+`todoSource: workbench_storage`. It still does not switch hidden planning modes,
+write `.openclaw/cc-todo.md`, mutate task state, create approvals, execute
+commands, call providers, or create result envelopes.

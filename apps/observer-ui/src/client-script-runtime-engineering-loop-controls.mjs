@@ -543,6 +543,50 @@ async function bridgeEngineeringPlanningWorkbenchState() {
   await refreshEngineeringLoopControlSurfaces();
 }
 
+async function saveEngineeringPlanningWorkbenchState() {
+  if (!latestEngineeringPlanTodoWorkbenchState) {
+    await bridgeEngineeringPlanningWorkbenchState();
+  }
+  const state = latestEngineeringPlanTodoWorkbenchState;
+  if (!state?.taskId) {
+    throw new Error("No selected engineering planning task is available for workbench storage.");
+  }
+
+  const evidence = latestEngineeringPlanTodoEvidence ?? {};
+  const todos = Array.isArray(evidence?.planningEvidence?.todoWrite?.items)
+    ? evidence.planningEvidence.todoWrite.items
+    : [];
+  const result = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/engineering-plan-todo/workbench-state\`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      confirm: true,
+      taskId: state.taskId,
+      source: "observer_engineering_plan_todo_panel",
+      planSummary: evidence?.planningEvidence?.enter?.summaryPreview ?? "",
+      confirmedPlan: evidence?.planningEvidence?.exit?.confirmedPlanPreview ?? "",
+      todos,
+    }),
+  });
+  const evidenceRoute = \`/plugins/native-adapter/engineering-plan-todo/evidence?taskId=\${encodeURIComponent(state.taskId)}&limit=8\`;
+  const refreshed = await fetchJson(\`\${observerConfig.coreUrl}\${evidenceRoute}\`);
+  renderEngineeringPlanTodoEvidence(refreshed);
+  latestEngineeringLoopControlState = {
+    kind: "planning-workbench",
+    taskId: state.taskId,
+    approvalId: null,
+    evidenceRoute,
+  };
+  engineeringLoopStateKind.textContent = "planning-workbench";
+  engineeringLoopStateTask.textContent = state.taskId.slice(0, 8);
+  engineeringLoopStateApproval.textContent = "none";
+  engineeringLoopStateNext.textContent = "use persisted visible todo state to guide next governed action";
+  engineeringLoopStateEvidence.textContent = evidenceRoute;
+  engineeringLoopStateCompletion.textContent = \`storedTodos=\${result.record?.counts?.total ?? 0} revision=\${result.record?.revision ?? 0}\`;
+  setControlMessage(\`Saved engineering planning workbench state for \${state.taskId}; revision \${result.record?.revision ?? "unknown"}.\`);
+  await refreshEngineeringLoopControlSurfaces();
+}
+
 function classifyRestorableEngineeringLoopTask(task) {
   if (!task?.id) {
     return null;

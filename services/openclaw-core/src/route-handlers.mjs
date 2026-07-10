@@ -9,6 +9,7 @@ import { handleCloudLiveProviderTaskPostRoute } from "./cloud-live-provider-task
 import { handleDomainTaskPostRoute } from "./domain-task-post-routes.mjs";
 import { handleNativeAdapterPluginRoute } from "./native-adapter-plugin-routes.mjs";
 import { handleNativeAcpxCodexProcessSpawnTaskRoute } from "./native-acpx-codex-process-spawn-task-routes.mjs";
+import { handleNativeEngineeringPlanTodoWorkbenchRoute } from "./native-engineering-plan-todo-workbench-routes.mjs";
 import { handleNativePluginRuntimeRoute } from "./native-plugin-runtime-routes.mjs";
 import { handleObserverReadModelRoute } from "./observer-read-model-routes.mjs";
 import { handleOperatorControlRoute } from "./operator-control-routes.mjs";
@@ -115,6 +116,16 @@ export function registerRoutes(deps) {
       serialiseTask,
       serialiseApproval,
       buildTaskSummary,
+    })) {
+      return;
+    }
+
+    if (await handleNativeEngineeringPlanTodoWorkbenchRoute({
+      req,
+      res,
+      requestUrl,
+      state,
+      publishEvent,
     })) {
       return;
     }

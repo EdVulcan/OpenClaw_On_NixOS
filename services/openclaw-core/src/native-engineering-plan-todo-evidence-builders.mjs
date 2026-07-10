@@ -12,7 +12,7 @@ function normalisePositiveInteger(value, fallback, max) {
   return Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, max) : fallback;
 }
 
-function boundedText(value, maxChars = MAX_TEXT_CHARS) {
+export function boundedPlanTodoText(value, maxChars = MAX_TEXT_CHARS) {
   const text = typeof value === "string" ? value.trim() : "";
   if (!text) {
     return "";
@@ -52,8 +52,8 @@ function normaliseTodoItem(item, index, source = "query_todos") {
   if (!item || typeof item !== "object") {
     return null;
   }
-  const id = boundedText(item.id ?? `todo-${index + 1}`, 80) || `todo-${index + 1}`;
-  const description = boundedText(item.description ?? item.title ?? item.phase ?? item.kind ?? "", MAX_TEXT_CHARS);
+  const id = boundedPlanTodoText(item.id ?? `todo-${index + 1}`, 80) || `todo-${index + 1}`;
+  const description = boundedPlanTodoText(item.description ?? item.title ?? item.phase ?? item.kind ?? "", MAX_TEXT_CHARS);
   if (!description) {
     return null;
   }
@@ -68,6 +68,13 @@ function normaliseTodoItem(item, index, source = "query_todos") {
   };
 }
 
+export function normalisePlanTodoItems(items = [], source = "query_todos") {
+  return (Array.isArray(items) ? items : [])
+    .slice(0, MAX_TODOS)
+    .map((item, index) => normaliseTodoItem(item, index, source))
+    .filter(Boolean);
+}
+
 function statusFromPlanStep(step) {
   const status = String(step?.status ?? "").trim();
   if (status === "completed" || status === "done") {
@@ -80,8 +87,8 @@ function statusFromPlanStep(step) {
 }
 
 function todoItemFromPlanStep(step, index, taskId) {
-  const id = boundedText(step?.id ?? step?.phase ?? `plan-step-${index + 1}`, 80) || `plan-step-${index + 1}`;
-  const description = boundedText(step?.title ?? step?.summary ?? step?.kind ?? step?.phase ?? id, MAX_TEXT_CHARS);
+  const id = boundedPlanTodoText(step?.id ?? step?.phase ?? `plan-step-${index + 1}`, 80) || `plan-step-${index + 1}`;
+  const description = boundedPlanTodoText(step?.title ?? step?.summary ?? step?.kind ?? step?.phase ?? id, MAX_TEXT_CHARS);
   if (!description) {
     return null;
   }
@@ -98,7 +105,7 @@ function todoItemFromPlanStep(step, index, taskId) {
   };
 }
 
-function countTodos(todos) {
+export function countPlanTodoItems(todos) {
   return todos.reduce((counts, todo) => {
     counts.total += 1;
     counts[todo.status] = (counts[todo.status] ?? 0) + 1;
@@ -122,19 +129,19 @@ function summarizeTaskPlan(task) {
     taskId: task?.id ?? null,
     taskType: task?.type ?? null,
     taskStatus: task?.status ?? null,
-    taskGoal: boundedText(task?.goal ?? "", MAX_TEXT_CHARS),
+    taskGoal: boundedPlanTodoText(task?.goal ?? "", MAX_TEXT_CHARS),
     plan: plan
       ? {
           planner: plan.planner ?? null,
           strategy: plan.strategy ?? null,
           status: plan.status ?? null,
-          summary: boundedText(plan.summary ?? task?.goal ?? "", MAX_TEXT_CHARS),
+          summary: boundedPlanTodoText(plan.summary ?? task?.goal ?? "", MAX_TEXT_CHARS),
           stepCount: steps.length,
           visibleTodoCount: todos.length,
         }
       : null,
     todos,
-    todoCounts: countTodos(todos),
+    todoCounts: countPlanTodoItems(todos),
   };
 }
 
@@ -196,6 +203,7 @@ function buildGovernance() {
     mode: "native_engineering_plan_todo_evidence_read_only",
     runtimeOwner: "openclaw_on_nixos",
     canReadTaskWorkbenchState: true,
+    canReadPersistedWorkbenchStorage: true,
     canReadTaskPlanSteps: true,
     canSwitchHiddenAgentMode: false,
     canWriteTodoFile: false,
@@ -208,9 +216,24 @@ function buildGovernance() {
   };
 }
 
+function selectWorkbenchRecord({ workbenchRecords, taskId, runtimeState }) {
+  if (!(workbenchRecords instanceof Map)) {
+    return null;
+  }
+  const selectedTaskId = taskId || runtimeState?.currentTaskId || null;
+  if (selectedTaskId && workbenchRecords.has(selectedTaskId)) {
+    return workbenchRecords.get(selectedTaskId);
+  }
+  return [...workbenchRecords.values()]
+    .sort((left, right) => String(right?.updatedAt ?? right?.createdAt ?? "").localeCompare(
+      String(left?.updatedAt ?? left?.createdAt ?? ""),
+    ))[0] ?? null;
+}
+
 export function buildNativeEngineeringPlanTodoEvidence({
   tasks = new Map(),
   runtimeState = {},
+  workbenchRecords = new Map(),
   taskId = null,
   planSummary = null,
   confirmedPlan = null,
@@ -220,23 +243,34 @@ export function buildNativeEngineeringPlanTodoEvidence({
 } = {}) {
   const safeLimit = normalisePositiveInteger(limit, DEFAULT_LIMIT, MAX_LIMIT);
   const parsedTodos = todosJson ? parseTodos(todosJson) : parseTodos(todos);
-  const queryTodos = parsedTodos.todos
-    .slice(0, MAX_TODOS)
-    .map((item, index) => normaliseTodoItem(item, index))
-    .filter(Boolean);
+  const queryTodos = normalisePlanTodoItems(parsedTodos.todos, "query_todos");
+  const workbenchRecord = selectWorkbenchRecord({ workbenchRecords, taskId, runtimeState });
+  const workbenchTodos = normalisePlanTodoItems(workbenchRecord?.todos ?? [], "workbench_storage");
   const taskPlans = selectTasks({ tasks, taskId, runtimeState, limit: safeLimit })
     .map((task) => summarizeTaskPlan(task));
   const taskTodos = taskPlans.flatMap((task) => task.todos).slice(0, MAX_TODOS);
-  const evidenceTodos = queryTodos.length > 0 ? queryTodos : taskTodos;
+  const evidenceTodos = queryTodos.length > 0
+    ? queryTodos
+    : workbenchTodos.length > 0
+      ? workbenchTodos
+      : taskTodos;
+  const todoSource = queryTodos.length > 0
+    ? "query_todos"
+    : workbenchTodos.length > 0
+      ? "workbench_storage"
+      : "task_plan_steps";
   const generatedAt = new Date().toISOString();
   const summary = {
     taskPlanCount: taskPlans.length,
-    todoSource: queryTodos.length > 0 ? "query_todos" : "task_plan_steps",
-    planSummaryObserved: Boolean(boundedText(planSummary)) || taskPlans.some((task) => task.plan?.summary),
-    confirmedPlanObserved: Boolean(boundedText(confirmedPlan)),
+    todoSource,
+    planSummaryObserved: Boolean(boundedPlanTodoText(planSummary))
+      || Boolean(workbenchRecord?.planSummaryPreview)
+      || taskPlans.some((task) => task.plan?.summary),
+    confirmedPlanObserved: Boolean(boundedPlanTodoText(confirmedPlan)) || Boolean(workbenchRecord?.confirmedPlanPreview),
     queryTodoCount: queryTodos.length,
+    workbenchTodoCount: workbenchTodos.length,
     taskTodoCount: taskTodos.length,
-    evidenceTodoCounts: countTodos(evidenceTodos),
+    evidenceTodoCounts: countPlanTodoItems(evidenceTodos),
   };
 
   return {
@@ -258,14 +292,15 @@ export function buildNativeEngineeringPlanTodoEvidence({
     },
     sourceRegistries: [
       "task-workbench-state",
+      "openclaw-native-engineering-plan-todo-workbench-storage-v0",
       "rule-plan-v1",
       "openclaw-native-engineering-tool-surface-inventory-v0",
     ],
     query: {
       taskId,
       limit: safeLimit,
-      planSummaryChars: boundedText(planSummary).length,
-      confirmedPlanChars: boundedText(confirmedPlan).length,
+      planSummaryChars: boundedPlanTodoText(planSummary).length,
+      confirmedPlanChars: boundedPlanTodoText(confirmedPlan).length,
       todoItemsProvided: queryTodos.length,
       todosParseError: parsedTodos.parseError,
     },
@@ -284,14 +319,14 @@ export function buildNativeEngineeringPlanTodoEvidence({
     planningEvidence: {
       enter: {
         sourceToolName: "cc_plan_enter",
-        observed: Boolean(boundedText(planSummary)),
-        summaryPreview: boundedText(planSummary),
+        observed: Boolean(boundedPlanTodoText(planSummary)) || Boolean(workbenchRecord?.planSummaryPreview),
+        summaryPreview: boundedPlanTodoText(planSummary) || (workbenchRecord?.planSummaryPreview ?? ""),
         hiddenModeCreated: false,
       },
       exit: {
         sourceToolName: "cc_plan_exit",
-        observed: Boolean(boundedText(confirmedPlan)),
-        confirmedPlanPreview: boundedText(confirmedPlan),
+        observed: Boolean(boundedPlanTodoText(confirmedPlan)) || Boolean(workbenchRecord?.confirmedPlanPreview),
+        confirmedPlanPreview: boundedPlanTodoText(confirmedPlan) || (workbenchRecord?.confirmedPlanPreview ?? ""),
         executionTransitionCreated: false,
       },
       todoWrite: {
@@ -300,7 +335,8 @@ export function buildNativeEngineeringPlanTodoEvidence({
         todoPath: ".openclaw/cc-todo.md",
         todoPathWritten: false,
         taskStateMutated: false,
-        counts: countTodos(evidenceTodos),
+        workbenchStatePersisted: Boolean(workbenchRecord),
+        counts: countPlanTodoItems(evidenceTodos),
         items: evidenceTodos,
       },
     },
@@ -308,6 +344,17 @@ export function buildNativeEngineeringPlanTodoEvidence({
       selectedTaskId: taskId || runtimeState?.currentTaskId || null,
       count: taskPlans.length,
       items: taskPlans,
+    },
+    workbenchStorage: {
+      registry: "openclaw-native-engineering-plan-todo-workbench-storage-v0",
+      persisted: Boolean(workbenchRecord),
+      recordId: workbenchRecord?.recordId ?? null,
+      taskId: workbenchRecord?.taskId ?? null,
+      revision: workbenchRecord?.revision ?? 0,
+      updatedAt: workbenchRecord?.updatedAt ?? null,
+      todoCount: workbenchTodos.length,
+      todoFileWritten: false,
+      taskStateMutated: false,
     },
     summary,
     auditEvidence: {

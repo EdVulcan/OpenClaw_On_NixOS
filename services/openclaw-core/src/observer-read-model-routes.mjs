@@ -164,6 +164,7 @@ export async function handleObserverReadModelRoute({ req, res, requestUrl, state
     sendJson(res, 200, buildNativeEngineeringPlanTodoEvidence({
       tasks: state.tasks,
       runtimeState: state.runtimeState,
+      workbenchRecords: state.nativeEngineeringPlanTodoWorkbenchRecords,
       taskId: requestUrl.searchParams.get("taskId"),
       planSummary: requestUrl.searchParams.get("planSummary"),
       confirmedPlan: requestUrl.searchParams.get("confirmedPlan"),

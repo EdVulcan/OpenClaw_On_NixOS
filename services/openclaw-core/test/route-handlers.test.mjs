@@ -545,6 +545,76 @@ test("native engineering plan/todo evidence route reads task workbench state wit
   assert.equal(response.body.bounds.noTaskMutation, true);
 });
 
+test("native engineering plan/todo workbench storage route persists bounded core state without task mutation", async () => {
+  let persistCount = 0;
+  const task = {
+    id: "task-plan-todo-storage-1",
+    type: "system_task",
+    status: "running",
+    goal: "Persist visible planning workbench state",
+    plan: {
+      planner: "rule-v1",
+      strategy: "native-engineering-plan-todo-workbench-storage",
+      status: "running",
+      summary: "Persist visible planning state.",
+      steps: [
+        { id: "fallback", title: "Fallback task plan todo", status: "planned" },
+      ],
+    },
+  };
+  const records = new Map();
+  const deps = createBaseDeps({
+    state: {
+      tasks: new Map([[task.id, task]]),
+      runtimeState: { currentTaskId: task.id },
+      nativeEngineeringPlanTodoWorkbenchRecords: records,
+      persistState: () => {
+        persistCount += 1;
+      },
+    },
+  });
+
+  const saved = await invokeRoute(deps, "POST", "/plugins/native-adapter/engineering-plan-todo/workbench-state", {
+    confirm: true,
+    taskId: task.id,
+    source: "route_test",
+    planSummary: "Stored route plan",
+    confirmedPlan: "Stored route confirmed plan",
+    todos: [
+      { id: "stored-done", description: "Persist a governed todo", status: "done" },
+      { id: "stored-next", description: "Read storage through evidence", status: "pending" },
+    ],
+  });
+
+  assert.equal(saved.statusCode, 201, JSON.stringify(saved.body));
+  assert.equal(saved.body.registry, "openclaw-native-engineering-plan-todo-workbench-storage-v0");
+  assert.equal(saved.body.record.taskId, task.id);
+  assert.equal(saved.body.record.counts.total, 2);
+  assert.equal(saved.body.record.governance.persistedInCoreState, true);
+  assert.equal(saved.body.record.governance.writesTodoFile, false);
+  assert.equal(saved.body.record.governance.mutatesTaskState, false);
+  assert.equal(saved.body.record.governance.executesCommand, false);
+  assert.equal(persistCount, 1);
+  assert.equal(records.has(task.id), true);
+  assert.equal(task.status, "running");
+
+  const evidence = await invokeRoute(
+    deps,
+    "GET",
+    `/plugins/native-adapter/engineering-plan-todo/evidence?taskId=${task.id}`,
+  );
+
+  assert.equal(evidence.statusCode, 200, JSON.stringify(evidence.body));
+  assert.equal(evidence.body.summary.todoSource, "workbench_storage");
+  assert.equal(evidence.body.summary.workbenchTodoCount, 2);
+  assert.equal(evidence.body.planningEvidence.todoWrite.workbenchStatePersisted, true);
+  assert.equal(evidence.body.planningEvidence.todoWrite.todoPathWritten, false);
+  assert.equal(evidence.body.planningEvidence.todoWrite.taskStateMutated, false);
+  assert.equal(evidence.body.workbenchStorage.persisted, true);
+  assert.equal(evidence.body.governance.canWriteTodoFile, false);
+  assert.equal(evidence.body.governance.canMutateTaskState, false);
+});
+
 test("capability invocation route preserves fallback limit and summary contract", async () => {
   let observedQuery = null;
   const deps = createBaseDeps({

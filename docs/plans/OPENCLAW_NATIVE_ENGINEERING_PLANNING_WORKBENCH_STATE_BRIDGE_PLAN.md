@@ -95,7 +95,6 @@ hidden planning mode, todo-file write, task mutation, command execution, and pro
 The following remain deferred:
 
 ```text
-persisted governed todo/workbench storage
 task state mutation from plan/todo controls
 plan_exit execution transition
 automatic approval or operator execution
@@ -115,3 +114,13 @@ OPENCLAW_NATIVE_ENGINEERING_WORKBENCH_STATE_RESTORATION_PLAN.md
 It rebuilds the latest engineering loop state from core task history after
 Observer reload without relying only on browser-local state and without creating
 new execution paths.
+
+The governed workbench storage follow-up was completed as:
+
+```text
+OPENCLAW_NATIVE_ENGINEERING_PLAN_TODO_WORKBENCH_STORAGE_PLAN.md
+```
+
+It adds explicit core-state storage for visible workbench todos while keeping
+todo-file writes, hidden planning modes, task mutation, approval creation, and
+command/provider execution blocked.

@@ -112,6 +112,7 @@ for (const token of [
   "engineering-plan-todo-todos",
   "engineering-plan-todo-done",
   "engineering-plan-todo-mutation",
+  "engineering-plan-todo-save-button",
   "engineering-plan-todo-json",
 ]) {
   if (!html.includes(token)) {
@@ -120,9 +121,12 @@ for (const token of [
 }
 for (const token of [
   "/plugins/native-adapter/engineering-plan-todo/evidence",
+  "/plugins/native-adapter/engineering-plan-todo/workbench-state",
   "refreshEngineeringPlanTodoEvidence",
   "renderEngineeringPlanTodoEvidence",
+  "saveEngineeringPlanningWorkbenchState",
   "Native engineering plan/todo evidence",
+  "workbench_storage",
   "sense.openclaw.engineering_context.plan_todo_evidence",
   "planning-todo-evidence-only",
   "cc_plan_enter",

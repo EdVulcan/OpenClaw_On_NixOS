@@ -1,4 +1,5 @@
-export const observerClientEngineeringPlanTodoRenderersScript = `let latestEngineeringPlanTodoWorkbenchState = null;
+export const observerClientEngineeringPlanTodoRenderersScript = `let latestEngineeringPlanTodoEvidence = null;
+let latestEngineeringPlanTodoWorkbenchState = null;
 
 function buildEngineeringPlanTodoWorkbenchState(data) {
   const summary = data?.summary ?? {};
@@ -73,6 +74,7 @@ function renderEngineeringPlanTodoWorkbenchState(state) {
 }
 
 function renderEngineeringPlanTodoEvidence(data) {
+  latestEngineeringPlanTodoEvidence = data ?? null;
   const summary = data?.summary ?? {};
   const governance = data?.governance ?? {};
   const todoCounts = summary.evidenceTodoCounts ?? data?.planningEvidence?.todoWrite?.counts ?? {};
@@ -95,6 +97,7 @@ function renderEngineeringPlanTodoEvidence(data) {
     \`Capability: \${data?.capability?.id ?? "sense.openclaw.engineering_context.plan_todo_evidence"} risk=\${data?.capability?.risk ?? "low"} approval=\${Boolean(data?.capability?.approvalRequired)}\`,
     \`Query: taskId=\${data?.query?.taskId ?? "current-or-latest"} limit=\${data?.query?.limit ?? 10} todoSource=\${summary.todoSource ?? "task_plan_steps"} parseError=\${data?.query?.todosParseError ?? "none"}\`,
     \`Summary: taskPlans=\${summary.taskPlanCount ?? taskItems.length} queryTodos=\${summary.queryTodoCount ?? 0} taskTodos=\${summary.taskTodoCount ?? 0} todos=\${todoCounts.total ?? todoItems.length} done=\${todoCounts.done ?? 0} inProgress=\${todoCounts.in_progress ?? 0} pending=\${todoCounts.pending ?? 0}\`,
+    \`Storage: workbench_storage persisted=\${Boolean(data?.workbenchStorage?.persisted)} revision=\${data?.workbenchStorage?.revision ?? 0} todoFileWritten=\${Boolean(data?.workbenchStorage?.todoFileWritten)} taskMutated=\${Boolean(data?.workbenchStorage?.taskStateMutated)}\`,
     \`Governance: readWorkbench=\${Boolean(governance.canReadTaskWorkbenchState)} hiddenMode=\${Boolean(governance.canSwitchHiddenAgentMode)} writeTodo=\${Boolean(governance.canWriteTodoFile)} mutateTask=\${Boolean(governance.canMutateTaskState)} createTask=\${Boolean(governance.canCreateTask)} execute=\${Boolean(governance.canExecuteCommand)} provider=\${Boolean(governance.canCallProvider)}\`,
     \`Audit: operation=\${data?.auditEvidence?.operation ?? "plan_todo_evidence"} evidence=\${data?.auditEvidence?.evidenceKind ?? "missing"} persisted=\${Boolean(data?.auditEvidence?.persisted)}\`,
     "",

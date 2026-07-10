@@ -89,6 +89,12 @@ preserve enhanced openclaw source on GitHub
 -> return to identity-upgrade work-view/session-helper/hostd route
 ```
 
+Current native engineering plan/todo storage evidence is documented in:
+
+```text
+OPENCLAW_NATIVE_ENGINEERING_PLAN_TODO_WORKBENCH_STORAGE_PLAN.md
+```
+
 ## Historical Phase Plans
 
 `OPENCLAW_PHASE_2_PLAN.md` through `OPENCLAW_PHASE_136_PLAN.md` are retained

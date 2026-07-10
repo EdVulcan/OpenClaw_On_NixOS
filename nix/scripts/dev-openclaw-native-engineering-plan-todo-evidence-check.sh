@@ -31,6 +31,8 @@ cleanup() {
     "${TASK_FILE:-}" \
     "${BEFORE_FILE:-}" \
     "${EVIDENCE_FILE:-}" \
+    "${STORAGE_FILE:-}" \
+    "${STORED_EVIDENCE_FILE:-}" \
     "${AFTER_FILE:-}" \
     "${ADAPTER_FILE:-}"
   "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
@@ -46,6 +48,8 @@ source "$SCRIPT_DIR/dev-openclaw-http-json-helper.sh"
 TASK_FILE="$(mktemp)"
 BEFORE_FILE="$(mktemp)"
 EVIDENCE_FILE="$(mktemp)"
+STORAGE_FILE="$(mktemp)"
+STORED_EVIDENCE_FILE="$(mktemp)"
 AFTER_FILE="$(mktemp)"
 ADAPTER_FILE="$(mktemp)"
 
@@ -83,10 +87,31 @@ EOF
 curl --silent --fail \
   "$CORE_URL/plugins/native-adapter/engineering-plan-todo/evidence?taskId=$task_id&limit=999&planSummary=bounded-planning-summary&confirmedPlan=bounded-confirmed-plan&todosJson=$todos_query" \
   > "$EVIDENCE_FILE"
+storage_body="$(node - <<'EOF' "$task_id"
+const taskId = process.argv[2];
+const todos = [
+  { id: "stored-read", description: "Persist visible workbench todo state", status: "done" },
+  { id: "stored-use", description: "Read persisted workbench state through evidence", status: "in_progress" },
+  { id: "stored-verify", description: "Keep todo files and task mutation blocked", status: "pending" }
+];
+process.stdout.write(JSON.stringify({
+  confirm: true,
+  taskId,
+  source: "openclaw-native-engineering-plan-todo-evidence-check",
+  planSummary: "stored-bounded-planning-summary",
+  confirmedPlan: "stored-bounded-confirmed-plan",
+  todos,
+}));
+EOF
+)"
+post_json "$CORE_URL/plugins/native-adapter/engineering-plan-todo/workbench-state" "$storage_body" > "$STORAGE_FILE"
+curl --silent --fail \
+  "$CORE_URL/plugins/native-adapter/engineering-plan-todo/evidence?taskId=$task_id&limit=999" \
+  > "$STORED_EVIDENCE_FILE"
 curl --silent --fail "$CORE_URL/tasks/summary" > "$AFTER_FILE"
 curl --silent --fail "$CORE_URL/plugins/openclaw-native-plugin-adapter" > "$ADAPTER_FILE"
 
-node - <<'EOF' "$TASK_FILE" "$BEFORE_FILE" "$EVIDENCE_FILE" "$AFTER_FILE" "$ADAPTER_FILE" "$WORKSPACE_DIR"
+node - <<'EOF' "$TASK_FILE" "$BEFORE_FILE" "$EVIDENCE_FILE" "$STORAGE_FILE" "$STORED_EVIDENCE_FILE" "$AFTER_FILE" "$ADAPTER_FILE" "$WORKSPACE_DIR"
 const fs = require("node:fs");
 const path = require("node:path");
 const readJson = (index) => JSON.parse(fs.readFileSync(process.argv[index], "utf8"));
@@ -94,11 +119,13 @@ const readJson = (index) => JSON.parse(fs.readFileSync(process.argv[index], "utf
 const taskResponse = readJson(2);
 const before = readJson(3);
 const evidence = readJson(4);
-const after = readJson(5);
-const adapter = readJson(6);
-const workspaceDir = process.argv[7];
+const storage = readJson(5);
+const storedEvidence = readJson(6);
+const after = readJson(7);
+const adapter = readJson(8);
+const workspaceDir = process.argv[9];
 const todoPath = path.join(workspaceDir, ".openclaw", "cc-todo.md");
-const raw = JSON.stringify({ evidence, adapter });
+const raw = JSON.stringify({ evidence, storage, storedEvidence, adapter });
 
 if (before.summary?.counts?.total !== after.summary?.counts?.total || before.summary?.counts?.total !== 1) {
   throw new Error(`plan/todo evidence endpoint should not create tasks: before=${JSON.stringify(before)} after=${JSON.stringify(after)}`);
@@ -114,6 +141,7 @@ if (
   || evidence.sourceCapability?.sourceToolNames?.length !== 3
   || evidence.summary?.taskPlanCount !== 1
   || evidence.summary?.queryTodoCount !== 3
+  || evidence.summary?.workbenchTodoCount !== 0
   || evidence.summary?.evidenceTodoCounts?.done !== 1
   || evidence.summary?.evidenceTodoCounts?.in_progress !== 1
   || evidence.summary?.evidenceTodoCounts?.pending !== 1
@@ -136,8 +164,41 @@ if (
   throw new Error(`plan/todo evidence mismatch: ${JSON.stringify(evidence)}`);
 }
 if (
+  !storage.ok
+  || storage.registry !== "openclaw-native-engineering-plan-todo-workbench-storage-v0"
+  || storage.record?.taskId !== taskResponse.task?.id
+  || storage.record?.counts?.total !== 3
+  || storage.record?.governance?.persistedInCoreState !== true
+  || storage.record?.governance?.writesTodoFile !== false
+  || storage.record?.governance?.mutatesTaskState !== false
+  || storage.record?.governance?.executesCommand !== false
+  || storage.record?.governance?.callsProvider !== false
+) {
+  throw new Error(`plan/todo workbench storage mismatch: ${JSON.stringify(storage)}`);
+}
+if (
+  !storedEvidence.ok
+  || storedEvidence.registry !== "openclaw-native-engineering-plan-todo-evidence-v0"
+  || storedEvidence.summary?.todoSource !== "workbench_storage"
+  || storedEvidence.summary?.workbenchTodoCount !== 3
+  || storedEvidence.summary?.evidenceTodoCounts?.done !== 1
+  || storedEvidence.summary?.evidenceTodoCounts?.in_progress !== 1
+  || storedEvidence.summary?.evidenceTodoCounts?.pending !== 1
+  || storedEvidence.planningEvidence?.todoWrite?.workbenchStatePersisted !== true
+  || storedEvidence.planningEvidence?.todoWrite?.todoPathWritten !== false
+  || storedEvidence.planningEvidence?.todoWrite?.taskStateMutated !== false
+  || storedEvidence.workbenchStorage?.persisted !== true
+  || storedEvidence.governance?.canReadPersistedWorkbenchStorage !== true
+  || storedEvidence.governance?.canWriteTodoFile !== false
+  || storedEvidence.governance?.canMutateTaskState !== false
+) {
+  throw new Error(`stored plan/todo evidence mismatch: ${JSON.stringify(storedEvidence)}`);
+}
+if (
   !adapter.implementedCapabilities?.includes("sense.openclaw.engineering_context.plan_todo_evidence")
+  || !adapter.implementedCapabilities?.includes("act.openclaw.engineering_context.plan_todo_workbench_state")
   || adapter.summary?.canReadEngineeringPlanTodoEvidence !== true
+  || adapter.summary?.canPersistEngineeringPlanTodoWorkbenchState !== true
 ) {
   throw new Error(`native adapter missing plan/todo evidence capability: ${JSON.stringify(adapter)}`);
 }
@@ -155,8 +216,10 @@ for (const token of [
 console.log(JSON.stringify({
   openclawNativeEngineeringPlanTodoEvidence: {
     registry: evidence.registry,
+    storageRegistry: storage.registry,
     taskId: taskResponse.task.id,
-    todos: evidence.summary.evidenceTodoCounts.total,
+    todos: storedEvidence.summary.evidenceTodoCounts.total,
+    todoSource: storedEvidence.summary.todoSource,
     todoFileWritten: fs.existsSync(todoPath),
   },
 }, null, 2));
