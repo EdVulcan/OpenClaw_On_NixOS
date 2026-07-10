@@ -91,7 +91,7 @@ storage_body="$(node - <<'EOF' "$task_id"
 const taskId = process.argv[2];
 const todos = [
   { id: "stored-read", description: "Persist visible workbench todo state", status: "done" },
-  { id: "stored-use", description: "Read persisted workbench state through evidence", status: "in_progress" },
+  { id: "stored-use", description: "Verify persisted workbench state through evidence", status: "in_progress" },
   { id: "stored-verify", description: "Keep todo files and task mutation blocked", status: "pending" }
 ];
 process.stdout.write(JSON.stringify({
@@ -188,6 +188,14 @@ if (
   || storedEvidence.planningEvidence?.todoWrite?.todoPathWritten !== false
   || storedEvidence.planningEvidence?.todoWrite?.taskStateMutated !== false
   || storedEvidence.workbenchStorage?.persisted !== true
+  || storedEvidence.nextGovernedActionSuggestion?.registry !== "openclaw-native-engineering-plan-todo-next-action-v0"
+  || storedEvidence.nextGovernedActionSuggestion?.suggestion?.actionId !== "create_verification_task"
+  || storedEvidence.nextGovernedActionSuggestion?.suggestion?.existingObserverControlId !== "engineering-verification-task-button"
+  || storedEvidence.nextGovernedActionSuggestion?.suggestion?.createsTaskAutomatically !== false
+  || storedEvidence.nextGovernedActionSuggestion?.suggestion?.executesAutomatically !== false
+  || storedEvidence.nextGovernedActionSuggestion?.governance?.guidanceOnly !== true
+  || storedEvidence.nextGovernedActionSuggestion?.governance?.createsTask !== false
+  || storedEvidence.nextGovernedActionSuggestion?.governance?.executesCommand !== false
   || storedEvidence.governance?.canReadPersistedWorkbenchStorage !== true
   || storedEvidence.governance?.canWriteTodoFile !== false
   || storedEvidence.governance?.canMutateTaskState !== false

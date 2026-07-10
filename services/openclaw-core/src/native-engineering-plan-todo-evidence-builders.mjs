@@ -1,3 +1,5 @@
+import { buildPlanTodoNextGovernedActionSuggestion } from "./native-engineering-plan-todo-next-action.mjs";
+
 export const NATIVE_ENGINEERING_PLAN_TODO_EVIDENCE_REGISTRY = "openclaw-native-engineering-plan-todo-evidence-v0";
 
 const DEFAULT_LIMIT = 10;
@@ -356,6 +358,11 @@ export function buildNativeEngineeringPlanTodoEvidence({
       todoFileWritten: false,
       taskStateMutated: false,
     },
+    nextGovernedActionSuggestion: buildPlanTodoNextGovernedActionSuggestion({
+      todos: evidenceTodos,
+      todoSource,
+      workbenchStatePersisted: Boolean(workbenchRecord),
+    }),
     summary,
     auditEvidence: {
       operation: "plan_todo_evidence",

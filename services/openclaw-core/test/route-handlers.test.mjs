@@ -582,7 +582,7 @@ test("native engineering plan/todo workbench storage route persists bounded core
     confirmedPlan: "Stored route confirmed plan",
     todos: [
       { id: "stored-done", description: "Persist a governed todo", status: "done" },
-      { id: "stored-next", description: "Read storage through evidence", status: "pending" },
+      { id: "stored-next", description: "Verify storage through evidence", status: "pending" },
     ],
   });
 
@@ -611,6 +611,11 @@ test("native engineering plan/todo workbench storage route persists bounded core
   assert.equal(evidence.body.planningEvidence.todoWrite.todoPathWritten, false);
   assert.equal(evidence.body.planningEvidence.todoWrite.taskStateMutated, false);
   assert.equal(evidence.body.workbenchStorage.persisted, true);
+  assert.equal(evidence.body.nextGovernedActionSuggestion.suggestion.actionId, "create_verification_task");
+  assert.equal(evidence.body.nextGovernedActionSuggestion.suggestion.createsTaskAutomatically, false);
+  assert.equal(evidence.body.nextGovernedActionSuggestion.suggestion.executesAutomatically, false);
+  assert.equal(evidence.body.nextGovernedActionSuggestion.governance.createsApproval, false);
+  assert.equal(evidence.body.nextGovernedActionSuggestion.governance.executesCommand, false);
   assert.equal(evidence.body.governance.canWriteTodoFile, false);
   assert.equal(evidence.body.governance.canMutateTaskState, false);
 });

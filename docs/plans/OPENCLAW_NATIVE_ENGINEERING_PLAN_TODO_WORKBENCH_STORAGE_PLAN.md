@@ -48,6 +48,18 @@ Save Workbench State
 The button saves the currently visible planning workbench state and refreshes
 the existing Engineering Loop State and Plan/Todo Evidence panels.
 
+The same readback now derives a guidance-only next action suggestion:
+
+```text
+registry: openclaw-native-engineering-plan-todo-next-action-v0
+mode: operator-guidance-only
+```
+
+The suggestion selects the current visible todo, classifies it into an existing
+governed Observer control when possible, and records the recommended control
+and capability id. It is not an endpoint and does not create tasks, approvals,
+commands, workspace mutations, provider calls, or result envelopes.
+
 ## Boundaries
 
 This slice does not:
@@ -72,6 +84,7 @@ Runtime storage:
 ```text
 services/openclaw-core/src/native-engineering-plan-todo-workbench-storage.mjs
 services/openclaw-core/src/native-engineering-plan-todo-workbench-routes.mjs
+services/openclaw-core/src/native-engineering-plan-todo-next-action.mjs
 services/openclaw-core/src/runtime-state.mjs
 ```
 
@@ -114,11 +127,12 @@ provider calls, network egress, result envelopes
 ## Next Slice
 
 The next high-density slice should use stored visible workbench state to guide
-the existing engineering loop without adding a new readiness chain:
+the existing engineering loop through an existing approval-gated creation path
+when the operator explicitly asks:
 
 ```text
-stored workbench todo -> explicit next governed engineering action suggestion
+stored workbench suggestion -> explicit governed task creation through existing controls
 ```
 
-That follow-up should remain readback/guidance only unless it reuses an
-existing approval-gated task creation path.
+Do not create a new readiness chain for this. Reuse the existing edit, write,
+verification, and recovery task controls.

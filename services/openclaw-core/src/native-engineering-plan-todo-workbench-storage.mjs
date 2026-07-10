@@ -5,6 +5,7 @@ import {
   countPlanTodoItems,
   normalisePlanTodoItems,
 } from "./native-engineering-plan-todo-evidence-builders.mjs";
+import { buildPlanTodoNextGovernedActionSuggestion } from "./native-engineering-plan-todo-next-action.mjs";
 
 export const NATIVE_ENGINEERING_PLAN_TODO_WORKBENCH_STORAGE_REGISTRY =
   "openclaw-native-engineering-plan-todo-workbench-storage-v0";
@@ -72,6 +73,11 @@ function publicRecord(record) {
     todoSha256: record.todoSha256 ?? null,
     counts: record.counts ?? countPlanTodoItems(record.todos ?? []),
     todos: normalisePlanTodoItems(record.todos ?? [], "workbench_storage"),
+    nextGovernedActionSuggestion: buildPlanTodoNextGovernedActionSuggestion({
+      todos: normalisePlanTodoItems(record.todos ?? [], "workbench_storage"),
+      todoSource: "workbench_storage",
+      workbenchStatePersisted: true,
+    }),
     governance: buildGovernance({ persisted: true }),
     auditEvidence: record.auditEvidence ?? null,
   };

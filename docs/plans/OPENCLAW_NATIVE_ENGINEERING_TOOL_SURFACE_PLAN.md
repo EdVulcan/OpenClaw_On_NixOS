@@ -194,6 +194,11 @@ an Observer Save Workbench State control while keeping hidden planning modes,
 todo-file writes, task mutation, approval creation, command execution, provider
 egress, and result envelopes blocked.
 
+The same lane now emits `openclaw-native-engineering-plan-todo-next-action-v0`
+as guidance-only readback over the stored/current todo. It points to existing
+Observer controls and governed capabilities but does not create tasks,
+approvals, execution, provider calls, workspace mutation, or result envelopes.
+
 The LSP lifecycle readiness draft follow-up was completed as:
 
 ```text

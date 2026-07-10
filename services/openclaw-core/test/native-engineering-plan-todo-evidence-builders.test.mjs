@@ -101,7 +101,7 @@ test("native engineering plan/todo evidence reads governed workbench storage bef
         planSummaryPreview: "Stored planning summary",
         confirmedPlanPreview: "Stored confirmed plan",
         todos: [
-          { id: "stored", description: "Use persisted workbench todo state", status: "in_progress" },
+          { id: "stored", description: "Verify persisted workbench todo state", status: "in_progress" },
         ],
       }],
     ]),
@@ -115,6 +115,11 @@ test("native engineering plan/todo evidence reads governed workbench storage bef
   assert.equal(response.planningEvidence.todoWrite.items[0].source, "workbench_storage");
   assert.equal(response.workbenchStorage.persisted, true);
   assert.equal(response.workbenchStorage.revision, 3);
+  assert.equal(response.nextGovernedActionSuggestion.status, "suggested");
+  assert.equal(response.nextGovernedActionSuggestion.suggestion.actionId, "create_verification_task");
+  assert.equal(response.nextGovernedActionSuggestion.suggestion.existingObserverControlId, "engineering-verification-task-button");
+  assert.equal(response.nextGovernedActionSuggestion.governance.createsTask, false);
+  assert.equal(response.nextGovernedActionSuggestion.governance.executesCommand, false);
   assert.equal(response.governance.canReadPersistedWorkbenchStorage, true);
   assert.equal(response.governance.canWriteTodoFile, false);
 });

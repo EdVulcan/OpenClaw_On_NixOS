@@ -527,7 +527,7 @@ async function bridgeEngineeringPlanningWorkbenchState() {
   engineeringLoopStateKind.textContent = "planning-workbench";
   engineeringLoopStateTask.textContent = state.taskId ? state.taskId.slice(0, 8) : "none";
   engineeringLoopStateApproval.textContent = "none";
-  engineeringLoopStateNext.textContent = "use visible todo state to guide next governed action";
+  engineeringLoopStateNext.textContent = state.nextGovernedActionSuggestion?.suggestion?.actionId ?? "use visible todo state to guide next governed action";
   engineeringLoopStateEvidence.textContent = evidenceRoute;
   engineeringLoopStateCompletion.textContent = \`todos=\${state.counts.total} pending=\${state.counts.pending}\`;
   engineeringLoopStateJson.textContent = [
@@ -536,6 +536,7 @@ async function bridgeEngineeringPlanningWorkbenchState() {
     \`Todo Source: \${state.todoSource}\`,
     \`Todos: total=\${state.counts.total} done=\${state.counts.done} inProgress=\${state.counts.inProgress} pending=\${state.counts.pending}\`,
     \`Current: \${state.currentTodo?.id ?? "none"} \${state.currentTodo?.status ?? "none"}\`,
+    \`Next Governed Action: \${state.nextGovernedActionSuggestion?.suggestion?.actionId ?? "none"} control=\${state.nextGovernedActionSuggestion?.suggestion?.existingObserverControlId ?? "none"} guidanceOnly=\${Boolean(state.nextGovernedActionSuggestion?.governance?.guidanceOnly)}\`,
     \`Evidence: \${evidenceRoute}\`,
     "Boundary: Observer workbench bridge only; no hidden planning mode, todo file write, task mutation, approval, command execution, provider call, or result envelope.",
   ].join("\\n");
@@ -580,7 +581,7 @@ async function saveEngineeringPlanningWorkbenchState() {
   engineeringLoopStateKind.textContent = "planning-workbench";
   engineeringLoopStateTask.textContent = state.taskId.slice(0, 8);
   engineeringLoopStateApproval.textContent = "none";
-  engineeringLoopStateNext.textContent = "use persisted visible todo state to guide next governed action";
+  engineeringLoopStateNext.textContent = refreshed.nextGovernedActionSuggestion?.suggestion?.actionId ?? "use persisted visible todo state to guide next governed action";
   engineeringLoopStateEvidence.textContent = evidenceRoute;
   engineeringLoopStateCompletion.textContent = \`storedTodos=\${result.record?.counts?.total ?? 0} revision=\${result.record?.revision ?? 0}\`;
   setControlMessage(\`Saved engineering planning workbench state for \${state.taskId}; revision \${result.record?.revision ?? "unknown"}.\`);

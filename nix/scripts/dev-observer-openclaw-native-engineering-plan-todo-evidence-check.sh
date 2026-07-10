@@ -127,6 +127,8 @@ for (const token of [
   "saveEngineeringPlanningWorkbenchState",
   "Native engineering plan/todo evidence",
   "workbench_storage",
+  "Next Governed Action",
+  "openclaw-native-engineering-plan-todo-next-action-v0",
   "sense.openclaw.engineering_context.plan_todo_evidence",
   "planning-todo-evidence-only",
   "cc_plan_enter",

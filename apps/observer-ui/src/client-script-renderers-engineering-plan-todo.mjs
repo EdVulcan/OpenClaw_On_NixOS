@@ -32,6 +32,7 @@ function buildEngineeringPlanTodoWorkbenchState(data) {
       pending: todoCounts.pending ?? 0,
     },
     currentTodo,
+    nextGovernedActionSuggestion: data?.nextGovernedActionSuggestion ?? null,
     governance: {
       hiddenModeCreated: false,
       todoFileWritten: false,
@@ -67,6 +68,7 @@ function renderEngineeringPlanTodoWorkbenchState(state) {
     \`Todo Source: \${state.todoSource}\`,
     \`Todos: total=\${state.counts.total} done=\${state.counts.done} inProgress=\${state.counts.inProgress} pending=\${state.counts.pending}\`,
     \`Current: \${state.currentTodo?.id ?? "none"} \${state.currentTodo?.status ?? "none"} \${state.currentTodo?.description ?? ""}\`,
+    \`Next Governed Action: \${state.nextGovernedActionSuggestion?.suggestion?.actionId ?? "none"} control=\${state.nextGovernedActionSuggestion?.suggestion?.existingObserverControlId ?? "none"} guidanceOnly=\${Boolean(state.nextGovernedActionSuggestion?.governance?.guidanceOnly)}\`,
     \`Boundary: hiddenMode=\${Boolean(state.governance.hiddenModeCreated)} writeTodo=\${Boolean(state.governance.todoFileWritten)} mutateTask=\${Boolean(state.governance.taskStateMutated)} execute=\${Boolean(state.governance.executesCommand)} provider=\${Boolean(state.governance.callsProvider)}\`,
     "",
     ...state.deferredExecutionBoundaries.map((boundary) => \`deferred: \${boundary}\`),
@@ -79,6 +81,7 @@ function renderEngineeringPlanTodoEvidence(data) {
   const governance = data?.governance ?? {};
   const todoCounts = summary.evidenceTodoCounts ?? data?.planningEvidence?.todoWrite?.counts ?? {};
   const deferred = Array.isArray(data?.deferredExecutionBoundaries) ? data.deferredExecutionBoundaries : [];
+  const nextAction = data?.nextGovernedActionSuggestion ?? {};
   const taskItems = Array.isArray(data?.taskPlanEvidence?.items) ? data.taskPlanEvidence.items : [];
   const todoItems = Array.isArray(data?.planningEvidence?.todoWrite?.items) ? data.planningEvidence.todoWrite.items : [];
   engineeringPlanTodoRegistry.textContent = data?.registry ?? "openclaw-native-engineering-plan-todo-evidence-v0";
@@ -98,6 +101,8 @@ function renderEngineeringPlanTodoEvidence(data) {
     \`Query: taskId=\${data?.query?.taskId ?? "current-or-latest"} limit=\${data?.query?.limit ?? 10} todoSource=\${summary.todoSource ?? "task_plan_steps"} parseError=\${data?.query?.todosParseError ?? "none"}\`,
     \`Summary: taskPlans=\${summary.taskPlanCount ?? taskItems.length} queryTodos=\${summary.queryTodoCount ?? 0} taskTodos=\${summary.taskTodoCount ?? 0} todos=\${todoCounts.total ?? todoItems.length} done=\${todoCounts.done ?? 0} inProgress=\${todoCounts.in_progress ?? 0} pending=\${todoCounts.pending ?? 0}\`,
     \`Storage: workbench_storage persisted=\${Boolean(data?.workbenchStorage?.persisted)} revision=\${data?.workbenchStorage?.revision ?? 0} todoFileWritten=\${Boolean(data?.workbenchStorage?.todoFileWritten)} taskMutated=\${Boolean(data?.workbenchStorage?.taskStateMutated)}\`,
+    \`Next Action Registry: \${nextAction.registry ?? "openclaw-native-engineering-plan-todo-next-action-v0"}\`,
+    \`Next Governed Action: \${nextAction.suggestion?.actionId ?? "none"} control=\${nextAction.suggestion?.existingObserverControlId ?? "none"} capability=\${nextAction.suggestion?.existingCapabilityId ?? "none"} guidanceOnly=\${Boolean(nextAction.governance?.guidanceOnly)} autoTask=\${Boolean(nextAction.suggestion?.createsTaskAutomatically)} autoExecute=\${Boolean(nextAction.suggestion?.executesAutomatically)}\`,
     \`Governance: readWorkbench=\${Boolean(governance.canReadTaskWorkbenchState)} hiddenMode=\${Boolean(governance.canSwitchHiddenAgentMode)} writeTodo=\${Boolean(governance.canWriteTodoFile)} mutateTask=\${Boolean(governance.canMutateTaskState)} createTask=\${Boolean(governance.canCreateTask)} execute=\${Boolean(governance.canExecuteCommand)} provider=\${Boolean(governance.canCallProvider)}\`,
     \`Audit: operation=\${data?.auditEvidence?.operation ?? "plan_todo_evidence"} evidence=\${data?.auditEvidence?.evidenceKind ?? "missing"} persisted=\${Boolean(data?.auditEvidence?.persisted)}\`,
     "",
