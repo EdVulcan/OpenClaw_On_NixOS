@@ -381,12 +381,6 @@ That slice approves and runs the recovered verification task through the
 existing operator path, then proves successful rerun verification evidence and
 source recovery readback without automatic approval or recovery execution.
 
-The current next smallest real capability is:
-
-```text
-Observer visibility for ACPX/Codex bridge compatibility and persistence state
-```
-
 The live plugin runtime refresh follow-up was completed as:
 
 ```text
@@ -410,5 +404,29 @@ sessions, overwrite revisions, missing-session null behavior, restart recovery,
 and secret-key redaction. It still does not read `CODEX_HOME`, copy auth
 material, write wrappers, spawn ACP processes, or perform provider egress.
 
-The next slice should expose that read model in Observer without enabling live
-auth copy, wrapper execution, ACP process spawn, or provider egress.
+The ACPX/Codex lane now also includes Observer visibility, proposal drafts,
+approval-gated wrapper action tasks, wrapper write proposal and approval bridge
+through `act.openclaw.workspace_text_write`, wrapper write execution readback,
+process-spawn proposal/preflight, and live execution boundary review. The next
+ACPX/Codex step is explicit live process execution authorization, which is
+intentionally blocked for autonomous development because it crosses real local
+process, auth, provider, and network boundaries.
+
+The Level 2 trusted work-view follow-up completed as:
+
+```text
+OPENCLAW_TRUSTED_WORK_VIEW_SESSION_CONTRACT_PLAN.md
+```
+
+That lane now carries a shared trusted-session contract, helper recovery
+recommendations, Observer recovery bridging, sidecar lifecycle task
+materialization, start-probe approval blocking, consolidated task/readback
+evidence, authoritative session identity matching across session-manager and
+browser-runtime, divergence recovery recommendations, and Observer session
+identity visibility. It still does not start a sidecar process, install a
+helper, capture the desktop, require root, copy credentials, call providers, or
+spawn ACP/Codex.
+
+The next autonomous slice should stay within existing governed local body and
+Observer surfaces unless the operator explicitly authorizes one of the blocked
+boundaries above.
