@@ -71,6 +71,22 @@ none -> no mutation
 
 It does not call arbitrary endpoints returned by the service contract.
 
+Observer also exposes the trusted sidecar lifecycle probe through the same
+Controls surface:
+
+```text
+Run Sidecar Start Probe
+```
+
+The control resolves the latest sidecar lifecycle task through
+`/phase-3/operator-interrupt-controls` and calls the existing
+`/work-view/trusted-sidecar/lifecycle-tasks/:taskId/start-probe` route. It
+intentionally accepts the pre-approval HTTP 409 response as a valid readback so
+the operator can see `blocked_before_approval`; after manual approval it reads
+`deferred_after_approval`. Both states preserve `processStarted: false`, no
+root/system daemon requirement, no desktop-wide capture, no host mutation, and
+no provider egress.
+
 The contract also carries a future Level 2 sidecar draft. It names the helper's
 capture/action/recovery/Observer responsibilities and explicitly records that no
 process is started, no installation is required, and no root/system daemon is

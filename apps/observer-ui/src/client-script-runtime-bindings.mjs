@@ -267,6 +267,12 @@ createTrustedSidecarLifecycleTaskButton.addEventListener("click", () => {
   });
 });
 
+startTrustedSidecarProbeButton.addEventListener("click", () => {
+  startTrustedSidecarLifecycleProbe().catch((error) => {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  });
+});
+
 refreshScreenButton.addEventListener("click", () => {
   refreshScreenNow().catch((error) => {
     setControlMessage(\`Request failed: \${formatError(error)}\`);

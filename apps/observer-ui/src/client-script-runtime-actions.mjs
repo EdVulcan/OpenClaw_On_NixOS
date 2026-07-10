@@ -378,6 +378,39 @@ async function createTrustedSidecarLifecycleTask() {
   await refreshWorkView();
 }
 
+async function startTrustedSidecarLifecycleProbe() {
+  const controls = await fetchJson(\`\${observerConfig.coreUrl}/phase-3/operator-interrupt-controls\`);
+  const taskId = controls.sidecarLifecycle?.taskId ?? getSelectedHistoryTaskId();
+  if (!taskId) {
+    throw new Error("Create or load a trusted sidecar lifecycle task first.");
+  }
+
+  const response = await fetch(\`\${observerConfig.coreUrl}/work-view/trusted-sidecar/lifecycle-tasks/\${encodeURIComponent(taskId)}/start-probe\`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({}),
+  });
+  const contentType = response.headers.get("content-type") ?? "";
+  const result = contentType.includes("application/json")
+    ? await response.json()
+    : { ok: false, error: await response.text() };
+  if (!response.ok && response.status !== 409) {
+    throw new Error(result?.error ?? \`Request failed with status \${response.status}\`);
+  }
+
+  taskHistoryFocus = "selected-task";
+  selectedHistoryTaskId = result.task?.id ?? taskId;
+  taskDetailIdInput.value = result.task?.id ?? taskId;
+  renderPlanPanel(result.task ?? latestHistoryTask);
+  setControlMessage(\`Trusted sidecar probe \${result.readback?.status ?? "unknown"} for \${taskId}; processStarted=\${String(Boolean(result.readback?.execution?.processStarted))}\`);
+  await refreshTaskList();
+  await refreshTaskHistoryDetail();
+  await refreshApprovalState();
+  await refreshOperatorState();
+  await refreshPhase3OperatorInterruptControls();
+  await refreshWorkView();
+}
+
 async function openWorkViewUrl(taskId = null) {
   const entryUrl = getDesiredWorkViewUrl();
   if (taskId) {

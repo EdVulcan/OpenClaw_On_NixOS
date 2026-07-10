@@ -22,6 +22,7 @@ export function observerOperationsPanels() {
               <button id="hide-work-view-button" class="secondary">Hide Work View</button>
               <button id="run-recommended-work-view-action-button" class="secondary">Run Recommended Work View Action</button>
               <button id="create-trusted-sidecar-lifecycle-task-button" class="secondary">Create Sidecar Lifecycle Task</button>
+              <button id="start-trusted-sidecar-probe-button" class="secondary">Run Sidecar Start Probe</button>
               <button id="refresh-screen-button" class="secondary">Refresh Screen State</button>
               <button id="click-action-button" class="secondary">Simulate Click</button>
               <button id="type-action-button" class="secondary">Simulate Type</button>
