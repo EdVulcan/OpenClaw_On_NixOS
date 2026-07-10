@@ -9,6 +9,7 @@ import {
   createSidecarMessageDecoder,
   encodeSidecarMessage,
 } from "./trusted-work-view-sidecar-channel.mjs";
+import { createTrustedWorkViewSidecarLauncher } from "./trusted-work-view-sidecar-launcher.mjs";
 
 const HEARTBEAT_REGISTRY = "openclaw-trusted-work-view-sidecar-heartbeat-v0";
 const SIDECAR_REGISTRY = "openclaw-trusted-work-view-sidecar-supervisor-v0";
@@ -60,6 +61,9 @@ export function createTrustedWorkViewSidecarSupervisor({
   stopTimeoutMs = 1_000,
   reconnectTimeoutMs = 30_000,
   socketDirectory = path.join(process.env.XDG_RUNTIME_DIR ?? tmpdir(), "openclaw-sidecars"),
+  launcherMode = process.env.OPENCLAW_TRUSTED_SIDECAR_LAUNCHER_MODE ?? "systemd-user",
+  unitInstance = process.env.OPENCLAW_TRUSTED_SIDECAR_UNIT_INSTANCE ?? "primary",
+  launcher = null,
   onHeartbeat = () => {},
   onFailure = () => {},
 } = {}) {
@@ -86,6 +90,12 @@ export function createTrustedWorkViewSidecarSupervisor({
   let startRejecter = null;
   let stopResolver = null;
   const pendingActions = new Map();
+  const processLauncher = launcher ?? createTrustedWorkViewSidecarLauncher({
+    mode: launcherMode,
+    unitInstance,
+    socketDirectory,
+    spawnProcess,
+  });
 
   function clearHeartbeatTimer() {
     if (heartbeatTimer) clearTimeout(heartbeatTimer);
@@ -126,12 +136,14 @@ export function createTrustedWorkViewSidecarSupervisor({
     const captureFreshness = captureAgeMs === null
       ? "missing"
       : captureAgeMs <= captureStaleAfterMs ? "fresh" : "stale";
+    const launcherState = processLauncher.describe();
     return {
       registry: SIDECAR_REGISTRY,
       status,
       running: status === "running" && Boolean(transport),
       recoveryRequired: status === "recovery_required" || status === "degraded",
       automaticRestart: false,
+      ...launcherState,
       authorityConnected: Boolean(transport),
       pid,
       sessionId: owner?.sessionId ?? null,
@@ -272,10 +284,10 @@ export function createTrustedWorkViewSidecarSupervisor({
     mkdirSync(path.dirname(targetPath), { recursive: true, mode: 0o700 });
     chmodSync(path.dirname(targetPath), 0o700);
     rmSync(targetPath, { force: true });
-    const processHandle = spawnProcess(process.execPath, [sidecarPath.pathname], {
-      detached: true,
-      stdio: ["ignore", "ignore", "ignore"],
-      env: {
+    const launched = await processLauncher.launch({
+      command: process.execPath,
+      args: [sidecarPath.pathname],
+      environment: {
         NODE_NO_WARNINGS: "1",
         OPENCLAW_SIDECAR_SOCKET_PATH: targetPath,
         OPENCLAW_SIDECAR_TASK_ID: owner.taskId,
@@ -285,22 +297,24 @@ export function createTrustedWorkViewSidecarSupervisor({
         OPENCLAW_SIDECAR_RECONNECT_TIMEOUT_MS: String(reconnectTimeoutMs),
       },
     });
+    const processHandle = launched.processHandle;
     spawnedProcess = processHandle;
-    pid = processHandle.pid ?? null;
-    processHandle.once("error", (error) => startRejecter?.(error));
-    processHandle.once("exit", (code, signal) => {
-      exitCode = code;
-      exitSignal = signal;
-      stoppedAt = now();
-      if (status !== "stopping" && status !== "stopped") {
-        status = "degraded";
-        degradedReason ??= `trusted_sidecar_exited_${code ?? signal ?? "unknown"}`;
-        reportFailure();
-      }
-      if (spawnedProcess === processHandle) spawnedProcess = null;
-      if (pid === processHandle.pid) pid = null;
-    });
-    processHandle.unref?.();
+    if (processHandle) {
+      pid = processHandle.pid ?? null;
+      processHandle.once("error", (error) => startRejecter?.(error));
+      processHandle.once("exit", (code, signal) => {
+        exitCode = code;
+        exitSignal = signal;
+        stoppedAt = now();
+        if (status !== "stopping" && status !== "stopped") {
+          status = "degraded";
+          degradedReason ??= `trusted_sidecar_exited_${code ?? signal ?? "unknown"}`;
+          reportFailure();
+        }
+        if (spawnedProcess === processHandle) spawnedProcess = null;
+        if (pid === processHandle.pid) pid = null;
+      });
+    }
 
     const deadline = Date.now() + startTimeoutMs;
     while (Date.now() < deadline) {
@@ -381,7 +395,10 @@ export function createTrustedWorkViewSidecarSupervisor({
       await ready;
     } catch (error) {
       transport?.destroy();
-      if (!reconnected) spawnedProcess?.kill("SIGTERM");
+      if (!reconnected) {
+        spawnedProcess?.kill("SIGTERM");
+        await processLauncher.stop().catch(() => {});
+      }
       status = "degraded";
       degradedReason = error instanceof Error ? error.message : "sidecar_start_failed";
       throw error;
@@ -413,24 +430,28 @@ export function createTrustedWorkViewSidecarSupervisor({
   }
 
   async function stop({ taskId } = {}) {
-    if (!transport) return { ...snapshot(), stopped: false };
-    if (requiredString(taskId, "taskId") !== owner?.taskId) {
+    const requestedTaskId = requiredString(taskId, "taskId");
+    if (owner && requestedTaskId !== owner.taskId) {
       throw new Error("Trusted work-view sidecar lifecycle task mismatch.");
     }
+    if (!owner) return { ...snapshot(), stopped: false };
     status = "stopping";
     clearHeartbeatTimer();
-    await new Promise((resolve) => {
-      const timeout = setTimeout(() => {
-        transport?.destroy();
-        spawnedProcess?.kill("SIGTERM");
-        resolve();
-      }, stopTimeoutMs);
-      stopResolver = () => {
-        clearTimeout(timeout);
-        resolve();
-      };
-      transport.write(encodeSidecarMessage({ type: "shutdown" }));
-    });
+    if (transport) {
+      await new Promise((resolve) => {
+        const timeout = setTimeout(() => {
+          transport?.destroy();
+          spawnedProcess?.kill("SIGTERM");
+          resolve();
+        }, stopTimeoutMs);
+        stopResolver = () => {
+          clearTimeout(timeout);
+          resolve();
+        };
+        transport.write(encodeSidecarMessage({ type: "shutdown" }));
+      });
+    }
+    await processLauncher.stop();
     stopResolver = null;
     status = "stopped";
     pid = null;

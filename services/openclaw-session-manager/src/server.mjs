@@ -46,6 +46,8 @@ const workViewState = {
 const sidecarRecoveryStore = createTrustedWorkViewSidecarRecoveryStore({ stateFilePath });
 let sidecarLifecycleIntent = sidecarRecoveryStore.snapshot();
 const trustedWorkViewSidecarSupervisor = createTrustedWorkViewSidecarSupervisor({
+  launcherMode: process.env.OPENCLAW_TRUSTED_SIDECAR_LAUNCHER_MODE ?? "systemd-user",
+  unitInstance: process.env.OPENCLAW_TRUSTED_SIDECAR_UNIT_INSTANCE ?? "primary",
   onHeartbeat(message) {
     const helperRuntime = trustedWorkViewHelperRuntime.snapshot();
     if (

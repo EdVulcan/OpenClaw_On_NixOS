@@ -58,6 +58,12 @@ export function createPhase3WorkViewBuilders(deps) {
           authorityConnected: false,
           reconnectable: false,
           boundedProcess: false,
+          launcherMode: "not_started",
+          unitInstance: null,
+          unitName: null,
+          userManagerOwned: false,
+          directSpawnFallback: false,
+          persistentAuthorityValues: false,
           credentialEnvironmentInherited: false,
           networkAccessRequired: false,
           networkScope: "none",
@@ -102,6 +108,12 @@ export function createPhase3WorkViewBuilders(deps) {
         reconnectable: Boolean(execution.reconnectable),
         reconnected: Boolean(execution.reconnected),
         boundedProcess: Boolean(execution.boundedProcess),
+        launcherMode: execution.launcherMode ?? "unavailable",
+        unitInstance: execution.unitInstance ?? null,
+        unitName: execution.unitName ?? null,
+        userManagerOwned: Boolean(execution.userManagerOwned),
+        directSpawnFallback: Boolean(execution.directSpawnFallback),
+        persistentAuthorityValues: Boolean(execution.persistentAuthorityValues),
         credentialEnvironmentInherited: Boolean(execution.credentialEnvironmentInherited),
         networkAccessRequired: Boolean(execution.networkAccessRequired),
         networkScope: execution.networkScope ?? "none",
@@ -322,6 +334,8 @@ export function createPhase3WorkViewBuilders(deps) {
         )
         && sidecarLifecycle.safety.authorityConnected !== false
         && sidecarLifecycle.safety.boundedProcess === true
+        && ["systemd-user", "direct-spawn"].includes(sidecarLifecycle.safety.launcherMode)
+        && sidecarLifecycle.safety.persistentAuthorityValues === false
         && sidecarLifecycle.safety.credentialEnvironmentInherited === false
         && sidecarLifecycle.safety.networkAccessRequired === true
         && sidecarLifecycle.safety.networkScope === "loopback_browser_runtime_only"
@@ -398,6 +412,8 @@ export function createPhase3WorkViewBuilders(deps) {
         sidecarProcessStarted: sidecarLifecycle.safety.processStarted,
         sidecarSupervisorStatus: sidecarLifecycle.safety.supervisorStatus,
         sidecarHeartbeatCount: sidecarLifecycle.safety.heartbeatCount,
+        sidecarLauncherMode: sidecarLifecycle.safety.launcherMode,
+        sidecarUnitInstance: sidecarLifecycle.safety.unitInstance,
       },
       next: {
         recommendedSlice: "openclaw-phase-3-completion-readiness",

@@ -16,6 +16,8 @@ export OBSERVER_UI_PORT="${OBSERVER_UI_PORT:-6718}"
 export OPENCLAW_CORE_STATE_FILE="${OPENCLAW_CORE_STATE_FILE:-$REPO_ROOT/.artifacts/openclaw-core-phase-3-operator-interrupt-controls-check.json}"
 export OPENCLAW_SYSTEM_HEAL_STATE_FILE="${OPENCLAW_SYSTEM_HEAL_STATE_FILE:-$REPO_ROOT/.artifacts/openclaw-system-heal-phase-3-operator-interrupt-controls-check.json}"
 export OPENCLAW_SESSION_MANAGER_STATE_FILE="${OPENCLAW_SESSION_MANAGER_STATE_FILE:-$REPO_ROOT/.artifacts/openclaw-session-manager-phase-3-operator-interrupt-controls-check.json}"
+export OPENCLAW_TRUSTED_SIDECAR_LAUNCHER_MODE="systemd-user"
+export OPENCLAW_TRUSTED_SIDECAR_UNIT_INSTANCE="primary"
 
 CORE_URL="http://127.0.0.1:$OPENCLAW_CORE_PORT"
 SESSION_MANAGER_URL="http://127.0.0.1:$OPENCLAW_SESSION_MANAGER_PORT"
@@ -28,6 +30,10 @@ SESSION_MANAGER_PID_FILE="$REPO_ROOT/.artifacts/openclaw-session-manager.pid"
 SESSION_MANAGER_LOG_FILE="$REPO_ROOT/.artifacts/openclaw-session-manager.log"
 BROWSER_RUNTIME_PID_FILE="$REPO_ROOT/.artifacts/openclaw-browser-runtime.pid"
 BROWSER_RUNTIME_LOG_FILE="$REPO_ROOT/.artifacts/openclaw-browser-runtime.log"
+SIDECAR_UNIT_NAME="openclaw-trusted-sidecar@${OPENCLAW_TRUSTED_SIDECAR_UNIT_INSTANCE}.service"
+SIDECAR_UNIT_DIR="${XDG_RUNTIME_DIR:?XDG_RUNTIME_DIR is required for the user-unit milestone}/systemd/user"
+SIDECAR_UNIT_FILE="$SIDECAR_UNIT_DIR/openclaw-trusted-sidecar@.service"
+SIDECAR_ENV_FILE="$XDG_RUNTIME_DIR/openclaw-sidecars/${OPENCLAW_TRUSTED_SIDECAR_UNIT_INSTANCE}.env"
 
 "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 rm -f "$OPENCLAW_CORE_STATE_FILE" "$OPENCLAW_CORE_STATE_FILE.tmp" "$OPENCLAW_SYSTEM_HEAL_STATE_FILE" "$OPENCLAW_SYSTEM_HEAL_STATE_FILE.tmp" \
@@ -61,10 +67,41 @@ cleanup() {
   if [[ -n "${RESTARTED_BROWSER_RUNTIME_PID:-}" ]]; then
     kill -TERM "$RESTARTED_BROWSER_RUNTIME_PID" >/dev/null 2>&1 || true
   fi
+  systemctl --user stop "$SIDECAR_UNIT_NAME" >/dev/null 2>&1 || true
+  rm -f "$SIDECAR_UNIT_FILE" "$SIDECAR_ENV_FILE"
+  systemctl --user daemon-reload >/dev/null 2>&1 || true
   "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
   rm -f "$OPENCLAW_SESSION_MANAGER_STATE_FILE" "$OPENCLAW_SESSION_MANAGER_STATE_FILE.tmp"
 }
 trap cleanup EXIT
+
+if [[ -e "$SIDECAR_UNIT_FILE" ]]; then
+  echo "Refusing to replace an existing runtime trusted-sidecar user unit: $SIDECAR_UNIT_FILE" >&2
+  exit 1
+fi
+mkdir -p "$SIDECAR_UNIT_DIR"
+cat > "$SIDECAR_UNIT_FILE" <<EOF
+[Unit]
+Description=OpenClaw trusted work-view sidecar instance %i (milestone runtime unit)
+
+[Service]
+Type=simple
+WorkingDirectory=$REPO_ROOT/services/openclaw-session-manager
+Environment=NODE_NO_WARNINGS=1
+EnvironmentFile=%t/openclaw-sidecars/%i.env
+ExecStart=$(command -v node) src/trusted-work-view-sidecar.mjs
+Restart=no
+KillMode=process
+TimeoutStopSec=5s
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%t/openclaw-sidecars
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+EOF
+systemctl --user daemon-reload
 
 # shellcheck source=/dev/null
 source "$SCRIPT_DIR/dev-openclaw-http-json-helper.sh"
@@ -114,6 +151,12 @@ approved_start_probe_status="$(curl --silent --output "$APPROVED_START_PROBE_FIL
   -X POST "$CORE_URL/work-view/trusted-sidecar/lifecycle-tasks/$sidecar_task_id/start-probe" \
   -H 'content-type: application/json' \
   --data '{}')"
+systemctl --user is-active --quiet "$SIDECAR_UNIT_NAME"
+test -f "$SIDECAR_ENV_FILE"
+if grep -Eq '^OPENCLAW_.*(SESSION|LEASE|CREDENTIAL|PROVIDER|BROWSER_RUNTIME)' "$SIDECAR_ENV_FILE"; then
+  echo "trusted sidecar environment file persisted forbidden authority or provider fields" >&2
+  exit 1
+fi
 curl --silent --fail "$CORE_URL/phase-3/operator-interrupt-controls" > "$CONTROLS_AFTER_PROBE_FILE"
 initial_capture_sequence="$(node -e 'const data=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8")); process.stdout.write(String(data.readback.execution.captureObservation.sequence));' "$APPROVED_START_PROBE_FILE")"
 FRESH_CAPTURE_ACTION_FILE="$(mktemp)"
@@ -417,6 +460,14 @@ curl --silent --fail \
   -X POST "$CORE_URL/work-view/trusted-sidecar/lifecycle-tasks/$sidecar_task_id/stop" \
   -H 'content-type: application/json' \
   --data '{}' > "$STOP_SIDECAR_FILE"
+if systemctl --user is-active --quiet "$SIDECAR_UNIT_NAME"; then
+  echo "explicit lifecycle stop did not stop $SIDECAR_UNIT_NAME" >&2
+  exit 1
+fi
+if [[ -e "$SIDECAR_ENV_FILE" ]]; then
+  echo "explicit lifecycle stop did not remove $SIDECAR_ENV_FILE" >&2
+  exit 1
+fi
 curl --silent --fail "$CORE_URL/phase-3/operator-interrupt-controls" > "$CONTROLS_AFTER_STOP_FILE"
 
 node - <<'EOF' "$CONTROLS_FILE" "$takeover" "$sidecar_task" "$start_probe_status" "$START_PROBE_FILE" "$approved_sidecar" "$approved_start_probe_status" "$APPROVED_START_PROBE_FILE" "$CONTROLS_AFTER_PROBE_FILE" "$SUSPENDED_STATE_FILE" "$old_browser_action_status" "$OLD_BROWSER_ACTION_FILE" "$resume" "$RESUMED_STATE_FILE" "$RESUMED_BROWSER_ACTION_FILE" "$STOP_SIDECAR_FILE" "$CONTROLS_AFTER_STOP_FILE" "$RECOVERY_REQUIRED_STATE_FILE" "$recovery_action_status" "$RECOVERY_BROWSER_ACTION_FILE" "$RESTART_SIDECAR_FILE" "$RESTARTED_STATE_FILE" "$CAPTURE_REFRESH_STATE_FILE" "$BROWSER_FAILURE_STATE_FILE" "$BROWSER_FAILURE_ACTION_FILE" "$BROWSER_RECOVERED_STATE_FILE" "$BROWSER_RECOVERED_ACTION_FILE" "$NEW_TAB_ACTION_FILE" "$NEW_TAB_BROWSER_STATE_FILE" "$NEW_TAB_CAPTURE_STATE_FILE" "$NEW_TAB_URL" "$AUTONOMOUS_NEW_TAB_RESULT_FILE" "$AUTONOMOUS_NEW_TAB_URL" "$AUTHORITY_INTERRUPTED_TASK_FILE" "$AUTHORITY_RECOVERED_TASK_FILE" "$AUTHORITY_RECOVERED_EXECUTION_FILE" "$AUTHORITY_INTERRUPTED_NEW_TAB_URL" "$REPLACED_STATE_FILE"
@@ -548,6 +599,12 @@ if (approvedStartProbeStatus !== "200"
   || !Number.isInteger(approvedStartProbe.readback?.execution?.pid)
   || approvedStartProbe.readback?.execution?.supervisorStatus !== "running"
   || approvedStartProbe.readback?.execution?.heartbeatCount < 1
+  || approvedStartProbe.readback?.execution?.launcherMode !== "systemd-user"
+  || approvedStartProbe.readback?.execution?.unitInstance !== "primary"
+  || approvedStartProbe.readback?.execution?.unitName !== "openclaw-trusted-sidecar@primary.service"
+  || approvedStartProbe.readback?.execution?.userManagerOwned !== true
+  || approvedStartProbe.readback?.execution?.directSpawnFallback !== false
+  || approvedStartProbe.readback?.execution?.persistentAuthorityValues !== false
   || approvedStartProbe.readback?.execution?.sessionManagerOwned !== false
   || approvedStartProbe.readback?.execution?.userSessionOwned !== true
   || approvedStartProbe.readback?.execution?.authorityConnected !== true
@@ -586,6 +643,10 @@ if (controlsAfterProbe.sidecarLifecycle?.taskId !== sidecarTask.task.id
   || controlsAfterProbe.sidecarLifecycle?.latestProbe?.status !== "running_after_approval"
   || controlsAfterProbe.sidecarLifecycle?.safety?.processStarted !== true
   || controlsAfterProbe.sidecarLifecycle?.safety?.boundedProcess !== true
+  || controlsAfterProbe.sidecarLifecycle?.safety?.launcherMode !== "systemd-user"
+  || controlsAfterProbe.sidecarLifecycle?.safety?.unitInstance !== "primary"
+  || controlsAfterProbe.summary?.sidecarLauncherMode !== "systemd-user"
+  || controlsAfterProbe.summary?.sidecarUnitInstance !== "primary"
   || controlsAfterProbe.summary?.sidecarStartProbeStatus !== "running_after_approval"
   || controlsAfterProbe.summary?.sidecarProcessStarted !== true
   || controlsAfterProbe.summary?.sidecarSupervisorStatus !== "running") {
@@ -741,6 +802,8 @@ console.log(JSON.stringify({
     startProbeAfterApproval: approvedStartProbe.readback.status,
     sidecarPid: approvedStartProbe.readback.execution.pid,
     heartbeatCount: approvedStartProbe.readback.execution.heartbeatCount,
+    launcherMode: approvedStartProbe.readback.execution.launcherMode,
+    unitInstance: approvedStartProbe.readback.execution.unitInstance,
     captureRefreshSequence: refreshedCapture.captureObservation.sequence,
     controlsSidecarProbe: controlsAfterProbe.sidecarLifecycle.latestProbe.status,
     restartRecoveryStatus: recoveryRuntime.sidecar.status,

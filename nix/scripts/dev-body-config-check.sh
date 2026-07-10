@@ -98,6 +98,7 @@ requireIncludes("openclaw-body module", bodyModule, [
   "EnvironmentFile = \"%t/openclaw-sidecars/%i.env\"",
   "ExecStart = \"${cfg.nodePackage}/bin/node src/trusted-work-view-sidecar.mjs\"",
   "Restart = \"no\"",
+  "ReadWritePaths = [ \"%t/openclaw-sidecars\" ]",
   "systemd.tmpfiles.rules",
   "StateDirectory = \"openclaw\"",
   "LogsDirectory = \"openclaw\"",
@@ -178,7 +179,7 @@ if command -v nix >/dev/null 2>&1; then
     --apply 'services: let unit = services."openclaw-trusted-sidecar@"; service = unit.serviceConfig; in {
       wantedBy = unit.wantedBy;
       serviceConfig = {
-        inherit (service) Restart EnvironmentFile ExecStart NoNewPrivileges PrivateTmp ProtectSystem ProtectHome RestrictAddressFamilies;
+        inherit (service) Restart EnvironmentFile ExecStart NoNewPrivileges PrivateTmp ProtectSystem ProtectHome ReadWritePaths RestrictAddressFamilies;
       };
     }')"
   node - <<'EOF' "$user_unit_json"
@@ -192,6 +193,8 @@ if ((unit.wantedBy ?? []).length !== 0
   || service.PrivateTmp !== true
   || service.ProtectSystem !== "strict"
   || service.ProtectHome !== true
+  || !Array.isArray(service.ReadWritePaths)
+  || !service.ReadWritePaths.includes("%t/openclaw-sidecars")
   || !Array.isArray(service.RestrictAddressFamilies)
   || !service.RestrictAddressFamilies.includes("AF_UNIX")
   || !service.RestrictAddressFamilies.includes("AF_INET")) {
@@ -204,6 +207,7 @@ console.log(JSON.stringify({
     restart: service.Restart,
     environmentFile: service.EnvironmentFile,
     noNewPrivileges: service.NoNewPrivileges,
+    readWritePaths: service.ReadWritePaths,
     addressFamilies: service.RestrictAddressFamilies,
   },
 }, null, 2));

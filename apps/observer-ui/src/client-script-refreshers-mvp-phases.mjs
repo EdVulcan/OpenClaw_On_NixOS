@@ -333,6 +333,7 @@ async function refreshPhase3OperatorInterruptControls() {
       "Operator: status=" + (data.operator?.status ?? "unknown") + " blocked=" + Boolean(data.operator?.blocked),
       "Action Authority: " + (summary.actionAuthority ?? helperRuntime.actionAuthority ?? "unknown") + " runtime=" + (helperRuntime.status ?? "unknown") + " suspended=" + Boolean(summary.actionAuthoritySuspended) + " lease=" + (summary.helperLeaseId ?? "none"),
       "Sidecar: task=" + (sidecarLifecycle.taskId ?? "none") + " approval=" + (sidecarLifecycle.approvalStatus ?? "none") + " lifecycle=" + (latestProbe.status ?? "none") + " supervisor=" + (safety.supervisorStatus ?? "none") + " pid=" + (safety.pid ?? "none") + " heartbeat=" + (safety.heartbeatCount ?? 0) + " capture=" + (safety.captureFreshness ?? "missing") + " processStarted=" + Boolean(safety.processStarted),
+      "Sidecar Launcher: mode=" + (safety.launcherMode ?? "unknown") + " unit=" + (safety.unitInstance ?? "none") + " userManagerOwned=" + Boolean(safety.userManagerOwned) + " directFallback=" + Boolean(safety.directSpawnFallback),
       "Sidecar Authority: userSessionOwned=" + Boolean(safety.userSessionOwned) + " connected=" + Boolean(safety.authorityConnected) + " reconnectable=" + Boolean(safety.reconnectable) + " reconnected=" + Boolean(safety.reconnected),
       "Next: " + (data.next?.recommendedSlice ?? "unknown"),
     ].join("\\n");

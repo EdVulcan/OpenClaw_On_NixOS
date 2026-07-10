@@ -6,6 +6,10 @@ import path from "node:path";
 
 import { createTrustedWorkViewSidecarSupervisor } from "../src/trusted-work-view-sidecar-supervisor.mjs";
 
+function createDirectSpawnSupervisor(options = {}) {
+  return createTrustedWorkViewSidecarSupervisor({ launcherMode: "direct-spawn", ...options });
+}
+
 function createSocketDirectory(t) {
   const directory = mkdtempSync(path.join(tmpdir(), "openclaw-sidecar-test-"));
   t.after(() => rmSync(directory, { recursive: true, force: true }));
@@ -26,7 +30,7 @@ function lifecycleInput(overrides = {}) {
 
 test("trusted work-view sidecar supervisor starts one bounded user-session process and stops it", async (t) => {
   const heartbeats = [];
-  const supervisor = createTrustedWorkViewSidecarSupervisor({
+  const supervisor = createDirectSpawnSupervisor({
     socketDirectory: createSocketDirectory(t),
     heartbeatIntervalMs: 25,
     onHeartbeat: (message) => heartbeats.push(message),
@@ -54,7 +58,7 @@ test("trusted work-view sidecar supervisor starts one bounded user-session proce
 
 test("trusted work-view sidecar survives authority disconnect and explicitly rebinds a fresh session", async (t) => {
   const socketDirectory = createSocketDirectory(t);
-  const firstSupervisor = createTrustedWorkViewSidecarSupervisor({ socketDirectory, heartbeatIntervalMs: 25 });
+  const firstSupervisor = createDirectSpawnSupervisor({ socketDirectory, heartbeatIntervalMs: 25 });
   const first = await firstSupervisor.start(lifecycleInput());
 
   const disconnected = await firstSupervisor.disconnectAuthority({ taskId: "task-sidecar" });
@@ -63,14 +67,14 @@ test("trusted work-view sidecar survives authority disconnect and explicitly reb
   assert.equal(disconnected.authorityConnected, false);
   assert.equal(disconnected.pid, first.pid);
 
-  const mismatchedSupervisor = createTrustedWorkViewSidecarSupervisor({ socketDirectory, heartbeatIntervalMs: 25 });
+  const mismatchedSupervisor = createDirectSpawnSupervisor({ socketDirectory, heartbeatIntervalMs: 25 });
   await assert.rejects(
     () => mismatchedSupervisor.start(lifecycleInput({ approvalId: "approval-mismatch" })),
     /lifecycle identity mismatch/u,
   );
   await new Promise((resolve) => setTimeout(resolve, 25));
 
-  const restartedSupervisor = createTrustedWorkViewSidecarSupervisor({ socketDirectory, heartbeatIntervalMs: 25 });
+  const restartedSupervisor = createDirectSpawnSupervisor({ socketDirectory, heartbeatIntervalMs: 25 });
   const rebound = await restartedSupervisor.start(lifecycleInput({
     sessionId: "session-sidecar-restarted",
     workViewId: "work-view-restarted",
@@ -86,7 +90,7 @@ test("trusted work-view sidecar survives authority disconnect and explicitly reb
 });
 
 test("trusted work-view sidecar rejects unapproved process start", async (t) => {
-  const supervisor = createTrustedWorkViewSidecarSupervisor({ socketDirectory: createSocketDirectory(t) });
+  const supervisor = createDirectSpawnSupervisor({ socketDirectory: createSocketDirectory(t) });
   await assert.rejects(
     () => supervisor.start(lifecycleInput({ approvalStatus: "pending" })),
     /approved lifecycle authority/u,
@@ -99,7 +103,7 @@ test("trusted work-view sidecar reports heartbeat timeout without automatic reco
   const failed = new Promise((resolve) => {
     resolveFailure = resolve;
   });
-  const supervisor = createTrustedWorkViewSidecarSupervisor({
+  const supervisor = createDirectSpawnSupervisor({
     socketDirectory: createSocketDirectory(t),
     heartbeatIntervalMs: 1_000,
     heartbeatTimeoutMs: 50,
@@ -130,7 +134,7 @@ test("trusted work-view sidecar process exit fails closed until explicit replace
   const failed = new Promise((resolve) => {
     resolveFailure = resolve;
   });
-  const supervisor = createTrustedWorkViewSidecarSupervisor({
+  const supervisor = createDirectSpawnSupervisor({
     socketDirectory: createSocketDirectory(t),
     heartbeatIntervalMs: 25,
     onFailure: resolveFailure,

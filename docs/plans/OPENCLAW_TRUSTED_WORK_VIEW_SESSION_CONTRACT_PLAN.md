@@ -577,3 +577,36 @@ existing approved sidecar lifecycle start
 This bridge must expose launcher mode and unit instance in existing lifecycle
 readback, must not pass lease/session/credential values through the environment,
 and must not auto-enable or auto-restart the unit.
+
+The approved launcher bridge is now complete. The existing lifecycle start
+writes one mode-0600 allowlisted environment file for the fixed `primary`
+instance, invokes `openclaw-trusted-sidecar@primary.service` through the current
+user manager, and then binds session/lease/browser authority only over the
+existing Unix socket. The environment contains lifecycle task/approval IDs,
+socket path, and bounded timing controls; it contains no session, lease,
+credential, provider, or browser-runtime URL. Explicit lifecycle stop stops the
+same unit and removes the environment file. `direct-spawn` remains available
+only when development startup selects it explicitly.
+
+The existing Phase 3 milestone temporarily materializes and cleans up the fixed
+user unit on the VM, proves actual `systemd --user` start/stop, same-PID
+session-manager reconnect, no automatic process replacement, explicit
+different-PID replacement, capture/action continuity, and Observer readback.
+The Nix unit also grants its strict sandbox write access only to
+`%t/openclaw-sidecars`, which real execution proved is required for the bounded
+Unix socket.
+
+The VM proof runs session-manager in the current user session. The Nix body
+skeleton still defines its main services at system scope, so wiring a selected
+desktop user's session-manager deployment to that user's manager remains a
+separate deployment concern. No UID is hardcoded and no root-to-user-manager
+proxy is introduced by this slice.
+
+The next smallest real Level 2 slice is bounded AI-owned browser workspace
+continuity across browser-runtime restart. The browser runtime is currently
+in-memory, so stable work-view ownership should persist only bounded tab and
+active-URL/session intent, restore it without action authority, require the
+existing prepare/lease rebind before actions resume, and expose recovery through
+the existing Observer surface. Lease values, input text, click data, capture
+payloads, credentials, provider data, and automatic action replay remain
+deferred.

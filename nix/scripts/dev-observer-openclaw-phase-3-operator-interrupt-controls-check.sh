@@ -91,7 +91,7 @@ for (const token of ["Phase 3 Operator Interrupt Controls", "phase3-operator-int
     throw new Error(`Observer HTML missing ${token}`);
   }
 }
-for (const token of ["/phase-3/operator-interrupt-controls", "refreshPhase3OperatorInterruptControls", "openclaw-phase-3-operator-interrupt-controls-v0", "/control/takeover", "/control/resume", "/work-view/trusted-sidecar/lifecycle-tasks", "/start-probe", "/stop", "/act/browser/new-tab", "newTabActionButton", "createTrustedSidecarLifecycleTask", "startTrustedSidecarLifecycleProbe", "stopTrustedSidecarLifecycle", "sidecarLifecycle", "latestProbe", "workViewRecoveryAction", "trustedSession.helperReadiness", "Action Authority", "actionAuthoritySuspended", "helperRuntime.actionAuthority", "safety.supervisorStatus", "safety.heartbeatCount", "safety.userSessionOwned", "safety.authorityConnected", "safety.reconnectable", "Sidecar Failure", "Sidecar Recovery", "Sidecar Authority", "Capture Source", "captureRecoveryRequired", "recoveryRequired", "lastSidecarFailure", "automaticRestart", "Recovery Evidence:", "Recovery Recommendation:", "recoverSelectedTask"]) {
+for (const token of ["/phase-3/operator-interrupt-controls", "refreshPhase3OperatorInterruptControls", "openclaw-phase-3-operator-interrupt-controls-v0", "/control/takeover", "/control/resume", "/work-view/trusted-sidecar/lifecycle-tasks", "/start-probe", "/stop", "/act/browser/new-tab", "newTabActionButton", "createTrustedSidecarLifecycleTask", "startTrustedSidecarLifecycleProbe", "stopTrustedSidecarLifecycle", "sidecarLifecycle", "latestProbe", "workViewRecoveryAction", "trustedSession.helperReadiness", "Action Authority", "actionAuthoritySuspended", "helperRuntime.actionAuthority", "safety.supervisorStatus", "safety.heartbeatCount", "safety.userSessionOwned", "safety.authorityConnected", "safety.reconnectable", "safety.launcherMode", "safety.unitInstance", "Sidecar Launcher:", "userManagerOwned", "directSpawnFallback", "Sidecar Failure", "Sidecar Recovery", "Sidecar Authority", "Capture Source", "captureRecoveryRequired", "recoveryRequired", "lastSidecarFailure", "automaticRestart", "Recovery Evidence:", "Recovery Recommendation:", "recoverSelectedTask"]) {
   if (!client.includes(token)) {
     throw new Error(`Observer client missing ${token}`);
   }
@@ -134,6 +134,11 @@ if (approvedStartProbeStatus !== "200"
   || !Number.isInteger(approvedStartProbe.readback?.execution?.pid)
   || approvedStartProbe.readback?.execution?.supervisorStatus !== "running"
   || approvedStartProbe.readback?.execution?.heartbeatCount < 1
+  || approvedStartProbe.readback?.execution?.launcherMode !== "direct-spawn"
+  || approvedStartProbe.readback?.execution?.unitInstance !== null
+  || approvedStartProbe.readback?.execution?.userManagerOwned !== false
+  || approvedStartProbe.readback?.execution?.directSpawnFallback !== true
+  || approvedStartProbe.readback?.execution?.persistentAuthorityValues !== false
   || approvedStartProbe.readback?.execution?.sessionManagerOwned !== false
   || approvedStartProbe.readback?.execution?.userSessionOwned !== true
   || approvedStartProbe.readback?.execution?.authorityConnected !== true

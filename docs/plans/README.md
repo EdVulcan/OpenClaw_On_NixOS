@@ -155,6 +155,14 @@ uses direct spawn. The next slice is the approval-preserving launcher bridge to
 that fixed template instance, including explicit stop and existing Observer
 readback; it is not another unit/readiness document.
 
+That launcher bridge is complete: approved lifecycle start/stop now controls
+the fixed `systemd --user` instance, binds authority over the existing socket,
+keeps lease/session/provider values out of its bounded environment file, and
+projects launcher ownership through the existing Observer panel. Direct spawn
+is an explicit development fallback. The next slice is bounded AI-owned browser
+workspace continuity across browser-runtime restart, not a Level 2 readiness
+wrapper.
+
 ## Historical Phase Plans
 
 `OPENCLAW_PHASE_2_PLAN.md` through `OPENCLAW_PHASE_136_PLAN.md` are retained

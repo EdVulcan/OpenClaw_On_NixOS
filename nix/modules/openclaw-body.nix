@@ -174,6 +174,7 @@ let
       PrivateTmp = true;
       ProtectSystem = "strict";
       ProtectHome = true;
+      ReadWritePaths = [ "%t/openclaw-sidecars" ];
       RestrictAddressFamilies = [ "AF_UNIX" "AF_INET" "AF_INET6" ];
     };
   };

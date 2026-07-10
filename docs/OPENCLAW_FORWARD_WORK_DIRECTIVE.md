@@ -305,6 +305,28 @@ existing approved lifecycle action launch/stop that fixed user-unit instance,
 while retaining direct spawn only as an explicit development fallback and
 keeping lease/session values out of the environment file.
 
+That approved launcher bridge is now complete. The session-manager runtime
+default uses the fixed `openclaw-trusted-sidecar@primary.service` user unit,
+while development must explicitly select the direct-spawn fallback. The
+existing lifecycle owns
+the mode-0600 environment file, systemd start/stop, deterministic socket bind,
+Observer launcher readback, and cleanup. Session, lease, credential, provider,
+and browser-runtime URL values never enter the file. The real Phase 3 milestone
+materializes the test unit, controls it through `systemctl --user`, proves
+restart/replacement/action continuity, and removes both unit and environment
+afterward.
+
+This proves user-session ownership, not every Nix deployment topology. The
+current Nix body skeleton still launches its main services as system services;
+moving session-manager itself into a selected login-user manager, or adding a
+separately governed cross-manager bridge, remains deferred. Do not hardcode a
+desktop UID or add a root proxy merely to hide that deployment boundary.
+
+The next real Level 2 behavior is bounded browser workspace continuity across a
+browser-runtime restart. Preserve only compact AI-owned tab/active-URL/session
+intent; restore it fail-closed without a lease or automatic action replay, and
+reuse the existing prepare/rebind/recovery and Observer surfaces.
+
 ## Identity-Upgrade Alignment
 
 Every new capability must state which identity level it serves:
