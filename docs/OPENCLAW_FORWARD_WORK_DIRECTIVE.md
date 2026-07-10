@@ -233,6 +233,12 @@ before the helper contract reports `active`. Continue by carrying that lease
 through existing browser action mediation; do not replace it with another
 readiness endpoint.
 
+That action-mediation follow-up is complete for browser input and click:
+screen-act derives the current trusted lease, browser-runtime rejects missing or
+mismatched leases before mutation, and Observer shows the mediation result. The
+next Level 2 slice should suspend this action authority during explicit operator
+takeover and require an explicit resume/rebind.
+
 ## Identity-Upgrade Alignment
 
 Every new capability must state which identity level it serves:

@@ -65,6 +65,58 @@ export function normaliseTrustedWorkViewHelperLease(value, { expectedSessionId =
   };
 }
 
+export function validateTrustedWorkViewActionLease({
+  candidate = null,
+  browserSessionId = null,
+  browserSessionAuthority = null,
+  browserLease = null,
+} = {}) {
+  const required = browserSessionAuthority === "openclaw-session-manager";
+  if (!required) {
+    return {
+      registry: "openclaw-trusted-work-view-action-mediation-v0",
+      required: false,
+      accepted: true,
+      status: "local_fallback_not_required",
+      reason: null,
+      sessionId: browserSessionId,
+      leaseId: null,
+      leaseMatched: false,
+    };
+  }
+
+  try {
+    const expected = normaliseTrustedWorkViewHelperLease(browserLease, {
+      expectedSessionId: browserSessionId,
+    });
+    const provided = normaliseTrustedWorkViewHelperLease(candidate, {
+      expectedSessionId: browserSessionId,
+    });
+    const leaseMatched = Boolean(expected?.leaseId && provided?.leaseId === expected.leaseId);
+    return {
+      registry: "openclaw-trusted-work-view-action-mediation-v0",
+      required: true,
+      accepted: leaseMatched,
+      status: leaseMatched ? "accepted" : "rejected",
+      reason: leaseMatched ? null : "trusted_helper_lease_mismatch",
+      sessionId: browserSessionId,
+      leaseId: provided?.leaseId ?? null,
+      leaseMatched,
+    };
+  } catch (error) {
+    return {
+      registry: "openclaw-trusted-work-view-action-mediation-v0",
+      required: true,
+      accepted: false,
+      status: "rejected",
+      reason: error instanceof Error ? error.message : "invalid_trusted_helper_lease",
+      sessionId: browserSessionId,
+      leaseId: null,
+      leaseMatched: false,
+    };
+  }
+}
+
 function deriveHelperRuntime({ input, workView, browser, capture, authoritativeSessionId, browserRuntimeSessionId }) {
   const supplied = input.helperRuntime
     ?? workView.helperRuntime

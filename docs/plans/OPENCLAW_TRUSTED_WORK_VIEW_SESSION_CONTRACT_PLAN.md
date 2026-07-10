@@ -55,6 +55,22 @@ It starts no extra process and performs no installation, root action,
 desktop-wide capture, host mutation, or provider egress. Divergence is visible
 and degrades trust; it is not silently repaired.
 
+The matched lease now mediates real AI-owned browser input and click actions:
+
+```text
+screen-sense trusted state
+-> screen-act derives the bounded current lease
+-> browser-runtime compares it with its authoritative session lease
+-> mutate browser input/click state only when the lease matches
+```
+
+The existing screen-act result carries
+`openclaw-trusted-work-view-action-mediation-v0` with required, accepted,
+status, session, lease, and match evidence. A session-manager-owned browser
+returns HTTP 409 before mutation when an action omits or mismatches the lease.
+Browser-local fallback remains compatible when no session-manager authority is
+present.
+
 The helper readiness portion makes the contract actionable without adding a new
 execution path. A visible work view reports `ready` with no recovery action. A
 prepared hidden work view recommends `/work-view/reveal`. A missing or degraded
@@ -194,6 +210,8 @@ Service propagation:
 ```text
 services/openclaw-session-manager/src/server.mjs
 services/openclaw-browser-runtime/src/server.mjs
+services/openclaw-screen-act/src/trusted-work-view-action-mediation.mjs
+services/openclaw-screen-act/src/server.mjs
 services/openclaw-screen-sense/src/server.mjs
 services/openclaw-core/src/phase3-work-view-builders.mjs
 ```
@@ -236,21 +254,23 @@ provider egress or credential access
 automatic recovery execution; the contract recommends existing operator actions
 unreviewed endpoint invocation from recommendation payloads
 actual external trusted sidecar process start after approval
-lease enforcement on browser input/click actions; the current slice binds and
-observes the work-view open/capture session only
+trusted-lease mediation for keyboard hotkey/window-focus paths that do not yet
+mutate browser-runtime state
+operator takeover-driven lease suspension or revocation
 ```
 
 ## Next Slice
 
-The next high-density identity-upgrade slice should carry the matched helper
-lease into the existing browser action mediation path:
+The matched helper lease is now enforced for browser input and click actions.
+The next high-density identity-upgrade slice should connect user sovereignty to
+that runtime:
 
 ```text
-trusted helper lease -> screen-act/browser input and click mediation
+operator takeover -> suspend AI helper action lease -> explicit resume/rebind
 ```
 
-It should reject mismatched session-manager leases for AI-owned browser actions,
-reuse existing screen-act/browser routes and milestones, and preserve explicit
-operator takeover. It should not add another readiness-only milestone. External
-process start, installation, root/system daemon work, desktop-wide capture, and
-provider egress remain deferred.
+It should reuse existing operator controls and work-view state, block AI-owned
+browser mutations while takeover is active, and require explicit resume/rebind
+before actions continue. It should not add another readiness-only milestone.
+External process start, installation, root/system daemon work, desktop-wide
+capture, and provider egress remain deferred.

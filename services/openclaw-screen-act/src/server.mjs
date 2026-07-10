@@ -1,6 +1,7 @@
 import http from "node:http";
 import { randomUUID } from "node:crypto";
 import { createEventName } from "../../../packages/shared-events/src/event-factory.mjs";
+import { buildTrustedWorkViewActionLease } from "./trusted-work-view-action-mediation.mjs";
 
 const host = process.env.OPENCLAW_SCREEN_ACT_HOST ?? "127.0.0.1";
 const port = Number.parseInt(process.env.OPENCLAW_SCREEN_ACT_PORT ?? "4105", 10);
@@ -73,6 +74,75 @@ function updateActionState(action) {
   actionState.updatedAt = new Date().toISOString();
 }
 
+async function executeBrowserAction(kind, params, screen) {
+  const endpoint = kind === "mouse.click"
+    ? "/browser/click"
+    : kind === "keyboard.type"
+      ? "/browser/input"
+      : null;
+  if (!endpoint) {
+    return {
+      registry: "openclaw-trusted-work-view-action-mediation-v0",
+      attempted: false,
+      required: false,
+      accepted: true,
+      status: "not_applicable",
+      reason: null,
+      leaseMatched: false,
+    };
+  }
+
+  const leaseContext = buildTrustedWorkViewActionLease(screen);
+  if (!leaseContext.ready) {
+    return {
+      registry: leaseContext.registry,
+      attempted: false,
+      required: leaseContext.required,
+      accepted: false,
+      status: "blocked",
+      reason: leaseContext.reason,
+      leaseMatched: false,
+    };
+  }
+
+  try {
+    const payload = kind === "mouse.click"
+      ? { x: params.x, y: params.y }
+      : { text: params.text ?? "" };
+    const response = await fetch(`${browserRuntimeUrl}${endpoint}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        ...payload,
+        trustedHelperLease: leaseContext.trustedHelperLease,
+      }),
+    });
+    const data = await response.json().catch(() => null);
+    const mediation = data?.mediation ?? {};
+    return {
+      registry: mediation.registry ?? leaseContext.registry,
+      attempted: true,
+      required: mediation.required ?? leaseContext.required,
+      accepted: response.ok && data?.ok === true && mediation.accepted !== false,
+      status: mediation.status ?? (response.ok ? "accepted" : "rejected"),
+      reason: mediation.reason ?? data?.error ?? null,
+      sessionId: mediation.sessionId ?? screen?.sessionId ?? null,
+      leaseId: mediation.leaseId ?? leaseContext.trustedHelperLease?.leaseId ?? null,
+      leaseMatched: mediation.leaseMatched === true,
+    };
+  } catch (error) {
+    return {
+      registry: leaseContext.registry,
+      attempted: true,
+      required: leaseContext.required,
+      accepted: false,
+      status: "unavailable",
+      reason: error instanceof Error ? error.message : "browser_action_unavailable",
+      leaseMatched: false,
+    };
+  }
+}
+
 async function executeAction(kind, params) {
   const actionId = randomUUID();
   const startedAt = new Date().toISOString();
@@ -83,24 +153,20 @@ async function executeAction(kind, params) {
   });
 
   const { screen, degraded } = await getScreenContext();
+  let actionDegraded = degraded;
+  let mediation = {
+    registry: "openclaw-trusted-work-view-action-mediation-v0",
+    attempted: false,
+    required: false,
+    accepted: true,
+    status: degraded ? "screen_context_degraded" : "not_applicable",
+    reason: degraded ? "screen_context_degraded" : null,
+    leaseMatched: false,
+  };
   if (!degraded && screen?.focusedWindow?.pid) {
-    try {
-      if (kind === "mouse.click") {
-        await fetch(`${browserRuntimeUrl}/browser/click`, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ x: params.x, y: params.y }),
-        });
-      }
-
-      if (kind === "keyboard.type") {
-        await fetch(`${browserRuntimeUrl}/browser/input`, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ text: params.text ?? "" }),
-        });
-      }
-    } catch {
+    mediation = await executeBrowserAction(kind, params, screen);
+    if (!mediation.accepted) {
+      actionDegraded = true;
     }
   }
 
@@ -116,8 +182,13 @@ async function executeAction(kind, params) {
           readiness: screen.readiness ?? "degraded",
         }
       : null,
-    degraded,
-    result: degraded ? "simulated-degraded" : "simulated",
+    degraded: actionDegraded,
+    result: mediation.accepted && mediation.attempted
+      ? "executed-browser-runtime"
+      : actionDegraded
+        ? "blocked-or-degraded"
+        : "simulated",
+    mediation,
   };
 
   updateActionState(action);

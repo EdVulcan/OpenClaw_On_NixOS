@@ -18,6 +18,7 @@ export OPENCLAW_SYSTEM_HEAL_STATE_FILE="${OPENCLAW_SYSTEM_HEAL_STATE_FILE:-$REPO
 
 CORE_URL="http://127.0.0.1:$OPENCLAW_CORE_PORT"
 SESSION_MANAGER_URL="http://127.0.0.1:$OPENCLAW_SESSION_MANAGER_PORT"
+SCREEN_ACT_URL="http://127.0.0.1:$OPENCLAW_SCREEN_ACT_PORT"
 OBSERVER_URL="http://127.0.0.1:$OBSERVER_UI_PORT"
 LEDGER_DIR="$REPO_ROOT/.artifacts/openclaw-body-evidence-ledger"
 
@@ -26,7 +27,7 @@ rm -f "$OPENCLAW_CORE_STATE_FILE" "$OPENCLAW_CORE_STATE_FILE.tmp" "$OPENCLAW_SYS
 rm -rf "$LEDGER_DIR"
 
 cleanup() {
-  rm -f "${HTML_FILE:-}" "${CLIENT_FILE:-}" "${BACKGROUND_FILE:-}"
+  rm -f "${HTML_FILE:-}" "${CLIENT_FILE:-}" "${BACKGROUND_FILE:-}" "${ACTION_FILE:-}"
   "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -36,6 +37,11 @@ curl --silent --fail -X POST "$SESSION_MANAGER_URL/work-view/prepare" \
   -H 'content-type: application/json' \
   --data '{"displayTarget":"workspace-2","entryUrl":"https://example.com/observer-phase-3-background","operatorActionSource":"observer_phase_3_background_milestone","recommendedAction":"prepare_work_view"}' >/dev/null
 
+ACTION_FILE="$(mktemp)"
+curl --silent --fail -X POST "$SCREEN_ACT_URL/act/mouse/click" \
+  -H 'content-type: application/json' \
+  --data '{"x":640,"y":360,"button":"left"}' > "$ACTION_FILE"
+
 HTML_FILE="$(mktemp)"
 CLIENT_FILE="$(mktemp)"
 BACKGROUND_FILE="$(mktemp)"
@@ -43,18 +49,19 @@ curl --silent --fail "$OBSERVER_URL/" > "$HTML_FILE"
 curl --silent --fail "$OBSERVER_URL/client-v5.js" > "$CLIENT_FILE"
 curl --silent --fail "$CORE_URL/phase-3/background-work-view" > "$BACKGROUND_FILE"
 
-node - <<'EOF' "$HTML_FILE" "$CLIENT_FILE" "$BACKGROUND_FILE"
+node - <<'EOF' "$HTML_FILE" "$CLIENT_FILE" "$BACKGROUND_FILE" "$ACTION_FILE"
 const fs = require("node:fs");
 const html = fs.readFileSync(process.argv[2], "utf8");
 const client = fs.readFileSync(process.argv[3], "utf8");
 const background = JSON.parse(fs.readFileSync(process.argv[4], "utf8"));
+const actionResponse = JSON.parse(fs.readFileSync(process.argv[5], "utf8"));
 
 for (const token of ["Phase 3 Background Work View", "phase3-background-work-view-panel", "phase3-background-visibility", "phase3-background-mode", "work-view-session-identity", "run-recommended-work-view-action-button"]) {
   if (!html.includes(token)) {
     throw new Error(`Observer HTML missing ${token}`);
   }
 }
-for (const token of ["/phase-3/background-work-view", "refreshPhase3BackgroundWorkView", "openclaw-phase-3-background-work-view-v0", "Trusted Session", "trustedSession.identityLevel", "Session Identity", "sessionIdentity", "Helper Runtime", "helperRuntime", "Helper Runtime Boundary", "Helper Readiness", "recoveryRecommendation", "Last Operator Action", "lastOperatorAction", "Sidecar Contract", "sidecarContract", "Sidecar Lifecycle", "lifecycleProposal", "Sidecar Approval Draft", "approvalTaskDraft", "runRecommendedWorkViewAction", "reveal_work_view"]) {
+for (const token of ["/phase-3/background-work-view", "refreshPhase3BackgroundWorkView", "openclaw-phase-3-background-work-view-v0", "Trusted Session", "trustedSession.identityLevel", "Session Identity", "sessionIdentity", "Helper Runtime", "helperRuntime", "Helper Runtime Boundary", "Action Mediation", "mediation", "Helper Readiness", "recoveryRecommendation", "Last Operator Action", "lastOperatorAction", "Sidecar Contract", "sidecarContract", "Sidecar Lifecycle", "lifecycleProposal", "Sidecar Approval Draft", "approvalTaskDraft", "runRecommendedWorkViewAction", "reveal_work_view"]) {
   if (!client.includes(token)) {
     throw new Error(`Observer client missing ${token}`);
   }
@@ -90,6 +97,13 @@ if (background.current?.workView?.lastOperatorAction?.action !== "prepare_work_v
   || background.current?.workView?.lastOperatorAction?.next?.visibility !== "hidden") {
   throw new Error(`Observer Phase 3 background work view should expose operator action result: ${JSON.stringify(background.current?.workView?.lastOperatorAction)}`);
 }
+if (!actionResponse.ok
+  || actionResponse.action?.result !== "executed-browser-runtime"
+  || actionResponse.action?.mediation?.required !== true
+  || actionResponse.action?.mediation?.accepted !== true
+  || actionResponse.action?.mediation?.leaseMatched !== true) {
+  throw new Error(`Observer Phase 3 action readback should expose accepted helper-lease mediation: ${JSON.stringify(actionResponse)}`);
+}
 
 console.log(JSON.stringify({
   observerOpenClawPhase3BackgroundWorkView: {
@@ -101,6 +115,7 @@ console.log(JSON.stringify({
     sessionIdentity: trustedSession.sessionIdentity.status,
     helperRuntime: trustedSession.helperRuntime.status,
     helperLeaseMatched: trustedSession.helperRuntime.leaseMatched,
+    actionMediation: actionResponse.action.mediation.status,
     recoveryRecommendation: trustedSession.recoveryRecommendation.action,
     lastOperatorAction: background.current.workView.lastOperatorAction.action,
     sidecarContract: trustedSession.sidecarContract.status,

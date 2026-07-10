@@ -5,6 +5,7 @@ import { corsHeaders, sendJson, readJsonBody, createEventPublisher, registerServ
 import {
   buildTrustedWorkViewContract,
   normaliseTrustedWorkViewHelperLease,
+  validateTrustedWorkViewActionLease,
 } from "../../../packages/shared-utils/src/work-view-trust.mjs";
 
 
@@ -44,6 +45,15 @@ function serialiseBrowserState() {
       : null,
     tabs: browserState.tabs.map((tab) => ({ ...tab })),
   };
+}
+
+function validateBrowserActionMediation(body) {
+  return validateTrustedWorkViewActionLease({
+    candidate: body.trustedHelperLease,
+    browserSessionId: browserState.sessionId,
+    browserSessionAuthority: browserState.sessionAuthority,
+    browserLease: browserState.trustedHelperLease,
+  });
 }
 
 function titleForUrl(url) {
@@ -315,13 +325,18 @@ const server = http.createServer(async (req, res) => {
       }
 
       const body = await readJsonBody(req);
+      const mediation = validateBrowserActionMediation(body);
+      if (!mediation.accepted) {
+        sendJson(res, 409, { ok: false, error: mediation.reason, mediation });
+        return;
+      }
       const text = typeof body.text === "string" ? body.text : "";
       updateBrowserState({
         lastInput: text,
       });
       const browser = serialiseBrowserState();
       await publishEvent(createEventName("browser.updated"), { browser, action: "input", text });
-      sendJson(res, 200, { ok: true, browser, echoedInput: text });
+      sendJson(res, 200, { ok: true, browser, echoedInput: text, mediation });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       sendJson(res, 400, { ok: false, error: message });
@@ -337,6 +352,11 @@ const server = http.createServer(async (req, res) => {
       }
 
       const body = await readJsonBody(req);
+      const mediation = validateBrowserActionMediation(body);
+      if (!mediation.accepted) {
+        sendJson(res, 409, { ok: false, error: mediation.reason, mediation });
+        return;
+      }
       const action = {
         x: typeof body.x === "number" ? body.x : null,
         y: typeof body.y === "number" ? body.y : null,
@@ -346,7 +366,7 @@ const server = http.createServer(async (req, res) => {
       });
       const browser = serialiseBrowserState();
       await publishEvent(createEventName("browser.updated"), { browser, action: "click", position: action });
-      sendJson(res, 200, { ok: true, browser, action });
+      sendJson(res, 200, { ok: true, browser, action, mediation });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       sendJson(res, 400, { ok: false, error: message });

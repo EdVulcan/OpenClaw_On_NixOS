@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   buildTrustedWorkViewContract,
   normaliseTrustedWorkViewHelperLease,
+  validateTrustedWorkViewActionLease,
 } from "../src/work-view-trust.mjs";
 
 test("trusted work-view contract records Level 2 boundary without host takeover", () => {
@@ -86,6 +87,42 @@ test("trusted work-view helper lease rejects a mismatched session", () => {
     sessionId: "session-other",
     workViewId: "work-view-primary",
   }, { expectedSessionId: "session-expected" }), /session mismatch/u);
+});
+
+test("trusted work-view action mediation requires the browser-owned helper lease", () => {
+  const lease = {
+    registry: "openclaw-trusted-work-view-helper-lease-v0",
+    owner: "openclaw-session-manager",
+    mode: "in_process_session_helper",
+    scope: "ai_owned_work_view_only",
+    leaseId: "lease-action",
+    sessionId: "session-action",
+    workViewId: "work-view-primary",
+  };
+  const accepted = validateTrustedWorkViewActionLease({
+    candidate: lease,
+    browserSessionId: "session-action",
+    browserSessionAuthority: "openclaw-session-manager",
+    browserLease: lease,
+  });
+  assert.equal(accepted.accepted, true);
+  assert.equal(accepted.leaseMatched, true);
+
+  const rejected = validateTrustedWorkViewActionLease({
+    candidate: { ...lease, leaseId: "lease-stale" },
+    browserSessionId: "session-action",
+    browserSessionAuthority: "openclaw-session-manager",
+    browserLease: lease,
+  });
+  assert.equal(rejected.accepted, false);
+  assert.equal(rejected.reason, "trusted_helper_lease_mismatch");
+
+  const fallback = validateTrustedWorkViewActionLease({
+    browserSessionId: "browser-local",
+    browserSessionAuthority: "browser-runtime-local",
+  });
+  assert.equal(fallback.accepted, true);
+  assert.equal(fallback.required, false);
 });
 
 test("trusted work-view contract detects divergent browser runtime session identity", () => {

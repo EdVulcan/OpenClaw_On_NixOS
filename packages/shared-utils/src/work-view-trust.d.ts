@@ -158,3 +158,19 @@ export function normaliseTrustedWorkViewHelperLease(
   value: unknown,
   options?: { expectedSessionId?: string | null },
 ): Record<string, unknown> | null;
+
+export function validateTrustedWorkViewActionLease(input?: {
+  candidate?: unknown;
+  browserSessionId?: string | null;
+  browserSessionAuthority?: string | null;
+  browserLease?: unknown;
+}): {
+  registry: "openclaw-trusted-work-view-action-mediation-v0";
+  required: boolean;
+  accepted: boolean;
+  status: string;
+  reason: string | null;
+  sessionId: string | null;
+  leaseId: string | null;
+  leaseMatched: boolean;
+};

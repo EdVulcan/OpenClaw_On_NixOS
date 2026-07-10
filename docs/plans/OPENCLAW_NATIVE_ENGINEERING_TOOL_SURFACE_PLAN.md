@@ -464,3 +464,7 @@ That transition has started with a session-manager owned in-process helper lease
 that browser-runtime matches for the AI-owned work-view session. The next Level
 2 slice should enforce the same lease through existing browser action mediation,
 not return to another native engineering evidence shell.
+
+The lease is now enforced for screen-act mediated browser input and click. The
+next Level 2 slice should bind explicit operator takeover to lease suspension and
+explicit resume/rebind.

@@ -18,6 +18,8 @@ export OPENCLAW_SYSTEM_HEAL_STATE_FILE="${OPENCLAW_SYSTEM_HEAL_STATE_FILE:-$REPO
 
 CORE_URL="http://127.0.0.1:$OPENCLAW_CORE_PORT"
 SESSION_MANAGER_URL="http://127.0.0.1:$OPENCLAW_SESSION_MANAGER_PORT"
+SCREEN_ACT_URL="http://127.0.0.1:$OPENCLAW_SCREEN_ACT_PORT"
+BROWSER_URL="http://127.0.0.1:$OPENCLAW_BROWSER_RUNTIME_PORT"
 LEDGER_DIR="$REPO_ROOT/.artifacts/openclaw-body-evidence-ledger"
 
 "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
@@ -25,7 +27,7 @@ rm -f "$OPENCLAW_CORE_STATE_FILE" "$OPENCLAW_CORE_STATE_FILE.tmp" "$OPENCLAW_SYS
 rm -rf "$LEDGER_DIR"
 
 cleanup() {
-  rm -f "${BACKGROUND_FILE:-}"
+  rm -f "${BACKGROUND_FILE:-}" "${ACTION_FILE:-}" "${REJECTED_ACTION_FILE:-}"
   "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -35,12 +37,30 @@ curl --silent --fail -X POST "$SESSION_MANAGER_URL/work-view/prepare" \
   -H 'content-type: application/json' \
   --data '{"displayTarget":"workspace-2","entryUrl":"https://example.com/phase-3-background","operatorActionSource":"phase_3_background_milestone","recommendedAction":"prepare_work_view"}' >/dev/null
 
+ACTION_FILE="$(mktemp)"
+curl --silent --fail -X POST "$SCREEN_ACT_URL/act/keyboard/type" \
+  -H 'content-type: application/json' \
+  --data '{"text":"phase 3 trusted helper action mediation"}' > "$ACTION_FILE"
+
+REJECTED_ACTION_FILE="$(mktemp)"
+rejected_status="$(curl --silent --output "$REJECTED_ACTION_FILE" --write-out '%{http_code}' \
+  -X POST "$BROWSER_URL/browser/input" \
+  -H 'content-type: application/json' \
+  --data '{"text":"must be rejected without trusted helper lease"}')"
+if [[ "$rejected_status" != "409" ]]; then
+  echo "Expected browser action without trusted helper lease to return 409, got $rejected_status" >&2
+  exit 1
+fi
+
 BACKGROUND_FILE="$(mktemp)"
 curl --silent --fail "$CORE_URL/phase-3/background-work-view" > "$BACKGROUND_FILE"
 
-node - <<'EOF' "$BACKGROUND_FILE"
+node - <<'EOF' "$BACKGROUND_FILE" "$ACTION_FILE" "$REJECTED_ACTION_FILE"
 const fs = require("node:fs");
 const background = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+const actionResponse = JSON.parse(fs.readFileSync(process.argv[3], "utf8"));
+const rejectedAction = JSON.parse(fs.readFileSync(process.argv[4], "utf8"));
+const action = actionResponse.action;
 
 if (!background.ok
   || background.registry !== "openclaw-phase-3-background-work-view-v0"
@@ -63,6 +83,23 @@ if (background.current?.workView?.lastOperatorAction?.action !== "prepare_work_v
   || background.current?.workView?.lastOperatorAction?.next?.visibility !== "hidden"
   || background.current?.workView?.lastOperatorAction?.rootRequired !== false) {
   throw new Error(`current work view should record prepare action evidence: ${JSON.stringify(background.current?.workView?.lastOperatorAction)}`);
+}
+if (!actionResponse.ok
+  || action?.degraded !== false
+  || action?.result !== "executed-browser-runtime"
+  || action?.mediation?.registry !== "openclaw-trusted-work-view-action-mediation-v0"
+  || action?.mediation?.required !== true
+  || action?.mediation?.accepted !== true
+  || action?.mediation?.status !== "accepted"
+  || action?.mediation?.leaseMatched !== true) {
+  throw new Error(`background work-view action should require and accept the trusted helper lease: ${JSON.stringify(actionResponse)}`);
+}
+if (rejectedAction.ok !== false
+  || rejectedAction.mediation?.required !== true
+  || rejectedAction.mediation?.accepted !== false
+  || rejectedAction.mediation?.status !== "rejected"
+  || rejectedAction.mediation?.leaseMatched !== false) {
+  throw new Error(`browser action without trusted helper lease should be rejected before mutation: ${JSON.stringify(rejectedAction)}`);
 }
 const trustedSession = background.workViewContract?.trustedSession ?? background.current?.workView?.trustedSession;
 if (trustedSession?.identityLevel !== "level_2_trusted_session_work_view"
@@ -107,6 +144,8 @@ console.log(JSON.stringify({
     sessionIdentity: trustedSession.sessionIdentity.status,
     helperRuntime: trustedSession.helperRuntime.status,
     helperLeaseMatched: trustedSession.helperRuntime.leaseMatched,
+    actionMediation: action.mediation.status,
+    missingLeaseAction: rejectedAction.mediation.status,
     recoveryRecommendation: trustedSession.recoveryRecommendation.action,
     lastOperatorAction: background.current.workView.lastOperatorAction.action,
     sidecarContract: trustedSession.sidecarContract.status,
