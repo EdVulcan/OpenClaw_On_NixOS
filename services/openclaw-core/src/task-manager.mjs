@@ -394,6 +394,31 @@ function reconcileRuntimeState() {
   return currentTask;
 }
 
+function reconcileInterruptedTasksAtStartup() {
+  const interruptedTasks = [...tasks.values()].filter((task) => (
+    task.status === "running"
+    && task.type === "browser_task"
+    && task.plan?.strategy === "rule-v1"
+  ));
+
+  for (const task of interruptedTasks) {
+    failTask(task, "Core runtime restarted while the browser task was active.", {
+      targetUrl: task.targetUrl ?? null,
+      executor: "core-startup-reconciliation-v1",
+      coreRuntimeInterruption: {
+        kind: "core-runtime-interruption",
+        code: "core_runtime_interruption",
+        stage: task.executionPhase ?? "running",
+        recoverable: true,
+        automaticRestart: false,
+        recoveryAction: "recover_task_after_core_restart",
+      },
+    });
+  }
+
+  return interruptedTasks;
+}
+
 function supersedeOtherActiveTasks(exceptTaskId) {
   const reclaimed = [];
 
@@ -550,5 +575,6 @@ function buildWorkViewAttachPayload(data, targetUrl) {
     recoverTask,
     supersedeOtherActiveTasks,
     reconcileRuntimeState,
+    reconcileInterruptedTasksAtStartup,
   };
 }

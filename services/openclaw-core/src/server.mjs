@@ -166,6 +166,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 state.loadPersistentState();
+taskManager.reconcileInterruptedTasksAtStartup();
 taskManager.reconcileRuntimeState();
 
 server.listen(port, host, async () => {

@@ -126,10 +126,14 @@ bounded recovery now performs one prepare and one retry only for sidecar capture
 reasons and records compact action evidence. Active-task continuity across
 session-manager restart now persists recoverable authority-interruption
 evidence, explicitly restores the session and approved sidecar, and executes
-only unfinished steps from the preserved browser plan. The next real continuity
-slice is active-task startup reconciliation across core process restart. Do not
-add a readiness milestone, automatic restart loop, fault-injection endpoint, or
-desktop-wide capture.
+only unfinished steps from the preserved browser plan. Active-task startup
+reconciliation across core process restart is also complete: persisted running
+browser plans become recoverable evidence while queued/paused tasks are
+preserved, and recovery executes pending work through the still-running sidecar.
+The next real Level 2 slice is independently supervised user-session sidecar
+ownership with fail-closed disconnect and explicit fresh-lease reconnect. Do
+not add a readiness milestone, automatic action restart, root/system daemon,
+fault-injection endpoint, or desktop-wide capture.
 
 ## Historical Phase Plans
 

@@ -22,6 +22,8 @@ SESSION_MANAGER_URL="http://127.0.0.1:$OPENCLAW_SESSION_MANAGER_PORT"
 BROWSER_RUNTIME_URL="http://127.0.0.1:$OPENCLAW_BROWSER_RUNTIME_PORT"
 SCREEN_ACT_URL="http://127.0.0.1:$OPENCLAW_SCREEN_ACT_PORT"
 LEDGER_DIR="$REPO_ROOT/.artifacts/openclaw-body-evidence-ledger"
+CORE_PID_FILE="$REPO_ROOT/.artifacts/openclaw-core.pid"
+CORE_LOG_FILE="$REPO_ROOT/.artifacts/openclaw-core.log"
 SESSION_MANAGER_PID_FILE="$REPO_ROOT/.artifacts/openclaw-session-manager.pid"
 SESSION_MANAGER_LOG_FILE="$REPO_ROOT/.artifacts/openclaw-session-manager.log"
 BROWSER_RUNTIME_PID_FILE="$REPO_ROOT/.artifacts/openclaw-browser-runtime.pid"
@@ -45,6 +47,12 @@ cleanup() {
   rm -f "${AUTONOMOUS_NEW_TAB_RESULT_FILE:-}"
   rm -f "${AUTHORITY_INTERRUPTED_TASK_FILE:-}" "${AUTHORITY_RECOVERED_TASK_FILE:-}" \
     "${AUTHORITY_RECOVERED_EXECUTION_FILE:-}"
+  rm -f "${CORE_RESTART_TASK_FILE:-}" "${CORE_RESTART_PHASE_FILE:-}" \
+    "${CORE_RESTART_INTERRUPTED_FILE:-}" "${CORE_RESTART_RECOVERED_FILE:-}" \
+    "${CORE_RESTART_EXECUTION_FILE:-}"
+  if [[ -n "${RESTARTED_CORE_PID:-}" ]]; then
+    kill -TERM "$RESTARTED_CORE_PID" >/dev/null 2>&1 || true
+  fi
   if [[ -n "${RESTARTED_SESSION_MANAGER_PID:-}" ]]; then
     kill -TERM "$RESTARTED_SESSION_MANAGER_PID" >/dev/null 2>&1 || true
   fi
@@ -120,6 +128,89 @@ for _ in $(seq 1 40); do
 done
 sidecar_pid="$(node -e 'const data=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8")); process.stdout.write(String(data.readback.execution.pid));' "$APPROVED_START_PROBE_FILE")"
 node -e 'const data=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8")); if(data.sidecarLifecycleIntent?.taskId!==process.argv[2] || data.sidecarLifecycleIntent?.status!=="running" || data.sidecarLifecycleIntent?.automaticRestart!==false){throw new Error(`missing persisted running intent: ${JSON.stringify(data)}`);}' "$OPENCLAW_SESSION_MANAGER_STATE_FILE" "$sidecar_task_id"
+CORE_RESTART_NEW_TAB_URL="https://example.com/phase-3-core-restart-recovered-new-tab"
+CORE_RESTART_TASK_FILE="$(mktemp)"
+post_json "$CORE_URL/tasks" "{\"goal\":\"Continue a persisted browser task after core restart\",\"type\":\"browser_task\",\"targetUrl\":\"https://example.com/phase-3-core-restart-origin\",\"workViewStrategy\":\"ai-work-view\",\"planStrategy\":\"rule-v1\",\"actions\":[{\"kind\":\"browser.new_tab\",\"params\":{\"url\":\"$CORE_RESTART_NEW_TAB_URL\"}}]}" > "$CORE_RESTART_TASK_FILE"
+core_restart_task_id="$(node -e 'const data=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8")); process.stdout.write(data.task.id);' "$CORE_RESTART_TASK_FILE")"
+CORE_RESTART_PHASE_FILE="$(mktemp)"
+post_json "$CORE_URL/tasks/$core_restart_task_id/phase" '{"phase":"preparing_work_view","status":"running","details":{"source":"core_restart_continuity_milestone"}}' > "$CORE_RESTART_PHASE_FILE"
+for _ in $(seq 1 50); do
+  if [[ -f "$OPENCLAW_CORE_STATE_FILE" ]] && node -e 'const data=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8")); const task=data.tasks?.find((item)=>item.id===process.argv[2]); process.exit(task?.status==="running" ? 0 : 1);' "$OPENCLAW_CORE_STATE_FILE" "$core_restart_task_id"; then
+    break
+  fi
+  sleep 0.1
+done
+node -e 'const data=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8")); const task=data.tasks?.find((item)=>item.id===process.argv[2]); if(task?.status!=="running"){throw new Error(`active task was not persisted before core restart: ${JSON.stringify(task)}`);}' "$OPENCLAW_CORE_STATE_FILE" "$core_restart_task_id"
+old_core_pid="$(cat "$CORE_PID_FILE")"
+kill -TERM "$old_core_pid"
+for _ in $(seq 1 50); do
+  if ! kill -0 "$old_core_pid" >/dev/null 2>&1 && ! curl --silent --fail "$CORE_URL/health" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 0.1
+done
+if kill -0 "$old_core_pid" >/dev/null 2>&1; then
+  echo "openclaw-core did not stop during active-task continuity check" >&2
+  exit 1
+fi
+(
+  cd "$REPO_ROOT/services/openclaw-core"
+  nohup env OPENCLAW_CORE_HOST=0.0.0.0 node src/server.mjs >> "$CORE_LOG_FILE" 2>&1 &
+  echo $! > "$CORE_PID_FILE"
+)
+RESTARTED_CORE_PID="$(cat "$CORE_PID_FILE")"
+for _ in $(seq 1 50); do
+  if curl --silent --fail "$CORE_URL/health" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 0.1
+done
+curl --silent --fail "$CORE_URL/health" >/dev/null
+CORE_RESTART_INTERRUPTED_FILE="$(mktemp)"
+curl --silent --fail "$CORE_URL/tasks/$core_restart_task_id" > "$CORE_RESTART_INTERRUPTED_FILE"
+CORE_RESTART_RECOVERED_FILE="$(mktemp)"
+post_json "$CORE_URL/tasks/$core_restart_task_id/recover" '{}' > "$CORE_RESTART_RECOVERED_FILE"
+core_restart_recovered_task_id="$(node -e 'const data=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8")); process.stdout.write(data.task.id);' "$CORE_RESTART_RECOVERED_FILE")"
+CORE_RESTART_EXECUTION_FILE="$(mktemp)"
+post_json "$CORE_URL/tasks/$core_restart_recovered_task_id/execute" "{\"expectedUrl\":\"$CORE_RESTART_NEW_TAB_URL\",\"hideOnComplete\":false}" > "$CORE_RESTART_EXECUTION_FILE"
+node - <<'EOF' "$CORE_RESTART_INTERRUPTED_FILE" "$CORE_RESTART_RECOVERED_FILE" "$CORE_RESTART_EXECUTION_FILE" "$CORE_RESTART_NEW_TAB_URL"
+const fs = require("node:fs");
+const interrupted = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+const recovered = JSON.parse(fs.readFileSync(process.argv[3], "utf8"));
+const execution = JSON.parse(fs.readFileSync(process.argv[4], "utf8"));
+const expectedUrl = process.argv[5];
+const interruption = interrupted.task?.outcome?.details?.coreRuntimeInterruption ?? {};
+const recoveryEvidence = interrupted.task?.outcome?.details?.recoveryEvidence ?? {};
+const plannedAction = recovered.task?.plan?.steps?.find((step) => step.phase === "acting_on_target");
+const evidence = execution.execution?.actionEvidence;
+const action = evidence?.actions?.[0] ?? {};
+if (interrupted.task?.status !== "failed"
+  || interruption.code !== "core_runtime_interruption"
+  || interruption.stage !== "preparing_work_view"
+  || interruption.automaticRestart !== false
+  || recoveryEvidence.kind !== "core-runtime-recovery-evidence"
+  || recoveryEvidence.recommendation?.strategy !== "recover_persisted_task_after_core_restart"
+  || recovered.task?.recovery?.recoveredFromTaskId !== interrupted.task?.id
+  || plannedAction?.kind !== "browser.new_tab"
+  || plannedAction?.status !== "pending"
+  || execution.task?.status !== "completed"
+  || action.kind !== "browser.new_tab"
+  || action.mediation?.accepted !== true
+  || action.mediation?.transport !== "trusted-sidecar-ipc"
+  || action.mediation?.effect?.url !== expectedUrl
+  || evidence?.observedAfterActions?.url !== expectedUrl) {
+  throw new Error(`core restart should reconcile and recover only unfinished browser work: ${JSON.stringify({ interrupted, recovered, execution })}`);
+}
+console.log(JSON.stringify({
+  coreRestartContinuity: {
+    sourceTaskId: interrupted.task.id,
+    recoveredTaskId: recovered.task.id,
+    evidence: recoveryEvidence.kind,
+    transport: action.mediation.transport,
+    effectUrl: action.mediation.effect.url,
+  },
+}, null, 2));
+EOF
 old_session_manager_pid="$(cat "$SESSION_MANAGER_PID_FILE")"
 kill -TERM "$old_session_manager_pid"
 for _ in $(seq 1 50); do

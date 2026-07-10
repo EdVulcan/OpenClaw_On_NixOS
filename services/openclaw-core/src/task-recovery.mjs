@@ -123,6 +123,21 @@ export function buildEyeHandRecoveryEvidence(task, reason, details = null) {
     };
   }
 
+  if (details.coreRuntimeInterruption?.recoverable === true) {
+    return {
+      kind: "core-runtime-recovery-evidence",
+      sourceTaskId: task.id,
+      reason,
+      interruption: { ...details.coreRuntimeInterruption },
+      targetUrl: details.targetUrl ?? task.targetUrl ?? null,
+      recommendation: {
+        strategy: "recover_persisted_task_after_core_restart",
+        targetUrl: details.targetUrl ?? task.targetUrl ?? null,
+        automaticRestart: false,
+      },
+    };
+  }
+
   const verification = details.verification ?? null;
   const actionEvidence = details.actionEvidence ?? verification?.actionEvidence ?? null;
   const workViewSummary = details.workViewSummary ?? verification?.workViewSummary ?? null;

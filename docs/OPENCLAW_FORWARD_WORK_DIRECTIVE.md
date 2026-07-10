@@ -272,9 +272,14 @@ authority dependency loss becomes a persisted recoverable task, explicit
 session/sidecar restoration reuses the existing recovery route, and only
 unfinished browser plan actions execute through the trusted sidecar. The next
 continuity gap is startup reconciliation for a persisted active task after the
-core process itself restarts. Do not add horizontal navigation variants, a
-readiness-only chain, fault-injection endpoints, automatic restart, or
-desktop-wide capture.
+core process itself restarts. That exit gate is now complete: startup converts
+only persisted running browser plans to recoverable evidence, preserves queued
+and paused tasks, and the existing recovery path executes only unfinished work
+through the still-running sidecar. The next Level 2 capability should establish
+independently supervised user-session sidecar ownership with fail-closed
+authority disconnect and explicit fresh-lease reconnect. Do not add horizontal
+navigation variants, a readiness-only chain, fault-injection endpoints,
+automatic action restart, root/system daemon ownership, or desktop-wide capture.
 
 ## Identity-Upgrade Alignment
 

@@ -129,3 +129,53 @@ test("task manager centralizes extension field creation and serialization", () =
     registry: "openclaw-cloud-consciousness-live-provider-credential-value-local-read-execution-local-read-attempt-local-read-result-envelope-creation-execution-attempt-local-read-result-envelope-creation-execution-attempt-local-read-task-v0",
   });
 });
+
+test("task manager reconciles only running browser rule plans after core restart", () => {
+  const { manager, tasks } = createHarness();
+  const runningTask = {
+    id: "running-browser-task",
+    type: "browser_task",
+    goal: "Continue after core restart",
+    status: "running",
+    targetUrl: "https://example.com/core-restart",
+    executionPhase: "preparing_work_view",
+    plan: {
+      strategy: "rule-v1",
+      status: "running",
+      steps: [{
+        phase: "acting_on_target",
+        kind: "browser.new_tab",
+        status: "pending",
+        params: { url: "https://example.com/core-restart/recovered" },
+      }],
+    },
+    phaseHistory: [],
+    createdAt: "2026-07-10T00:00:00.000Z",
+    updatedAt: "2026-07-10T00:00:00.000Z",
+  };
+  const queuedTask = {
+    ...structuredClone(runningTask),
+    id: "queued-browser-task",
+    status: "queued",
+  };
+  const pausedTask = {
+    ...structuredClone(runningTask),
+    id: "paused-browser-task",
+    status: "paused",
+  };
+  tasks.set(runningTask.id, runningTask);
+  tasks.set(queuedTask.id, queuedTask);
+  tasks.set(pausedTask.id, pausedTask);
+
+  const interrupted = manager.reconcileInterruptedTasksAtStartup();
+
+  assert.deepEqual(interrupted.map((task) => task.id), [runningTask.id]);
+  assert.equal(runningTask.status, "failed");
+  assert.equal(runningTask.outcome.details.coreRuntimeInterruption.stage, "preparing_work_view");
+  assert.equal(runningTask.outcome.details.coreRuntimeInterruption.automaticRestart, false);
+  assert.equal(runningTask.outcome.details.recoveryEvidence.kind, "core-runtime-recovery-evidence");
+  assert.equal(runningTask.outcome.details.recoveryEvidence.recommendation.strategy, "recover_persisted_task_after_core_restart");
+  assert.equal(manager.isRecoverableTask(runningTask), true);
+  assert.equal(queuedTask.status, "queued");
+  assert.equal(pausedTask.status, "paused");
+});

@@ -371,9 +371,9 @@ explicit approved operator action
 automatic task or sidecar restart after session authority loss; recovery remains
 an explicit operator action using the existing approved lifecycle and task
 recovery routes
-core process restart while a browser task is active; task state is durable, but
-startup reconciliation does not yet turn an interrupted running task into an
-explicit recoverable outcome
+independently supervised user-session sidecar ownership and reconnect; the
+current bounded helper remains a session-manager-owned child and exits with its
+authority process
 ```
 
 ## Next Slice
@@ -478,3 +478,28 @@ This should reuse task persistence, recovery, trusted work-view state, and the
 existing Phase 3 milestone family rather than add another readiness endpoint.
 Root/system daemon work, desktop-wide capture, graphics-stack integration,
 broader input, automatic restart, and provider egress remain deferred.
+
+This core-restart exit gate is now complete. Startup reconciliation converts
+only persisted `running` browser rule plans into `core-runtime-recovery-evidence`;
+queued and intentionally paused tasks keep their state. No task is automatically
+executed. The existing recovery route preserves completed action steps and the
+real Phase 3 milestone proves the recovered pending new-tab action uses the
+still-running trusted sidecar after core returns. Observer's existing task
+history and selected-task recovery controls render the evidence and
+recommendation without a new panel.
+
+The next real Level 2 architecture step should make the sidecar a stable
+user-session component rather than add more browser actions:
+
+```text
+approved user-space sidecar
+-> authority disconnect immediately suspends action capability
+-> sidecar retains no usable lease while disconnected
+-> restarted session-manager establishes a fresh work-view session
+-> explicit approved reconnect binds the sidecar to the fresh lease
+-> bounded capture and actions resume with linked lifecycle evidence
+```
+
+This must remain user-space and fail closed. It must not become a root/system
+daemon, automatic action restart, login installation, desktop-wide capture, or
+provider route.
