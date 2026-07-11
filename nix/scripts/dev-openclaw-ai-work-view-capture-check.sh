@@ -10,6 +10,7 @@ GROUNDING_URL="http://127.0.0.1:$FIXTURE_PORT/grounded-action"
 AUTONOMOUS_GROUNDING_URL="http://127.0.0.1:$FIXTURE_PORT/autonomous-grounded-action"
 SEMANTIC_CLICK_URL="http://127.0.0.1:$FIXTURE_PORT/semantic-click-target"
 INPUT_TEXT="openclaw sees its own work view"
+SEMANTIC_INPUT_TEXT="semantic input remains write only"
 
 export OPENCLAW_CORE_PORT="${OPENCLAW_CORE_PORT:-5700}"
 export OPENCLAW_EVENT_HUB_PORT="${OPENCLAW_EVENT_HUB_PORT:-5701}"
@@ -54,6 +55,7 @@ cleanup() {
   rm -f "$OPENCLAW_EVENT_LOG_FILE"
   rm -f "${SCREEN_EVENTS_FILE:-}"
   rm -f "${AUTONOMOUS_SEMANTIC_FILE:-}"
+  rm -f "${AUTONOMOUS_SEMANTIC_TYPE_FILE:-}"
 }
 trap cleanup EXIT
 
@@ -559,6 +561,62 @@ console.log(JSON.stringify({
   },
 }, null, 2));
 EOF
+
+autonomous_semantic_type_task="$(post_json "$CORE_URL/tasks" "$(node -e 'process.stdout.write(JSON.stringify({goal:"Type once into one current semantic target",type:"browser_task",targetUrl:process.argv[1],workViewStrategy:"ai-work-view",planStrategy:"rule-v1",actions:[{kind:"browser.semantic_type",params:{target:{name:"work-input",role:"textbox"}}}]}));' "$AUTONOMOUS_GROUNDING_URL")")"
+autonomous_semantic_type_task_id="$(node -e 'const data=JSON.parse(process.argv[1]); process.stdout.write(data.task.id);' "$autonomous_semantic_type_task")"
+AUTONOMOUS_SEMANTIC_TYPE_FILE="$(mktemp)"
+semantic_type_execution_body="$(node -e 'process.stdout.write(JSON.stringify({expectedUrl:process.argv[1],hideOnComplete:false,actions:[{kind:"browser.semantic_type",params:{target:{name:"work-input",role:"textbox"},text:process.argv[2]}}]}));' "$AUTONOMOUS_GROUNDING_URL" "$SEMANTIC_INPUT_TEXT")"
+post_json "$CORE_URL/tasks/$autonomous_semantic_type_task_id/execute" "$semantic_type_execution_body" > "$AUTONOMOUS_SEMANTIC_TYPE_FILE"
+node - <<'EOF' "$AUTONOMOUS_SEMANTIC_TYPE_FILE" "$AUTONOMOUS_GROUNDING_URL" "$SEMANTIC_INPUT_TEXT"
+const { readFileSync } = require("node:fs");
+const responseText = readFileSync(process.argv[2], "utf8");
+const data = JSON.parse(responseText);
+const expectedUrl = process.argv[3];
+const inputText = process.argv[4];
+const evidence = data.execution?.actionEvidence;
+const action = evidence?.actions?.[0];
+const effect = action?.mediation?.effect ?? {};
+const grounding = action?.mediation?.visualGrounding ?? {};
+const inputEvidence = effect.inputEvidence ?? action?.params?.inputEvidence;
+if (data.task?.status !== "completed"
+  || action?.kind !== "keyboard.type"
+  || action?.params?.semanticTarget?.operation !== "type"
+  || "text" in (action?.params ?? {})
+  || effect.registry !== "openclaw-browser-semantic-target-action-v0"
+  || effect.operation !== "type"
+  || effect.targetId !== action.params.semanticTarget.targetId
+  || effect.frame?.sequence !== grounding.before?.sequence
+  || inputEvidence?.registry !== "openclaw-write-only-input-evidence-v0"
+  || inputEvidence.charCount !== inputText.length
+  || inputEvidence.textExposed !== false
+  || inputEvidence.persisted !== false
+  || effect.inputValuesExposed !== false
+  || effect.selectorsExposed !== false
+  || grounding.status !== "grounded"
+  || grounding.after?.pageUrl !== expectedUrl
+  || grounding.after?.sequence <= grounding.before?.sequence
+  || grounding.after?.sha256 === grounding.before?.sha256
+  || evidence.observedAfterActions?.url !== expectedUrl
+  || responseText.includes(inputText)) {
+  throw new Error(`autonomous semantic type did not remain frame-bound and write-only: ${responseText}`);
+}
+console.log(JSON.stringify({
+  autonomousSemanticType: {
+    taskId: data.task.id,
+    targetId: effect.targetId,
+    inputChars: inputEvidence.charCount,
+    textExposed: inputEvidence.textExposed,
+    beforeSequence: grounding.before.sequence,
+    afterSequence: grounding.after.sequence,
+    observedUrl: evidence.observedAfterActions.url,
+  },
+}, null, 2));
+EOF
+
+if grep -Fq -- "$SEMANTIC_INPUT_TEXT" "$OPENCLAW_CORE_STATE_FILE" "$OPENCLAW_EVENT_LOG_FILE"; then
+  echo "semantic input leaked into persistent core or event state" >&2
+  exit 1
+fi
 
 post_json "$CORE_URL/work-view/trusted-sidecar/lifecycle-tasks/$SIDECAR_TASK_ID/stop" '{}' >/dev/null
 SIDECAR_STOPPED=true

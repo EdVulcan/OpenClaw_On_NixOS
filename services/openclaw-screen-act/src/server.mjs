@@ -115,7 +115,10 @@ async function executeBrowserAction(kind, params, screen) {
         : { x: params.x, y: params.y }
       : kind === "browser.new_tab"
         ? { url: params.url }
-        : { text: params.text ?? "" };
+        : {
+          text: params.text ?? "",
+          ...(params.semanticTarget ? { semanticTarget: params.semanticTarget } : {}),
+        };
     const sidecarActive = Boolean(
       screen?.trustedSession?.helperRuntime?.sidecar?.taskId
       && screen.trustedSession.helperRuntime.sidecar.status === "running"
@@ -288,8 +291,15 @@ const server = http.createServer(async (req, res) => {
     // M-4 Fix: Added try/catch consistent with all other routes in this service.
     try {
       const body = await readJsonBody(req);
+      const semanticTarget = body.semanticTarget
+        ? normaliseWorkViewSemanticTargetReference(body.semanticTarget)
+        : null;
+      if (body.semanticTarget && (!semanticTarget || semanticTarget.operation !== "type")) {
+        throw new Error("Invalid frame-bound semantic type target reference.");
+      }
       const action = await executeAction("keyboard.type", {
         text: typeof body.text === "string" ? body.text : "",
+        semanticTarget,
       });
       sendJson(res, 200, { ok: true, action });
     } catch (error) {

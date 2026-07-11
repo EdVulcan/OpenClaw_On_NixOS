@@ -227,6 +227,14 @@ redacted-input tasks as `input_reentry_required` with no replay. The next Level
 executed through the existing keyboard/sidecar/grounding path with a transient
 execution-only value.
 
+Semantic type is now complete through that path. The plan stores target intent
+only, execution supplies transient text, the runtime accepts only a current
+enabled textbox, and Firefox evidence proves frame change with no value in
+response, state, or events. The current bounded Level 2 browser eye-hand exit
+gate is closed. The next active route is the kernel whitepaper Phase A purity
+slice: package one cohesive service closure into `/nix/store` and prove its real
+unit no longer executes from mutable `/opt/openclaw` before expanding further.
+
 ## Historical Phase Plans
 
 `OPENCLAW_PHASE_2_PLAN.md` through `OPENCLAW_PHASE_136_PLAN.md` are retained

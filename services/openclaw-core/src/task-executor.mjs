@@ -690,7 +690,7 @@ async function executeTask(task, options = {}) {
           operatorActionSource: "task_capture_interruption_recovery",
           recommendedAction: "prepare_work_view",
         })),
-        refreshAction: action.kind === "browser.semantic_click"
+        refreshAction: ["browser.semantic_click", "browser.semantic_type"].includes(action.kind)
           ? async () => materialiseBrowserTaskAction(
             action,
             await fetchJson(`${screenSenseUrl}/screen/current`),

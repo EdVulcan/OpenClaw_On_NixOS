@@ -253,6 +253,33 @@ test("browser engine adapter clicks only a current frame-bound semantic target",
   await adapter.close();
 });
 
+test("browser engine adapter types write-only input into one current textbox target", async (t) => {
+  const fake = createFakePuppeteer(t);
+  const adapter = createBrowserEngineAdapter({
+    executablePath: fake.executablePath,
+    profileDirectory: fake.profileDirectory,
+    puppeteerApi: fake.puppeteerApi,
+  });
+  await adapter.open({ url: "http://127.0.0.1/semantic-type" });
+  const frame = await adapter.captureVisualFrame({ includeData: false });
+  const inventory = adapter.semanticTargetInventory();
+  const result = await adapter.typeSemanticTarget({
+    registry: "openclaw-browser-semantic-target-reference-v0",
+    operation: "type",
+    targetId: inventory.items[0].targetId,
+    inventorySha256: inventory.inventorySha256,
+    frame: { sha256: frame.sha256, sequence: frame.sequence },
+  }, "private semantic input");
+  assert.equal(result.semanticTarget.operation, "type");
+  assert.equal(result.semanticTarget.inputEvidence.charCount, 22);
+  assert.equal(result.semanticTarget.inputValuesExposed, false);
+  assert.equal(JSON.stringify(result).includes("private semantic input"), false);
+  assert.deepEqual(fake.browser.pageList.at(-1).clicked, [{ x: 110, y: 46 }]);
+  assert.deepEqual(fake.browser.pageList.at(-1).typed, ["private semantic input"]);
+  assert.equal(adapter.semanticTargetInventory().available, false);
+  await adapter.close();
+});
+
 test("browser engine adapter does not publish a frame captured across a page mutation", async (t) => {
   let releaseScreenshot;
   let screenshotStarted;

@@ -300,7 +300,7 @@
 | 身份层级 | 当前成熟度 | 证据与主要缺口 |
 | --- | --- | --- |
 | Level 1 用户态控制平面 | 约 90% | 本地服务、任务/审批/审计、工程读写验证恢复、记忆与 provider 治理面已形成；仍需少量整合与产品化。 |
-| Level 2 受信会话组件 | 约 99% | trusted-session 契约、takeover suspend/resume-rebind、独立 user-session sidecar、fail-closed reconnect/replacement、受治理 browser input/click/new-tab、autonomous dispatch、跨服务重启、`systemd --user` ownership、bounded workspace continuity、真实 NixOS Firefox、bounded 页面像素帧、frame-grounded 动作、帧绑定目标清单、semantic click、core 观察后自主 target selection，以及不回显/不持久化原文的 write-only input evidence 已有；主要产品缺口是将 semantic type 纳入同一当前 target、租约、sidecar refresh、视觉 grounding、审计与 Observer 合同，其文本只能作为单次执行的瞬态 payload。 |
+| Level 2 受信会话组件 | 约 100%（当前 bounded browser 边界） | trusted-session、takeover/rebind、user-session sidecar、fail-closed recovery、`systemd --user` ownership、workspace continuity、真实 NixOS Firefox、bounded 像素帧、frame-grounded action、语义目标清单、stale rejection、自主 semantic click/type、write-only input、审计与 Observer 证据已形成闭环。更广的原生图形工作空间属于 Level 4，不应继续作为 Level 2 横向变体。 |
 | Level 3 系统级特权组件 | 约 10-15% | 已有 systemd 感知、提案和有限执行证据；独立 `openclaw-hostd`、D-Bus/Polkit RPC 和受控特权边界尚未建立。 |
 | Level 4 图形栈内生组件 | 约 0-5% | 只有 AI-owned work-view 方向与接口预留；专属 session、nested compositor、原生图形输入输出尚未实现。 |
 
@@ -311,9 +311,10 @@
 边界证据。因此旧阶段路线的“接近 90%”只能描述早期里程碑清单，不能代表
 最终白皮书完成度。
 
-当前最高收益主线是：收口 Level 1 工程连续性后，建设真实的 Level 2
-trusted session helper/work-view runtime；在进入 Level 3 前不 root 化整个
-控制平面。
+当前 bounded Level 2 browser 眼手闭环已收口。下一高收益非 root 主线是
+内核白皮书 Phase A Nix 纯净化：先让一个真实服务 closure 从
+`/nix/store` 而不是 `/opt/openclaw` 运行，再扩展至其余服务。在进入
+Level 3 前不 root 化整个控制平面。
 
 ---
 

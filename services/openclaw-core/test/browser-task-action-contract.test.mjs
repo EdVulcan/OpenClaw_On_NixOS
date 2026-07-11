@@ -135,6 +135,32 @@ test("browser task action contract rejects ambiguous semantic target intent", ()
   }), /semantic_target_selection_ambiguous/u);
 });
 
+test("browser task action contract materialises transient semantic type input", () => {
+  const action = materialiseBrowserTaskAction({
+    kind: "browser.semantic_type",
+    params: { target: { name: "Work", role: "textbox" }, text: "transient private input" },
+  }, {
+    screen: {
+      semanticTargets: {
+        available: true,
+        inventorySha256: "b".repeat(64),
+        frame: { sha256: "a".repeat(64), sequence: 9 },
+        items: [{
+          targetId: "frame-9-target-1",
+          role: "textbox",
+          name: "Work",
+          visible: true,
+          disabled: false,
+        }],
+      },
+    },
+  });
+  assert.equal(action.params.semanticTarget.operation, "type");
+  assert.equal(action.params.text, "transient private input");
+  assert.equal(screenActEndpointForBrowserTaskAction(action.kind), "/act/keyboard/type");
+  assert.equal(capabilityIdForBrowserTaskAction(action.kind), "act.screen.pointer_keyboard");
+});
+
 test("browser task action recovery prepares once and retries a capture interruption", async () => {
   const calls = [];
   const responses = [

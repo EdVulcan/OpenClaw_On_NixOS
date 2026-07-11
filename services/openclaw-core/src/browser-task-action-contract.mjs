@@ -5,6 +5,7 @@ export const BROWSER_TASK_ACTION_DESCRIPTORS = Object.freeze([
   { kind: "keyboard.hotkey", endpoint: "/act/keyboard/hotkey", capabilityId: "act.screen.pointer_keyboard" },
   { kind: "mouse.click", endpoint: "/act/mouse/click", capabilityId: "act.screen.pointer_keyboard" },
   { kind: "browser.semantic_click", endpoint: "/act/mouse/click", capabilityId: "act.screen.pointer_keyboard" },
+  { kind: "browser.semantic_type", endpoint: "/act/keyboard/type", capabilityId: "act.screen.pointer_keyboard" },
   { kind: "browser.new_tab", endpoint: "/act/browser/new-tab", capabilityId: "act.browser.open" },
 ]);
 
@@ -50,7 +51,8 @@ function boundedSelectionText(value, maxChars) {
 }
 
 export function materialiseBrowserTaskAction(action, screenResponse) {
-  if (action?.kind !== "browser.semantic_click") return action;
+  if (!["browser.semantic_click", "browser.semantic_type"].includes(action?.kind)) return action;
+  const operation = action.kind === "browser.semantic_type" ? "type" : "click";
   const name = boundedSelectionText(action?.params?.target?.name, 120);
   const role = action?.params?.target?.role == null
     ? null
@@ -72,9 +74,15 @@ export function materialiseBrowserTaskAction(action, screenResponse) {
     && (!role || target.role === role));
   if (matches.length === 0) throw new Error("semantic_target_selection_not_found");
   if (matches.length > 1) throw new Error("semantic_target_selection_ambiguous");
+  if (operation === "type" && matches[0].role !== "textbox") {
+    throw new Error("semantic_target_selection_not_textbox");
+  }
+  if (operation === "type" && typeof action?.params?.text !== "string") {
+    throw new Error("semantic_target_input_required");
+  }
   const reference = normaliseWorkViewSemanticTargetReference({
     registry: "openclaw-browser-semantic-target-reference-v0",
-    operation: "click",
+    operation,
     targetId: matches[0].targetId,
     inventorySha256: inventory.inventorySha256,
     frame: {
@@ -85,7 +93,10 @@ export function materialiseBrowserTaskAction(action, screenResponse) {
   if (!reference) throw new Error("semantic_target_selection_invalid_inventory");
   return {
     ...action,
-    params: { semanticTarget: reference },
+    params: {
+      semanticTarget: reference,
+      ...(operation === "type" ? { text: action.params.text } : {}),
+    },
   };
 }
 

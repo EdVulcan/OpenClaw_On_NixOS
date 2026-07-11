@@ -524,17 +524,27 @@ const server = http.createServer(async (req, res) => {
         sendJson(res, 409, { ok: false, error: mediation.reason, mediation });
         return;
       }
-      const { text, evidence: inputEvidence } = buildWriteOnlyInputEvidence(body.text);
-      if (browserEngine) applyEngineSnapshot(await browserEngine.type(text));
+      const { text, evidence: boundedInputEvidence } = buildWriteOnlyInputEvidence(body.text);
+      let inputEvidence = boundedInputEvidence;
+      let effect = null;
+      if (body.semanticTarget) {
+        if (!browserEngine) throw new Error("semantic_target_real_engine_required");
+        const result = await browserEngine.typeSemanticTarget(body.semanticTarget, text);
+        applyEngineSnapshot(result.snapshot);
+        inputEvidence = result.inputEvidence;
+        effect = result.semanticTarget;
+      } else if (browserEngine) {
+        applyEngineSnapshot(await browserEngine.type(text));
+      }
       updateBrowserState({
         lastInput: inputEvidence,
       });
       const browser = serialiseBrowserState();
-      await publishEvent(createEventName("browser.updated"), { browser, action: "input", inputEvidence });
-      sendJson(res, 200, { ok: true, browser, inputEvidence, mediation });
+      await publishEvent(createEventName("browser.updated"), { browser, action: "input", inputEvidence, effect });
+      sendJson(res, 200, { ok: true, browser, inputEvidence, effect, mediation });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
-      sendJson(res, 400, { ok: false, error: message });
+      sendJson(res, message.startsWith("semantic_target_") ? 409 : 400, { ok: false, error: message });
     }
     return;
   }

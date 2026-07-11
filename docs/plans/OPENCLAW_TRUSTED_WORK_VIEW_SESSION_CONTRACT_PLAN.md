@@ -838,3 +838,25 @@ textbox target selected after observation, pass the text only in the execution
 request, and return write-only input evidence plus pre/post visual grounding.
 Reuse `/act/keyboard/type`, sidecar refresh, task and Observer paths; do not
 persist the value or add a selector/endpoint family.
+
+That semantic type slice is now complete. `browser.semantic_type` stores only
+exact textbox target intent in its plan; the execution request supplies the
+bounded transient value. Core materializes the current type reference after
+observation, sidecar refreshes and matches the same inventory/frame, and the
+browser adapter focuses only an enabled `textbox` before typing. The existing
+keyboard route returns semantic effect, write-only input evidence, and pre/post
+visual grounding without returning or persisting the value.
+
+The real Firefox milestone proves an autonomous task selects `work-input` on
+frame 8, changes the rendered frame to 9, remains on the expected page, and
+keeps the 33-character input absent from task response, core state, and event
+log. Observer and Phase 3 takeover/recovery milestones remain green. This
+closes the current Level 2 bounded browser eye-hand exit gate; do not add more
+horizontal browser action variants by inertia.
+
+The next active route should return to the kernel evolution whitepaper's Phase
+A Nix purity gap. The smallest real non-root slice is to package one cohesive
+OpenClaw service closure into a read-only Nix derivation and run its systemd
+unit from `/nix/store` instead of mutable `/opt/openclaw`, while preserving the
+existing login-user ownership, routes, state paths, and milestones. Expand to
+the remaining services only after that real unit proof is stable.

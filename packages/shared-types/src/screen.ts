@@ -49,7 +49,7 @@ export type WorkViewSemanticTarget = {
 
 export type WorkViewSemanticTargetReference = {
   registry: "openclaw-browser-semantic-target-reference-v0";
-  operation: "click";
+  operation: "click" | "type";
   targetId: string;
   inventorySha256: string;
   frame: { sha256: string; sequence: number };

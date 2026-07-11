@@ -123,7 +123,7 @@ export function normaliseWorkViewSemanticTargetReference(reference) {
     : "";
   const frameSequence = reference?.frame?.sequence;
   if (reference?.registry !== WORK_VIEW_SEMANTIC_TARGET_REFERENCE_REGISTRY
-    || reference?.operation !== "click"
+    || !["click", "type"].includes(reference?.operation)
     || !targetMatch
     || !/^[a-f0-9]{64}$/u.test(inventorySha256)
     || !/^[a-f0-9]{64}$/u.test(frameSha256)
@@ -134,7 +134,7 @@ export function normaliseWorkViewSemanticTargetReference(reference) {
   }
   return {
     registry: WORK_VIEW_SEMANTIC_TARGET_REFERENCE_REGISTRY,
-    operation: "click",
+    operation: reference.operation,
     targetId,
     inventorySha256,
     frame: { sha256: frameSha256, sequence: frameSequence },

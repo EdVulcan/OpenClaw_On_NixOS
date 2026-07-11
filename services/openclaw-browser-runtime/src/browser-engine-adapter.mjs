@@ -19,6 +19,7 @@ import {
   projectWorkViewSemanticTargets,
   unavailableWorkViewSemanticTargets,
 } from "../../../packages/shared-utils/src/work-view-semantic-targets.mjs";
+import { buildWriteOnlyInputEvidence } from "../../../packages/shared-utils/src/work-view-input-evidence.mjs";
 
 const ENGINE_REGISTRY = "openclaw-browser-engine-adapter-v0";
 const MAX_RESTORED_TABS = 32;
@@ -269,10 +270,10 @@ export function createBrowserEngineAdapter({
     return snapshot();
   }
 
-  async function clickSemanticTarget(reference) {
+  async function resolveSemanticTarget(reference, operation) {
     if (!activePage) throw new Error("semantic_target_browser_not_running");
     const boundedReference = normaliseWorkViewSemanticTargetReference(reference);
-    if (!boundedReference) throw new Error("semantic_target_reference_invalid");
+    if (!boundedReference || boundedReference.operation !== operation) throw new Error("semantic_target_reference_invalid");
     const frame = await captureVisualFrame({ includeData: false });
     const inventory = semanticTargetInventory();
     if (!frame.available || !frame.fresh || !inventory.available) {
@@ -290,6 +291,11 @@ export function createBrowserEngineAdapter({
       x: Math.max(0, Math.min(WORK_VIEW_VISUAL_FRAME_WIDTH - 1, Math.round(target.bounds.x + target.bounds.width / 2))),
       y: Math.max(0, Math.min(WORK_VIEW_VISUAL_FRAME_HEIGHT - 1, Math.round(target.bounds.y + target.bounds.height / 2))),
     };
+    return { inventory, position, target };
+  }
+
+  async function clickSemanticTarget(reference) {
+    const { inventory, position, target } = await resolveSemanticTarget(reference, "click");
     await activePage.mouse.click(position.x, position.y);
     const semanticTarget = {
       registry: "openclaw-browser-semantic-target-action-v0",
@@ -306,6 +312,30 @@ export function createBrowserEngineAdapter({
     };
     invalidateVisualFrame();
     return { snapshot: await snapshot(), position, semanticTarget };
+  }
+
+  async function typeSemanticTarget(reference, value) {
+    const { inventory, position, target } = await resolveSemanticTarget(reference, "type");
+    if (target.role !== "textbox") throw new Error("semantic_target_not_textbox");
+    const { text, evidence: inputEvidence } = buildWriteOnlyInputEvidence(value);
+    await activePage.mouse.click(position.x, position.y);
+    await activePage.keyboard.type(text);
+    const semanticTarget = {
+      registry: "openclaw-browser-semantic-target-action-v0",
+      operation: "type",
+      status: "executed",
+      targetId: target.targetId,
+      inventorySha256: inventory.inventorySha256,
+      frame: { ...inventory.frame },
+      position,
+      inputEvidence,
+      inputValuesExposed: false,
+      selectorsExposed: false,
+      arbitraryPageScript: false,
+      persisted: false,
+    };
+    invalidateVisualFrame();
+    return { snapshot: await snapshot(), inputEvidence, semanticTarget };
   }
 
   async function captureVisualFrame({ includeData = true } = {}) {
@@ -402,5 +432,5 @@ export function createBrowserEngineAdapter({
     return projectWorkViewSemanticTargets(semanticTargets);
   }
 
-  return { captureVisualFrame, click, clickSemanticTarget, close, newTab, open, semanticTargetInventory, snapshot, type };
+  return { captureVisualFrame, click, clickSemanticTarget, close, newTab, open, semanticTargetInventory, snapshot, type, typeSemanticTarget };
 }

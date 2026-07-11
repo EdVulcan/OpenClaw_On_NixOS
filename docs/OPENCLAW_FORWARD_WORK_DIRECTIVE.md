@@ -455,6 +455,21 @@ at sidecar and browser-runtime, and return write-only input evidence with
 pre/post visual grounding. Do not add selectors, a parallel route, text
 persistence, or readback of the typed value.
 
+That semantic type capability is now complete. Core selects the current
+textbox after observation, the transient execution value never enters the
+plan, sidecar and browser-runtime validate the same frame-bound authority, and
+the existing keyboard route returns only semantic effect, input evidence, and
+pre/post visual grounding. Real Firefox, Observer, persistence, recovery, and
+Phase 3 checks pass. The current bounded Level 2 browser eye-hand exit gate is
+closed; do not grow more horizontal action variants.
+
+The next active route is the kernel evolution whitepaper's Phase A Nix purity
+gap. Start with one real cohesive service closure packaged into `/nix/store`
+and make its generated unit execute from that read-only derivation instead of
+mutable `/opt/openclaw`. Preserve user-session ownership, runtime state/log
+paths, public routes, and real milestones. Do not introduce root hostd, D-Bus,
+eBPF, or broad all-service migration until this first packaging proof works.
+
 ## Identity-Upgrade Alignment
 
 Every new capability must state which identity level it serves:

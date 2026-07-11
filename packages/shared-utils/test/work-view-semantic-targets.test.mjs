@@ -86,4 +86,8 @@ test("semantic target action references retain only frame-bound click authority"
     ...reference,
     frame: { ...reference.frame, sequence: 8 },
   }), null);
+  assert.equal(normaliseWorkViewSemanticTargetReference({
+    ...reference,
+    operation: "type",
+  })?.operation, "type");
 });
