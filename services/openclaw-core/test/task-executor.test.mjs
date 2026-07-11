@@ -1557,11 +1557,14 @@ test "$#" -eq 0
 printf '%s\\n' '{"ok":true,"transport":"dbus_native","method":"org.freedesktop.systemd1.Manager.RestartUnit","unit":"openclaw-system-sense.service","jobPath":"/org/freedesktop/systemd1/job/42","before":{"activeState":"active","subState":"running","mainPid":100},"after":{"activeState":"active","subState":"running","mainPid":200}}'
 `);
   chmodSync(helper, 0o755);
+  let inventoryCalls = 0;
 
   try {
     const { executor, events } = createExecutorHarness({
       state: {
         SYSTEMD_REPAIR_EXECUTION_TIMEOUT_MS: 3000,
+        SYSTEMD_REPAIR_POST_VERIFICATION_ATTEMPTS: 3,
+        SYSTEMD_REPAIR_POST_VERIFICATION_POLL_MS: 1,
         SYSTEMD_REPAIR_RESTART_HELPER: helper,
         SYSTEMD_REPAIR_AUTH_DELEGATION: "polkit-dbus-fixed-unit",
       },
@@ -1571,8 +1574,13 @@ printf '%s\\n' '{"ok":true,"transport":"dbus_native","method":"org.freedesktop.s
           screenSenseUrl: "http://127.0.0.1:4104",
           screenActUrl: "http://127.0.0.1:4105",
           systemSenseUrl: "http://127.0.0.1:4106",
-          fetchJson: async (url) => url.endsWith("/system/systemd/units")
-            ? {
+          fetchJson: async (url) => {
+            if (url.endsWith("/system/systemd/units")) {
+              inventoryCalls += 1;
+              if (inventoryCalls === 2) {
+                throw new Error("service endpoint restarting");
+              }
+              return {
                 registry: "openclaw-systemd-unit-inventory-v0",
                 observedAt: new Date().toISOString(),
                 units: [{
@@ -1584,15 +1592,17 @@ printf '%s\\n' '{"ok":true,"transport":"dbus_native","method":"org.freedesktop.s
                   systemdObserved: true,
                   observation: "dbus_properties_read_only",
                 }],
-              }
-            : {
+              };
+            }
+            return {
                 system: {
                   timestamp: new Date().toISOString(),
                   alerts: [],
                   network: { online: true, checkedTargets: 7 },
                   services: { browserRuntime: { name: "browserRuntime", ok: true } },
                 },
-              },
+              };
+          },
           postJson: async () => ({ ok: true }),
         },
       },
@@ -1627,6 +1637,8 @@ printf '%s\\n' '{"ok":true,"transport":"dbus_native","method":"org.freedesktop.s
     assert.equal(finalTask.outcome.details.postExecutionVerification.summary.nativeMutationVerified, true);
     assert.equal(finalTask.outcome.details.postExecutionVerification.summary.restoredHealthy, true);
     assert.equal(finalTask.outcome.details.postExecutionVerification.recoveryRecommendation, null);
+    assert.equal(finalTask.outcome.details.postExecutionVerification.after.readinessAttempts, 2);
+    assert.equal(inventoryCalls, 3);
     assert(events.some((event) => event.name === "systemd.next_repair.execution_completed"));
   } finally {
     rmSync(root, { recursive: true, force: true });

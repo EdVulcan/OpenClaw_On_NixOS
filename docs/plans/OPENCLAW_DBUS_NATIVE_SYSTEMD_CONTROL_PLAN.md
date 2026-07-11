@@ -103,10 +103,14 @@ VM generation:
    plus an observed `loaded/active/running` target; failure records an
    operator-reviewed declarative-generation recovery recommendation without an
    automatic second restart.
+8. Because systemd can report the restarted Node service as running before its
+   HTTP listener is ready, post-verification performs a bounded readiness poll
+   of the existing read-only inventory route. It never repeats `RestartUnit`.
 
 Focused tests prove the exact D-Bus message, no-argument boundary, PID-change
 verification, production helper subprocess bridge, negative fallback, and
-non-retrying recovery recommendation. The
+non-retrying recovery recommendation. A restart-race test proves one transient
+post-restart fetch failure is absorbed without a second mutation. The
 auth-delegation and full body-config gates prove Nix/Polkit evaluation and all
 store closures. The existing core and Observer real-execution milestones now
 require successful native transport rather than accepting a failed attempt.

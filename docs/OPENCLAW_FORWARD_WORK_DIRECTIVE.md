@@ -593,6 +593,8 @@ during that deployment rather than treated as current architecture.
 Post-verification now derives restored health from the selected unit's native
 inventory state and helper PID evidence; failures recommend operator-reviewed
 declarative-generation recovery and never issue an automatic second restart.
+It uses a bounded read-only readiness poll because systemd process readiness can
+precede the restarted service's HTTP-listener readiness.
 
 ## Identity-Upgrade Alignment
 

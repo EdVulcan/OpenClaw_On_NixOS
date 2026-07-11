@@ -12,6 +12,8 @@ export function createSystemBodyTaskHandlers({ client, state, taskManager, publi
   const {
     persistState,
     SYSTEMD_REPAIR_EXECUTION_TIMEOUT_MS,
+    SYSTEMD_REPAIR_POST_VERIFICATION_ATTEMPTS = 30,
+    SYSTEMD_REPAIR_POST_VERIFICATION_POLL_MS = 100,
     SYSTEMD_REPAIR_RESTART_HELPER,
     SYSTEMD_REPAIR_AUTH_DELEGATION,
     SYSTEMD_REPAIR_EXECUTION_TASK_REGISTRY,
@@ -783,6 +785,26 @@ export function createSystemBodyTaskHandlers({ client, state, taskManager, publi
     return snapshot;
   }
 
+  async function captureSystemdRepairPostRestartSnapshot(targetUnit, stage) {
+    let snapshot;
+    for (let attempt = 1; attempt <= SYSTEMD_REPAIR_POST_VERIFICATION_ATTEMPTS; attempt += 1) {
+      snapshot = await captureSystemdRepairVerificationSnapshot(targetUnit, stage);
+      if (snapshot.targetUnitState?.systemdObserved === true) {
+        return {
+          ...snapshot,
+          readinessAttempts: attempt,
+        };
+      }
+      if (attempt < SYSTEMD_REPAIR_POST_VERIFICATION_ATTEMPTS) {
+        await new Promise((resolve) => setTimeout(resolve, SYSTEMD_REPAIR_POST_VERIFICATION_POLL_MS));
+      }
+    }
+    return {
+      ...snapshot,
+      readinessAttempts: SYSTEMD_REPAIR_POST_VERIFICATION_ATTEMPTS,
+    };
+  }
+
   function buildSystemdRepairPostExecutionVerification(targetUnit, before, after, result) {
     const afterTarget = after.targetUnitState;
     const targetHealthy = afterTarget?.systemdObserved === true
@@ -862,7 +884,7 @@ export function createSystemBodyTaskHandlers({ client, state, taskManager, publi
     });
     const result = await runSystemdRepairCommand(runningTask);
     const commandTranscript = [buildSystemdRepairCommandTranscript(runningTask, result)];
-    const afterVerification = await captureSystemdRepairVerificationSnapshot(targetUnit, "after_real_execution");
+    const afterVerification = await captureSystemdRepairPostRestartSnapshot(targetUnit, "after_real_execution");
     const postExecutionVerification = buildSystemdRepairPostExecutionVerification(
       targetUnit,
       beforeVerification,
@@ -1027,7 +1049,7 @@ export function createSystemBodyTaskHandlers({ client, state, taskManager, publi
     });
     const result = await runSystemdRepairCommand(runningTask);
     const commandTranscript = [buildSystemdRepairCommandTranscript(runningTask, result)];
-    const afterVerification = await captureSystemdRepairVerificationSnapshot(targetUnit, "after_next_real_execution");
+    const afterVerification = await captureSystemdRepairPostRestartSnapshot(targetUnit, "after_next_real_execution");
     const postExecutionVerification = buildSystemdRepairPostExecutionVerification(
       targetUnit,
       beforeVerification,
