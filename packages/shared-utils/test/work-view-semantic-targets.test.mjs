@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   WORK_VIEW_SEMANTIC_TARGET_MAX_ITEMS,
+  normaliseWorkViewSemanticTargetReference,
   projectWorkViewSemanticTargets,
   summariseWorkViewSemanticTargets,
 } from "../src/work-view-semantic-targets.mjs";
@@ -59,4 +60,30 @@ test("semantic targets enforce item, text, and viewport bounds", () => {
   assert.equal(projected.truncated, true);
   assert.equal(projected.items[0].name.length <= 120, true);
   assert.deepEqual(projected.items[0].bounds, { x: 0, y: 0, width: 960, height: 540 });
+});
+
+test("semantic target action references retain only frame-bound click authority", () => {
+  const reference = normaliseWorkViewSemanticTargetReference({
+    registry: "openclaw-browser-semantic-target-reference-v0",
+    operation: "click",
+    targetId: "frame-7-target-2",
+    inventorySha256: "b".repeat(64),
+    frame: { sha256: "a".repeat(64), sequence: 7 },
+    selector: "#must-not-survive",
+    pageScript: "must-not-survive()",
+  });
+  assert.deepEqual(reference, {
+    registry: "openclaw-browser-semantic-target-reference-v0",
+    operation: "click",
+    targetId: "frame-7-target-2",
+    inventorySha256: "b".repeat(64),
+    frame: { sha256: "a".repeat(64), sequence: 7 },
+    selectorsExposed: false,
+    arbitraryPageScript: false,
+  });
+  assert.equal(JSON.stringify(reference).includes("must-not-survive"), false);
+  assert.equal(normaliseWorkViewSemanticTargetReference({
+    ...reference,
+    frame: { ...reference.frame, sequence: 8 },
+  }), null);
 });

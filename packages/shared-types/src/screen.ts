@@ -47,6 +47,16 @@ export type WorkViewSemanticTarget = {
   selectorExposed: false;
 };
 
+export type WorkViewSemanticTargetReference = {
+  registry: "openclaw-browser-semantic-target-reference-v0";
+  operation: "click";
+  targetId: string;
+  inventorySha256: string;
+  frame: { sha256: string; sequence: number };
+  selectorsExposed: false;
+  arbitraryPageScript: false;
+};
+
 export type WorkViewSemanticTargetInventory = {
   registry: "openclaw-browser-semantic-target-inventory-v0";
   available: boolean;

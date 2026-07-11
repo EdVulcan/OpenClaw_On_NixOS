@@ -259,10 +259,14 @@ async function refreshActionState() {
     actionCount.textContent = String(state.actionCount ?? 0);
     actionDegraded.textContent = String(state.lastAction?.degraded ?? false);
     const visualGrounding = state.lastAction?.mediation?.visualGrounding ?? null;
+    const semanticTarget = state.lastAction?.mediation?.effect?.registry === "openclaw-browser-semantic-target-action-v0"
+      ? state.lastAction.mediation.effect
+      : null;
     actionJson.textContent = state.lastAction
       ? [
           "Action Mediation: " + (state.lastAction.mediation?.status ?? "unknown") + " required=" + Boolean(state.lastAction.mediation?.required) + " accepted=" + Boolean(state.lastAction.mediation?.accepted) + " leaseMatched=" + Boolean(state.lastAction.mediation?.leaseMatched),
           "Visual Grounding: " + (visualGrounding?.status ?? "not_available") + " required=" + Boolean(visualGrounding?.required) + " before=" + (visualGrounding?.before?.sequence ?? "none") + " after=" + (visualGrounding?.after?.sequence ?? "none"),
+          "Semantic Target: " + (semanticTarget ? semanticTarget.targetId + " operation=" + semanticTarget.operation + " status=" + semanticTarget.status + " frame=" + (semanticTarget.frame?.sequence ?? "none") : "not_available"),
           \`Result: \${state.lastAction.result}\`,
           \`Executed: \${formatTimestamp(state.lastAction.executedAt)}\`,
           \`Window: \${state.lastAction.screenContext?.focusedWindow?.title ?? "none"}\`,

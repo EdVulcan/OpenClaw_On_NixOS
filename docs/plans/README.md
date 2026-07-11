@@ -200,6 +200,16 @@ semantic target action selected by `targetId` plus matching frame/inventory
 digest, reusing the current lease, grounding, autonomous task, and Observer
 contracts rather than adding a route or readiness family.
 
+The first governed semantic click is now complete through the existing
+mouse-click route and trusted sidecar. Browser-runtime resolves only a current
+frame-bound target, derives its coordinate internally, emits compact semantic
+effect plus visual grounding, and rejects stale reference reuse. Observer shows
+the effect and the real Firefox milestone proves navigation and no replay. The
+next Level 2 slice is core-side target selection after initial observation so
+an autonomous browser task can construct a current reference at dispatch time.
+Semantic typing remains deferred pending removal of input-text echoes from
+public state and audit paths.
+
 ## Historical Phase Plans
 
 `OPENCLAW_PHASE_2_PLAN.md` through `OPENCLAW_PHASE_136_PLAN.md` are retained

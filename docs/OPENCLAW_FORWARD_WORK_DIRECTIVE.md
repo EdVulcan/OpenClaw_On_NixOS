@@ -411,6 +411,21 @@ the request to the matching frame and inventory digest, reject stale evidence,
 and prove the post-action frame. Do not accept CSS/XPath selectors or arbitrary
 page scripts, and do not add a parallel endpoint or readiness chain.
 
+That first governed action is now complete for semantic click. The existing
+mouse-click route accepts a normalized click-only target reference, resolves it
+against the current browser-owned inventory, derives coordinates internally,
+and rejects stale frame/inventory evidence. Sidecar mediation retains compact
+semantic effect plus pre/post visual grounding, and Observer shows the result.
+The real Firefox milestone proves navigation by target id and fail-closed reuse
+of the old reference; Phase 3 recovery and takeover checks remain unchanged.
+
+The next smallest Level 2 capability is autonomous semantic target selection
+inside core after its initial screen observation. Build the current reference
+at dispatch time and reuse the existing mouse-click/task evidence path. Do not
+add another endpoint, selector surface, or action family. Semantic typing stays
+deferred until input content no longer appears in public browser state or audit
+events.
+
 ## Identity-Upgrade Alignment
 
 Every new capability must state which identity level it serves:

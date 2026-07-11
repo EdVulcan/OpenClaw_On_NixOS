@@ -8,6 +8,7 @@ FIXTURE_PORT="${OPENCLAW_BROWSER_FIXTURE_PORT:-5799}"
 TARGET_URL="http://127.0.0.1:$FIXTURE_PORT/openclaw-ai-work-view-capture"
 GROUNDING_URL="http://127.0.0.1:$FIXTURE_PORT/grounded-action"
 AUTONOMOUS_GROUNDING_URL="http://127.0.0.1:$FIXTURE_PORT/autonomous-grounded-action"
+SEMANTIC_CLICK_URL="http://127.0.0.1:$FIXTURE_PORT/semantic-click-target"
 
 export OPENCLAW_CORE_PORT="${OPENCLAW_CORE_PORT:-5700}"
 export OPENCLAW_EVENT_HUB_PORT="${OPENCLAW_EVENT_HUB_PORT:-5701}"
@@ -71,7 +72,7 @@ if [[ -z "${OPENCLAW_BROWSER_EXECUTABLE:-}" ]]; then
   fi
 fi
 
-node -e 'const http=require("node:http"); const port=Number(process.argv[1]); http.createServer((req,res)=>{const autonomous=req.url.includes("autonomous-grounded-action"); const grounded=req.url.includes("grounded-action"); const title=autonomous?"Autonomous Grounded Fixture":grounded?"Grounded Action Fixture":"OpenClaw Engine Fixture"; const heading=autonomous?"Autonomous visual action observed":grounded?"Visual action observed":"AI-owned work view"; res.writeHead(200,{"content-type":"text/html; charset=utf-8"}); res.end(`<!doctype html><title>${title}</title><main><h1>${heading}</h1><label>Work <input autofocus aria-label="work-input" value="fixture-private-value"></label><label>Account <input type="password" aria-label="account-password" value="fixture-password-secret"></label><button>Observe</button><a href="/inspect">Inspect target</a><button hidden>Hidden target</button></main>`);}).listen(port,"127.0.0.1");' "$FIXTURE_PORT" &
+node -e 'const http=require("node:http"); const port=Number(process.argv[1]); http.createServer((req,res)=>{const autonomous=req.url.includes("autonomous-grounded-action"); const grounded=req.url.includes("grounded-action"); const semantic=req.url.includes("semantic-click-target"); const title=autonomous?"Autonomous Grounded Fixture":grounded?"Grounded Action Fixture":semantic?"Semantic Click Fixture":"OpenClaw Engine Fixture"; const heading=autonomous?"Autonomous visual action observed":grounded?"Visual action observed":semantic?"Semantic target clicked":"AI-owned work view"; res.writeHead(200,{"content-type":"text/html; charset=utf-8"}); res.end(`<!doctype html><title>${title}</title><main><h1>${heading}</h1><label>Work <input autofocus aria-label="work-input" value="fixture-private-value"></label><label>Account <input type="password" aria-label="account-password" value="fixture-password-secret"></label><button>Observe</button><a href="/semantic-click-target">Inspect target</a><button hidden>Hidden target</button></main>`);}).listen(port,"127.0.0.1");' "$FIXTURE_PORT" &
 FIXTURE_PID=$!
 openclaw_wait_for_http_up "$TARGET_URL" 10 0.2
 
@@ -104,6 +105,52 @@ post_json "$CORE_URL/approvals/$sidecar_approval_id/approve" '{"approvedBy":"ai-
 sidecar_start="$(post_json "$CORE_URL/work-view/trusted-sidecar/lifecycle-tasks/$SIDECAR_TASK_ID/start-probe" '{}')"
 node -e 'const data=JSON.parse(process.argv[1]); const frame=data.readback?.execution?.captureObservation?.visualFrame??{}; if(!data.ok || data.readback?.status!=="running_after_approval" || frame.available!==true || frame.fresh!==true || frame.dataExposed!==false || frame.sourceScope!=="ai_owned_active_page_only" || JSON.stringify(frame).includes("data:image/")){throw new Error(`real sidecar did not receive bounded frame metadata: ${JSON.stringify(data)}`);}' "$sidecar_start"
 node -e 'const data=JSON.parse(process.argv[1]); const targets=data.readback?.execution?.captureObservation?.semanticTargets??{}; if(targets.available!==true || targets.itemCount<4 || targets.itemsRetained!==false || targets.inputValuesExposed!==false || targets.selectorsExposed!==false || targets.mutation!==false || !targets.inventorySha256 || JSON.stringify(targets).includes("fixture-password-secret")){throw new Error(`real sidecar did not retain semantic target summary safely: ${JSON.stringify(targets)}`);}' "$sidecar_start"
+
+semantic_capture="$(curl --silent --fail "$BROWSER_URL/browser/capture")"
+semantic_click_body="$(node -e 'const data=JSON.parse(process.argv[1]); const inventory=data.capture?.semanticTargets??{}; const target=inventory.items?.find((item)=>item.name==="Inspect target"); if(!target){throw new Error(`semantic click target missing: ${JSON.stringify(inventory)}`);} process.stdout.write(JSON.stringify({semanticTarget:{registry:"openclaw-browser-semantic-target-reference-v0",operation:"click",targetId:target.targetId,inventorySha256:inventory.inventorySha256,frame:{sha256:inventory.frame.sha256,sequence:inventory.frame.sequence}}}));' "$semantic_capture")"
+semantic_click="$(post_json "$SCREEN_ACT_URL/act/mouse/click" "$semantic_click_body")"
+node - <<'EOF' "$semantic_click" "$SEMANTIC_CLICK_URL"
+const data = JSON.parse(process.argv[2]);
+const expectedUrl = process.argv[3];
+const mediation = data.action?.mediation ?? {};
+const effect = mediation.effect ?? {};
+const grounding = mediation.visualGrounding ?? {};
+if (data.action?.result !== "executed-browser-runtime"
+  || mediation.accepted !== true
+  || mediation.transport !== "trusted-sidecar-ipc"
+  || effect.registry !== "openclaw-browser-semantic-target-action-v0"
+  || effect.operation !== "click"
+  || effect.status !== "executed"
+  || !effect.targetId
+  || !effect.inventorySha256
+  || effect.frame?.sequence !== grounding.before?.sequence
+  || effect.inputValuesExposed !== false
+  || effect.selectorsExposed !== false
+  || effect.arbitraryPageScript !== false
+  || effect.persisted !== false
+  || grounding.status !== "grounded"
+  || grounding.after?.pageUrl !== expectedUrl
+  || grounding.after?.sequence <= grounding.before?.sequence
+  || grounding.after?.sha256 === grounding.before?.sha256
+  || JSON.stringify(data).includes("fixture-private-value")
+  || JSON.stringify(data).includes("fixture-password-secret")
+  || JSON.stringify(data).includes('"selector":')) {
+  throw new Error(`semantic target click was not governed and frame-grounded: ${JSON.stringify(data)}`);
+}
+console.log(JSON.stringify({
+  semanticTargetAction: {
+    targetId: effect.targetId,
+    inventorySha256: effect.inventorySha256,
+    beforeSequence: grounding.before.sequence,
+    afterSequence: grounding.after.sequence,
+    observedUrl: grounding.after.pageUrl,
+    selectorsExposed: effect.selectorsExposed,
+  },
+}, null, 2));
+EOF
+
+stale_semantic_click="$(post_json "$SCREEN_ACT_URL/act/mouse/click" "$semantic_click_body")"
+node -e 'const data=JSON.parse(process.argv[1]); const mediation=data.action?.mediation??{}; if(data.action?.result!=="blocked-or-degraded" || mediation.accepted!==false || mediation.reason!=="semantic_target_inventory_stale" || mediation.visualGrounding?.status!=="action_rejected"){throw new Error(`stale semantic target reference was not rejected: ${JSON.stringify(data)}`);}' "$stale_semantic_click"
 
 grounded_action="$(post_json "$SCREEN_ACT_URL/act/browser/new-tab" "{\"url\":\"$GROUNDING_URL\"}")"
 node - <<'EOF' "$grounded_action" "$GROUNDING_URL"

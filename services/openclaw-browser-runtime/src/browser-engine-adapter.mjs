@@ -15,6 +15,7 @@ import {
 import {
   WORK_VIEW_SEMANTIC_TARGET_MAX_ITEMS,
   WORK_VIEW_SEMANTIC_TARGET_MAX_NAME_CHARS,
+  normaliseWorkViewSemanticTargetReference,
   projectWorkViewSemanticTargets,
   unavailableWorkViewSemanticTargets,
 } from "../../../packages/shared-utils/src/work-view-semantic-targets.mjs";
@@ -268,6 +269,45 @@ export function createBrowserEngineAdapter({
     return snapshot();
   }
 
+  async function clickSemanticTarget(reference) {
+    if (!activePage) throw new Error("semantic_target_browser_not_running");
+    const boundedReference = normaliseWorkViewSemanticTargetReference(reference);
+    if (!boundedReference) throw new Error("semantic_target_reference_invalid");
+    const frame = await captureVisualFrame({ includeData: false });
+    const inventory = semanticTargetInventory();
+    if (!frame.available || !frame.fresh || !inventory.available) {
+      throw new Error("semantic_target_inventory_not_ready");
+    }
+    if (inventory.inventorySha256 !== boundedReference.inventorySha256
+      || inventory.frame?.sha256 !== boundedReference.frame.sha256
+      || inventory.frame?.sequence !== boundedReference.frame.sequence) {
+      throw new Error("semantic_target_inventory_stale");
+    }
+    const target = inventory.items.find((candidate) => candidate.targetId === boundedReference.targetId);
+    if (!target) throw new Error("semantic_target_not_found");
+    if (target.disabled) throw new Error("semantic_target_disabled");
+    const position = {
+      x: Math.max(0, Math.min(WORK_VIEW_VISUAL_FRAME_WIDTH - 1, Math.round(target.bounds.x + target.bounds.width / 2))),
+      y: Math.max(0, Math.min(WORK_VIEW_VISUAL_FRAME_HEIGHT - 1, Math.round(target.bounds.y + target.bounds.height / 2))),
+    };
+    await activePage.mouse.click(position.x, position.y);
+    const semanticTarget = {
+      registry: "openclaw-browser-semantic-target-action-v0",
+      operation: "click",
+      status: "executed",
+      targetId: target.targetId,
+      inventorySha256: inventory.inventorySha256,
+      frame: { ...inventory.frame },
+      position,
+      inputValuesExposed: false,
+      selectorsExposed: false,
+      arbitraryPageScript: false,
+      persisted: false,
+    };
+    invalidateVisualFrame();
+    return { snapshot: await snapshot(), position, semanticTarget };
+  }
+
   async function captureVisualFrame({ includeData = true } = {}) {
     if (!activePage || !browser?.connected) return unavailableWorkViewVisualFrame("browser_not_running");
     const capturedAtMs = Date.parse(visualFrame?.capturedAt ?? "");
@@ -362,5 +402,5 @@ export function createBrowserEngineAdapter({
     return projectWorkViewSemanticTargets(semanticTargets);
   }
 
-  return { captureVisualFrame, click, close, newTab, open, semanticTargetInventory, snapshot, type };
+  return { captureVisualFrame, click, clickSemanticTarget, close, newTab, open, semanticTargetInventory, snapshot, type };
 }

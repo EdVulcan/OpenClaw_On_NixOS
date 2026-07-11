@@ -768,3 +768,27 @@ chain. It must address a target by frame-scoped `targetId`, reject stale frame
 or inventory digests, and accept no arbitrary CSS/XPath selector or page
 script. Start with one bounded click or input operation and prove the resulting
 post-action frame; do not create another route family or readiness milestone.
+
+The first governed semantic click is now complete without a new endpoint.
+`/act/mouse/click` accepts a normalized click-only target reference containing
+the target id, inventory digest, and visual-frame SHA/sequence. Browser-runtime
+refreshes or validates the current frame, resolves the target only inside its
+current inventory, derives the center coordinate internally, rejects disabled,
+missing, invalid, or stale targets, and invalidates the inventory after the
+click. No selector, XPath, element handle, or caller-supplied page script crosses
+the action boundary.
+
+The same trusted sidecar transport attaches compact semantic effect evidence to
+the existing pre/post visual grounding result, screen-act audit state, and
+Observer Last Action panel. The real Firefox milestone follows the visible
+`Inspect target` link, proves the URL/frame changed, then resubmits the old
+reference and receives `semantic_target_inventory_stale` without replaying the
+click. Existing Phase 3 recovery and takeover milestones remain green.
+
+The next real Level 2 slice is autonomous semantic target selection after the
+core executor's initial screen observation. It should select one current target
+from that observation under a bounded task intent, construct the exact
+frame-bound reference at dispatch time, and use the existing mouse-click route
+and task evidence. Do not let task creators precompute stale frame ids. Semantic
+typing remains deferred until input text is redacted from public browser state
+and audit events rather than echoed as current legacy input actions do.

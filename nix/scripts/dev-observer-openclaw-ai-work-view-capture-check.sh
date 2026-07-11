@@ -92,6 +92,8 @@ const requiredClient = [
   "screen.semanticTargets",
   "inventorySha256",
   "Semantic Targets:",
+  "Semantic Target:",
+  "openclaw-browser-semantic-target-action-v0",
 ];
 
 for (const token of requiredHtml) {

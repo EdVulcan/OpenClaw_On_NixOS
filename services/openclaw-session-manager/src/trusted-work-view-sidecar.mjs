@@ -259,11 +259,11 @@ async function executeBrowserAction(message) {
         ok: actionAccepted,
         reason: data?.mediation?.reason ?? data?.error ?? null,
         mediation: data?.mediation ?? null,
-        effect: data?.tab ? {
+        effect: data?.effect ?? (data?.tab ? {
           tabId: data.tab.id ?? null,
           url: data.tab.url ?? null,
           tabCount: Array.isArray(data.browser?.tabs) ? data.browser.tabs.length : null,
-        } : null,
+        } : null),
         visualGrounding,
       },
     });

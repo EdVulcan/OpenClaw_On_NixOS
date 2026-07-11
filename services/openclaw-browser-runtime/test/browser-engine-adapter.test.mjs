@@ -210,6 +210,49 @@ test("browser engine adapter fails closed when an AI-owned frame exceeds the byt
   await adapter.close();
 });
 
+test("browser engine adapter clicks only a current frame-bound semantic target", async (t) => {
+  const fake = createFakePuppeteer(t, {
+    semanticItems: [{
+      role: "button",
+      tag: "button",
+      name: "Observe",
+      disabled: false,
+      bounds: { x: 100, y: 80, width: 120, height: 40 },
+    }],
+  });
+  const adapter = createBrowserEngineAdapter({
+    executablePath: fake.executablePath,
+    profileDirectory: fake.profileDirectory,
+    puppeteerApi: fake.puppeteerApi,
+  });
+
+  await adapter.open({ url: "http://127.0.0.1/semantic-click" });
+  const frame = await adapter.captureVisualFrame({ includeData: false });
+  const inventory = adapter.semanticTargetInventory();
+  const reference = {
+    registry: "openclaw-browser-semantic-target-reference-v0",
+    operation: "click",
+    targetId: inventory.items[0].targetId,
+    inventorySha256: inventory.inventorySha256,
+    frame: { sha256: frame.sha256, sequence: frame.sequence },
+  };
+
+  await assert.rejects(
+    () => adapter.clickSemanticTarget({ ...reference, inventorySha256: "f".repeat(64) }),
+    /semantic_target_inventory_stale/u,
+  );
+  const result = await adapter.clickSemanticTarget(reference);
+  assert.deepEqual(result.position, { x: 160, y: 100 });
+  assert.equal(result.semanticTarget.targetId, reference.targetId);
+  assert.equal(result.semanticTarget.inventorySha256, reference.inventorySha256);
+  assert.equal(result.semanticTarget.selectorsExposed, false);
+  assert.equal(result.semanticTarget.arbitraryPageScript, false);
+  assert.deepEqual(fake.browser.pageList.at(-1).clicked, [{ x: 160, y: 100 }]);
+  assert.equal(adapter.semanticTargetInventory().available, false);
+
+  await adapter.close();
+});
+
 test("browser engine adapter does not publish a frame captured across a page mutation", async (t) => {
   let releaseScreenshot;
   let screenshotStarted;

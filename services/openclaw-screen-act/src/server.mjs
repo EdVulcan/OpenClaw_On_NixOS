@@ -2,6 +2,7 @@ import http from "node:http";
 import { randomUUID } from "node:crypto";
 import { createEventName } from "../../../packages/shared-events/src/event-factory.mjs";
 import { buildTrustedWorkViewActionLease } from "./trusted-work-view-action-mediation.mjs";
+import { normaliseWorkViewSemanticTargetReference } from "../../../packages/shared-utils/src/work-view-semantic-targets.mjs";
 
 const host = process.env.OPENCLAW_SCREEN_ACT_HOST ?? "127.0.0.1";
 const port = Number.parseInt(process.env.OPENCLAW_SCREEN_ACT_PORT ?? "4105", 10);
@@ -108,7 +109,9 @@ async function executeBrowserAction(kind, params, screen) {
 
   try {
     const payload = kind === "mouse.click"
-      ? { x: params.x, y: params.y }
+      ? params.semanticTarget
+        ? { semanticTarget: params.semanticTarget }
+        : { x: params.x, y: params.y }
       : kind === "browser.new_tab"
         ? { url: params.url }
         : { text: params.text ?? "" };
@@ -259,10 +262,17 @@ const server = http.createServer(async (req, res) => {
     // the HTTP connection hanging with no response.
     try {
       const body = await readJsonBody(req);
+      const semanticTarget = body.semanticTarget
+        ? normaliseWorkViewSemanticTargetReference(body.semanticTarget)
+        : null;
+      if (body.semanticTarget && !semanticTarget) {
+        throw new Error("Invalid frame-bound semantic target reference.");
+      }
       const action = await executeAction("mouse.click", {
-        x: typeof body.x === "number" ? body.x : null,
-        y: typeof body.y === "number" ? body.y : null,
+        x: semanticTarget ? null : typeof body.x === "number" ? body.x : null,
+        y: semanticTarget ? null : typeof body.y === "number" ? body.y : null,
         button: typeof body.button === "string" ? body.button : "left",
+        semanticTarget,
       });
       sendJson(res, 200, { ok: true, action });
     } catch (error) {

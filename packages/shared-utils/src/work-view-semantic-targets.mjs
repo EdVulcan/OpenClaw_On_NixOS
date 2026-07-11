@@ -6,6 +6,7 @@ import {
 } from "./work-view-visual-frame.mjs";
 
 export const WORK_VIEW_SEMANTIC_TARGET_INVENTORY_REGISTRY = "openclaw-browser-semantic-target-inventory-v0";
+export const WORK_VIEW_SEMANTIC_TARGET_REFERENCE_REGISTRY = "openclaw-browser-semantic-target-reference-v0";
 export const WORK_VIEW_SEMANTIC_TARGET_MAX_ITEMS = 64;
 export const WORK_VIEW_SEMANTIC_TARGET_MAX_NAME_CHARS = 120;
 
@@ -109,4 +110,35 @@ export function summariseWorkViewSemanticTargets(inventory) {
   const projected = projectWorkViewSemanticTargets(inventory);
   const { items: _items, ...summary } = projected;
   return summary;
+}
+
+export function normaliseWorkViewSemanticTargetReference(reference) {
+  const targetId = typeof reference?.targetId === "string" ? reference.targetId.trim() : "";
+  const targetMatch = /^frame-(\d+)-target-([1-9]\d*)$/u.exec(targetId);
+  const inventorySha256 = typeof reference?.inventorySha256 === "string"
+    ? reference.inventorySha256.trim().toLowerCase()
+    : "";
+  const frameSha256 = typeof reference?.frame?.sha256 === "string"
+    ? reference.frame.sha256.trim().toLowerCase()
+    : "";
+  const frameSequence = reference?.frame?.sequence;
+  if (reference?.registry !== WORK_VIEW_SEMANTIC_TARGET_REFERENCE_REGISTRY
+    || reference?.operation !== "click"
+    || !targetMatch
+    || !/^[a-f0-9]{64}$/u.test(inventorySha256)
+    || !/^[a-f0-9]{64}$/u.test(frameSha256)
+    || !Number.isInteger(frameSequence)
+    || frameSequence < 1
+    || Number.parseInt(targetMatch[1], 10) !== frameSequence) {
+    return null;
+  }
+  return {
+    registry: WORK_VIEW_SEMANTIC_TARGET_REFERENCE_REGISTRY,
+    operation: "click",
+    targetId,
+    inventorySha256,
+    frame: { sha256: frameSha256, sequence: frameSequence },
+    selectorsExposed: false,
+    arbitraryPageScript: false,
+  };
 }
