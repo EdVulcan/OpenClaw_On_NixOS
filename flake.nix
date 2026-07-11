@@ -35,6 +35,7 @@
         openclaw-event-hub = pkgs.callPackage ./nix/packages/openclaw-event-hub.nix { };
         openclaw-screen-sense = pkgs.callPackage ./nix/packages/openclaw-screen-sense.nix { };
         openclaw-screen-act = pkgs.callPackage ./nix/packages/openclaw-screen-act.nix { };
+        openclaw-system-sense = pkgs.callPackage ./nix/packages/openclaw-system-sense.nix { };
         openclaw-system-heal = pkgs.callPackage ./nix/packages/openclaw-system-heal.nix { };
       };
     };

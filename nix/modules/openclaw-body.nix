@@ -83,6 +83,7 @@ let
       portEnv = "OPENCLAW_SYSTEM_SENSE_PORT";
       port = cfg.ports.systemSense;
       after = [ "openclaw-event-hub" "openclaw-core" ];
+      runtimePackage = cfg.runtimePackages.systemSense;
     }
     {
       key = "systemHeal";
@@ -299,6 +300,12 @@ in
       type = types.nullOr types.package;
       default = pkgs.callPackage ../packages/openclaw-screen-act.nix { };
       description = "Read-only Nix package used by screen-act; null keeps the mutable repository fallback.";
+    };
+
+    runtimePackages.systemSense = mkOption {
+      type = types.nullOr types.package;
+      default = pkgs.callPackage ../packages/openclaw-system-sense.nix { };
+      description = "Read-only Nix package used by system-sense; null keeps the mutable repository fallback.";
     };
 
     runtimePackages.systemHeal = mkOption {

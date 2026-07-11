@@ -115,6 +115,7 @@ requireIncludes("openclaw-body module", bodyModule, [
   "runtimePackages.eventHub",
   "runtimePackages.screenSense",
   "runtimePackages.screenAct",
+  "runtimePackages.systemSense",
   "runtimePackages.systemHeal",
   ...serviceNames,
   ...componentKeys,
@@ -172,6 +173,7 @@ requireIncludes("flake", flake, [
   "openclaw-event-hub = pkgs.callPackage",
   "openclaw-screen-sense = pkgs.callPackage",
   "openclaw-screen-act = pkgs.callPackage",
+  "openclaw-system-sense = pkgs.callPackage",
   "openclaw-system-heal = pkgs.callPackage",
 ]);
 
@@ -214,6 +216,7 @@ if command -v nix >/dev/null 2>&1; then
       eventHub = project config.systemd.services.openclaw-event-hub;
       screenSense = project config.systemd.services.openclaw-screen-sense;
       screenAct = project config.systemd.services.openclaw-screen-act;
+      systemSense = project config.systemd.services.openclaw-system-sense;
       systemHeal = project config.systemd.services.openclaw-system-heal;
     }')"
   node - <<'EOF' "$ownership_json"
@@ -266,6 +269,12 @@ if (ownership.systemHeal.environment?.OPENCLAW_BODY_RUNTIME_SOURCE !== "nix-stor
   || ownership.systemHeal.serviceConfig?.WorkingDirectory?.includes("/opt/openclaw")) {
   throw new Error(`system-heal must execute from its read-only Nix closure: ${JSON.stringify(ownership.systemHeal)}`);
 }
+if (ownership.systemSense.environment?.OPENCLAW_BODY_RUNTIME_SOURCE !== "nix-store"
+  || !String(ownership.systemSense.serviceConfig?.WorkingDirectory ?? "").startsWith("/nix/store/")
+  || !String(ownership.systemSense.serviceConfig?.WorkingDirectory ?? "").endsWith("/share/openclaw/services/openclaw-system-sense")
+  || ownership.systemSense.serviceConfig?.WorkingDirectory?.includes("/opt/openclaw")) {
+  throw new Error(`system-sense must execute from its read-only Nix closure: ${JSON.stringify(ownership.systemSense)}`);
+}
 console.log(JSON.stringify({
   componentOwnership: {
     userOwned,
@@ -278,6 +287,8 @@ console.log(JSON.stringify({
     screenSenseWorkingDirectory: ownership.screenSense.serviceConfig.WorkingDirectory,
     screenActRuntimeSource: ownership.screenAct.environment.OPENCLAW_BODY_RUNTIME_SOURCE,
     screenActWorkingDirectory: ownership.screenAct.serviceConfig.WorkingDirectory,
+    systemSenseRuntimeSource: ownership.systemSense.environment.OPENCLAW_BODY_RUNTIME_SOURCE,
+    systemSenseWorkingDirectory: ownership.systemSense.serviceConfig.WorkingDirectory,
     systemHealRuntimeSource: ownership.systemHeal.environment.OPENCLAW_BODY_RUNTIME_SOURCE,
     systemHealWorkingDirectory: ownership.systemHeal.serviceConfig.WorkingDirectory,
   },
@@ -569,6 +580,102 @@ console.log(JSON.stringify({
     leaseMatched: action.mediation.leaseMatched,
     inputChars: action.params.inputEvidence.charCount,
     textExposed: action.params.inputEvidence.textExposed,
+  },
+}, null, 2));
+EOF
+  )
+
+  system_sense_out="$(nix --extra-experimental-features 'nix-command flakes' build \
+    --no-update-lock-file --no-link --print-out-paths .#openclaw-system-sense)"
+  system_sense_working_dir="$system_sense_out/share/openclaw/services/openclaw-system-sense"
+  system_sense_server="$system_sense_working_dir/src/server.mjs"
+  if [[ "$system_sense_out" != /nix/store/*
+    || ! -f "$system_sense_server"
+    || ! -f "$system_sense_out/share/openclaw/services/openclaw-system-sense/src/system-health-governance.mjs"
+    || ! -f "$system_sense_out/share/openclaw/services/openclaw-system-sense/src/systemd-routes.mjs"
+    || ! -f "$system_sense_out/share/openclaw/packages/shared-events/src/event-names.mjs"
+    || -w "$system_sense_server"
+    || -e "$system_sense_out/share/openclaw/services/openclaw-system-sense/test"
+    || "$(find "$system_sense_out" -type f | wc -l)" -ne 19 ]]; then
+    echo "system-sense Nix closure is not exact and read-only: $system_sense_out" >&2
+    exit 1
+  fi
+
+  (
+    runtime_dir="$(mktemp -d)"
+    runtime_port=5846
+    upstream_port=5843
+    runtime_url="http://127.0.0.1:$runtime_port"
+    upstream_url="http://127.0.0.1:$upstream_port"
+    cleanup_runtime() {
+      for pid in "${system_sense_pid:-}" "${upstream_pid:-}"; do
+        if [[ -n "$pid" ]]; then
+          kill -TERM "$pid" >/dev/null 2>&1 || true
+          wait "$pid" >/dev/null 2>&1 || true
+        fi
+      done
+      rm -rf "$runtime_dir"
+    }
+    trap cleanup_runtime EXIT
+
+    node "$REPO_ROOT/nix/scripts/dev-body-config-store-upstream.mjs" "$upstream_port" \
+      >"$runtime_dir/upstream.log" 2>&1 &
+    upstream_pid=$!
+    for _ in $(seq 1 50); do
+      if curl --silent --fail "$upstream_url/health" >/dev/null; then
+        break
+      fi
+      sleep 0.1
+    done
+    cd "$system_sense_working_dir"
+    OPENCLAW_SYSTEM_SENSE_HOST=127.0.0.1 \
+    OPENCLAW_SYSTEM_SENSE_PORT="$runtime_port" \
+    OPENCLAW_BODY_STATE_DIR="$runtime_dir" \
+    OPENCLAW_SYSTEM_SENSE_DISK_PATH="$runtime_dir" \
+    OPENCLAW_SYSTEM_ALLOWED_ROOTS="$runtime_dir" \
+    OPENCLAW_CORE_URL="$upstream_url" \
+    OPENCLAW_EVENT_HUB_URL="$upstream_url" \
+    OPENCLAW_SESSION_MANAGER_URL="$upstream_url" \
+    OPENCLAW_BROWSER_RUNTIME_URL="$upstream_url" \
+    OPENCLAW_SCREEN_SENSE_URL="$upstream_url" \
+    OPENCLAW_SCREEN_ACT_URL="$upstream_url" \
+    OPENCLAW_SYSTEM_HEAL_URL="$upstream_url" \
+    OPENCLAW_BODY_RUNTIME_SOURCE=nix-store \
+      node src/server.mjs >"$runtime_dir/system-sense.log" 2>&1 &
+    system_sense_pid=$!
+
+    for _ in $(seq 1 50); do
+      if curl --silent --fail "$runtime_url/system/body" >"$runtime_dir/body.json"; then
+        break
+      fi
+      sleep 0.1
+    done
+    node - <<'EOF' "$runtime_dir/body.json" "$runtime_dir" "$system_sense_out"
+const fs = require("node:fs");
+const data = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+const runtimeDir = process.argv[3];
+const storePath = process.argv[4];
+if (data.ok !== true
+  || data.body?.platform !== "linux"
+  || data.body?.stateDir !== runtimeDir
+  || data.body?.diskPath !== runtimeDir
+  || data.resources?.disk?.path !== runtimeDir
+  || data.resources?.disk?.available !== true
+  || data.network?.checkedTargets !== 7
+  || data.network?.online !== true) {
+  throw new Error(`store-native system-sense did not produce bounded body readback: ${JSON.stringify(data)}`);
+}
+console.log(JSON.stringify({
+  nixStoreSystemSense: {
+    storePath,
+    readOnlySource: true,
+    platform: data.body.platform,
+    writableStatePath: data.body.stateDir,
+    diskProbePath: data.resources.disk.path,
+    checkedTargets: data.network.checkedTargets,
+    networkOnline: data.network.online,
+    commandExecuted: false,
+    hostMutation: false,
   },
 }, null, 2));
 EOF

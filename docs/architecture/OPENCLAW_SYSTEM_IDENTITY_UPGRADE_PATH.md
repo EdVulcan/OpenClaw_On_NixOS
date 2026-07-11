@@ -306,7 +306,7 @@
 
 按四级身份路线与内核长期白皮书综合衡量，整个最终项目当前约完成
 **35-40%**。内核白皮书中的 Phase A Nix 纯净化已完成 event-hub、
-screen-sense、screen-act 与 system-heal 四个服务 closure，其余 5 个服务仍受 `/opt/openclaw`
+screen-sense、screen-act、system-heal 与 system-sense 五个服务 closure，其余 4 个服务仍受 `/opt/openclaw`
 源码运行模式影响；
 Phase B 仍主要使用 `systemctl` 包装；Phase C eBPF
 神经网尚未开始；Phase D 声明式 Nix 自进化与自动回滚仍主要是设计和

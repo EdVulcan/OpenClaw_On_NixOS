@@ -514,6 +514,16 @@ The next closure is system-sense. Its larger explicit runtime manifest must
 cover the current body, health, file, command, and systemd modules while the
 representative packaging proof remains read-only and non-privileged.
 
+That fifth closure is now complete. System-sense contains exactly 19 runtime
+files, its generated system unit points into the store, and a real packaged
+process returns Linux body/resource state after sampling seven bounded loopback
+service targets. The proof invokes no command, file-write, systemd, or repair
+route and performs no host mutation. Phase A is 5/9 services, not complete.
+
+The next closure is session-manager. Preserve login-user ownership, writable
+recovery state, and trusted sidecar lifecycle contracts while proving session
+state behavior without starting an unapproved helper process.
+
 ## Identity-Upgrade Alignment
 
 Every new capability must state which identity level it serves:
