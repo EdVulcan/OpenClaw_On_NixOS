@@ -52,6 +52,7 @@ cleanup() {
   rm -f "$OPENCLAW_BROWSER_RUNTIME_STATE_FILE" "$OPENCLAW_BROWSER_RUNTIME_STATE_FILE.tmp-"*
   rm -f "$OPENCLAW_EVENT_LOG_FILE"
   rm -f "${SCREEN_EVENTS_FILE:-}"
+  rm -f "${AUTONOMOUS_SEMANTIC_FILE:-}"
 }
 trap cleanup EXIT
 
@@ -104,7 +105,7 @@ sidecar_approval_id="$(node -e 'const data=JSON.parse(process.argv[1]); process.
 post_json "$CORE_URL/approvals/$sidecar_approval_id/approve" '{"approvedBy":"ai-work-view-capture-check","reason":"prove bounded visual grounding through the existing trusted sidecar"}' >/dev/null
 sidecar_start="$(post_json "$CORE_URL/work-view/trusted-sidecar/lifecycle-tasks/$SIDECAR_TASK_ID/start-probe" '{}')"
 node -e 'const data=JSON.parse(process.argv[1]); const frame=data.readback?.execution?.captureObservation?.visualFrame??{}; if(!data.ok || data.readback?.status!=="running_after_approval" || frame.available!==true || frame.fresh!==true || frame.dataExposed!==false || frame.sourceScope!=="ai_owned_active_page_only" || JSON.stringify(frame).includes("data:image/")){throw new Error(`real sidecar did not receive bounded frame metadata: ${JSON.stringify(data)}`);}' "$sidecar_start"
-node -e 'const data=JSON.parse(process.argv[1]); const targets=data.readback?.execution?.captureObservation?.semanticTargets??{}; if(targets.available!==true || targets.itemCount<4 || targets.itemsRetained!==false || targets.inputValuesExposed!==false || targets.selectorsExposed!==false || targets.mutation!==false || !targets.inventorySha256 || JSON.stringify(targets).includes("fixture-password-secret")){throw new Error(`real sidecar did not retain semantic target summary safely: ${JSON.stringify(targets)}`);}' "$sidecar_start"
+node -e 'const data=JSON.parse(process.argv[1]); const targets=data.readback?.execution?.captureObservation?.semanticTargets??{}; if(targets.available!==true || targets.itemCount<4 || targets.itemsRetained!==false || targets.inputValuesExposed!==false || targets.selectorsExposed!==false || targets.mutation!==false || !targets.inventorySha256 || !targets.frameSha256 || JSON.stringify(targets).includes("fixture-password-secret")){throw new Error(`real sidecar did not retain semantic target summary safely: ${JSON.stringify(targets)}`);}' "$sidecar_start"
 
 semantic_capture="$(curl --silent --fail "$BROWSER_URL/browser/capture")"
 semantic_click_body="$(node -e 'const data=JSON.parse(process.argv[1]); const inventory=data.capture?.semanticTargets??{}; const target=inventory.items?.find((item)=>item.name==="Inspect target"); if(!target){throw new Error(`semantic click target missing: ${JSON.stringify(inventory)}`);} process.stdout.write(JSON.stringify({semanticTarget:{registry:"openclaw-browser-semantic-target-reference-v0",operation:"click",targetId:target.targetId,inventorySha256:inventory.inventorySha256,frame:{sha256:inventory.frame.sha256,sequence:inventory.frame.sequence}}}));' "$semantic_capture")"
@@ -150,7 +151,7 @@ console.log(JSON.stringify({
 EOF
 
 stale_semantic_click="$(post_json "$SCREEN_ACT_URL/act/mouse/click" "$semantic_click_body")"
-node -e 'const data=JSON.parse(process.argv[1]); const mediation=data.action?.mediation??{}; if(data.action?.result!=="blocked-or-degraded" || mediation.accepted!==false || mediation.reason!=="semantic_target_inventory_stale" || mediation.visualGrounding?.status!=="action_rejected"){throw new Error(`stale semantic target reference was not rejected: ${JSON.stringify(data)}`);}' "$stale_semantic_click"
+node -e 'const data=JSON.parse(process.argv[1]); const mediation=data.action?.mediation??{}; if(data.action?.result!=="blocked-or-degraded" || mediation.accepted!==false || mediation.reason!=="semantic_target_capture_mismatch" || mediation.visualGrounding!=null){throw new Error(`stale semantic target reference was not rejected before dispatch: ${JSON.stringify(data)}`);}' "$stale_semantic_click"
 
 grounded_action="$(post_json "$SCREEN_ACT_URL/act/browser/new-tab" "{\"url\":\"$GROUNDING_URL\"}")"
 node - <<'EOF' "$grounded_action" "$GROUNDING_URL"
@@ -503,6 +504,49 @@ console.log(JSON.stringify({
     dataExposed: frame.dataExposed,
     sha256: frame.sha256,
     persistedImageData: false,
+  },
+}, null, 2));
+EOF
+
+autonomous_semantic_task="$(post_json "$CORE_URL/tasks" "$(node -e 'process.stdout.write(JSON.stringify({goal:"Select and click one current semantic target",type:"browser_task",targetUrl:process.argv[1],workViewStrategy:"ai-work-view",planStrategy:"rule-v1",actions:[{kind:"browser.semantic_click",params:{target:{name:"Inspect target",role:"link"}}}]}));' "$AUTONOMOUS_GROUNDING_URL")")"
+autonomous_semantic_task_id="$(node -e 'const data=JSON.parse(process.argv[1]); process.stdout.write(data.task.id);' "$autonomous_semantic_task")"
+AUTONOMOUS_SEMANTIC_FILE="$(mktemp)"
+post_json "$CORE_URL/tasks/$autonomous_semantic_task_id/execute" "{\"expectedUrl\":\"$SEMANTIC_CLICK_URL\",\"hideOnComplete\":false}" > "$AUTONOMOUS_SEMANTIC_FILE"
+node - <<'EOF' "$AUTONOMOUS_SEMANTIC_FILE" "$SEMANTIC_CLICK_URL"
+const { readFileSync } = require("node:fs");
+const data = JSON.parse(readFileSync(process.argv[2], "utf8"));
+const expectedUrl = process.argv[3];
+const evidence = data.execution?.actionEvidence;
+const action = evidence?.actions?.[0];
+const effect = action?.mediation?.effect ?? {};
+const grounding = action?.mediation?.visualGrounding ?? {};
+if (data.task?.status !== "completed"
+  || evidence?.kind !== "eye-hand-action-evidence"
+  || action?.kind !== "mouse.click"
+  || action?.params?.semanticTarget?.registry !== "openclaw-browser-semantic-target-reference-v0"
+  || effect.registry !== "openclaw-browser-semantic-target-action-v0"
+  || effect.targetId !== action.params.semanticTarget.targetId
+  || effect.inventorySha256 !== action.params.semanticTarget.inventorySha256
+  || effect.frame?.sequence !== grounding.before?.sequence
+  || effect.selectorsExposed !== false
+  || effect.arbitraryPageScript !== false
+  || grounding.status !== "grounded"
+  || grounding.after?.pageUrl !== expectedUrl
+  || grounding.after?.sequence <= grounding.before?.sequence
+  || evidence.observedAfterActions?.url !== expectedUrl
+  || JSON.stringify(evidence).includes("fixture-private-value")
+  || JSON.stringify(evidence).includes("fixture-password-secret")
+  || JSON.stringify(evidence).includes('"selector":')) {
+  throw new Error(`autonomous semantic target click did not use current bounded observation: ${JSON.stringify(data)}`);
+}
+console.log(JSON.stringify({
+  autonomousSemanticTargetAction: {
+    taskId: data.task.id,
+    targetId: effect.targetId,
+    inventorySha256: effect.inventorySha256,
+    beforeSequence: grounding.before.sequence,
+    afterSequence: grounding.after.sequence,
+    observedUrl: evidence.observedAfterActions.url,
   },
 }, null, 2));
 EOF

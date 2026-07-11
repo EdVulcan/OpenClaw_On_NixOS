@@ -210,6 +210,15 @@ an autonomous browser task can construct a current reference at dispatch time.
 Semantic typing remains deferred pending removal of input-text echoes from
 public state and audit paths.
 
+Autonomous target selection is now complete. Core stores exact-name/optional
+role intent, observes after prepare, requires one unique current match, and
+materializes the frame reference only at dispatch. Recovery rematerializes
+after prepare, while sidecar refreshes capture and requires target inventory and
+grounding-frame equality before forwarding. The existing Firefox milestone now
+proves the autonomous task. The next Level 2 slice is write-only semantic text
+input after replacing all legacy plaintext input echoes with bounded redaction
+metadata.
+
 ## Historical Phase Plans
 
 `OPENCLAW_PHASE_2_PLAN.md` through `OPENCLAW_PHASE_136_PLAN.md` are retained

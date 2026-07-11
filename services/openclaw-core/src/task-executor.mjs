@@ -10,6 +10,7 @@ import {
   browserTaskActionsForExecution,
   compactBrowserTaskVisualGrounding,
   executeBrowserTaskActionWithCaptureRecovery,
+  materialiseBrowserTaskAction,
   observedBrowserTaskUrl,
 } from "./browser-task-action-contract.mjs";
 import {
@@ -678,8 +679,9 @@ async function executeTask(task, options = {}) {
     initialScreen = await fetchJson(`${screenSenseUrl}/screen/current`);
 
     for (const action of actions) {
+      const dispatchedAction = materialiseBrowserTaskAction(action, initialScreen);
       const actionData = await executeBrowserTaskActionWithCaptureRecovery({
-        action,
+        action: dispatchedAction,
         recoveryEnabled: options.recoverCaptureInterruptions !== false,
         postAction: (endpoint, params) => postJson(`${screenActUrl}${endpoint}`, params),
         prepareWorkView: () => invokeWorkViewAuthority("capture_recovery_prepare", () => postJson(`${sessionManagerUrl}/work-view/prepare`, {
@@ -688,6 +690,12 @@ async function executeTask(task, options = {}) {
           operatorActionSource: "task_capture_interruption_recovery",
           recommendedAction: "prepare_work_view",
         })),
+        refreshAction: action.kind === "browser.semantic_click"
+          ? async () => materialiseBrowserTaskAction(
+            action,
+            await fetchJson(`${screenSenseUrl}/screen/current`),
+          )
+          : null,
       });
       actionResults.push(actionData.action);
       await setTaskPhase(task, "acting_on_target", {

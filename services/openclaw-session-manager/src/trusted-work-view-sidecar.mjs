@@ -160,6 +160,9 @@ async function observeBrowserCapture({ afterMutation = false } = {}) {
           frameSequence: Number.isInteger(semanticTargetSummary.frame?.sequence)
             ? semanticTargetSummary.frame.sequence
             : null,
+          frameSha256: typeof semanticTargetSummary.frame?.sha256 === "string"
+            ? semanticTargetSummary.frame.sha256.slice(0, 64)
+            : null,
           itemsRetained: false,
           inputValuesExposed: false,
           selectorsExposed: false,
@@ -201,10 +204,13 @@ function frameReference(observation) {
 }
 
 async function executeBrowserAction(message) {
-  const beforeObservation = latestCaptureObservation;
-  const observedAt = Date.parse(latestCaptureObservation?.observedAt ?? "");
+  const semanticTargetReference = message.payload?.semanticTarget ?? null;
+  const beforeObservation = semanticTargetReference
+    ? await observeBrowserCapture()
+    : latestCaptureObservation;
+  const observedAt = Date.parse(beforeObservation?.observedAt ?? "");
   const fresh = Number.isFinite(observedAt) && Date.now() - observedAt <= 3_000;
-  if (!fresh || latestCaptureObservation?.sessionId !== binding?.sessionId) {
+  if (!fresh || beforeObservation?.sessionId !== binding?.sessionId) {
     send("action_result", {
       requestId: message.requestId,
       result: { ok: false, reason: fresh ? "capture_session_mismatch" : "capture_stale" },
@@ -217,6 +223,19 @@ async function executeBrowserAction(message) {
     send("action_result", {
       requestId: message.requestId,
       result: { ok: false, reason: "visual_frame_not_ready" },
+    });
+    return;
+  }
+  if (semanticTargetReference && (
+    beforeObservation.semanticTargets?.inventorySha256 !== semanticTargetReference.inventorySha256
+    || beforeObservation.semanticTargets?.frameSequence !== semanticTargetReference.frame?.sequence
+    || beforeObservation.semanticTargets?.frameSha256 !== semanticTargetReference.frame?.sha256
+    || beforeFrame?.sequence !== semanticTargetReference.frame?.sequence
+    || beforeFrame?.sha256 !== semanticTargetReference.frame?.sha256
+  )) {
+    send("action_result", {
+      requestId: message.requestId,
+      result: { ok: false, reason: "semantic_target_capture_mismatch" },
     });
     return;
   }

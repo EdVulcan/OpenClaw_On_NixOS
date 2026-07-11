@@ -792,3 +792,25 @@ frame-bound reference at dispatch time, and use the existing mouse-click route
 and task evidence. Do not let task creators precompute stale frame ids. Semantic
 typing remains deferred until input text is redacted from public browser state
 and audit events rather than echoed as current legacy input actions do.
+
+Autonomous semantic click is now complete. A `browser.semantic_click` plan step
+stores only exact accessible name plus optional role intent. After prepare and
+the initial `/screen/current` observation, core requires one unique visible,
+enabled match and materializes its current frame-bound reference immediately
+before dispatch. Capture recovery performs one new observation and
+rematerializes authority rather than retrying a stale reference.
+
+The sidecar now refreshes metadata before every semantic action and verifies
+that the reference inventory digest, frame sequence/SHA, and visual-grounding
+`before` frame are identical before forwarding the click. This closed a real
+race where a still-fresh sidecar polling frame could precede core's newer target
+inventory. The real Firefox milestone proves the autonomous task selects the
+link after prepare, advances frame 6 to 7, reaches the expected URL, and retains
+only bounded target/effect evidence.
+
+The next Level 2 slice should make semantic text input write-only and
+frame-bound. First replace legacy plaintext input echoes in browser state,
+work-view summaries, screen-act action parameters, task evidence, and audit
+events with bounded length/hash/redaction metadata. Then add one semantic type
+operation through the same current-target, lease, sidecar refresh, visual
+grounding, task, and Observer path. Do not persist or read back the typed value.

@@ -1,7 +1,10 @@
+import { normaliseWorkViewSemanticTargetReference } from "../../../packages/shared-utils/src/work-view-semantic-targets.mjs";
+
 export const BROWSER_TASK_ACTION_DESCRIPTORS = Object.freeze([
   { kind: "keyboard.type", endpoint: "/act/keyboard/type", capabilityId: "act.screen.pointer_keyboard" },
   { kind: "keyboard.hotkey", endpoint: "/act/keyboard/hotkey", capabilityId: "act.screen.pointer_keyboard" },
   { kind: "mouse.click", endpoint: "/act/mouse/click", capabilityId: "act.screen.pointer_keyboard" },
+  { kind: "browser.semantic_click", endpoint: "/act/mouse/click", capabilityId: "act.screen.pointer_keyboard" },
   { kind: "browser.new_tab", endpoint: "/act/browser/new-tab", capabilityId: "act.browser.open" },
 ]);
 
@@ -39,6 +42,51 @@ export function screenActEndpointForBrowserTaskAction(kind) {
 
 export function capabilityIdForBrowserTaskAction(kind) {
   return descriptorByKind.get(kind)?.capabilityId ?? null;
+}
+
+function boundedSelectionText(value, maxChars) {
+  const text = typeof value === "string" ? value.replace(/\s+/gu, " ").trim() : "";
+  return text && text.length <= maxChars ? text : null;
+}
+
+export function materialiseBrowserTaskAction(action, screenResponse) {
+  if (action?.kind !== "browser.semantic_click") return action;
+  const name = boundedSelectionText(action?.params?.target?.name, 120);
+  const role = action?.params?.target?.role == null
+    ? null
+    : boundedSelectionText(action.params.target.role, 40);
+  if (!name || (action?.params?.target?.role != null && !role)) {
+    throw new Error("semantic_target_selection_invalid");
+  }
+  const inventory = screenResponse?.screen?.semanticTargets;
+  if (inventory?.available !== true
+    || !Array.isArray(inventory.items)
+    || typeof inventory.inventorySha256 !== "string"
+    || typeof inventory.frame?.sha256 !== "string"
+    || !Number.isInteger(inventory.frame?.sequence)) {
+    throw new Error("semantic_target_selection_not_ready");
+  }
+  const matches = inventory.items.filter((target) => target?.visible === true
+    && target.disabled !== true
+    && target.name === name
+    && (!role || target.role === role));
+  if (matches.length === 0) throw new Error("semantic_target_selection_not_found");
+  if (matches.length > 1) throw new Error("semantic_target_selection_ambiguous");
+  const reference = normaliseWorkViewSemanticTargetReference({
+    registry: "openclaw-browser-semantic-target-reference-v0",
+    operation: "click",
+    targetId: matches[0].targetId,
+    inventorySha256: inventory.inventorySha256,
+    frame: {
+      sha256: inventory.frame.sha256,
+      sequence: inventory.frame.sequence,
+    },
+  });
+  if (!reference) throw new Error("semantic_target_selection_invalid_inventory");
+  return {
+    ...action,
+    params: { semanticTarget: reference },
+  };
 }
 
 export function observedBrowserTaskUrl({ workViewSummary, workView, snapshotText } = {}) {
@@ -97,6 +145,7 @@ export async function executeBrowserTaskActionWithCaptureRecovery({
   action,
   postAction,
   prepareWorkView,
+  refreshAction,
   recoveryEnabled = true,
 } = {}) {
   const endpoint = screenActEndpointForBrowserTaskAction(action?.kind);
@@ -107,7 +156,9 @@ export async function executeBrowserTaskActionWithCaptureRecovery({
   }
 
   const prepared = await prepareWorkView();
-  const retried = await postAction(endpoint, action?.params ?? {});
+  const retryAction = typeof refreshAction === "function" ? await refreshAction() : action;
+  const retryEndpoint = screenActEndpointForBrowserTaskAction(retryAction?.kind);
+  const retried = await postAction(retryEndpoint, retryAction?.params ?? {});
   return {
     ...retried,
     action: retried?.action ? {

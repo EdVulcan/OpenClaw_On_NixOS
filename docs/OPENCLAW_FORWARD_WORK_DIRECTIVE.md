@@ -426,6 +426,21 @@ add another endpoint, selector surface, or action family. Semantic typing stays
 deferred until input content no longer appears in public browser state or audit
 events.
 
+That autonomous selection is now complete. `browser.semantic_click` stores
+bounded exact-name/optional-role intent, core materializes one unique current
+target after initial observation, and capture recovery rematerializes after its
+single prepare retry. Before dispatch, sidecar refreshes capture and requires
+the target reference, inventory digest, and visual-grounding frame to match.
+The real Firefox milestone proves autonomous selection, click, task evidence,
+post-frame advance, and expected navigation.
+
+The next smallest Level 2 capability is write-only semantic text input. Remove
+legacy plaintext input echoes from browser state, summaries, action/task
+evidence, and audit events first; retain only bounded length/hash/redaction
+evidence. Then reuse the same current-target selection, sidecar refresh, lease,
+visual grounding, and Observer path for one semantic type operation without
+persisting or reading back the value.
+
 ## Identity-Upgrade Alignment
 
 Every new capability must state which identity level it serves:

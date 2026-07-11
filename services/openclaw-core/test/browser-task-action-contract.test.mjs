@@ -7,6 +7,7 @@ import {
   capabilityIdForBrowserTaskAction,
   compactBrowserTaskVisualGrounding,
   executeBrowserTaskActionWithCaptureRecovery,
+  materialiseBrowserTaskAction,
   observedBrowserTaskUrl,
   screenActEndpointForBrowserTaskAction,
 } from "../src/browser-task-action-contract.mjs";
@@ -78,6 +79,62 @@ test("browser task action contract maps new-tab to the existing governed transpo
   assert.equal(BROWSER_TASK_ACTION_DESCRIPTORS.filter((entry) => entry.kind === "browser.new_tab").length, 1);
 });
 
+test("browser task action contract materialises one current semantic click target", () => {
+  const action = materialiseBrowserTaskAction({
+    kind: "browser.semantic_click",
+    params: { target: { name: "Inspect target", role: "link" } },
+  }, {
+    screen: {
+      semanticTargets: {
+        available: true,
+        inventorySha256: "b".repeat(64),
+        frame: { sha256: "a".repeat(64), sequence: 7 },
+        items: [{
+          targetId: "frame-7-target-4",
+          role: "link",
+          name: "Inspect target",
+          visible: true,
+          disabled: false,
+        }],
+      },
+    },
+  });
+  assert.equal(action.kind, "browser.semantic_click");
+  assert.deepEqual(action.params.semanticTarget, {
+    registry: "openclaw-browser-semantic-target-reference-v0",
+    operation: "click",
+    targetId: "frame-7-target-4",
+    inventorySha256: "b".repeat(64),
+    frame: { sha256: "a".repeat(64), sequence: 7 },
+    selectorsExposed: false,
+    arbitraryPageScript: false,
+  });
+  assert.equal(screenActEndpointForBrowserTaskAction(action.kind), "/act/mouse/click");
+  assert.equal(capabilityIdForBrowserTaskAction(action.kind), "act.screen.pointer_keyboard");
+});
+
+test("browser task action contract rejects ambiguous semantic target intent", () => {
+  assert.throws(() => materialiseBrowserTaskAction({
+    kind: "browser.semantic_click",
+    params: { target: { name: "Duplicate" } },
+  }, {
+    screen: {
+      semanticTargets: {
+        available: true,
+        inventorySha256: "b".repeat(64),
+        frame: { sha256: "a".repeat(64), sequence: 2 },
+        items: [1, 2].map((index) => ({
+          targetId: `frame-2-target-${index}`,
+          role: "button",
+          name: "Duplicate",
+          visible: true,
+          disabled: false,
+        })),
+      },
+    },
+  }), /semantic_target_selection_ambiguous/u);
+});
+
 test("browser task action recovery prepares once and retries a capture interruption", async () => {
   const calls = [];
   const responses = [
@@ -123,6 +180,28 @@ test("browser task action recovery does not retry unrelated action failures", as
   });
   assert.equal(prepareCalls, 0);
   assert.equal(result.action.recovery, undefined);
+});
+
+test("browser task semantic action recovery refreshes authority before retry", async () => {
+  const calls = [];
+  const firstAction = { kind: "browser.semantic_click", params: { semanticTarget: { targetId: "frame-1-target-1" } } };
+  const refreshedAction = { kind: "browser.semantic_click", params: { semanticTarget: { targetId: "frame-2-target-1" } } };
+  const result = await executeBrowserTaskActionWithCaptureRecovery({
+    action: firstAction,
+    postAction: async (endpoint, params) => {
+      calls.push({ endpoint, targetId: params.semanticTarget.targetId });
+      return calls.length === 1
+        ? { action: { mediation: { reason: "trusted_sidecar_capture_stale" } } }
+        : { action: { result: "executed-browser-runtime" } };
+    },
+    prepareWorkView: async () => ({ ok: true }),
+    refreshAction: async () => refreshedAction,
+  });
+  assert.deepEqual(calls, [
+    { endpoint: "/act/mouse/click", targetId: "frame-1-target-1" },
+    { endpoint: "/act/mouse/click", targetId: "frame-2-target-1" },
+  ]);
+  assert.equal(result.action.result, "executed-browser-runtime");
 });
 
 test("browser task verification prefers the post-action observed URL over stale session metadata", () => {
