@@ -742,6 +742,7 @@ export function createSystemBodyTaskHandlers({ client, state, taskManager, publi
             subState: unit.subState ?? null,
             loadState: unit.loadState ?? null,
             unitFileState: unit.unitFileState ?? null,
+            mainPid: Number.isInteger(unit.mainPid) ? unit.mainPid : null,
             systemdObserved: unit.systemdObserved === true,
             observation: unit.observation ?? null,
           }
@@ -783,9 +784,21 @@ export function createSystemBodyTaskHandlers({ client, state, taskManager, publi
   }
 
   function buildSystemdRepairPostExecutionVerification(targetUnit, before, after, result) {
+    const afterTarget = after.targetUnitState;
+    const targetHealthy = afterTarget?.systemdObserved === true
+      && afterTarget.loadState === "loaded"
+      && afterTarget.activeState === "active"
+      && afterTarget.subState === "running";
+    const nativeMutationVerified = result.ok === true
+      && result.nativeMutation?.transport === "dbus_native"
+      && result.nativeMutation?.method === "org.freedesktop.systemd1.Manager.RestartUnit"
+      && Number.isInteger(result.nativeMutation?.before?.mainPid)
+      && Number.isInteger(result.nativeMutation?.after?.mainPid)
+      && result.nativeMutation.before.mainPid !== result.nativeMutation.after.mainPid;
+    const restoredHealthy = targetHealthy && nativeMutationVerified;
     return {
       registry: "openclaw-systemd-repair-post-verification-v0",
-      mode: "single_observation_no_recovery",
+      mode: restoredHealthy ? "native_restart_restored_health" : "recovery_recommendation_required",
       targetUnit,
       checkedAt: new Date().toISOString(),
       commandExitCode: result.exitCode,
@@ -797,11 +810,24 @@ export function createSystemBodyTaskHandlers({ client, state, taskManager, publi
         unitObservedAfter: after.targetUnitState?.systemdObserved === true,
         beforeActiveState: before.targetUnitState?.activeState ?? null,
         afterActiveState: after.targetUnitState?.activeState ?? null,
+        afterSubState: afterTarget?.subState ?? null,
+        afterMainPid: afterTarget?.mainPid ?? null,
         beforeServiceOk: before.targetServiceHealth?.ok ?? null,
         afterServiceOk: after.targetServiceHealth?.ok ?? null,
         errorCount: before.errors.length + after.errors.length,
+        targetHealthy,
+        nativeMutationVerified,
+        restoredHealthy,
         noAutomaticRecovery: true,
       },
+      recoveryRecommendation: restoredHealthy
+        ? null
+        : {
+            strategy: "inspect_unit_and_restore_declarative_generation",
+            targetUnit,
+            automaticRestart: false,
+            requiresOperatorReview: true,
+          },
       governance: {
         recordsEvidenceOnly: true,
         triggersRecovery: false,

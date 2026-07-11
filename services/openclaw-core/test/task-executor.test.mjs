@@ -1623,10 +1623,72 @@ printf '%s\\n' '{"ok":true,"transport":"dbus_native","method":"org.freedesktop.s
     assert.equal(transcript.afterMainPid, 200);
     assert.equal(transcript.authDelegation.mode, "polkit-dbus-fixed-unit");
     assert.equal(transcript.authDelegation.sudo, null);
+    assert.equal(finalTask.outcome.details.postExecutionVerification.summary.targetHealthy, true);
+    assert.equal(finalTask.outcome.details.postExecutionVerification.summary.nativeMutationVerified, true);
+    assert.equal(finalTask.outcome.details.postExecutionVerification.summary.restoredHealthy, true);
+    assert.equal(finalTask.outcome.details.postExecutionVerification.recoveryRecommendation, null);
     assert(events.some((event) => event.name === "systemd.next_repair.execution_completed"));
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("failed native systemd repair recommends operator recovery without fallback or retry", async () => {
+  const { executor } = createExecutorHarness({
+    state: {
+      SYSTEMD_REPAIR_RESTART_HELPER: null,
+      SYSTEMD_REPAIR_AUTH_DELEGATION: null,
+    },
+    deps: {
+      client: {
+        sessionManagerUrl: "http://127.0.0.1:4102",
+        screenSenseUrl: "http://127.0.0.1:4104",
+        screenActUrl: "http://127.0.0.1:4105",
+        systemSenseUrl: "http://127.0.0.1:4106",
+        fetchJson: async (url) => url.endsWith("/system/systemd/units")
+          ? {
+              units: [{
+                unit: "openclaw-system-sense.service",
+                loadState: "loaded",
+                activeState: "active",
+                subState: "running",
+                mainPid: 100,
+                systemdObserved: true,
+              }],
+            }
+          : { system: { timestamp: new Date().toISOString(), alerts: [], network: {} } },
+        postJson: async () => ({ ok: true }),
+      },
+    },
+  });
+  const task = {
+    id: "systemd-next-native-repair-failure-1",
+    type: "systemd_next_repair_task",
+    goal: "Reject an unavailable native systemd repair helper",
+    status: "queued",
+    systemdNextRepair: {
+      registry: "openclaw-systemd-next-repair-real-execution-v0",
+      target: { unit: "openclaw-system-sense.service" },
+      command: { command: "systemctl", args: ["restart", "openclaw-system-sense.service"] },
+      execution: { realExecutionEnabled: true },
+    },
+  };
+
+  const result = await executor.executeTaskWithRecovery(task, { autoRecover: true });
+  const finalTask = result.finalExecution.task;
+  const verification = finalTask.outcome.details.postExecutionVerification;
+
+  assert.equal(finalTask.status, "failed");
+  assert.equal(finalTask.outcome.kind, "systemd_next_repair_execution_failed");
+  assert.equal(finalTask.outcome.details.commandTranscript[0].actualCommand, "not-executed");
+  assert.equal(finalTask.outcome.details.commandTranscript[0].authDelegation.mode, "native-dbus-helper-required");
+  assert.equal(verification.summary.targetHealthy, true);
+  assert.equal(verification.summary.nativeMutationVerified, false);
+  assert.equal(verification.summary.restoredHealthy, false);
+  assert.equal(verification.recoveryRecommendation.strategy, "inspect_unit_and_restore_declarative_generation");
+  assert.equal(verification.recoveryRecommendation.automaticRestart, false);
+  assert.equal(verification.governance.triggersRecovery, false);
+  assert.equal(result.recovery.attempted, false);
 });
 
 test("body evidence followup record task dispatches to deferred append shell when append is disabled", async () => {

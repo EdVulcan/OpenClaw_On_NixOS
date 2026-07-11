@@ -106,7 +106,11 @@ if (transcript.exitCode !== 0
 if (typeof details.rollbackNote !== "string" || !details.rollbackNote.includes("verify health")) {
   throw new Error(`next real execution should carry rollback note: ${JSON.stringify(details.rollbackNote)}`);
 }
-if (!details.postExecutionVerification?.summary || details.postExecutionVerification?.governance?.triggersRecovery !== false) {
+if (details.postExecutionVerification?.summary?.targetHealthy !== true
+  || details.postExecutionVerification?.summary?.nativeMutationVerified !== true
+  || details.postExecutionVerification?.summary?.restoredHealthy !== true
+  || details.postExecutionVerification?.recoveryRecommendation !== null
+  || details.postExecutionVerification?.governance?.triggersRecovery !== false) {
   throw new Error(`next real execution should carry verification evidence without recovery: ${JSON.stringify(details.postExecutionVerification)}`);
 }
 

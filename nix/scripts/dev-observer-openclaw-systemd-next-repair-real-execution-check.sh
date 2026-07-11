@@ -94,7 +94,9 @@ if (details.hostMutationAttempted !== true
   || !Number.isInteger(transcript?.afterMainPid)
   || transcript?.beforeMainPid === transcript?.afterMainPid
   || transcript?.authDelegation?.mode !== "polkit-dbus-fixed-unit"
-  || transcript?.authDelegation?.sudo !== null) {
+  || transcript?.authDelegation?.sudo !== null
+  || details.postExecutionVerification?.summary?.restoredHealthy !== true
+  || details.postExecutionVerification?.recoveryRecommendation !== null) {
   throw new Error(`Observer source should expose next real execution evidence: ${JSON.stringify(details)}`);
 }
 

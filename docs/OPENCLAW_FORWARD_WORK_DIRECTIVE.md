@@ -590,6 +590,9 @@ mark this mutation complete until a switched VM generation proves exit zero,
 job path, changed PID, restored health, Observer evidence, and no password
 prompt. The active host's historical browser-runtime sudo helper must be removed
 during that deployment rather than treated as current architecture.
+Post-verification now derives restored health from the selected unit's native
+inventory state and helper PID evidence; failures recommend operator-reviewed
+declarative-generation recovery and never issue an automatic second restart.
 
 ## Identity-Upgrade Alignment
 

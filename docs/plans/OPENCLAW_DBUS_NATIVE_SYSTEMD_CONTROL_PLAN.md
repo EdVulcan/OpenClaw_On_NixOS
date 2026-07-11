@@ -98,9 +98,15 @@ VM generation:
    `OPENCLAW_BODY_EVIDENCE_LEDGER_DIR` at
    `/var/lib/openclaw/body-evidence-ledger`; public evidence continues to use
    the stable `.artifacts/openclaw-body-evidence-ledger` display path.
+7. Post-verification evaluates the selected unit rather than the historical
+   browser-runtime health field. Completion requires native mutation evidence
+   plus an observed `loaded/active/running` target; failure records an
+   operator-reviewed declarative-generation recovery recommendation without an
+   automatic second restart.
 
 Focused tests prove the exact D-Bus message, no-argument boundary, PID-change
-verification, production helper subprocess bridge, and negative fallback. The
+verification, production helper subprocess bridge, negative fallback, and
+non-retrying recovery recommendation. The
 auth-delegation and full body-config gates prove Nix/Polkit evaluation and all
 store closures. The existing core and Observer real-execution milestones now
 require successful native transport rather than accepting a failed attempt.
