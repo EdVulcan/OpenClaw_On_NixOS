@@ -9,7 +9,8 @@
     let
       system = "x86_64-linux";
       pkgs = import nixpkgs { inherit system; };
-    in {
+    in
+    {
       nixosModules.openclaw-body = ./nix/modules/openclaw-body.nix;
       nixosModules.default = self.nixosModules.openclaw-body;
 
@@ -29,6 +30,9 @@
         ];
       };
 
-      packages.${system}.firefox = pkgs.firefox;
+      packages.${system} = {
+        firefox = pkgs.firefox;
+        openclaw-event-hub = pkgs.callPackage ./nix/packages/openclaw-event-hub.nix { };
+      };
     };
 }

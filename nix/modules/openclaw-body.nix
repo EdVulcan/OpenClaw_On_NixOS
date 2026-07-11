@@ -14,6 +14,7 @@ let
       portEnv = "OPENCLAW_EVENT_HUB_PORT";
       port = cfg.ports.eventHub;
       after = [ ];
+      runtimePackage = cfg.runtimePackages.eventHub;
     }
     {
       key = "core";
@@ -146,6 +147,10 @@ let
       stateDir = if userScope then cfg.userService.stateDir else cfg.stateDir;
       logDir = if userScope then cfg.userService.logDir else cfg.logDir;
       browserProfileDir = if userScope then "${stateDir}/browser-profile" else cfg.browserEngine.profileDir;
+      runtimeRoot =
+        if spec ? runtimePackage && spec.runtimePackage != null
+        then "${spec.runtimePackage}/share/openclaw"
+        else cfg.repoRoot;
       sameScopeAfter = builtins.filter
         (name:
           if userScope
@@ -168,10 +173,14 @@ let
         OPENCLAW_BODY_COMPONENT_SCOPE = scope;
         OPENCLAW_BODY_STATE_DIR = stateDir;
         OPENCLAW_BODY_LOG_DIR = logDir;
+        OPENCLAW_BODY_RUNTIME_SOURCE =
+          if spec ? runtimePackage && spec.runtimePackage != null
+          then "nix-store"
+          else "mutable-repo";
       } // (if spec ? extraEnvironment then spec.extraEnvironment browserProfileDir else { });
       serviceConfig = {
         Type = "simple";
-        WorkingDirectory = "${cfg.repoRoot}/${spec.path}";
+        WorkingDirectory = "${runtimeRoot}/${spec.path}";
         ExecStart = "${cfg.nodePackage}/bin/node src/server.mjs";
         Restart = "on-failure";
         RestartSec = "2s";
@@ -269,6 +278,12 @@ in
       type = types.str;
       default = "/opt/openclaw";
       description = "Repository root containing OpenClaw apps and services.";
+    };
+
+    runtimePackages.eventHub = mkOption {
+      type = types.nullOr types.package;
+      default = pkgs.callPackage ../packages/openclaw-event-hub.nix { };
+      description = "Read-only Nix package used by event-hub; null keeps the mutable repository fallback.";
     };
 
     nodePackage = mkOption {

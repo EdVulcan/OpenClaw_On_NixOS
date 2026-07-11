@@ -107,6 +107,17 @@ The active Level 2 bridge is documented in:
 OPENCLAW_TRUSTED_WORK_VIEW_SESSION_CONTRACT_PLAN.md
 ```
 
+The bounded Level 2 browser eye-hand exit gate is complete. The current active
+kernel-whitepaper Phase A route is documented in:
+
+```text
+OPENCLAW_NIX_STORE_RUNTIME_PACKAGING_PLAN.md
+```
+
+Event-hub is the first of nine services proven from a minimal read-only Nix
+closure. The next slice packages screen-sense as the second concrete closure
+before considering a shared packaging helper.
+
 It now closes browser action mediation through operator takeover suspension and
 explicit resume/rebind, then runs a bounded approval-gated user-space helper
 heartbeat process under the existing sidecar lifecycle. Fail-closed recovery

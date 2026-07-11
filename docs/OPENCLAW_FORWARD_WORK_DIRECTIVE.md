@@ -470,6 +470,18 @@ mutable `/opt/openclaw`. Preserve user-session ownership, runtime state/log
 paths, public routes, and real milestones. Do not introduce root hostd, D-Bus,
 eBPF, or broad all-service migration until this first packaging proof works.
 
+That first packaging proof is now complete for event-hub. Its minimal closure
+contains only four runtime files, the generated unit executes from a read-only
+store WorkingDirectory, and the body-config milestone starts the store process
+and proves health plus audit event write/read against a separate state path.
+The other eight services remain explicitly mutable-repo backed.
+
+The next Phase A slice is the second concrete closure, screen-sense. Package its
+exact shared-events/shared-utils imports, preserve system ownership and upstream
+contracts, evaluate the unit, and prove a real screen readback from the store
+path. Only then consider a small packaging helper based on demonstrated
+duplication.
+
 ## Identity-Upgrade Alignment
 
 Every new capability must state which identity level it serves:

@@ -85,6 +85,7 @@ const envNames = [
   "OPENCLAW_BROWSER_PROFILE_DIR",
   "OPENCLAW_BODY_PROFILE",
   "OPENCLAW_BODY_COMPONENT_SCOPE",
+  "OPENCLAW_BODY_RUNTIME_SOURCE",
 ];
 
 function requireIncludes(label, content, tokens) {
@@ -111,6 +112,7 @@ requireIncludes("openclaw-body module", bodyModule, [
   "StateDirectory = \"openclaw\"",
   "LogsDirectory = \"openclaw\"",
   "ExecStart = \"${cfg.nodePackage}/bin/node src/server.mjs\"",
+  "runtimePackages.eventHub",
   ...serviceNames,
   ...componentKeys,
   ...envNames,
@@ -162,7 +164,9 @@ requireIncludes("flake", flake, [
   "nixosModules.openclaw-body",
   "nixosModules.default",
   "nixosConfigurations.openclaw-local-dev",
-  "packages.${system}.firefox",
+  "packages.${system} =",
+  "firefox = pkgs.firefox",
+  "openclaw-event-hub = pkgs.callPackage",
 ]);
 
 console.log(JSON.stringify({
@@ -190,13 +194,18 @@ if command -v nix >/dev/null 2>&1; then
     --apply 'config: let
       project = unit: {
         inherit (unit) wantedBy partOf after environment;
-        serviceConfig.User = unit.serviceConfig.User or null;
+        serviceConfig = {
+          User = unit.serviceConfig.User or null;
+          WorkingDirectory = unit.serviceConfig.WorkingDirectory;
+          ExecStart = unit.serviceConfig.ExecStart;
+        };
       };
     in {
       system = builtins.attrNames config.systemd.services;
       user = builtins.attrNames config.systemd.user.services;
       session = project config.systemd.user.services.openclaw-session-manager;
       browser = project config.systemd.user.services.openclaw-browser-runtime;
+      eventHub = project config.systemd.services.openclaw-event-hub;
     }')"
   node - <<'EOF' "$ownership_json"
 const ownership = JSON.parse(process.argv[2]);
@@ -224,12 +233,20 @@ if (ownership.browser.environment?.OPENCLAW_BROWSER_ENGINE_MODE !== "firefox"
 if (!ownership.browser.after?.includes("openclaw-session-manager.service")) {
   throw new Error(`browser runtime must retain same-scope session-manager ordering: ${JSON.stringify(ownership.browser.after)}`);
 }
+if (ownership.eventHub.environment?.OPENCLAW_BODY_RUNTIME_SOURCE !== "nix-store"
+  || !String(ownership.eventHub.serviceConfig?.WorkingDirectory ?? "").startsWith("/nix/store/")
+  || !String(ownership.eventHub.serviceConfig?.WorkingDirectory ?? "").endsWith("/share/openclaw/services/openclaw-event-hub")
+  || ownership.eventHub.serviceConfig?.WorkingDirectory?.includes("/opt/openclaw")) {
+  throw new Error(`event hub must execute from its read-only Nix closure: ${JSON.stringify(ownership.eventHub)}`);
+}
 console.log(JSON.stringify({
   componentOwnership: {
     userOwned,
     duplicated: userOwned.filter((name) => ownership.system.includes(name)),
     browserEngine: ownership.browser.environment.OPENCLAW_BROWSER_ENGINE_MODE,
     browserProfile: ownership.browser.environment.OPENCLAW_BROWSER_PROFILE_DIR,
+    eventHubRuntimeSource: ownership.eventHub.environment.OPENCLAW_BODY_RUNTIME_SOURCE,
+    eventHubWorkingDirectory: ownership.eventHub.serviceConfig.WorkingDirectory,
   },
 }, null, 2));
 EOF
@@ -273,4 +290,76 @@ console.log(JSON.stringify({
   },
 }, null, 2));
 EOF
+
+  event_hub_out="$(nix --extra-experimental-features 'nix-command flakes' build \
+    --no-update-lock-file --no-link --print-out-paths .#openclaw-event-hub)"
+  event_hub_working_dir="$event_hub_out/share/openclaw/services/openclaw-event-hub"
+  event_hub_server="$event_hub_working_dir/src/server.mjs"
+  if [[ "$event_hub_out" != /nix/store/*
+    || ! -f "$event_hub_server"
+    || ! -f "$event_hub_out/share/openclaw/packages/shared-utils/src/http.mjs"
+    || -w "$event_hub_server"
+    || -e "$event_hub_out/share/openclaw/packages/shared-utils/src/work-view-trust.mjs" ]]; then
+    echo "event-hub Nix closure is not minimal and read-only: $event_hub_out" >&2
+    exit 1
+  fi
+
+  (
+    runtime_dir="$(mktemp -d)"
+    runtime_port=5841
+    runtime_url="http://127.0.0.1:$runtime_port"
+    cleanup_runtime() {
+      if [[ -n "${runtime_pid:-}" ]]; then
+        kill -TERM "$runtime_pid" >/dev/null 2>&1 || true
+        wait "$runtime_pid" >/dev/null 2>&1 || true
+      fi
+      rm -rf "$runtime_dir"
+    }
+    trap cleanup_runtime EXIT
+
+    cd "$event_hub_working_dir"
+    OPENCLAW_EVENT_HUB_HOST=127.0.0.1 \
+    OPENCLAW_EVENT_HUB_PORT="$runtime_port" \
+    OPENCLAW_BODY_RUNTIME_SOURCE=nix-store \
+    OPENCLAW_BODY_STATE_DIR="$runtime_dir" \
+    OPENCLAW_EVENT_LOG_FILE="$runtime_dir/events.jsonl" \
+      "${pkgs_node:-$(command -v node)}" src/server.mjs >"$runtime_dir/event-hub.log" 2>&1 &
+    runtime_pid=$!
+
+    for _ in $(seq 1 50); do
+      if curl --silent --fail "$runtime_url/health" >"$runtime_dir/health.json"; then
+        break
+      fi
+      sleep 0.1
+    done
+    curl --silent --fail -X POST "$runtime_url/events" \
+      -H 'content-type: application/json' \
+      --data '{"type":"phase_a.nix_store_probe","source":"body-config-milestone","payload":{"runtimeSource":"nix-store"}}' \
+      >"$runtime_dir/published.json"
+    curl --silent --fail "$runtime_url/events/audit?type=phase_a.nix_store_probe&limit=1" \
+      >"$runtime_dir/audit.json"
+
+    node - <<'EOF' "$runtime_dir/health.json" "$runtime_dir/published.json" "$runtime_dir/audit.json" "$event_hub_out"
+const fs = require("node:fs");
+const health = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+const published = JSON.parse(fs.readFileSync(process.argv[3], "utf8"));
+const audit = JSON.parse(fs.readFileSync(process.argv[4], "utf8"));
+const storePath = process.argv[5];
+if (health.service !== "openclaw-event-hub"
+  || published.ok !== true
+  || published.event?.type !== "phase_a.nix_store_probe"
+  || audit.items?.[0]?.payload?.runtimeSource !== "nix-store") {
+  throw new Error(`store-native event hub did not serve real audit behavior: ${JSON.stringify({ health, published, audit })}`);
+}
+console.log(JSON.stringify({
+  nixStoreEventHub: {
+    storePath,
+    readOnlySource: true,
+    health: health.service,
+    auditEvent: audit.items[0].type,
+    runtimeSource: audit.items[0].payload.runtimeSource,
+  },
+}, null, 2));
+EOF
+  )
 fi
