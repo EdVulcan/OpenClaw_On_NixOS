@@ -524,6 +524,17 @@ The next closure is session-manager. Preserve login-user ownership, writable
 recovery state, and trusted sidecar lifecycle contracts while proving session
 state behavior without starting an unapproved helper process.
 
+That sixth closure is now complete. Session-manager contains exactly 14 runtime
+files, its generated login-user unit points into the store and keeps recovery
+intent under `%S/openclaw`, and a real packaged process creates an authoritative
+Level 2 session while remaining fail-closed at `awaiting_browser`. No external
+sidecar or recovery intent is started automatically. Phase A is 6/9 services,
+not complete.
+
+The next closure is observer-ui. Package its runtime client composition and
+served assets without npm runtime dependencies, preserve upstream contracts,
+and prove real HTML/client responses from the store.
+
 ## Identity-Upgrade Alignment
 
 Every new capability must state which identity level it serves:

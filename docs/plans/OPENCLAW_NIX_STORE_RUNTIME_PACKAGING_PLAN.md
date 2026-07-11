@@ -22,7 +22,7 @@ root daemon, hostd, D-Bus, eBPF, or self-rebuild capability.
 - Introduce a shared packaging factory only after two concrete service
   closures prove the same file-selection and unit-wiring shape.
 
-## Completed: Five Store-Native Services
+## Completed: Six Store-Native Services
 
 `openclaw-event-hub` is the first store-native service closure:
 
@@ -99,26 +99,39 @@ their output content and runtime behavior.
 - the packaging proof calls no command, file-write, systemd, or repair route
   and performs no host mutation.
 
+`openclaw-session-manager` is the sixth store-native service closure:
+
+- its 14-file closure contains seven runtime service modules plus the service
+  package and exact shared event/trust/visual-frame imports,
+- its generated user unit preserves login-session ownership and points its
+  recovery intent file at writable `%S/openclaw` state,
+- the real packaged process creates an authoritative Level 2 session while the
+  helper truthfully remains `awaiting_browser`, and
+- no browser prepare, external sidecar start, automatic restart, or recovery
+  intent write occurs during the packaging proof.
+
 ## Evidence
 
 - Packages: `nix/packages/openclaw-event-hub.nix`,
   `nix/packages/openclaw-screen-sense.nix`, and
   `nix/packages/openclaw-screen-act.nix`, plus
   `nix/packages/openclaw-system-heal.nix` and
-  `nix/packages/openclaw-system-sense.nix`
+  `nix/packages/openclaw-system-sense.nix`, plus
+  `nix/packages/openclaw-session-manager.nix`
 - Shared packaging mechanism: `nix/lib/mk-openclaw-source-closure.nix`
 - Module: `nix/modules/openclaw-body.nix`
 - Flake exports: `packages.x86_64-linux.openclaw-event-hub`,
   `packages.x86_64-linux.openclaw-screen-sense`, and
   `packages.x86_64-linux.openclaw-screen-act`, plus
   `packages.x86_64-linux.openclaw-system-heal` and
-  `packages.x86_64-linux.openclaw-system-sense`
+  `packages.x86_64-linux.openclaw-system-sense`, plus
+  `packages.x86_64-linux.openclaw-session-manager`
 - Targeted milestone: `nix/scripts/dev-body-config-check.sh`
 - Identity route: kernel whitepaper Phase A, before privileged Level 3 work
 
 ## Deferred
 
-- Four remaining OpenClaw services still execute from `repoRoot`.
+- Three remaining OpenClaw services still execute from `repoRoot`.
 - npm dependency closure handling for browser-runtime and Observer is not yet
   designed.
 - No root service, hostd, D-Bus control, eBPF probe, Nix self-edit, rebuild, or
@@ -126,9 +139,8 @@ their output content and runtime behavior.
 
 ## Next Slice
 
-Package `openclaw-session-manager` as the sixth store-native service. Preserve
-login-user ownership, writable recovery state, event/browser URLs, and the
-existing trusted sidecar lifecycle. Prove real session state behavior from the
-store without starting an unapproved sidecar. Keep browser-runtime's Puppeteer
-dependency closure, Observer assets, and the 135-file core closure as separate
-later packaging problems.
+Package `observer-ui` as the seventh store-native service. Include only its
+runtime server/client composition files and served assets, preserve system
+ownership plus upstream URLs, and prove real HTML/client responses from the
+store. Keep browser-runtime's Puppeteer dependency closure and the 135-file core
+closure as separate later packaging problems.

@@ -35,6 +35,7 @@ let
       portEnv = "OPENCLAW_SESSION_MANAGER_PORT";
       port = cfg.ports.sessionManager;
       after = [ "openclaw-event-hub" ];
+      runtimePackage = cfg.runtimePackages.sessionManager;
     }
     {
       key = "browserRuntime";
@@ -136,6 +137,7 @@ let
     OPENCLAW_SYSTEM_SENSE_URL = urlFor cfg.ports.systemSense;
     OPENCLAW_SYSTEM_HEAL_URL = urlFor cfg.ports.systemHeal;
     OPENCLAW_CORE_STATE_FILE = "${stateDir}/openclaw-core-state.json";
+    OPENCLAW_SESSION_MANAGER_STATE_FILE = "${stateDir}/openclaw-session-manager-state.json";
     OPENCLAW_SYSTEM_HEAL_STATE_FILE = "${stateDir}/openclaw-system-heal-state.json";
     OPENCLAW_BROWSER_RUNTIME_STATE_FILE = "${stateDir}/openclaw-browser-runtime-state.json";
     OPENCLAW_EVENT_LOG_FILE = "${stateDir}/openclaw-events.jsonl";
@@ -288,6 +290,12 @@ in
       type = types.nullOr types.package;
       default = pkgs.callPackage ../packages/openclaw-event-hub.nix { };
       description = "Read-only Nix package used by event-hub; null keeps the mutable repository fallback.";
+    };
+
+    runtimePackages.sessionManager = mkOption {
+      type = types.nullOr types.package;
+      default = pkgs.callPackage ../packages/openclaw-session-manager.nix { };
+      description = "Read-only Nix package used by session-manager; null keeps the mutable repository fallback.";
     };
 
     runtimePackages.screenSense = mkOption {

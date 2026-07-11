@@ -78,6 +78,7 @@ const envNames = [
   "OPENCLAW_SYSTEM_SENSE_URL",
   "OPENCLAW_SYSTEM_HEAL_URL",
   "OPENCLAW_CORE_STATE_FILE",
+  "OPENCLAW_SESSION_MANAGER_STATE_FILE",
   "OPENCLAW_SYSTEM_HEAL_STATE_FILE",
   "OPENCLAW_BROWSER_RUNTIME_STATE_FILE",
   "OPENCLAW_BROWSER_ENGINE_MODE",
@@ -113,6 +114,7 @@ requireIncludes("openclaw-body module", bodyModule, [
   "LogsDirectory = \"openclaw\"",
   "ExecStart = \"${cfg.nodePackage}/bin/node src/server.mjs\"",
   "runtimePackages.eventHub",
+  "runtimePackages.sessionManager",
   "runtimePackages.screenSense",
   "runtimePackages.screenAct",
   "runtimePackages.systemSense",
@@ -171,6 +173,7 @@ requireIncludes("flake", flake, [
   "packages.${system} =",
   "firefox = pkgs.firefox",
   "openclaw-event-hub = pkgs.callPackage",
+  "openclaw-session-manager = pkgs.callPackage",
   "openclaw-screen-sense = pkgs.callPackage",
   "openclaw-screen-act = pkgs.callPackage",
   "openclaw-system-sense = pkgs.callPackage",
@@ -245,6 +248,13 @@ if (ownership.browser.environment?.OPENCLAW_BROWSER_ENGINE_MODE !== "firefox"
 if (!ownership.browser.after?.includes("openclaw-session-manager.service")) {
   throw new Error(`browser runtime must retain same-scope session-manager ordering: ${JSON.stringify(ownership.browser.after)}`);
 }
+if (ownership.session.environment?.OPENCLAW_BODY_RUNTIME_SOURCE !== "nix-store"
+  || ownership.session.environment?.OPENCLAW_SESSION_MANAGER_STATE_FILE !== "%S/openclaw/openclaw-session-manager-state.json"
+  || !String(ownership.session.serviceConfig?.WorkingDirectory ?? "").startsWith("/nix/store/")
+  || !String(ownership.session.serviceConfig?.WorkingDirectory ?? "").endsWith("/share/openclaw/services/openclaw-session-manager")
+  || ownership.session.serviceConfig?.WorkingDirectory?.includes("/opt/openclaw")) {
+  throw new Error(`session-manager must execute from its read-only Nix closure with writable user state: ${JSON.stringify(ownership.session)}`);
+}
 if (ownership.eventHub.environment?.OPENCLAW_BODY_RUNTIME_SOURCE !== "nix-store"
   || !String(ownership.eventHub.serviceConfig?.WorkingDirectory ?? "").startsWith("/nix/store/")
   || !String(ownership.eventHub.serviceConfig?.WorkingDirectory ?? "").endsWith("/share/openclaw/services/openclaw-event-hub")
@@ -281,6 +291,9 @@ console.log(JSON.stringify({
     duplicated: userOwned.filter((name) => ownership.system.includes(name)),
     browserEngine: ownership.browser.environment.OPENCLAW_BROWSER_ENGINE_MODE,
     browserProfile: ownership.browser.environment.OPENCLAW_BROWSER_PROFILE_DIR,
+    sessionManagerRuntimeSource: ownership.session.environment.OPENCLAW_BODY_RUNTIME_SOURCE,
+    sessionManagerWorkingDirectory: ownership.session.serviceConfig.WorkingDirectory,
+    sessionManagerStateFile: ownership.session.environment.OPENCLAW_SESSION_MANAGER_STATE_FILE,
     eventHubRuntimeSource: ownership.eventHub.environment.OPENCLAW_BODY_RUNTIME_SOURCE,
     eventHubWorkingDirectory: ownership.eventHub.serviceConfig.WorkingDirectory,
     screenSenseRuntimeSource: ownership.screenSense.environment.OPENCLAW_BODY_RUNTIME_SOURCE,
@@ -402,6 +415,109 @@ console.log(JSON.stringify({
     health: health.service,
     auditEvent: audit.items[0].type,
     runtimeSource: audit.items[0].payload.runtimeSource,
+  },
+}, null, 2));
+EOF
+  )
+
+  session_manager_out="$(nix --extra-experimental-features 'nix-command flakes' build \
+    --no-update-lock-file --no-link --print-out-paths .#openclaw-session-manager)"
+  session_manager_working_dir="$session_manager_out/share/openclaw/services/openclaw-session-manager"
+  session_manager_server="$session_manager_working_dir/src/server.mjs"
+  if [[ "$session_manager_out" != /nix/store/*
+    || ! -f "$session_manager_server"
+    || ! -f "$session_manager_out/share/openclaw/services/openclaw-session-manager/src/trusted-work-view-sidecar.mjs"
+    || ! -f "$session_manager_out/share/openclaw/packages/shared-utils/src/work-view-trust.mjs"
+    || -w "$session_manager_server"
+    || -e "$session_manager_out/share/openclaw/services/openclaw-session-manager/test"
+    || "$(find "$session_manager_out" -type f | wc -l)" -ne 14 ]]; then
+    echo "session-manager Nix closure is not exact and read-only: $session_manager_out" >&2
+    exit 1
+  fi
+
+  (
+    runtime_dir="$(mktemp -d)"
+    runtime_port=5847
+    upstream_port=5843
+    runtime_url="http://127.0.0.1:$runtime_port"
+    upstream_url="http://127.0.0.1:$upstream_port"
+    state_file="$runtime_dir/session-manager-state.json"
+    cleanup_runtime() {
+      for pid in "${session_manager_pid:-}" "${upstream_pid:-}"; do
+        if [[ -n "$pid" ]]; then
+          kill -TERM "$pid" >/dev/null 2>&1 || true
+          wait "$pid" >/dev/null 2>&1 || true
+        fi
+      done
+      rm -rf "$runtime_dir"
+    }
+    trap cleanup_runtime EXIT
+
+    node "$REPO_ROOT/nix/scripts/dev-body-config-store-upstream.mjs" "$upstream_port" \
+      >"$runtime_dir/upstream.log" 2>&1 &
+    upstream_pid=$!
+    for _ in $(seq 1 50); do
+      if curl --silent --fail "$upstream_url/health" >/dev/null; then
+        break
+      fi
+      sleep 0.1
+    done
+    cd "$session_manager_working_dir"
+    OPENCLAW_SESSION_MANAGER_HOST=127.0.0.1 \
+    OPENCLAW_SESSION_MANAGER_PORT="$runtime_port" \
+    OPENCLAW_EVENT_HUB_URL="$upstream_url" \
+    OPENCLAW_BROWSER_RUNTIME_URL="$upstream_url" \
+    OPENCLAW_SESSION_MANAGER_STATE_FILE="$state_file" \
+    OPENCLAW_BODY_RUNTIME_SOURCE=nix-store \
+      node src/server.mjs >"$runtime_dir/session-manager.log" 2>&1 &
+    session_manager_pid=$!
+
+    for _ in $(seq 1 50); do
+      if curl --silent --fail "$runtime_url/health" >/dev/null; then
+        break
+      fi
+      sleep 0.1
+    done
+    curl --silent --fail -X POST "$runtime_url/session/start" \
+      -H 'content-type: application/json' \
+      --data '{"displayTarget":"nix-store-workspace"}' >"$runtime_dir/started.json"
+    curl --silent --fail "$runtime_url/session/state" >"$runtime_dir/state.json"
+
+    node - <<'EOF' "$runtime_dir/started.json" "$runtime_dir/state.json" "$state_file" "$session_manager_out"
+const fs = require("node:fs");
+const started = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+const state = JSON.parse(fs.readFileSync(process.argv[3], "utf8"));
+const recoveryStatePath = process.argv[4];
+const storePath = process.argv[5];
+const helper = state.workView?.helperRuntime ?? {};
+if (started.ok !== true
+  || started.reused !== false
+  || started.session?.status !== "running"
+  || started.session?.displayTarget !== "nix-store-workspace"
+  || state.session?.sessionId !== started.session.sessionId
+  || state.trustedSession?.kind !== "openclaw-trusted-session-work-view-contract"
+  || state.trustedSession?.identityLevel !== "level_2_trusted_session_work_view"
+  || state.trustedSession?.sessionIdentity?.status !== "authoritative"
+  || helper.status !== "awaiting_browser"
+  || helper.externalProcessStarted !== false
+  || helper.sidecar?.running !== false
+  || state.trustedSession?.readiness !== "degraded"
+  || state.trustedSession?.recoveryRecommendation?.action !== "prepare_work_view"
+  || fs.existsSync(recoveryStatePath)) {
+  throw new Error(`store-native session-manager did not preserve bounded session ownership: ${JSON.stringify({ started, state, recoveryStatePath })}`);
+}
+console.log(JSON.stringify({
+  nixStoreSessionManager: {
+    storePath,
+    readOnlySource: true,
+    sessionStatus: started.session.status,
+    displayTarget: started.session.displayTarget,
+    trustedSession: state.trustedSession.kind,
+    identityLevel: state.trustedSession.identityLevel,
+    helperStatus: helper.status,
+    externalSidecarStarted: helper.externalProcessStarted,
+    recoveryStatePath,
+    recoveryIntentWritten: false,
   },
 }, null, 2));
 EOF

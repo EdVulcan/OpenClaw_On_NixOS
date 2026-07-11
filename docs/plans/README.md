@@ -114,11 +114,11 @@ kernel-whitepaper Phase A route is documented in:
 OPENCLAW_NIX_STORE_RUNTIME_PACKAGING_PLAN.md
 ```
 
-Event-hub, screen-sense, screen-act, system-heal, and system-sense are the first
-five of nine services proven from minimal read-only Nix closures. Their common
-installation mechanism uses a small helper while service file manifests remain
-explicit. System-sense proves bounded body/resource observation without host
-mutation. The next slice packages the login-user-owned session-manager.
+Event-hub, session-manager, screen-sense, screen-act, system-heal, and
+system-sense are six of nine services proven from minimal read-only Nix
+closures. Session-manager preserves login-user ownership, writable recovery
+state, and fail-closed helper startup. The next slice packages observer-ui's
+runtime composition and served assets.
 
 It now closes browser action mediation through operator takeover suspension and
 explicit resume/rebind, then runs a bounded approval-gated user-space helper

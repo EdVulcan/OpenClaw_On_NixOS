@@ -33,6 +33,7 @@
       packages.${system} = {
         firefox = pkgs.firefox;
         openclaw-event-hub = pkgs.callPackage ./nix/packages/openclaw-event-hub.nix { };
+        openclaw-session-manager = pkgs.callPackage ./nix/packages/openclaw-session-manager.nix { };
         openclaw-screen-sense = pkgs.callPackage ./nix/packages/openclaw-screen-sense.nix { };
         openclaw-screen-act = pkgs.callPackage ./nix/packages/openclaw-screen-act.nix { };
         openclaw-system-sense = pkgs.callPackage ./nix/packages/openclaw-system-sense.nix { };
