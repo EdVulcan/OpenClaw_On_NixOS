@@ -115,6 +115,7 @@ requireIncludes("openclaw-body module", bodyModule, [
   "runtimePackages.eventHub",
   "runtimePackages.screenSense",
   "runtimePackages.screenAct",
+  "runtimePackages.systemHeal",
   ...serviceNames,
   ...componentKeys,
   ...envNames,
@@ -171,6 +172,7 @@ requireIncludes("flake", flake, [
   "openclaw-event-hub = pkgs.callPackage",
   "openclaw-screen-sense = pkgs.callPackage",
   "openclaw-screen-act = pkgs.callPackage",
+  "openclaw-system-heal = pkgs.callPackage",
 ]);
 
 console.log(JSON.stringify({
@@ -212,6 +214,7 @@ if command -v nix >/dev/null 2>&1; then
       eventHub = project config.systemd.services.openclaw-event-hub;
       screenSense = project config.systemd.services.openclaw-screen-sense;
       screenAct = project config.systemd.services.openclaw-screen-act;
+      systemHeal = project config.systemd.services.openclaw-system-heal;
     }')"
   node - <<'EOF' "$ownership_json"
 const ownership = JSON.parse(process.argv[2]);
@@ -257,6 +260,12 @@ if (ownership.screenAct.environment?.OPENCLAW_BODY_RUNTIME_SOURCE !== "nix-store
   || ownership.screenAct.serviceConfig?.WorkingDirectory?.includes("/opt/openclaw")) {
   throw new Error(`screen-act must execute from its read-only Nix closure: ${JSON.stringify(ownership.screenAct)}`);
 }
+if (ownership.systemHeal.environment?.OPENCLAW_BODY_RUNTIME_SOURCE !== "nix-store"
+  || !String(ownership.systemHeal.serviceConfig?.WorkingDirectory ?? "").startsWith("/nix/store/")
+  || !String(ownership.systemHeal.serviceConfig?.WorkingDirectory ?? "").endsWith("/share/openclaw/services/openclaw-system-heal")
+  || ownership.systemHeal.serviceConfig?.WorkingDirectory?.includes("/opt/openclaw")) {
+  throw new Error(`system-heal must execute from its read-only Nix closure: ${JSON.stringify(ownership.systemHeal)}`);
+}
 console.log(JSON.stringify({
   componentOwnership: {
     userOwned,
@@ -269,6 +278,8 @@ console.log(JSON.stringify({
     screenSenseWorkingDirectory: ownership.screenSense.serviceConfig.WorkingDirectory,
     screenActRuntimeSource: ownership.screenAct.environment.OPENCLAW_BODY_RUNTIME_SOURCE,
     screenActWorkingDirectory: ownership.screenAct.serviceConfig.WorkingDirectory,
+    systemHealRuntimeSource: ownership.systemHeal.environment.OPENCLAW_BODY_RUNTIME_SOURCE,
+    systemHealWorkingDirectory: ownership.systemHeal.serviceConfig.WorkingDirectory,
   },
 }, null, 2));
 EOF
@@ -558,6 +569,114 @@ console.log(JSON.stringify({
     leaseMatched: action.mediation.leaseMatched,
     inputChars: action.params.inputEvidence.charCount,
     textExposed: action.params.inputEvidence.textExposed,
+  },
+}, null, 2));
+EOF
+  )
+
+  system_heal_out="$(nix --extra-experimental-features 'nix-command flakes' build \
+    --no-update-lock-file --no-link --print-out-paths .#openclaw-system-heal)"
+  system_heal_working_dir="$system_heal_out/share/openclaw/services/openclaw-system-heal"
+  system_heal_server="$system_heal_working_dir/src/server.mjs"
+  if [[ "$system_heal_out" != /nix/store/*
+    || ! -f "$system_heal_server"
+    || ! -f "$system_heal_out/share/openclaw/packages/shared-utils/src/persist.mjs"
+    || ! -f "$system_heal_out/share/openclaw/packages/shared-events/src/event-names.mjs"
+    || -w "$system_heal_server"
+    || -e "$system_heal_out/share/openclaw/services/openclaw-system-heal/test"
+    || "$(find "$system_heal_out" -type f | wc -l)" -ne 7 ]]; then
+    echo "system-heal Nix closure is not exact and read-only: $system_heal_out" >&2
+    exit 1
+  fi
+
+  (
+    runtime_dir="$(mktemp -d)"
+    runtime_port=5845
+    upstream_port=5843
+    runtime_url="http://127.0.0.1:$runtime_port"
+    upstream_url="http://127.0.0.1:$upstream_port"
+    state_file="$runtime_dir/system-heal-state.json"
+    cleanup_runtime() {
+      for pid in "${system_heal_pid:-}" "${upstream_pid:-}"; do
+        if [[ -n "$pid" ]]; then
+          kill -TERM "$pid" >/dev/null 2>&1 || true
+          wait "$pid" >/dev/null 2>&1 || true
+        fi
+      done
+      rm -rf "$runtime_dir"
+    }
+    trap cleanup_runtime EXIT
+
+    node "$REPO_ROOT/nix/scripts/dev-body-config-store-upstream.mjs" "$upstream_port" \
+      >"$runtime_dir/upstream.log" 2>&1 &
+    upstream_pid=$!
+    for _ in $(seq 1 50); do
+      if curl --silent --fail "$upstream_url/health" >/dev/null; then
+        break
+      fi
+      sleep 0.1
+    done
+
+    start_system_heal() {
+      cd "$system_heal_working_dir"
+      OPENCLAW_SYSTEM_HEAL_HOST=127.0.0.1 \
+      OPENCLAW_SYSTEM_HEAL_PORT="$runtime_port" \
+      OPENCLAW_EVENT_HUB_URL="$upstream_url" \
+      OPENCLAW_SYSTEM_SENSE_URL="$upstream_url" \
+      OPENCLAW_SYSTEM_HEAL_STATE_FILE="$state_file" \
+      OPENCLAW_BODY_RUNTIME_SOURCE=nix-store \
+        node src/server.mjs >"$runtime_dir/system-heal.log" 2>&1 &
+      system_heal_pid=$!
+      for _ in $(seq 1 50); do
+        if curl --silent --fail "$runtime_url/health" >/dev/null; then
+          return 0
+        fi
+        sleep 0.1
+      done
+      return 1
+    }
+
+    start_system_heal
+    curl --silent --fail -X POST "$runtime_url/heal/diagnose" \
+      -H 'content-type: application/json' \
+      --data '{"mode":"simulated","system":{"timestamp":"2026-07-11T00:00:00.000Z","body":{"hostname":"nix-store-probe"},"services":{"screenSense":{"name":"openclaw-screen-sense","ok":false,"status":"unhealthy","url":"http://127.0.0.1:4104"}},"alerts":[]}}' \
+      >"$runtime_dir/diagnosis.json"
+    for _ in $(seq 1 50); do
+      [[ -s "$state_file" ]] && break
+      sleep 0.1
+    done
+    kill -TERM "$system_heal_pid"
+    wait "$system_heal_pid" >/dev/null 2>&1 || true
+    system_heal_pid=""
+    start_system_heal
+    curl --silent --fail "$runtime_url/heal/state" >"$runtime_dir/restored-state.json"
+
+    node - <<'EOF' "$runtime_dir/diagnosis.json" "$runtime_dir/restored-state.json" "$state_file" "$system_heal_out"
+const fs = require("node:fs");
+const diagnosed = JSON.parse(fs.readFileSync(process.argv[2], "utf8")).diagnosis ?? {};
+const restored = JSON.parse(fs.readFileSync(process.argv[3], "utf8"));
+const persisted = JSON.parse(fs.readFileSync(process.argv[4], "utf8"));
+const storePath = process.argv[5];
+if (diagnosed.status !== "repairable"
+  || diagnosed.source?.hostname !== "nix-store-probe"
+  || diagnosed.plan?.stepCount !== 1
+  || diagnosed.plan.steps?.[0]?.kind !== "restart-service"
+  || diagnosed.plan.steps[0].mode !== "simulated"
+  || restored.latestDiagnosis?.id !== diagnosed.id
+  || persisted.latestDiagnosis?.id !== diagnosed.id
+  || restored.historyCount !== 0) {
+  throw new Error(`store-native system-heal did not persist conservative diagnosis: ${JSON.stringify({ diagnosed, restored, persisted })}`);
+}
+console.log(JSON.stringify({
+  nixStoreSystemHeal: {
+    storePath,
+    readOnlySource: true,
+    writableStatePath: process.argv[4],
+    diagnosisStatus: diagnosed.status,
+    plannedAction: diagnosed.plan.steps[0].kind,
+    executionMode: diagnosed.plan.steps[0].mode,
+    restoredAfterRestart: true,
+    realRepairExecuted: false,
   },
 }, null, 2));
 EOF

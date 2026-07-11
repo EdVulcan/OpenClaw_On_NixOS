@@ -93,6 +93,7 @@ let
       portEnv = "OPENCLAW_SYSTEM_HEAL_PORT";
       port = cfg.ports.systemHeal;
       after = [ "openclaw-event-hub" "openclaw-system-sense" ];
+      runtimePackage = cfg.runtimePackages.systemHeal;
     }
     {
       key = "observerUi";
@@ -298,6 +299,12 @@ in
       type = types.nullOr types.package;
       default = pkgs.callPackage ../packages/openclaw-screen-act.nix { };
       description = "Read-only Nix package used by screen-act; null keeps the mutable repository fallback.";
+    };
+
+    runtimePackages.systemHeal = mkOption {
+      type = types.nullOr types.package;
+      default = pkgs.callPackage ../packages/openclaw-system-heal.nix { };
+      description = "Read-only Nix package used by system-heal; null keeps the mutable repository fallback.";
     };
 
     nodePackage = mkOption {

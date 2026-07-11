@@ -504,6 +504,16 @@ system-sense URLs, and writable state path while proving representative
 persisted diagnosis or simulated maintenance behavior from the read-only store
 source. Defer the broader system-sense closure to its own explicit slice.
 
+That fourth closure is now complete. System-heal contains exactly seven runtime
+files, its generated system unit points into the store, and a real packaged
+process persists a conservative simulated diagnosis to a separate writable
+state file and restores it after process restart. No real repair executes.
+Phase A is 4/9 services, not complete.
+
+The next closure is system-sense. Its larger explicit runtime manifest must
+cover the current body, health, file, command, and systemd modules while the
+representative packaging proof remains read-only and non-privileged.
+
 ## Identity-Upgrade Alignment
 
 Every new capability must state which identity level it serves:
