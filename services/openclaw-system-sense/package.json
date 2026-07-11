@@ -8,5 +8,8 @@
     "start": "node src/server.mjs",
     "test": "node --test test/*.test.mjs",
     "typecheck": "node --check src/*.mjs"
+  },
+  "dependencies": {
+    "@homebridge/dbus-native": "0.7.7"
   }
 }

@@ -84,11 +84,25 @@ if (!inventory.ok || inventory.registry !== "openclaw-systemd-unit-inventory-v0"
 if (inventory.mode !== "read_only" || inventory.canMutate !== false || inventory.canRestart !== false) {
   throw new Error(`Observer-facing systemd inventory must stay read-only: ${JSON.stringify(inventory)}`);
 }
+if (inventory.source?.transport !== "dbus_native"
+  || inventory.governance?.readOnlyCommands?.length !== 0
+  || !inventory.governance?.readOnlyDbusMethods?.includes("org.freedesktop.DBus.Properties.GetAll")) {
+  throw new Error(`Observer-facing inventory should retain native D-Bus evidence: ${JSON.stringify({
+    source: inventory.source,
+    governance: inventory.governance,
+  })}`);
+}
 if (!inventory.units?.some((unit) => unit.unit === "openclaw-system-sense.service")) {
   throw new Error(`Observer-facing inventory should include system-sense body unit: ${JSON.stringify(inventory.units)}`);
 }
 if (!inventory.units?.some((unit) => unit.unit === "observer-ui.service")) {
   throw new Error(`Observer-facing inventory should include observer-ui unit: ${JSON.stringify(inventory.units)}`);
+}
+const coreUnit = inventory.units.find((unit) => unit.unit === "openclaw-core.service");
+if (coreUnit?.observation !== "dbus_properties_read_only"
+  || coreUnit.loadState !== "loaded"
+  || coreUnit.activeState !== "active") {
+  throw new Error(`Observer-facing inventory should expose native core state: ${JSON.stringify(coreUnit)}`);
 }
 
 console.log(JSON.stringify({
@@ -100,6 +114,8 @@ console.log(JSON.stringify({
     total: inventory.summary?.total,
     observed: inventory.summary?.observed,
     systemdAvailable: inventory.source?.systemdAvailable,
+    transport: inventory.source?.transport,
+    coreState: `${coreUnit.loadState}/${coreUnit.activeState}/${coreUnit.subState}`,
   },
 }, null, 2));
 EOF

@@ -11,6 +11,7 @@ import { handleSystemFileRoutes } from "./system-file-routes.mjs";
 import { createSystemFileOperations } from "./system-file-operations.mjs";
 import { createSystemHealthGovernance } from "./system-health-governance.mjs";
 import { handleSystemHealthRoutes } from "./system-health-routes.mjs";
+import { createSystemdDbusAdapter } from "./systemd-dbus-adapter.mjs";
 import { createSystemdInspection } from "./systemd-inspection.mjs";
 import { createSystemdNextRepairPlanning } from "./systemd-next-repair-planning.mjs";
 import { createSystemdRepairCandidatePlanning } from "./systemd-repair-candidate-planning.mjs";
@@ -328,8 +329,7 @@ const {
   buildSystemdUnitInventory,
   buildSystemdDependencyMap,
 } = createSystemdInspection({
-  execFileAsync,
-  serviceTimeoutMs,
+  systemdAdapter: createSystemdDbusAdapter({ timeoutMs: serviceTimeoutMs }),
   openClawSystemdUnitSpecs,
   registries: {
     systemdUnitInventory: SYSTEMD_UNIT_INVENTORY_REGISTRY,

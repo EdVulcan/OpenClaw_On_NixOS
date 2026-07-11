@@ -977,15 +977,22 @@ EOF
     --no-update-lock-file --no-link --print-out-paths .#openclaw-system-sense)"
   system_sense_working_dir="$system_sense_out/share/openclaw/services/openclaw-system-sense"
   system_sense_server="$system_sense_working_dir/src/server.mjs"
+  system_sense_source_count="$(find "$system_sense_out/share/openclaw" \
+    -path '*/node_modules' -prune -o -type f -print | wc -l)"
   if [[ "$system_sense_out" != /nix/store/*
     || ! -f "$system_sense_server"
+    || ! -f "$system_sense_working_dir/node_modules/@homebridge/dbus-native/package.json"
     || ! -f "$system_sense_out/share/openclaw/services/openclaw-system-sense/src/system-health-governance.mjs"
+    || ! -f "$system_sense_out/share/openclaw/services/openclaw-system-sense/src/systemd-dbus-adapter.mjs"
     || ! -f "$system_sense_out/share/openclaw/services/openclaw-system-sense/src/systemd-routes.mjs"
     || ! -f "$system_sense_out/share/openclaw/packages/shared-events/src/event-names.mjs"
     || -w "$system_sense_server"
     || -e "$system_sense_out/share/openclaw/services/openclaw-system-sense/test"
-    || "$(find "$system_sense_out" -type f | wc -l)" -ne 19 ]]; then
-    echo "system-sense Nix closure is not exact and read-only: $system_sense_out" >&2
+    || -e "$system_sense_working_dir/node_modules/@openclaw"
+    || -e "$system_sense_working_dir/node_modules/puppeteer-core"
+    || -e "$system_sense_working_dir/node_modules/typescript"
+    || "$system_sense_source_count" -ne 20 ]]; then
+    echo "system-sense Nix closure is not exact, production-only, and read-only: $system_sense_out" >&2
     exit 1
   fi
 

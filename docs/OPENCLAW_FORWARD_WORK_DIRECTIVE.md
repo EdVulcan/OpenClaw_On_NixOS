@@ -568,6 +568,16 @@ The active route now advances to kernel-whitepaper Phase B through
 read-only systemd unit inventory behind the existing system-sense/Observer
 contract. Do not add privileged mutation, hostd, Polkit, or a readiness shell.
 
+That first Phase B slice is now complete. System-sense reads the nine fixed
+OpenClaw unit records through native systemd D-Bus from its lockfile-pinned Nix
+store closure, exposes only an eight-property inventory allowlist, and reports
+the transport through the existing route and Observer panel. VM milestones
+prove a real `loaded/active/running` core unit and no command evidence. The
+temporary read-only `systemctl` fallback has been removed; bus failure is
+fail-closed. Phase B is not complete: native mutation, Polkit policy, hostd,
+removal of the fixed repair helper, and recovery proof remain deferred and
+require an explicit privilege decision before implementation.
+
 ## Identity-Upgrade Alignment
 
 Every new capability must state which identity level it serves:

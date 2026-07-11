@@ -1,6 +1,5 @@
 export function createSystemdInspection({
-  execFileAsync,
-  serviceTimeoutMs = 1500,
+  systemdAdapter,
   openClawSystemdUnitSpecs = [],
   platform = process.platform,
   registries = {},
@@ -8,51 +7,40 @@ export function createSystemdInspection({
   const SYSTEMD_UNIT_INVENTORY_REGISTRY = registries.systemdUnitInventory ?? "openclaw-systemd-unit-inventory-v0";
   const SYSTEMD_DEPENDENCY_MAP_REGISTRY = registries.systemdDependencyMap ?? "openclaw-systemd-dependency-map-v0";
 
-function parseSystemctlShow(output) {
-  return Object.fromEntries(
-    output
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((line) => {
-        const separator = line.indexOf("=");
-        if (separator === -1) {
-          return [line, ""];
-        }
-        return [line.slice(0, separator), line.slice(separator + 1)];
-      }),
-  );
-}
-
 async function detectSystemdAvailability() {
   if (platform !== "linux") {
     return {
       available: false,
       reason: `systemd inspection is only attempted on linux; current platform is ${platform}.`,
+      transport: "unavailable",
+      nativeFailureReason: null,
     };
   }
 
-  try {
-    const result = await execFileAsync("systemctl", ["--version"], {
-      timeout: serviceTimeoutMs,
-      windowsHide: true,
-      maxBuffer: 4096,
-    });
-    const firstLine = result.stdout.split(/\r?\n/).find(Boolean) ?? "systemctl";
-    return {
-      available: true,
-      version: firstLine,
-    };
-  } catch (error) {
-    return {
-      available: false,
-      reason: error instanceof Error ? error.message : "systemctl is unavailable.",
-    };
+  if (systemdAdapter?.inspectUnits) {
+    try {
+      return await systemdAdapter.inspectUnits(openClawSystemdUnitSpecs.map((spec) => spec.unit));
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : "Native systemd D-Bus is unavailable.";
+      return {
+        available: false,
+        reason,
+        transport: "dbus_unavailable",
+        nativeFailureReason: reason,
+      };
+    }
   }
+
+  return {
+    available: false,
+    reason: "Native systemd D-Bus adapter is not configured.",
+    transport: "dbus_unavailable",
+    nativeFailureReason: "Native systemd D-Bus adapter is not configured.",
+  };
 }
 
-async function inspectSystemdUnit(spec, systemd) {
-  const baseUnit = {
+function buildBaseUnit(spec) {
+  return {
     key: spec.key,
     name: spec.name,
     unit: spec.unit,
@@ -73,6 +61,38 @@ async function inspectSystemdUnit(spec, systemd) {
     fragmentPath: null,
     systemdObserved: false,
   };
+}
+
+function inspectNativeSystemdUnit(spec, systemd) {
+  const baseUnit = buildBaseUnit(spec);
+  const observed = systemd.units.get(spec.unit);
+  if (!observed?.found) {
+    return {
+      ...baseUnit,
+      systemdObserved: true,
+      observation: "dbus_properties_read_failed",
+      observationError: observed?.error ?? "Native systemd unit observation is missing.",
+    };
+  }
+  const properties = observed.properties;
+  return {
+    ...baseUnit,
+    description: properties.Description || baseUnit.description,
+    status: properties.ActiveState || "unknown",
+    loadState: properties.LoadState || "unknown",
+    activeState: properties.ActiveState || "unknown",
+    subState: properties.SubState || "unknown",
+    unitFileState: properties.UnitFileState || "unknown",
+    mainPid: Number(properties.MainPID) || null,
+    execMainStatus: Number(properties.ExecMainStatus) || 0,
+    fragmentPath: properties.FragmentPath || null,
+    systemdObserved: true,
+    observation: "dbus_properties_read_only",
+  };
+}
+
+function inspectSystemdUnit(spec, systemd) {
+  const baseUnit = buildBaseUnit(spec);
 
   if (!systemd.available) {
     return {
@@ -81,48 +101,7 @@ async function inspectSystemdUnit(spec, systemd) {
     };
   }
 
-  try {
-    const result = await execFileAsync("systemctl", [
-      "show",
-      spec.unit,
-      "--property=Id",
-      "--property=LoadState",
-      "--property=ActiveState",
-      "--property=SubState",
-      "--property=UnitFileState",
-      "--property=FragmentPath",
-      "--property=Description",
-      "--property=MainPID",
-      "--property=ExecMainStatus",
-      "--no-pager",
-    ], {
-      timeout: serviceTimeoutMs,
-      windowsHide: true,
-      maxBuffer: 8192,
-    });
-    const properties = parseSystemctlShow(result.stdout);
-    return {
-      ...baseUnit,
-      description: properties.Description || baseUnit.description,
-      status: properties.ActiveState || "unknown",
-      loadState: properties.LoadState || "unknown",
-      activeState: properties.ActiveState || "unknown",
-      subState: properties.SubState || "unknown",
-      unitFileState: properties.UnitFileState || "unknown",
-      mainPid: Number.parseInt(properties.MainPID ?? "0", 10) || null,
-      execMainStatus: Number.parseInt(properties.ExecMainStatus ?? "0", 10) || 0,
-      fragmentPath: properties.FragmentPath || null,
-      systemdObserved: true,
-      observation: "systemctl_show_read_only",
-    };
-  } catch (error) {
-    return {
-      ...baseUnit,
-      systemdObserved: true,
-      observation: "systemctl_show_failed",
-      observationError: error instanceof Error ? error.message : "Unable to inspect unit.",
-    };
-  }
+  return inspectNativeSystemdUnit(spec, systemd);
 }
 
 async function buildSystemdUnitInventory() {
@@ -148,6 +127,8 @@ async function buildSystemdUnitInventory() {
       systemdAvailable: systemd.available,
       systemdVersion: systemd.version ?? null,
       unavailableReason: systemd.reason ?? null,
+      transport: systemd.transport,
+      nativeUnavailableReason: systemd.nativeFailureReason ?? null,
       plannedFrom: "nix/modules/openclaw-body.nix serviceSpecs",
     },
     governance: {
@@ -156,7 +137,8 @@ async function buildSystemdUnitInventory() {
       autonomy: "observe_only",
       approvalRequired: false,
       hostMutation: false,
-      readOnlyCommands: systemd.available ? ["systemctl --version", "systemctl show <unit>"] : [],
+      readOnlyDbusMethods: systemd.transport === "dbus_native" ? systemd.readOnlyMethods : [],
+      readOnlyCommands: [],
       forbiddenActions: ["start", "stop", "restart", "reload", "enable", "disable"],
     },
     summary: {

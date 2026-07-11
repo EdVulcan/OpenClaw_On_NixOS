@@ -67,8 +67,16 @@ if (inventory.summary?.mutationEndpoints !== 0 || inventory.summary?.restartEndp
 if (inventory.source?.kind !== "openclaw-body-systemd-inventory" || inventory.source?.evidence !== "read_only_body_governance") {
   throw new Error(`systemd unit inventory should identify body governance evidence: ${JSON.stringify(inventory.source)}`);
 }
+if (inventory.source?.transport !== "dbus_native" || !String(inventory.source?.systemdVersion).startsWith("systemd ")) {
+  throw new Error(`systemd unit inventory should use the native system bus: ${JSON.stringify(inventory.source)}`);
+}
 if (inventory.governance?.hostMutation !== false || inventory.governance?.autonomy !== "observe_only") {
   throw new Error(`systemd unit inventory governance should stay observe-only: ${JSON.stringify(inventory.governance)}`);
+}
+if (inventory.governance?.readOnlyCommands?.length !== 0
+  || !inventory.governance?.readOnlyDbusMethods?.includes("org.freedesktop.systemd1.Manager.GetUnit")
+  || !inventory.governance?.readOnlyDbusMethods?.includes("org.freedesktop.DBus.Properties.GetAll")) {
+  throw new Error(`native inventory must expose D-Bus-only read evidence: ${JSON.stringify(inventory.governance)}`);
 }
 if (!Array.isArray(inventory.units)) {
   throw new Error(`systemd unit inventory should expose unit items: ${JSON.stringify(inventory)}`);
@@ -84,6 +92,15 @@ for (const unitName of expectedUnits) {
   }
 }
 
+const coreUnit = inventory.units.find((item) => item.unit === "openclaw-core.service");
+if (coreUnit?.observation !== "dbus_properties_read_only"
+  || coreUnit.loadState !== "loaded"
+  || coreUnit.activeState !== "active"
+  || coreUnit.subState !== "running"
+  || coreUnit.systemdObserved !== true) {
+  throw new Error(`native inventory should observe the running core unit: ${JSON.stringify(coreUnit)}`);
+}
+
 if (inventory.next?.boundary !== "plan-only repair proposal before any host mutation") {
   throw new Error(`systemd unit inventory should point to plan-only repair next: ${JSON.stringify(inventory.next)}`);
 }
@@ -94,6 +111,8 @@ console.log(JSON.stringify({
     registry: inventory.registry,
     mode: inventory.mode,
     systemdAvailable: inventory.source.systemdAvailable,
+    transport: inventory.source.transport,
+    coreState: `${coreUnit.loadState}/${coreUnit.activeState}/${coreUnit.subState}`,
     total: inventory.summary.total,
     plannedUnits: expectedUnits.length,
     next: inventory.next.recommendedSlice,

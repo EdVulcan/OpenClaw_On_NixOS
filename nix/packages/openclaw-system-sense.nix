@@ -1,14 +1,19 @@
-{ lib, stdenvNoCC }:
+{ lib, buildNpmPackage, fetchNpmDeps }:
 
 let
-  mkOpenClawSourceClosure = import ../lib/mk-openclaw-source-closure.nix {
-    inherit lib stdenvNoCC;
+  mkOpenClawNpmRuntimeClosure = import ../lib/mk-openclaw-npm-runtime-closure.nix {
+    inherit lib buildNpmPackage fetchNpmDeps;
   };
 in
-mkOpenClawSourceClosure {
+mkOpenClawNpmRuntimeClosure {
   pname = "openclaw-system-sense";
+  serviceName = "openclaw-system-sense";
+  servicePath = ../../services/openclaw-system-sense;
+  npmDepsHash = "sha256-zBGbb/sOqgi2cBeudc7uWd/sfwrAkMg4O2RdtiueqnE=";
+  removeModules = [ "@openclaw" "puppeteer-core" "typescript" ];
   files = [
     ../../services/openclaw-system-sense/package.json
+    ../../services/openclaw-system-sense/package-lock.json
     ../../services/openclaw-system-sense/src/server.mjs
     ../../services/openclaw-system-sense/src/system-body-evidence-routes.mjs
     ../../services/openclaw-system-sense/src/system-body-evidence.mjs
@@ -18,6 +23,7 @@ mkOpenClawSourceClosure {
     ../../services/openclaw-system-sense/src/system-file-routes.mjs
     ../../services/openclaw-system-sense/src/system-health-governance.mjs
     ../../services/openclaw-system-sense/src/system-health-routes.mjs
+    ../../services/openclaw-system-sense/src/systemd-dbus-adapter.mjs
     ../../services/openclaw-system-sense/src/systemd-inspection.mjs
     ../../services/openclaw-system-sense/src/systemd-next-repair-planning.mjs
     ../../services/openclaw-system-sense/src/systemd-repair-candidate-planning.mjs

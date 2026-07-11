@@ -33,8 +33,8 @@ unit, and runs representative behavior from each store path.
 3. Inject that adapter into the existing systemd inspection owner; preserve the
    current inventory response and Observer contract rather than adding a new
    readiness route.
-4. Keep the current command adapter as an explicit development/test fallback
-   until native inventory equivalence is proven on the VM.
+4. Keep the current command adapter only until native inventory equivalence is
+   proven on the VM, then remove it and fail closed when D-Bus is unavailable.
 5. Prove at least one real OpenClaw unit inventory result through D-Bus and
    attach transport evidence to the existing readback.
 
@@ -52,11 +52,27 @@ unit, and runs representative behavior from each store path.
 
 ## Evidence
 
-- Focused adapter unit tests with a fake bus.
-- Existing systemd inspection tests unchanged at the public contract boundary.
-- Targeted core and Observer systemd inventory milestone.
-- Real VM read-only system-bus inventory proving native transport and no command
-  execution.
+- Focused adapter and inspection unit tests prove the fixed read-only method set,
+  bounded unit names, property allowlist, native-first behavior, and fail-closed
+  handling without command fallback.
+- `dev-openclaw-systemd-unit-inventory-check.sh` proves all nine unit records and
+  a real `loaded/active/running` core unit through `dbus_native` transport.
+- `dev-observer-openclaw-systemd-unit-inventory-check.sh` proves the same native
+  evidence remains visible through the existing Observer panel.
+- The system-sense Nix closure contains 20 reviewed runtime source files plus
+  the lockfile-pinned production D-Bus dependency and excludes Puppeteer and
+  workspace development packages.
+
+## Completed First Slice
+
+The read-only native inventory slice is complete. System-sense now uses only
+`org.freedesktop.systemd1.Manager.GetUnit` and
+`org.freedesktop.DBus.Properties.GetAll`, retains only eight allowlisted unit
+properties, and closes the bus after each inventory. The public route and
+Observer contract are unchanged, while response evidence identifies
+`source.transport = "dbus_native"` and contains no read-only command evidence.
+If the system bus is unavailable, inventory remains planned and unobserved; it
+does not shell out to `systemctl`.
 
 ## Deferred
 
@@ -68,5 +84,8 @@ unit, and runs representative behavior from each store path.
 
 ## Next Slice
 
-Implement and prove the read-only native systemd D-Bus inventory adapter through
-the existing system-sense route and Observer surface.
+Design and authorize the smallest native systemd mutation behind the existing
+repair proposal, approval, audit, and recovery path. This requires an explicit
+Polkit/privilege decision before implementation. Do not invoke `RestartUnit`,
+change host policy, or remove the existing fixed repair helper without that
+authority and a real VM recovery proof.

@@ -119,9 +119,11 @@ OPENCLAW_DBUS_NATIVE_SYSTEMD_CONTROL_PLAN.md
 
 Kernel-whitepaper Phase A is complete: all nine services and the trusted
 sidecar template run from reviewed read-only Nix closures with real targeted
-behavior evidence. The active Phase B plan starts by replacing read-only
-`systemctl` inventory with native systemd D-Bus transport behind the existing
-system-sense and Observer contracts.
+behavior evidence. Phase B's first slice is also complete: system-sense now
+reads all fixed OpenClaw unit inventory through native systemd D-Bus, fails
+closed without a `systemctl` fallback, and preserves the existing Observer
+contract. Native mutation, Polkit, hostd, and removal of the fixed repair helper
+remain deferred pending an explicit privilege decision.
 
 It now closes browser action mediation through operator takeover suspension and
 explicit resume/rebind, then runs a bounded approval-gated user-space helper
@@ -247,9 +249,10 @@ Semantic type is now complete through that path. The plan stores target intent
 only, execution supplies transient text, the runtime accepts only a current
 enabled textbox, and Firefox evidence proves frame change with no value in
 response, state, or events. The current bounded Level 2 browser eye-hand exit
-gate is closed. The next active route is the kernel whitepaper Phase A purity
-slice: package one cohesive service closure into `/nix/store` and prove its real
-unit no longer executes from mutable `/opt/openclaw` before expanding further.
+gate and kernel-whitepaper Phase A are closed. Phase B now has a proven native
+read-only D-Bus inventory; its next real step is an explicitly authorized,
+policy/audit/recovery-bound systemd mutation rather than another readiness
+surface.
 
 ## Historical Phase Plans
 
