@@ -140,6 +140,15 @@ let
     exec ${pkgs.nodejs}/bin/node ${systemSenseRuntimeRoot}/src/systemd-dbus-restart-helper.mjs
   '';
 
+  eventLogOwnershipMigration = pkgs.writeShellScript "openclaw-event-log-ownership-migration" ''
+    set -euo pipefail
+    event_log=${lib.escapeShellArg "${cfg.stateDir}/openclaw-events.jsonl"}
+    if [ -e "$event_log" ]; then
+      ${pkgs.coreutils}/bin/chown ${lib.escapeShellArg "${owner}:${group}"} "$event_log"
+      ${pkgs.coreutils}/bin/chmod 0640 "$event_log"
+    fi
+  '';
+
   commonEnvironment = stateDir: {
     OPENCLAW_CORE_URL = urlFor cfg.ports.core;
     OPENCLAW_EVENT_HUB_URL = urlFor cfg.ports.eventHub;
@@ -208,6 +217,8 @@ let
       } // optionalAttrs (!userScope && cfg.user != null) {
         User = cfg.user;
         Group = cfg.group;
+      } // optionalAttrs (!userScope && cfg.user != null && spec.key == "eventHub") {
+        ExecStartPre = [ "+${eventLogOwnershipMigration}" ];
       };
     };
 
@@ -488,7 +499,6 @@ in
     systemd.tmpfiles.rules = [
       "d ${cfg.stateDir} 0750 ${owner} ${group} - -"
       "d ${cfg.logDir} 0750 ${owner} ${group} - -"
-      "z ${cfg.stateDir}/openclaw-events.jsonl 0640 ${owner} ${group} - -"
     ];
 
     systemd.services = builtins.listToAttrs (map
