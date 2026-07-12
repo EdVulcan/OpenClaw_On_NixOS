@@ -140,5 +140,7 @@ work disabled.
 
 The runtime refresh milestone checks now run without a workspace or reviewed SDK
 fixture. They assert the initial generation in GET evidence and task plan
-readback, then assert the approved generation transition through task execution
-and the subsequent GET evidence.
+readback, assert the approved generation transition through task execution and
+the subsequent GET evidence, then restart the core with the same state file and
+verify the active generation hash, completed task readback, and compact
+generation metadata survive the restart.

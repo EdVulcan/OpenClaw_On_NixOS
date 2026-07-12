@@ -23,6 +23,8 @@ OBSERVER_URL="http://127.0.0.1:$OBSERVER_UI_PORT"
 OPENCLAW_POST_JSON_DATA_FLAG="-d"
 # shellcheck source=/dev/null
 source "$SCRIPT_DIR/dev-openclaw-http-json-helper.sh"
+# shellcheck source=/dev/null
+source "$SCRIPT_DIR/dev-openclaw-wait-helper.sh"
 
 "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 rm -f "$OPENCLAW_CORE_STATE_FILE" "$OPENCLAW_CORE_STATE_FILE.tmp" "$OPENCLAW_EVENT_LOG_FILE"
@@ -39,7 +41,9 @@ cleanup() {
     "${APPROVED_FILE:-}" \
     "${STEP_FILE:-}" \
     "${TASK_STATE_FILE:-}" \
-    "${REFRESH_AFTER_FILE:-}"
+    "${REFRESH_AFTER_FILE:-}" \
+    "${REFRESH_AFTER_RESTART_FILE:-}" \
+    "${TASK_AFTER_RESTART_FILE:-}"
   "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -57,6 +61,8 @@ APPROVED_FILE="$(mktemp)"
 STEP_FILE="$(mktemp)"
 TASK_STATE_FILE="$(mktemp)"
 REFRESH_AFTER_FILE="$(mktemp)"
+REFRESH_AFTER_RESTART_FILE="$(mktemp)"
+TASK_AFTER_RESTART_FILE="$(mktemp)"
 
 curl --silent --fail "$OBSERVER_URL/" > "$HTML_FILE"
 curl --silent --fail "$OBSERVER_URL/client-v5.js" > "$CLIENT_FILE"
@@ -236,6 +242,63 @@ console.log(JSON.stringify({
     observerPanel: "visible",
     canImportModule: execution.governance.canImportModule,
     canActivateRuntime: execution.governance.canActivateRuntime,
+  },
+}, null, 2));
+EOF
+
+wait_for_persisted_runtime_generation() {
+  [[ -f "$OPENCLAW_CORE_STATE_FILE" ]] \
+    && node -e 'const fs=require("node:fs"); const data=JSON.parse(fs.readFileSync(process.argv[1], "utf8")); process.exit(data.runtime?.nativePluginRegistryGeneration?.active?.id === "native-registry-generation-2" && data.runtime?.nativePluginRegistryGeneration?.active?.sequence === 2 ? 0 : 1);' "$OPENCLAW_CORE_STATE_FILE"
+}
+
+openclaw_wait_until 3 0.05 wait_for_persisted_runtime_generation
+"$SCRIPT_DIR/dev-down.sh" >/dev/null
+"$SCRIPT_DIR/dev-up.sh" >/dev/null
+
+curl --silent --fail "$CORE_URL/plugins/native-adapter/runtime-refresh-evidence" > "$REFRESH_AFTER_RESTART_FILE"
+curl --silent --fail "$CORE_URL/tasks/$task_id" > "$TASK_AFTER_RESTART_FILE"
+
+node - <<'EOF' "$TASK_STATE_FILE" "$REFRESH_AFTER_FILE" "$REFRESH_AFTER_RESTART_FILE" "$TASK_AFTER_RESTART_FILE"
+const fs = require("node:fs");
+const readJson = (index) => JSON.parse(fs.readFileSync(process.argv[index], "utf8"));
+
+const taskBeforeRestart = readJson(2);
+const refreshBeforeRestart = readJson(3);
+const refreshAfterRestart = readJson(4);
+const taskAfterRestart = readJson(5);
+const persisted = JSON.parse(fs.readFileSync(process.env.OPENCLAW_CORE_STATE_FILE, "utf8"));
+const executionBeforeRestart = taskBeforeRestart.task?.nativePluginRuntimeRefresh?.execution;
+const executionAfterRestart = taskAfterRestart.task?.nativePluginRuntimeRefresh?.execution;
+const persistedGeneration = persisted.runtime?.nativePluginRegistryGeneration;
+
+if (
+  refreshAfterRestart.runtimeState?.activeGenerationId !== "native-registry-generation-2"
+  || refreshAfterRestart.runtimeState?.activeGenerationSequence !== 2
+  || refreshAfterRestart.runtimeState?.activeGenerationHash !== refreshBeforeRestart.runtimeState?.activeGenerationHash
+  || taskAfterRestart.task?.id !== taskBeforeRestart.task?.id
+  || taskAfterRestart.task?.status !== "completed"
+  || executionAfterRestart?.generation?.currentId !== "native-registry-generation-2"
+  || executionAfterRestart?.generation?.currentSequence !== 2
+  || executionAfterRestart?.generation?.previousId !== "native-registry-generation-1"
+  || executionAfterRestart?.generation?.previousSequence !== 1
+  || executionAfterRestart?.runtimeState?.activeGenerationHash !== executionBeforeRestart?.runtimeState?.activeGenerationHash
+  || persistedGeneration?.version !== "openclaw-native-plugin-registry-generation-state-v0"
+  || persistedGeneration?.active?.id !== "native-registry-generation-2"
+  || persistedGeneration?.active?.sequence !== 2
+  || "registry" in (persistedGeneration?.active ?? {})
+  || "registry" in (persistedGeneration?.previous ?? {})
+) {
+  throw new Error(`observer runtime refresh generation did not survive core restart: ${JSON.stringify({ refreshAfterRestart, taskAfterRestart, persistedGeneration })}`);
+}
+
+console.log(JSON.stringify({
+  observerOpenClawNativePluginRuntimeRefreshPersistence: {
+    taskId: taskAfterRestart.task.id,
+    activeGeneration: refreshAfterRestart.runtimeState.activeGenerationId,
+    sequence: refreshAfterRestart.runtimeState.activeGenerationSequence,
+    hashStable: refreshAfterRestart.runtimeState.activeGenerationHash === refreshBeforeRestart.runtimeState.activeGenerationHash,
+    taskReadbackRestored: taskAfterRestart.task.id === taskBeforeRestart.task.id,
+    compactState: true,
   },
 }, null, 2));
 EOF

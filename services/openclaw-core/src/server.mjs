@@ -166,6 +166,10 @@ const server = http.createServer(async (req, res) => {
 });
 
 state.loadPersistentState();
+const nativePluginRuntimeRestore = planBuilder.restoreNativePluginRuntimeState();
+if (!nativePluginRuntimeRestore.ok && nativePluginRuntimeRestore.restored === false) {
+  console.warn(`Native plugin runtime generation state was reset: ${nativePluginRuntimeRestore.reason}`);
+}
 taskManager.reconcileInterruptedTasksAtStartup();
 taskManager.reconcileRuntimeState();
 

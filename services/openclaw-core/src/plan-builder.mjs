@@ -127,7 +127,16 @@ export function createPlanBuilder(deps) {
     shouldBuildPlan,
     updatePlanForPhase,
   } = rulePlanBuilders;
-  const nativePluginRegistryStore = createOpenClawNativePluginRegistryGenerationStore();
+  const nativePluginRegistryStore = createOpenClawNativePluginRegistryGenerationStore({
+    onStateChange: (generationState) => {
+      runtimeState.nativePluginRegistryGeneration = generationState;
+      persistState();
+    },
+  });
+
+  function restoreNativePluginRuntimeState() {
+    return nativePluginRegistryStore.restore(runtimeState.nativePluginRegistryGeneration);
+  }
 
   const nativePluginPlanBuilders = createNativePluginPlanBuilders({
     nativePluginRegistryStore,
@@ -629,6 +638,7 @@ function compactCloudConsciousnessEvidenceRef(evidence) {
 
 
   return {
+    restoreNativePluginRuntimeState,
     refreshNativePluginRuntimeRegistry,
     buildNativePluginCapabilityInvokePlan,
     buildNativePluginRuntimePreflight,

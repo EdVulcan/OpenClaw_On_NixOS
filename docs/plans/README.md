@@ -104,10 +104,10 @@ That lane now preserves compact persisted-workbench provenance through existing
 edit/write/verification task readback. The Level 1 engineering loop should not
 grow another evidence/readiness shell; continue with the smallest real Level 2
 trusted work-view/session-helper capability. The LSP selected-target chain,
-plugin generation refresh, ACPX compatibility/preflight, and local context
-packet are already completed evidence; do not reopen their historical next-step
-wording. ACPX live process execution and provider/model use remain explicit
-authorization boundaries.
+plugin generation refresh with compact core-state persistence, ACPX
+compatibility/preflight, and local context packet are already completed
+evidence; do not reopen their historical next-step wording. ACPX live process
+execution and provider/model use remain explicit authorization boundaries.
 
 The active Level 2 bridge is documented in:
 

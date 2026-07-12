@@ -39,6 +39,11 @@ The runtime refresh task now proves:
   generation and expose its id, sequence, and content hash
 - task outcome stores refresh execution evidence and verification checks
 - `/tasks/:taskId` readback exposes the persisted refresh execution evidence
+- the active and immediately previous generation metadata is persisted in the
+  existing core runtime state and restored after a core restart
+- restored generation metadata is checked against the current fixed registry
+  hash; invalid or unsupported state resets to generation 1 without restoring
+  a stale registry
 - Observer milestone coverage keeps the runtime refresh panel visible while
   proving the same approval-gated lifecycle
 - Observer now exposes an explicit `Create Refresh Task` control that reuses the
@@ -51,9 +56,11 @@ The executor refreshes the same active native registry generation used by:
 GET /plugins/native-adapter/runtime-refresh-evidence
 ```
 
-This is a real process-lifetime lifecycle state change, not module-loader
+This is a real core-state-backed lifecycle state change, not module-loader
 activation. The fixed built-in descriptor set is rebuilt and validated before
-swap; no workspace or external module path is accepted.
+swap; no workspace or external module path is accepted. Restart recovery
+rehydrates only compact generation metadata and reconstructs the current
+fixed registry locally.
 
 ## Governance
 
@@ -88,7 +95,7 @@ no install/enable/disable state mutation
 no provider call
 no network egress
 no root/system daemon escalation
-no generation persistence or automatic rollback
+no automatic rollback or generation selection from an external path
 ```
 
 ## Evidence
@@ -124,6 +131,7 @@ Validation targets:
 services/openclaw-core/test/native-plugin-plan-builders.test.mjs
 services/openclaw-core/test/native-plugin-runtime-routes.test.mjs
 services/openclaw-core/test/task-executor.test.mjs
+packages/plugin-runtime/test/plugin-runtime.test.mjs
 openclaw-native-plugin-runtime-refresh-evidence
 observer-openclaw-native-plugin-runtime-refresh-evidence
 ```
@@ -141,7 +149,7 @@ plugin install/enable/disable mutation
 provider egress
 result envelopes
 root/system daemon work
-generation persistence and explicit rollback action
+explicit rollback action
 ```
 
 ## Next Smallest Real Capability

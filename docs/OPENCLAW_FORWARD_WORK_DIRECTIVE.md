@@ -599,10 +599,12 @@ precede the restarted service's HTTP-listener readiness.
 The Level 1 live-plugin-refresh migration now owns a real fixed-registry
 generation lifecycle. An approved existing refresh task builds and validates a
 new built-in registry generation, atomically swaps the shared native plugin
-plan owner, retains the previous process-lifetime generation, and causes later
-capability plans to report the active generation id, sequence, and hash. It
-still performs no arbitrary module discovery/import, plugin code execution,
-loader-cache invalidation, provider egress, or persisted generation rollback.
+plan owner, retains the previous generation, and causes later capability plans
+to report the active generation id, sequence, and hash. Compact active and
+previous generation metadata now persists in core runtime state and is
+rehydrated after a core restart only when its hash matches the current fixed
+registry. It still performs no arbitrary module discovery/import, plugin code
+execution, loader-cache invalidation, provider egress, or automatic rollback.
 Do not expand this into another readiness chain.
 
 ## Identity-Upgrade Alignment

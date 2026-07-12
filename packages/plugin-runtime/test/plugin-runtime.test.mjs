@@ -108,3 +108,65 @@ test("keeps the active generation when candidate validation fails", () => {
   assert.equal(store.getActiveGeneration(), initial);
   assert.equal(store.describe().previous, null);
 });
+
+test("exports and restores compact generation state across store instances", () => {
+  const persistedStates = [];
+  const store = createOpenClawNativePluginRegistryGenerationStore({
+    now: () => "2026-07-11T00:00:00.000Z",
+    onStateChange: (state) => persistedStates.push(state),
+  });
+  store.refresh();
+
+  const persisted = persistedStates.at(-1);
+  assert.equal(persisted.version, "openclaw-native-plugin-registry-generation-state-v0");
+  assert.deepEqual(persisted.active, {
+    id: "native-registry-generation-2",
+    sequence: 2,
+    activatedAt: "2026-07-11T00:00:00.000Z",
+    hash: store.getActiveGeneration().hash,
+  });
+  assert.deepEqual(persisted.previous, {
+    id: "native-registry-generation-1",
+    sequence: 1,
+    activatedAt: "2026-07-11T00:00:00.000Z",
+    hash: store.getActiveGeneration().hash,
+  });
+  assert.equal("registry" in persisted.active, false);
+
+  const restoredStore = createOpenClawNativePluginRegistryGenerationStore({
+    now: () => "2026-07-12T00:00:00.000Z",
+  });
+  const result = restoredStore.restore(persisted);
+
+  assert.equal(result.ok, true);
+  assert.equal(result.restored, true);
+  assert.equal(restoredStore.getActiveGeneration().id, "native-registry-generation-2");
+  assert.equal(restoredStore.getActiveGeneration().sequence, 2);
+  assert.equal(restoredStore.describe().previous.id, "native-registry-generation-1");
+  assert.equal(restoredStore.describe().persistence, "core_state");
+
+  const next = restoredStore.refresh();
+  assert.equal(next.active.id, "native-registry-generation-3");
+  assert.equal(next.previous.id, "native-registry-generation-2");
+});
+
+test("rejects persisted generation metadata when the registry hash does not match", () => {
+  const store = createOpenClawNativePluginRegistryGenerationStore({
+    now: () => "2026-07-12T00:00:00.000Z",
+  });
+  const persisted = store.exportState();
+  persisted.active = {
+    ...persisted.active,
+    id: "native-registry-generation-4",
+    sequence: 4,
+    hash: "invalid",
+  };
+
+  const result = store.restore(persisted);
+
+  assert.equal(result.ok, false);
+  assert.equal(result.restored, false);
+  assert.equal(result.reason, "invalid_persisted_active_generation");
+  assert.equal(store.getActiveGeneration().id, "native-registry-generation-1");
+  assert.equal(store.describe().previous, null);
+});

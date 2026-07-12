@@ -407,9 +407,10 @@ OPENCLAW_NATIVE_PLUGIN_RUNTIME_REFRESH_TASK_PLAN.md
 
 It creates an approval-gated runtime refresh task, blocks before approval,
 builds and validates a new fixed native registry generation, atomically swaps it
-into the shared plan owner, retains the previous process-lifetime generation,
-and keeps arbitrary plugin module import, plugin code execution, runtime
-activation, cache mutation, provider egress, and root work disabled.
+into the shared plan owner, retains the previous generation, persists compact
+generation metadata for core restart, and keeps arbitrary plugin module import,
+plugin code execution, runtime activation, cache mutation, provider egress, and
+root work disabled.
 
 The ACPX/Codex bridge compatibility follow-up was completed as:
 
