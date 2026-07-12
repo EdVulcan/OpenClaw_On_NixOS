@@ -3,6 +3,7 @@ import {
   buildLiveProviderConfig,
   sendLiveProviderRequest,
 } from "./cloud-live-provider-network-sender.mjs";
+import { CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CONTEXT_PACKET_EVIDENCE } from "./cloud-live-provider-runtime-context-packet.mjs";
 
 export const CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_LIVE_EXECUTION_REGISTRY =
   "openclaw-cloud-consciousness-live-provider-live-execution-v0";
@@ -27,6 +28,32 @@ function compactProviderEvidence(result) {
     responseModel: result?.response?.model ?? null,
     responseTruncated: result?.response?.responseTruncated === true,
     usage: result?.response?.usage ?? null,
+  };
+}
+
+function compactContextPacketEvidence(evidence) {
+  if (!evidence || typeof evidence !== "object") return null;
+  return {
+    registry: evidence.registry ?? CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_LIVE_EXECUTION_REGISTRY,
+    sourceRegistry: evidence.sourceRegistry ?? null,
+    taskId: evidence.taskId ?? null,
+    sourceTranscriptRecords: Number.isInteger(evidence.sourceTranscriptRecords)
+      ? evidence.sourceTranscriptRecords
+      : 0,
+    messageCount: Number.isInteger(evidence.messageCount) ? evidence.messageCount : 0,
+    redactions: Number.isInteger(evidence.redactions) ? evidence.redactions : 0,
+    truncatedOutputs: Number.isInteger(evidence.truncatedOutputs) ? evidence.truncatedOutputs : 0,
+    compactedMessages: Number.isInteger(evidence.compactedMessages) ? evidence.compactedMessages : 0,
+    reclaimedChars: Number.isInteger(evidence.reclaimedChars) ? evidence.reclaimedChars : 0,
+    contextContentHash: typeof evidence.contextContentHash === "string"
+      ? evidence.contextContentHash
+      : null,
+    providerMessageChars: Number.isInteger(evidence.providerMessageChars)
+      ? evidence.providerMessageChars
+      : 0,
+    contextTruncated: evidence.contextTruncated === true,
+    contextContentIncluded: false,
+    requestEnvelopeMaterialized: evidence.requestEnvelopeMaterialized === true,
   };
 }
 
@@ -60,7 +87,7 @@ function buildOperatorAuthorization(task, approval, request) {
   };
 }
 
-function buildTaskExecutionState(result, authorization, approval) {
+function buildTaskExecutionState(result, authorization, approval, contextPacketEvidence) {
   const credentialRead = result?.governance?.credentialValueRead === true;
   const endpointContacted = result?.audit?.endpointContacted === true;
   const networkEgress = result?.audit?.networkEgress === true;
@@ -93,6 +120,7 @@ function buildTaskExecutionState(result, authorization, approval) {
     transmitsExternally: result?.audit?.transmitsExternally === true,
     liveProviderCallEnabled: result?.governance?.liveProviderCallEnabled === true,
     evidence: compactProviderEvidence(result),
+    contextPacket: compactContextPacketEvidence(contextPacketEvidence),
   };
 }
 
@@ -126,6 +154,15 @@ export async function executeCloudConsciousnessLiveProviderRequest({
       reason: "approval_required",
       task,
       approval: approval ? { ...approval } : null,
+    };
+  }
+
+  if (options.liveProviderContextPacketError) {
+    return {
+      blocked: true,
+      reason: options.liveProviderContextPacketError,
+      task,
+      approval: { ...approval },
     };
   }
 
@@ -173,7 +210,10 @@ export async function executeCloudConsciousnessLiveProviderRequest({
     env,
   });
   const evidence = compactProviderEvidence(result);
-  const taskState = buildTaskExecutionState(result, authorization, approval);
+  const contextPacketEvidence = compactContextPacketEvidence(
+    options[CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CONTEXT_PACKET_EVIDENCE],
+  );
+  const taskState = buildTaskExecutionState(result, authorization, approval, contextPacketEvidence);
   task.cloudConsciousnessLiveProviderEgressExecution = {
     ...(task.cloudConsciousnessLiveProviderEgressExecution ?? {}),
     ...taskState,
@@ -188,6 +228,7 @@ export async function executeCloudConsciousnessLiveProviderRequest({
       taskRegistry: taskState.registry,
       phase: "cloud_consciousness_live_provider_call_completed",
       liveProvider: evidence,
+      contextPacket: taskState.contextPacket,
     });
     await publishTaskState({
       task: completedTask,
@@ -202,6 +243,7 @@ export async function executeCloudConsciousnessLiveProviderRequest({
       status: "live_provider_call_completed",
       task: completedTask,
       liveProvider: transientProviderResponse(result),
+      contextPacket: taskState.contextPacket,
       governance: result.governance,
       summary: taskState,
     };
@@ -214,6 +256,7 @@ export async function executeCloudConsciousnessLiveProviderRequest({
     taskRegistry: taskState.registry,
     phase: "cloud_consciousness_live_provider_call_failed",
     liveProvider: evidence,
+    contextPacket: taskState.contextPacket,
   });
   await publishTaskState({
     task: failedTask,
@@ -229,6 +272,7 @@ export async function executeCloudConsciousnessLiveProviderRequest({
     reason: result.reason ?? "live_provider_request_failed",
     task: failedTask,
     liveProvider: transientProviderResponse(result),
+    contextPacket: taskState.contextPacket,
     governance: result.governance,
     summary: taskState,
   };

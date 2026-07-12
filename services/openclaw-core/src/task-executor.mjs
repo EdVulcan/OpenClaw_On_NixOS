@@ -19,6 +19,10 @@ import {
   isWorkViewAuthorityInterruption,
   serialiseWorkViewAuthorityInterruption,
 } from "./work-view-authority-continuity.mjs";
+import {
+  CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CONTEXT_PACKET_EVIDENCE,
+  materialiseCloudLiveProviderContextPacketExecution,
+} from "./cloud-live-provider-runtime-context-packet.mjs";
 
 export function createTaskExecutor(deps) {
   const { client, state, taskManager, planBuilder, approvalEngine, workspaceOps, policyEvaluator, publishEvent } = deps;
@@ -1103,6 +1107,9 @@ function serialiseExecutionResult(executionResult) {
       ?? finalExecution.task?.outcome?.details?.actionEvidence
       ?? null,
     liveProvider: finalExecution.liveProvider ?? null,
+    contextPacket: finalExecution.contextPacket
+      ?? finalExecution.task?.outcome?.details?.contextPacket
+      ?? null,
     capabilityInvocations: (finalExecution.capabilityInvocations ?? []).map((response) => ({
       id: response.invocation?.id ?? null,
       capabilityId: response.capability?.id ?? null,
@@ -1244,12 +1251,33 @@ function buildOperatorOptions(task, body = {}) {
   const planActions = task.plan?.steps
     ?.filter((step) => step.phase === "acting_on_target")
     .map((step) => ({ kind: step.kind, params: step.params ?? {} }));
-  return {
+  const options = {
     ...body,
     targetUrl: body.targetUrl ?? task.targetUrl,
     actions: Array.isArray(body.actions) ? body.actions : planActions,
     operator: "loop-v1",
   };
+  if (body.liveProviderExecution?.contextPacket?.requested === true) {
+    const materialised = materialiseCloudLiveProviderContextPacketExecution({
+      task,
+      liveProviderExecution: body.liveProviderExecution,
+      transcriptRecords: listCommandTranscriptRecords({ limit: 100 }),
+      capabilityInvocations: typeof planBuilder.listCapabilityInvocations === "function"
+        ? planBuilder.listCapabilityInvocations({
+          limit: 100,
+          capabilityId: "act.system.command.execute",
+        })
+        : [],
+      tasks,
+    });
+    if (materialised.ok) {
+      options.liveProviderExecution = materialised.liveProviderExecution;
+      options[CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CONTEXT_PACKET_EVIDENCE] = materialised.evidence;
+    } else {
+      options.liveProviderContextPacketError = materialised.reason;
+    }
+  }
+  return options;
 }
 
 async function runOperatorStep(body = {}) {

@@ -227,8 +227,8 @@ standalone engineering evidence/readiness shell without a concrete operator gap.
 
 The next autonomous product route is the smallest real Level 2 trusted AI
 work-view/session-helper behavior. Keep helper installation, root/system daemon
-work, desktop-wide capture, provider egress, and arbitrary endpoint execution
-deferred until their runtime owner and authority boundary are explicit.
+work, desktop-wide capture, unapproved provider egress, and arbitrary endpoint
+execution deferred until their runtime owner and authority boundary are explicit.
 
 The first Level 2 runtime slice is now active: session-manager owns an in-process
 AI work-view helper lease and browser-runtime must echo the same session/lease

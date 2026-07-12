@@ -127,8 +127,11 @@ and explicit recovery task creation; recovered verification rerun proof is
 absorbed through the existing approval/operator/verification readback path
 verification command execution and task-completion attachment
 planning/todo evidence and governed core-state workbench storage are absorbed; hidden planning mode, `.openclaw/cc-todo.md` persistence, task mutation, and plan_exit execution transition remain deferred
-microcompact evidence, bounded in-memory projection, and local governed engineering context packets are absorbed; automatic provider-request integration and persisted transcript rewriting remain deferred
-provider calls, network egress, and result envelopes
+microcompact evidence, bounded in-memory projection, local governed engineering
+context packets, and the explicitly approved DeepSeek context-packet handoff
+are absorbed; automatic provider-request creation, persisted transcript
+rewriting, and result-envelope creation remain deferred
+unapproved provider calls and network egress
 ```
 
 ## Next Slice
@@ -462,11 +465,12 @@ The bounded Level 2 browser eye-hand exit gate is closed. The kernel-whitepaper
 Phase A Nix store packaging and the fixed Phase B native D-Bus systemd inventory
 and restart slices are closed as well. The active route returns to a concrete
 Level 1 local capability; helper process execution, desktop-wide capture, hostd,
-provider egress, and ACPX/Codex live process execution remain deferred.
+unapproved provider egress, and ACPX/Codex live process execution remain
+deferred.
 
 ## Current Route Correction
 
-Updated: 2026-07-12
+Updated: 2026-07-13
 
 The historical LSP next-step text above is evidence history, not an instruction
 to reopen completed variants. The current native engineering frontier includes
@@ -474,7 +478,9 @@ the complete LSP selected-target edit, verification, recovery, and rerun loop;
 the fixed native plugin registry generation lifecycle; ACPX/Codex compatibility
 and process-spawn preflight; and the local Engineering Context Packet.
 
-The remaining ACPX live process/auth boundary and provider/model boundary require
-explicit operator authorization. Until that authorization exists, preserve the
-existing contracts and select only a concrete local capability that closes a
-user-visible gap; do not create another readiness or evidence-only shell.
+The remaining ACPX live process/auth boundary and any provider/model boundary
+outside the explicit DeepSeek handoff require explicit operator authorization.
+The context-packet handoff consumes the local packet only for the current
+approved operator call; preserve that boundary and select only concrete local
+capabilities that close a user-visible gap. Do not create another readiness or
+evidence-only shell.

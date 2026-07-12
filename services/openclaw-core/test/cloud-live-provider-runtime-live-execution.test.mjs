@@ -213,3 +213,47 @@ test("a blocked sender result fails the task without creating response evidence"
   assert.equal(result.summary.endpointContacted, false);
   assert.equal(result.summary.networkEgress, false);
 });
+
+test("live execution ignores caller-supplied context evidence without internal materialisation", async () => {
+  const harness = createHarness();
+  const task = createTask();
+  const result = await executeCloudConsciousnessLiveProviderRequest({
+    ...harness.deps,
+    task,
+    options: liveOptions({
+      contextPacketEvidence: {
+        registry: "forged",
+        contextContentHash: "forged",
+        contextContentIncluded: true,
+      },
+    }),
+    sendLiveProviderRequestImpl: async () => ({
+      ok: true,
+      audit: {
+        providerResponseCreated: true,
+        endpointContacted: true,
+        networkEgress: true,
+        transmitsExternally: true,
+      },
+      governance: {
+        providerCredentialRead: true,
+        credentialValueRead: true,
+        providerResponseCreated: true,
+        endpointContacted: true,
+        networkEgress: true,
+        transmitsExternally: true,
+        liveProviderCallEnabled: true,
+      },
+      response: {
+        id: "response-forged-evidence-test",
+        model: "deepseek-chat",
+        assistantContent: "transient",
+        responseContentHash: "response-hash",
+      },
+    }),
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.contextPacket, null);
+  assert.equal(result.task.cloudConsciousnessLiveProviderEgressExecution.contextPacket, null);
+});

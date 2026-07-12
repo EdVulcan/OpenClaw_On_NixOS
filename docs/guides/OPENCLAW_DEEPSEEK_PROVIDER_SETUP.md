@@ -59,6 +59,36 @@ Send that object as the body of `POST /operator/step` after the task approval
 is recorded. The response content is returned only in that execution response;
 the durable task record keeps hashes, status, usage, and endpoint evidence.
 
+To send the existing local Engineering Context Packet instead of supplying a
+manual prompt, replace `requestEnvelope` with this bounded context request:
+
+```json
+{
+  "liveProviderExecution": {
+    "requested": true,
+    "taskId": "<approved-egress-task-id>",
+    "contextPacket": {
+      "requested": true,
+      "taskId": "<approved-egress-task-id>",
+      "limit": 6,
+      "maxOutputChars": 1800,
+      "instruction": "Review the local engineering evidence and recommend the next verification step."
+    },
+    "authorization": {
+      "confirmed": true,
+      "credentialValueAccessAuthorized": true,
+      "endpointNetworkEgressAuthorized": true,
+      "liveProviderCallEnabled": true
+    }
+  }
+}
+```
+
+The context packet is assembled in memory for that operator call. Existing
+command output is bounded, credential-like text is redacted, and only packet
+counts, hashes, and truncation evidence are retained on the task. Do not send
+both `contextPacket` and `requestEnvelope` in the same request.
+
 Neither path turns on automatic provider calls for OpenClaw tasks. The existing
 task and Observer lanes remain approval-gated, and the live branch requires the
 explicit operator request above.

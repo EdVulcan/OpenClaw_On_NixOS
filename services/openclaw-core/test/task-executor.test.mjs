@@ -7,6 +7,7 @@ import path from "node:path";
 
 import { createTaskExecutor } from "../src/task-executor.mjs";
 import { DELEGATED_PLAN_TASK_HANDLER_DESCRIPTORS } from "../src/task-executor-delegated-plan-handlers.mjs";
+import { CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CONTEXT_PACKET_EVIDENCE } from "../src/cloud-live-provider-runtime-context-packet.mjs";
 
 const DELEGATED_NON_RECOVERABLE_TASK_HANDLERS = DELEGATED_PLAN_TASK_HANDLER_DESCRIPTORS.map(
   ({ name, predicate, execute }) => [name, predicate, execute],
@@ -1951,4 +1952,46 @@ test("browser task executor returns recoverable evidence when session authority 
   assert.equal(failed.authorityInterruption.stage, "prepare");
   assert.equal(failed.authorityInterruption.automaticRestart, false);
   assert.equal(failed.task.outcome.details.authorityInterruption.recoveryAction, "restore_trusted_work_view_then_recover_task");
+});
+
+test("operator options materialise the existing context packet for live provider execution", () => {
+  const { executor, state } = createExecutorHarness();
+  const task = {
+    id: "provider-context-task",
+    type: "cloud_consciousness_live_provider_egress_execution_task",
+    goal: "Use local engineering evidence for one approved provider call",
+    status: "completed",
+    outcome: {
+      kind: "completed",
+      details: {
+        commandTranscript: [{
+          invocationId: "provider-context-invocation",
+          command: "npm test",
+          exitCode: 0,
+          timedOut: false,
+          stdout: "provider context evidence",
+          stderr: "",
+        }],
+      },
+    },
+  };
+  state.tasks.set(task.id, task);
+
+  const options = executor.buildOperatorOptions(task, {
+    liveProviderExecution: {
+      requested: true,
+      taskId: task.id,
+      contextPacket: {
+        requested: true,
+        taskId: task.id,
+        instruction: "Recommend the next bounded verification step.",
+      },
+    },
+  });
+
+  assert.equal(options.operator, "loop-v1");
+  assert.equal(options[CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CONTEXT_PACKET_EVIDENCE].contextContentIncluded, false);
+  assert.equal(options.liveProviderExecution.requestEnvelope.messages.length, 1);
+  assert.match(options.liveProviderExecution.requestEnvelope.messages[0].content, /npm test/);
+  assert.match(options.liveProviderExecution.requestEnvelope.messages[0].content, /provider context evidence/);
 });

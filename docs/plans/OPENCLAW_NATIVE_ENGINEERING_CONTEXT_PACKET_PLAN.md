@@ -1,6 +1,6 @@
 # OpenClaw Native Engineering Context Packet Plan
 
-Updated: 2026-07-12
+Updated: 2026-07-13
 
 ## Active Slice
 
@@ -90,12 +90,12 @@ tokens, redaction and microcompaction evidence, and no provider/network use.
 ## Deferred
 
 ```text
-automatic provider request creation
-credential value access
-provider SDK loading or network egress
 automatic packet persistence
 automatic task execution or recovery
 unbounded transcript/output inclusion
+provider SDK loading
+provider calls or network egress outside the explicitly approved live-provider task
+credential value access outside the existing sender gate
 ```
 
 ## Observer Follow-Up Complete
@@ -106,9 +106,30 @@ renders the returned packet only after the operator requests it. The control
 does not create a task, approval, command, provider request, or persistent packet
 artifact.
 
+## Provider Handoff Follow-Up Complete
+
+The existing approved live-provider task can now consume this packet through
+the same explicit `POST /operator/step` execution call. The handoff is:
+
+```text
+bounded transcript/task evidence -> redaction and microcompact -> one bounded
+provider message -> existing endpoint/credential/egress gate -> transient response
+```
+
+The operator must request `contextPacket` with the current task id; a manual
+`requestEnvelope` and context packet cannot be combined. The bridge reuses the
+existing verification and recovery evidence builders, keeps packet content in
+the current execution request only, and persists only counts, hashes, redaction,
+truncation, and materialization evidence. No new provider route, task type,
+automatic call, credential read path, or Observer execution control was added.
+
+This advances the Level 1 cloud-consciousness boundary from local context
+assembly to an explicitly approved provider handoff while preserving local
+operator control.
+
 ## Next Slice
 
-The next provider-related step may consume this packet only when an explicit
-provider/API integration route is selected. Until then, improve the packet only
-for a concrete local engineering workflow gap; do not resume the historical
-Phase 59-136 wrapper chain.
+The next provider-related slice, if selected, should define an explicit local
+response transcript/readback retention policy before persisting any assistant
+content. Until that policy is chosen, keep provider response content transient
+and do not resume the historical Phase 59-136 wrapper chain.
