@@ -1,6 +1,6 @@
 # OpenClaw Native Engineering LSP Symbol Request Task Plan
 
-Updated: 2026-07-10
+Updated: 2026-07-12
 
 ## Active Slice
 
@@ -119,14 +119,16 @@ It lets the operator create the existing approval-gated symbol request task from
 the LSP panel and inspect task/approval/completion readback without adding
 another standalone evidence milestone.
 
-## Next Slice
+## Route Correction
 
-The next smallest real capability is:
+The historical next-step text for LSP references/hover variants is complete and
+must not be selected again. The subsequent LSP chain now includes bounded
+response summaries, references/hover variants, response target selection,
+selected-target read/edit, verification handoff, recovery recommendation, and
+recovered verification rerun.
 
-```text
-governed LSP references/hover variants
-```
-
-That follow-up should prove the same approval-gated single-request execution and
-bounded response summary work for references and hover without starting
-long-lived language-server pools.
+The route then completed the native plugin refresh generation lifecycle and the
+local Engineering Context Packet. The remaining ACPX live process boundary and
+provider/model boundary require explicit operator authorization; autonomous work
+must stay within already governed local capabilities until that authorization
+exists.

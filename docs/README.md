@@ -1,6 +1,6 @@
 # OpenClaw Documentation Control Room
 
-Updated: 2026-07-11
+Updated: 2026-07-12
 
 This is the active documentation entry point for `OpenClawOnNixOS`.
 
@@ -75,7 +75,7 @@ directive.
 | [OPENCLAW_NATIVE_ENGINEERING_MICROCOMPACT_PROJECTION_PLAN.md](./plans/OPENCLAW_NATIVE_ENGINEERING_MICROCOMPACT_PROJECTION_PLAN.md) | Active bounded in-memory microcompact transformation over caller-owned message copies without persisted transcript mutation or provider calls. |
 | [OPENCLAW_NATIVE_ENGINEERING_CONTEXT_PACKET_PLAN.md](./plans/OPENCLAW_NATIVE_ENGINEERING_CONTEXT_PACKET_PLAN.md) | Active local engineering context assembly over bounded/redacted task, transcript, verification, recovery, and microcompact evidence without provider calls. |
 | [OPENCLAW_NATIVE_PLUGIN_RUNTIME_REFRESH_EVIDENCE_PLAN.md](./plans/OPENCLAW_NATIVE_PLUGIN_RUNTIME_REFRESH_EVIDENCE_PLAN.md) | Active native plugin runtime refresh evidence route without module loading or activation. |
-| [OPENCLAW_NATIVE_PLUGIN_RUNTIME_REFRESH_TASK_PLAN.md](./plans/OPENCLAW_NATIVE_PLUGIN_RUNTIME_REFRESH_TASK_PLAN.md) | Active approval-gated native plugin runtime refresh task that recomputes read-model evidence after approval without module import, code execution, runtime activation, or cache mutation. |
+| [OPENCLAW_NATIVE_PLUGIN_RUNTIME_REFRESH_TASK_PLAN.md](./plans/OPENCLAW_NATIVE_PLUGIN_RUNTIME_REFRESH_TASK_PLAN.md) | Active approval-gated native plugin refresh task that atomically swaps a validated fixed-registry generation after approval without arbitrary module import, code execution, runtime activation, or cache mutation. |
 | [OPENCLAW_NATIVE_ACPX_CODEX_BRIDGE_COMPATIBILITY_PLAN.md](./plans/OPENCLAW_NATIVE_ACPX_CODEX_BRIDGE_COMPATIBILITY_PLAN.md) | Active ACPX/Codex bridge compatibility, session metadata persistence, Observer visibility, wrapper/action proposal draft, approval-gated task bridge, wrapper write proposal/preview, approved wrapper write bridge, wrapper write execution readback/recovery recommendation, process-spawn proposal contract, approval-gated process-spawn preflight task, and live execution boundary review without reading credentials, copying auth material, spawning ACP processes, or using provider egress. |
 | [OPENCLAW_NATIVE_ENGINEERING_PLAN_TODO_EVIDENCE_PLAN.md](./plans/OPENCLAW_NATIVE_ENGINEERING_PLAN_TODO_EVIDENCE_PLAN.md) | Active planning/todo evidence route for `cc_plan_enter`, `cc_plan_exit`, and `cc_todo_write` without hidden mode or todo-file mutation. |
 | [OPENCLAW_NATIVE_ENGINEERING_PLAN_TODO_WORKBENCH_STORAGE_PLAN.md](./plans/OPENCLAW_NATIVE_ENGINEERING_PLAN_TODO_WORKBENCH_STORAGE_PLAN.md) | Active governed core-state workbench storage plus compact task/readback provenance for local whitelisted suggested actions, without hidden mode, todo-file writes, arbitrary endpoints, automatic approval/execution, or providers. |

@@ -1,6 +1,6 @@
 # OpenClaw Native Engineering Tool Surface Plan
 
-Updated: 2026-07-10
+Updated: 2026-07-12
 
 ## Active Slice
 
@@ -292,13 +292,8 @@ That slice exposes creation and completion readback for the existing
 approval-gated symbol request task in the LSP Observer panel without adding a
 new standalone evidence shell.
 
-The current next smallest real capability is:
-
-```text
-governed LSP references/hover variants
-```
-
-The bounded response summary follow-up was completed as:
+The previously recorded LSP variant next-step is complete and must not be
+selected again. The bounded response summary follow-up was completed as:
 
 ```text
 OPENCLAW_NATIVE_ENGINEERING_LSP_SYMBOL_RESPONSE_SUMMARY_PLAN.md
@@ -411,9 +406,10 @@ OPENCLAW_NATIVE_PLUGIN_RUNTIME_REFRESH_TASK_PLAN.md
 ```
 
 It creates an approval-gated runtime refresh task, blocks before approval,
-recomputes read-model evidence after approval, persists task execution evidence,
-and keeps plugin module import, plugin code execution, runtime activation, cache
-mutation, provider egress, and root work disabled.
+builds and validates a new fixed native registry generation, atomically swaps it
+into the shared plan owner, retains the previous process-lifetime generation,
+and keeps arbitrary plugin module import, plugin code execution, runtime
+activation, cache mutation, provider egress, and root work disabled.
 
 The ACPX/Codex bridge compatibility follow-up was completed as:
 
@@ -469,3 +465,18 @@ not return to another native engineering evidence shell.
 The lease is now enforced for screen-act mediated browser input and click. The
 next Level 2 slice should bind explicit operator takeover to lease suspension and
 explicit resume/rebind.
+
+## Current Route Correction
+
+Updated: 2026-07-12
+
+The historical LSP next-step text above is evidence history, not an instruction
+to reopen completed variants. The current native engineering frontier includes
+the complete LSP selected-target edit, verification, recovery, and rerun loop;
+the fixed native plugin registry generation lifecycle; ACPX/Codex compatibility
+and process-spawn preflight; and the local Engineering Context Packet.
+
+The remaining ACPX live process/auth boundary and provider/model boundary require
+explicit operator authorization. Until that authorization exists, preserve the
+existing contracts and select only a concrete local capability that closes a
+user-visible gap; do not create another readiness or evidence-only shell.

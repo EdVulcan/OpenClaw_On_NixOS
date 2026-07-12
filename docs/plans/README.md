@@ -1,6 +1,6 @@
 # OpenClaw Plans Directory
 
-Updated: 2026-07-11
+Updated: 2026-07-12
 
 This directory contains both active route documents and historical milestone
 evidence. Do not infer the next development task from the highest numbered phase
@@ -103,7 +103,11 @@ OPENCLAW_NATIVE_ENGINEERING_PLAN_TODO_WORKBENCH_STORAGE_PLAN.md
 That lane now preserves compact persisted-workbench provenance through existing
 edit/write/verification task readback. The Level 1 engineering loop should not
 grow another evidence/readiness shell; continue with the smallest real Level 2
-trusted work-view/session-helper capability.
+trusted work-view/session-helper capability. The LSP selected-target chain,
+plugin generation refresh, ACPX compatibility/preflight, and local context
+packet are already completed evidence; do not reopen their historical next-step
+wording. ACPX live process execution and provider/model use remain explicit
+authorization boundaries.
 
 The active Level 2 bridge is documented in:
 
