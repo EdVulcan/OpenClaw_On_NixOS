@@ -262,6 +262,12 @@ function renderTaskSummary(task, { includeRecovery = true, includeOutcome = true
     if (task.outcome?.reason) {
       lines.push(\`Failure Reason: \${task.outcome.reason}\`);
     }
+    const trustedWorkViewAuthority = task.outcome?.details?.trustedWorkViewAuthority ?? null;
+    if (trustedWorkViewAuthority) {
+      lines.push("Trusted Work-View Authority: "
+        + (trustedWorkViewAuthority.authorityRevoked === true ? "revoked" : "unknown")
+        + " / " + (trustedWorkViewAuthority.actionAuthority ?? "unknown"));
+    }
     const taskVerification = task.outcome?.details?.verification ?? null;
     const taskWorkViewSummary = task.outcome?.details?.workViewSummary ?? taskVerification?.workViewSummary ?? null;
     const taskActionEvidence = task.outcome?.details?.actionEvidence ?? taskVerification?.actionEvidence ?? null;

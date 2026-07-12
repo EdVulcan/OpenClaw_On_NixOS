@@ -607,6 +607,17 @@ registry. It still performs no arbitrary module discovery/import, plugin code
 execution, loader-cache invalidation, provider egress, or automatic rollback.
 Do not expand this into another readiness chain.
 
+The existing operator stop control now also closes the trusted work-view action
+authority before marking a session-bound task failed. It reuses the existing
+session-manager suspend route, records only compact revoked-state evidence on
+the task, and fails closed if the authority cannot be confirmed revoked. Tasks
+without a trusted work-view session keep the existing local stop behavior. This
+closes an operator-visible stop boundary without adding a route, sidecar,
+automatic restart, or new permission surface.
+Observer task history now renders the compact revoked/authority state from that
+outcome so the stop result is visible after refresh as well as in the API
+response.
+
 ## Identity-Upgrade Alignment
 
 Every new capability must state which identity level it serves:

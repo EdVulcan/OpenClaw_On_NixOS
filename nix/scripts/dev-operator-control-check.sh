@@ -58,7 +58,7 @@ for (const token of ["resume-button", "operator-loop-status", "operator-loop-blo
     throw new Error(`Observer HTML missing ${token}`);
   }
 }
-for (const token of ["/operator/state", "/control/resume", "task.resumed"]) {
+for (const token of ["/operator/state", "/control/resume", "task.resumed", "Trusted Work-View Authority"]) {
   if (!client.includes(token)) {
     throw new Error(`Observer client missing ${token}`);
   }

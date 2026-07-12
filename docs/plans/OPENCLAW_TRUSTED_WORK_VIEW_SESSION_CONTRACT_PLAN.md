@@ -860,3 +860,19 @@ reviewed read-only Nix store paths, and the fixed Phase B native D-Bus inventory
 and system-sense restart slices are complete. The active route returns to a
 concrete Level 1 local capability; hostd expansion, provider egress, and ACPX or
 Codex live process execution remain explicitly deferred.
+
+## Operator Stop Authority Closure
+
+The existing `POST /control/stop` path now closes the trusted session boundary
+when the current task carries a work-view session id. Before marking the task
+failed, core calls the existing session-manager
+`/work-view/helper-authority/suspend` route with an `operator_stop` reason and
+accepts only `suspended` or `inactive` authority readback. A failed or
+ambiguous suspend leaves the task unchanged and returns `409`, so a stop cannot
+report success while an attached trusted browser lease remains actionable.
+
+The task phase and outcome retain only compact endpoint, helper status, and
+revoked-state evidence, and the existing Observer task summary renders that
+state after refresh. Tasks without a trusted work-view session preserve the
+existing stop behavior. No new route, process, automatic restart, desktop-wide
+capture, provider call, or root/system mutation is introduced.

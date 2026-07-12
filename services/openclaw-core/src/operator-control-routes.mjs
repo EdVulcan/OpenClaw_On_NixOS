@@ -17,6 +17,26 @@ function serialiseOperatorStep(step, { serialiseTask, serialiseExecutionResult, 
   };
 }
 
+function hasTrustedWorkViewSession(task) {
+  return typeof task?.workView?.sessionId === "string" && task.workView.sessionId.trim().length > 0;
+}
+
+function buildTrustedWorkViewStopEvidence(authorityResponse) {
+  const helperRuntime = authorityResponse?.workView?.helperRuntime
+    ?? authorityResponse?.authority
+    ?? null;
+  const actionAuthority = typeof helperRuntime?.actionAuthority === "string"
+    ? helperRuntime.actionAuthority
+    : "unknown";
+  return {
+    registry: helperRuntime?.registry ?? null,
+    endpoint: "/work-view/helper-authority/suspend",
+    actionAuthority,
+    helperStatus: helperRuntime?.status ?? null,
+    authorityRevoked: actionAuthority === "suspended" || actionAuthority === "inactive",
+  };
+}
+
 export async function handleOperatorControlRoute({
   req,
   res,
@@ -226,20 +246,49 @@ export async function handleOperatorControlRoute({
       return true;
     }
 
+    let workViewAuthority = null;
+    let trustedWorkViewStopEvidence = null;
+    if (hasTrustedWorkViewSession(task)) {
+      try {
+        workViewAuthority = await postJson(`${sessionManagerUrl}/work-view/helper-authority/suspend`, {
+          reason: "operator_stop",
+          operatorActionSource: "openclaw-core-control-stop",
+        });
+        trustedWorkViewStopEvidence = buildTrustedWorkViewStopEvidence(workViewAuthority);
+        if (!trustedWorkViewStopEvidence.authorityRevoked) {
+          throw new Error("Trusted work-view action authority did not report a revoked state.");
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unable to suspend trusted work-view action authority.";
+        sendJson(res, 409, { ok: false, error: message, task: serialiseTask(task) });
+        return true;
+      }
+    }
+
+    const stopDetails = trustedWorkViewStopEvidence
+      ? { reason: "Stopped by operator.", trustedWorkViewAuthority: trustedWorkViewStopEvidence }
+      : { reason: "Stopped by operator." };
     task.status = "failed";
-    appendTaskPhase(task, "failed", { reason: "Stopped by operator." });
+    appendTaskPhase(task, "failed", stopDetails);
     task.outcome = {
       kind: "failed",
       summary: "Stopped by operator.",
       reason: "Stopped by operator.",
       at: task.updatedAt,
     };
+    if (trustedWorkViewStopEvidence) {
+      task.outcome.details = stopDetails;
+    }
     task.closedAt = task.updatedAt;
     const stoppedTask = serialiseTask(task);
     reconcileRuntimeState();
 
     await publishEvent(createEventName("task.failed"), { task: stoppedTask, reason: "Stopped by operator." });
-    sendJson(res, 200, { ok: true, task: stoppedTask, runtime: runtimeState });
+    const response = { ok: true, task: stoppedTask, runtime: runtimeState };
+    if (workViewAuthority) {
+      response.workViewAuthority = workViewAuthority;
+    }
+    sendJson(res, 200, response);
     return true;
   }
 

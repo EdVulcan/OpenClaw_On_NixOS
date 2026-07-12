@@ -1018,6 +1018,108 @@ test("control stop route fails current task and emits task failed event", async 
   });
 });
 
+test("control stop route suspends trusted work-view authority before failing the task", async () => {
+  const task = {
+    id: "task-stop-trusted",
+    status: "running",
+    updatedAt: "2026-07-08T00:00:00.000Z",
+    workView: { sessionId: "session-stop-trusted", helperStatus: "active" },
+  };
+  const calls = [];
+  const phases = [];
+  const runtimeState = { currentTaskId: task.id };
+  const deps = createBaseDeps({
+    state: { runtimeState },
+    client: {
+      postJson: async (url, body) => {
+        calls.push({ url, body });
+        return {
+          ok: true,
+          authority: {
+            registry: "openclaw-trusted-work-view-helper-runtime-v0",
+            status: "suspended",
+            actionAuthority: "suspended",
+          },
+          workView: {
+            helperRuntime: {
+              registry: "openclaw-trusted-work-view-helper-runtime-v0",
+              status: "suspended",
+              actionAuthority: "suspended",
+            },
+          },
+        };
+      },
+    },
+    taskManager: {
+      getTaskById: (taskId) => (taskId === task.id ? task : null),
+      appendTaskPhase: (item, phase, details) => {
+        phases.push({ item, phase, details });
+        item.updatedAt = "2026-07-08T00:00:01.000Z";
+        return item;
+      },
+      reconcileRuntimeState: () => {},
+      serialiseTask: (item) => ({
+        id: item.id,
+        status: item.status,
+        outcome: item.outcome,
+        closedAt: item.closedAt,
+      }),
+    },
+  });
+
+  const response = await invokeRoute(deps, "POST", "/control/stop", {});
+
+  assert.equal(response.statusCode, 200, JSON.stringify(response.body));
+  assert.deepEqual(calls, [{
+    url: "http://127.0.0.1:4102/work-view/helper-authority/suspend",
+    body: {
+      reason: "operator_stop",
+      operatorActionSource: "openclaw-core-control-stop",
+    },
+  }]);
+  assert.equal(task.status, "failed");
+  assert.deepEqual(phases[0].details, {
+    reason: "Stopped by operator.",
+    trustedWorkViewAuthority: {
+      registry: "openclaw-trusted-work-view-helper-runtime-v0",
+      endpoint: "/work-view/helper-authority/suspend",
+      actionAuthority: "suspended",
+      helperStatus: "suspended",
+      authorityRevoked: true,
+    },
+  });
+  assert.equal(response.body.workViewAuthority.workView.helperRuntime.actionAuthority, "suspended");
+  assert.equal(response.body.task.outcome.details.trustedWorkViewAuthority.authorityRevoked, true);
+});
+
+test("control stop route fails closed when trusted authority cannot be revoked", async () => {
+  const task = {
+    id: "task-stop-trusted-error",
+    status: "running",
+    workView: { sessionId: "session-stop-trusted-error" },
+  };
+  const runtimeState = { currentTaskId: task.id };
+  const deps = createBaseDeps({
+    state: { runtimeState },
+    client: {
+      postJson: async () => {
+        throw new Error("session-manager unavailable");
+      },
+    },
+    taskManager: {
+      getTaskById: (taskId) => (taskId === task.id ? task : null),
+      serialiseTask: (item) => ({ id: item.id, status: item.status }),
+      reconcileRuntimeState: () => {},
+    },
+  });
+
+  const response = await invokeRoute(deps, "POST", "/control/stop", {});
+
+  assert.equal(response.statusCode, 409, JSON.stringify(response.body));
+  assert.equal(task.status, "running");
+  assert.equal(response.body.error, "session-manager unavailable");
+});
+
 test("task list route returns capped items with total count and summary", async () => {
   const tasks = new Map([
     ["task-1", { id: "task-1", status: "queued" }],

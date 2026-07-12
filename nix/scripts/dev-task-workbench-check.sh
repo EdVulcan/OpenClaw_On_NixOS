@@ -123,7 +123,9 @@ recovered_latest_id="$(json_value "$recovered_latest" 'const data=JSON.parse(pro
 launch_task_into_work_view "$recovered_latest_id" "$TARGET_ONE"
 
 stop_result="$(post_json "$CORE_URL/control/stop" '{}')"
-assert_json "$stop_result" 'const data=JSON.parse(process.argv[1]); if(!data.ok || data.task?.status!=="failed" || data.task?.outcome?.reason!=="Stopped by operator.") {throw new Error("stop did not create failed task with reason");}'
+assert_json "$stop_result" 'const data=JSON.parse(process.argv[1]); const evidence=data.task?.outcome?.details?.trustedWorkViewAuthority; if(!data.ok || data.task?.status!=="failed" || data.task?.outcome?.reason!=="Stopped by operator." || evidence?.authorityRevoked!==true || evidence?.actionAuthority!=="suspended" || data.workViewAuthority?.workView?.helperRuntime?.actionAuthority!=="suspended") {throw new Error(`stop did not revoke trusted work-view authority: ${JSON.stringify(data)}`);}'
+stopped_work_view_state="$(curl --silent "$SESSION_MANAGER_URL/work-view/state")"
+assert_json "$stopped_work_view_state" 'const data=JSON.parse(process.argv[1]); if(data.workView?.helperRuntime?.actionAuthority!=="suspended" || data.workView?.helperRuntime?.status!=="suspended"){throw new Error(`trusted work-view authority remained active after stop: ${JSON.stringify(data)}`);}'
 
 latest_failed="$(curl --silent "$CORE_URL/tasks/latest-failed")"
 assert_json "$latest_failed" 'const data=JSON.parse(process.argv[1]); const task=data.task; if(!task || task.status!=="failed" || !task.restorable || task.outcome?.reason!=="Stopped by operator.") {throw new Error("latest failed task missing, not recoverable, or missing failure reason");}'
