@@ -55,14 +55,52 @@ function engineeringLspSelectedTargetEditProposalSeedRoute(taskId, language = "t
   return \`/plugins/native-adapter/engineering-lsp/selected-target-edit-proposal-seed?taskId=\${encodeURIComponent(taskId ?? "")}&language=\${encodeURIComponent(language ?? "typescript")}&contextLines=0\`;
 }
 
+function engineeringLoopWorkStandardsQuery(kind) {
+  return {
+    edit: "edit",
+    write: "write",
+    verification: "verify",
+    recovery: "verify",
+    "recovery-draft": "verify",
+    "planning-workbench": "plan",
+    "lsp-lifecycle": "verify",
+  }[kind] ?? "edit";
+}
+
+function engineeringLoopWorkStandardsNextAction(workStandards) {
+  const missing = Array.isArray(workStandards?.missingRequiredStandards)
+    ? workStandards.missingRequiredStandards
+    : [];
+  const actions = {
+    plan_before_mutation: "add plan-first intent before proposing mutation",
+    diff_preview_before_apply: "review the bounded diff or mutation preview before approval",
+    explicit_approval_for_mutation: "keep mutation behind the explicit approval gate",
+    filesystem_ledger_after_apply: "inspect filesystem ledger evidence after approved apply",
+    patch_validation_for_edits: "review exact-match patch validation before creating the task",
+    verification_evidence_before_report: "attach verification evidence before reporting completion",
+    prompt_content_not_product_authority: "keep prompt content hidden and use derived standards only",
+  };
+  if (missing.length > 0) {
+    return actions[missing[0]] ?? "review missing standard: " + missing[0];
+  }
+  if (workStandards?.status === "ready_for_engineering_loop_guidance") {
+    return "standards satisfied; follow the task approval and evidence path";
+  }
+  return "inspect work-standards readback before continuing";
+}
+
 function formatEngineeringLoopWorkStandards(workStandards) {
   const score = workStandards?.score ?? {};
   const missing = workStandards?.missingRequiredStandards ?? [];
+  const query = workStandards?.query ?? latestEngineeringLoopControlState?.workStandardsQuery ?? "edit";
+  const nextAction = engineeringLoopWorkStandardsNextAction(workStandards);
   return [
     "Work Standards:",
     \`Registry: \${workStandards?.registry ?? "openclaw-engineering-work-standards-v0"}\`,
+    "Query: " + query,
     \`Status: \${workStandards?.status ?? "unknown"} satisfied=\${score.satisfied ?? 0}/\${score.required ?? 0} missing=\${score.missing ?? missing.length ?? 0}\`,
     \`Missing: \${missing.join(",") || "none"}\`,
+    "Next Standards Action: " + nextAction,
     \`Operator Contract: approval=\${Boolean(workStandards?.operatorContract?.mutationRequiresApproval)} verification=\${Boolean(workStandards?.operatorContract?.completionShouldAttachVerificationEvidence)} promptWall=\${Boolean(workStandards?.operatorContract?.promptWallEnforced)}\`,
     "Boundary: standards are read-only guidance; no task, approval, operator step, mutation, prompt execution, or provider call is created.",
   ].join("\\n");
@@ -74,10 +112,18 @@ function renderEngineeringLoopWorkStandards(workStandards) {
   }
   latestEngineeringLoopControlState.workStandards = {
     registry: workStandards?.registry ?? "openclaw-engineering-work-standards-v0",
+    query: workStandards?.query ?? latestEngineeringLoopControlState.workStandardsQuery ?? "edit",
     status: workStandards?.status ?? "unknown",
     score: workStandards?.score ?? {},
     missingRequiredStandards: workStandards?.missingRequiredStandards ?? [],
+    nextAction: engineeringLoopWorkStandardsNextAction(workStandards),
   };
+  engineeringLoopStateStandards.textContent = latestEngineeringLoopControlState.workStandards.status
+    + " ("
+    + latestEngineeringLoopControlState.workStandards.query
+    + ")";
+  engineeringLoopStateMissing.textContent = String(latestEngineeringLoopControlState.workStandards.missingRequiredStandards.length);
+  engineeringLoopStateStandardsNext.textContent = latestEngineeringLoopControlState.workStandards.nextAction;
   const marker = "\\n\\nWork Standards:\\n";
   const existing = String(engineeringLoopStateJson.textContent ?? "");
   const base = existing.includes(marker) ? existing.split(marker)[0] : existing;
@@ -91,12 +137,18 @@ async function refreshEngineeringLoopWorkStandards() {
   if (!latestEngineeringLoopControlState?.taskId) {
     return;
   }
+  const query = engineeringLoopWorkStandardsQuery(latestEngineeringLoopControlState.kind);
+  latestEngineeringLoopControlState.workStandardsQuery = query;
   try {
-    const data = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/prompt-semantics?query=edit&limit=24\`);
-    renderEngineeringLoopWorkStandards(data?.workStandards ?? data?.derivedPlanSemantics?.workStandards ?? null);
+    const data = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/prompt-semantics?query=\${encodeURIComponent(query)}&limit=24\`);
+    renderEngineeringLoopWorkStandards({
+      ...(data?.workStandards ?? data?.derivedPlanSemantics?.workStandards ?? {}),
+      query,
+    });
   } catch {
     renderEngineeringLoopWorkStandards({
       registry: "openclaw-engineering-work-standards-v0",
+      query,
       status: "offline",
       score: { required: 0, satisfied: 0, missing: 0 },
       missingRequiredStandards: [],
@@ -120,6 +172,7 @@ function renderEngineeringLoopControlState(kind, result) {
     approvalId: result.approval?.id ?? null,
     evidenceRoute,
     suggestionLink,
+    workStandardsQuery: engineeringLoopWorkStandardsQuery(kind),
   };
   engineeringLoopStateKind.textContent = kind;
   engineeringLoopStateTask.textContent = taskId === "none" ? "none" : taskId.slice(0, 8);
@@ -135,6 +188,7 @@ function renderEngineeringLoopControlState(kind, result) {
     \`Approval Status: \${result.approval?.status ?? "unknown"}\`,
     "Next: approve pending approval, then run operator step",
     \`Evidence: \${evidenceRoute}\`,
+    "Standards: pending query=" + latestEngineeringLoopControlState.workStandardsQuery,
     ...engineeringPlanTodoSuggestionLinkLines(suggestionLink),
     "Boundary: no auto-approval, no automatic operator step, no unapproved mutation.",
   ].join("\\n");
@@ -488,6 +542,7 @@ async function draftEngineeringRecoveryLoopAction() {
     throw new Error("No recoverable engineering failure is available for a recovery action draft.");
   }
   renderEngineeringRecoveryLoopDraftState(latestEngineeringRecoveryActionDraft);
+  await refreshEngineeringLoopWorkStandards();
   setControlMessage(\`Drafted recovery action for failed task \${latestEngineeringRecoveryActionDraft.sourceTaskId}; creation still requires an explicit operator click.\`);
 }
 
@@ -691,6 +746,7 @@ async function restoreEngineeringLoopStateFromHistory({ startup = false } = {}) 
 
   const { task, restored } = pair;
   restored.suggestionLink = task.engineeringPlanTodoSuggestionLink ?? null;
+  restored.workStandardsQuery = engineeringLoopWorkStandardsQuery(restored.kind);
   latestEngineeringLoopControlState = restored;
   taskHistoryFocus = "selected-task";
   selectedHistoryTaskId = task.id;
@@ -709,11 +765,13 @@ async function restoreEngineeringLoopStateFromHistory({ startup = false } = {}) 
     \`Task Status: \${task.status ?? "unknown"}\`,
     \`Restored From: \${restored.restoredFrom}\`,
     \`Evidence: \${restored.evidenceRoute}\`,
+    "Standards: pending query=" + latestEngineeringLoopControlState.workStandardsQuery,
     restored.verificationRoute ? \`Rerun Evidence: \${restored.verificationRoute}\` : null,
     \`Next: \${nextStepForRestoredEngineeringLoop(task, restored)}\`,
     ...engineeringPlanTodoSuggestionLinkLines(restored.suggestionLink),
     "Boundary: restoration is read-only; no task, approval, operator step, command, mutation, provider call, or result envelope is created.",
   ].filter(Boolean).join("\\n");
+  await refreshEngineeringLoopWorkStandards();
   setControlMessage(startup
     ? \`Auto-restored engineering loop state from core history task \${task.id}.\`
     : \`Restored engineering loop state from core history task \${task.id}.\`);

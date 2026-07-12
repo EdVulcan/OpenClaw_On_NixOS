@@ -1,6 +1,6 @@
 # OpenClaw Native Engineering Prompt Work Standards Plan
 
-Updated: 2026-07-10
+Updated: 2026-07-12
 
 ## Active Slice
 
@@ -47,6 +47,29 @@ prompt content is not product authority
 
 Observer renders the assessment in the existing OpenClaw Prompt Semantics panel.
 
+## Task-Aware Engineering Loop Readback
+
+The Observer Engineering Loop State now consumes the same read-only assessment
+with a fixed query selected from the current task kind:
+
+```text
+edit -> edit
+write -> write
+verification -> verify
+recovery/recovery-draft -> verify
+planning-workbench -> plan
+lsp-lifecycle -> verify
+```
+
+The existing panel shows the standards status, missing required standard count,
+and a bounded next-standards action. The JSON readback includes the selected
+query and the same guidance. Restored tasks refresh this state from core
+history, so a reload does not leave stale edit guidance attached to a write,
+verification, or recovery task.
+
+This remains read-only guidance: it does not create tasks, approvals, operator
+steps, mutations, command executions, provider requests, or recovery actions.
+
 ## Governance
 
 The surface remains read-only:
@@ -91,6 +114,7 @@ Validation targets:
 services/openclaw-core/test/plugin-review-workspace-intelligence.test.mjs
 openclaw-prompt-semantics-edit-plan
 observer-openclaw-prompt-semantics-edit-plan
+openclaw-native-engineering-loop-operator-controls
 ```
 
 ## Deferred
@@ -108,8 +132,8 @@ root/system daemon work
 
 ## Next Slice
 
-The next safe capability should keep strengthening the existing engineering
-loop without requiring live ACP/Codex process execution. A good candidate is a
-small Observer-side improvement that uses `workStandards` to highlight missing
-engineering-loop evidence for an existing task, while keeping task creation and
-mutation explicit.
+Task-aware standards readback is complete. The next provider-related step may
+consume the existing context packet only after an explicitly authorized local
+model/provider boundary is selected. Until then, keep provider egress,
+credential access, ACP/Codex live process execution, and root/system daemon work
+deferred; do not reopen this lane with another evidence-only shell.

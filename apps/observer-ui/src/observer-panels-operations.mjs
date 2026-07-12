@@ -136,6 +136,9 @@ export function observerOperationsPanels() {
           <div class="metric"><span>Next</span><span id="engineering-loop-state-next">create task</span></div>
           <div class="metric"><span>Evidence</span><span id="engineering-loop-state-evidence">none</span></div>
           <div class="metric"><span>Completion</span><span id="engineering-loop-state-completion">not checked</span></div>
+          <div class="metric"><span>Standards</span><span id="engineering-loop-state-standards">not loaded</span></div>
+          <div class="metric"><span>Missing Evidence</span><span id="engineering-loop-state-missing">0</span></div>
+          <div class="metric"><span>Standards Next</span><span id="engineering-loop-state-standards-next">inspect work standards</span></div>
           <div class="actions tight">
             <button id="engineering-loop-completion-button" class="secondary" type="button">Refresh Completion</button>
             <button id="engineering-loop-selected-target-read-button" class="secondary" type="button">Read Selected Target</button>

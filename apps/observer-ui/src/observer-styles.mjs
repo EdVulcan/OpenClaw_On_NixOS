@@ -54,7 +54,10 @@ export function observerStyles() {
         margin: 8px 0;
       }
       .metric span:last-child {
+        min-width: 0;
         color: var(--accent);
+        overflow-wrap: anywhere;
+        text-align: right;
       }
       .actions {
         display: flex;
