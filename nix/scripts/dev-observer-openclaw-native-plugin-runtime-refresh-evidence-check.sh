@@ -3,9 +3,6 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-FIXTURE_DIR="$REPO_ROOT/.artifacts/observer-openclaw-native-plugin-runtime-refresh-evidence-fixture"
-WORKSPACE_DIR="$FIXTURE_DIR/openclaw"
-PLUGIN_SDK_DIR="$WORKSPACE_DIR/packages/plugin-sdk"
 
 export OPENCLAW_CORE_PORT="${OPENCLAW_CORE_PORT:-10200}"
 export OPENCLAW_EVENT_HUB_PORT="${OPENCLAW_EVENT_HUB_PORT:-10201}"
@@ -16,7 +13,7 @@ export OPENCLAW_SCREEN_ACT_PORT="${OPENCLAW_SCREEN_ACT_PORT:-10205}"
 export OPENCLAW_SYSTEM_SENSE_PORT="${OPENCLAW_SYSTEM_SENSE_PORT:-10206}"
 export OPENCLAW_SYSTEM_HEAL_PORT="${OPENCLAW_SYSTEM_HEAL_PORT:-10207}"
 export OBSERVER_UI_PORT="${OBSERVER_UI_PORT:-10208}"
-export OPENCLAW_WORKSPACE_ROOTS="$WORKSPACE_DIR"
+unset OPENCLAW_WORKSPACE_ROOTS
 export OPENCLAW_CORE_STATE_FILE="${OPENCLAW_CORE_STATE_FILE:-$REPO_ROOT/.artifacts/openclaw-core-observer-native-plugin-runtime-refresh-evidence-check.json}"
 export OPENCLAW_EVENT_LOG_FILE="${OPENCLAW_EVENT_LOG_FILE:-$REPO_ROOT/.artifacts/observer-native-plugin-runtime-refresh-evidence-check-events.jsonl}"
 
@@ -28,42 +25,7 @@ OPENCLAW_POST_JSON_DATA_FLAG="-d"
 source "$SCRIPT_DIR/dev-openclaw-http-json-helper.sh"
 
 "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
-rm -rf "$FIXTURE_DIR"
-mkdir -p "$WORKSPACE_DIR/.git" "$WORKSPACE_DIR/.openclaw" "$WORKSPACE_DIR/extensions/provider-a" "$PLUGIN_SDK_DIR/src" "$PLUGIN_SDK_DIR/types"
 rm -f "$OPENCLAW_CORE_STATE_FILE" "$OPENCLAW_CORE_STATE_FILE.tmp" "$OPENCLAW_EVENT_LOG_FILE"
-
-cat > "$WORKSPACE_DIR/package.json" <<'JSON'
-{
-  "name": "openclaw",
-  "version": "0.0.0-observer-runtime-refresh-evidence-fixture",
-  "private": true,
-  "scripts": {
-    "build": "echo OBSERVER_RUNTIME_REFRESH_ROOT_SECRET_BUILD_BODY"
-  }
-}
-JSON
-cat > "$WORKSPACE_DIR/pnpm-workspace.yaml" <<'YAML'
-packages:
-  - "extensions/*"
-  - "packages/*"
-YAML
-cat > "$PLUGIN_SDK_DIR/package.json" <<'JSON'
-{
-  "name": "@openclaw/plugin-sdk",
-  "version": "0.0.0-observer-runtime-refresh-evidence-fixture",
-  "private": false,
-  "types": "./types/index.d.ts",
-  "exports": {
-    ".": "./dist/index.js"
-  },
-  "scripts": {
-    "build": "echo OBSERVER_RUNTIME_REFRESH_SDK_SECRET_BUILD_BODY"
-  }
-}
-JSON
-cat > "$PLUGIN_SDK_DIR/src/index.ts" <<'TS'
-export const OBSERVER_RUNTIME_REFRESH_SDK_SECRET_SOURCE_CONTENT = "must-not-leak";
-TS
 
 cleanup() {
   rm -f \
@@ -76,7 +38,8 @@ cleanup() {
     "${BLOCKED_FILE:-}" \
     "${APPROVED_FILE:-}" \
     "${STEP_FILE:-}" \
-    "${TASK_STATE_FILE:-}"
+    "${TASK_STATE_FILE:-}" \
+    "${REFRESH_AFTER_FILE:-}"
   "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -93,6 +56,7 @@ BLOCKED_FILE="$(mktemp)"
 APPROVED_FILE="$(mktemp)"
 STEP_FILE="$(mktemp)"
 TASK_STATE_FILE="$(mktemp)"
+REFRESH_AFTER_FILE="$(mktemp)"
 
 curl --silent --fail "$OBSERVER_URL/" > "$HTML_FILE"
 curl --silent --fail "$OBSERVER_URL/client-v5.js" > "$CLIENT_FILE"
@@ -110,7 +74,6 @@ const client = readText(3);
 const refresh = readJson(4);
 const history = readJson(5);
 const approvals = readJson(6);
-const raw = JSON.stringify({ html, client, refresh, history, approvals });
 
 for (const token of [
   "OpenClaw Native Runtime Refresh",
@@ -140,6 +103,9 @@ if (
   !refresh.ok
   || refresh.registry !== "openclaw-native-plugin-runtime-refresh-evidence-v0"
   || refresh.summary?.readModelRefreshed !== true
+  || refresh.runtimeState?.activeGenerationId !== "native-registry-generation-1"
+  || refresh.runtimeState?.activeGenerationSequence !== 1
+  || typeof refresh.runtimeState?.activeGenerationHash !== "string"
   || refresh.summary?.canImportModule !== false
   || refresh.summary?.canExecutePluginCode !== false
   || refresh.summary?.canActivateRuntime !== false
@@ -153,17 +119,6 @@ if ((history.items ?? []).length !== 0) {
 if ((approvals.items ?? []).length !== 0) {
   throw new Error(`Observer runtime refresh evidence must not create approvals: ${JSON.stringify(approvals.items)}`);
 }
-for (const secret of [
-  "OBSERVER_RUNTIME_REFRESH_ROOT_SECRET_BUILD_BODY",
-  "OBSERVER_RUNTIME_REFRESH_SDK_SECRET_BUILD_BODY",
-  "OBSERVER_RUNTIME_REFRESH_SDK_SECRET_SOURCE_CONTENT",
-  "0.0.0-observer-runtime-refresh-evidence-fixture",
-]) {
-  if (raw.includes(secret)) {
-    throw new Error(`Observer runtime refresh evidence leaked source contents, script bodies, or package versions: ${secret}`);
-  }
-}
-
 console.log(JSON.stringify({
   observerOpenClawNativePluginRuntimeRefreshEvidence: {
     html: "visible",
@@ -192,6 +147,9 @@ if (
   || taskResponse.governance?.canImportModule !== false
   || taskResponse.governance?.canExecutePluginCode !== false
   || taskResponse.governance?.canActivateRuntime !== false
+  || taskResponse.task?.plan?.registryGeneration?.id !== "native-registry-generation-1"
+  || taskResponse.task?.plan?.registryGeneration?.sequence !== 1
+  || taskResponse.task?.plan?.steps?.[0]?.params?.registryGeneration?.sequence !== 1
 ) {
   throw new Error(`observer runtime refresh task response mismatch: ${JSON.stringify(taskResponse)}`);
 }
@@ -218,8 +176,9 @@ EOF
 post_json "$CORE_URL/approvals/$approval_id/approve" '{"approvedBy":"dev-observer-openclaw-native-plugin-runtime-refresh-evidence-check","reason":"Approve observer-visible read-model-only runtime refresh task."}' > "$APPROVED_FILE"
 post_json "$CORE_URL/operator/step" '{}' > "$STEP_FILE"
 curl --silent --fail "$CORE_URL/tasks/$task_id" > "$TASK_STATE_FILE"
+curl --silent --fail "$CORE_URL/plugins/native-adapter/runtime-refresh-evidence" > "$REFRESH_AFTER_FILE"
 
-node - <<'EOF' "$HTML_FILE" "$CLIENT_FILE" "$TASK_FILE" "$APPROVED_FILE" "$STEP_FILE" "$TASK_STATE_FILE"
+node - <<'EOF' "$HTML_FILE" "$CLIENT_FILE" "$TASK_FILE" "$APPROVED_FILE" "$STEP_FILE" "$TASK_STATE_FILE" "$REFRESH_AFTER_FILE"
 const fs = require("node:fs");
 const readText = (index) => fs.readFileSync(process.argv[index], "utf8");
 const readJson = (index) => JSON.parse(readText(index));
@@ -230,7 +189,7 @@ const taskResponse = readJson(4);
 const approved = readJson(5);
 const step = readJson(6);
 const taskState = readJson(7);
-const raw = JSON.stringify({ html, client, taskResponse, approved, step, taskState });
+const refreshAfter = readJson(8);
 
 if (!html.includes("OpenClaw Native Runtime Refresh") || !client.includes("/plugins/native-adapter/runtime-refresh-evidence")) {
   throw new Error("Observer runtime refresh panel tokens should remain visible after task bridge.");
@@ -253,20 +212,19 @@ if (
   || execution.governance?.canExecutePluginCode !== false
   || execution.governance?.canActivateRuntime !== false
   || execution.runtimeRefreshEvidence?.summary?.readModelRefreshed !== true
+  || execution.generation?.previousId !== "native-registry-generation-1"
+  || execution.generation?.previousSequence !== 1
+  || execution.generation?.currentId !== "native-registry-generation-2"
+  || execution.generation?.currentSequence !== 2
+  || execution.runtimeState?.activeGenerationId !== execution.generation.currentId
+  || execution.runtimeState?.activeGenerationSequence !== execution.generation.currentSequence
+  || taskState.task?.plan?.registryGeneration?.id !== execution.generation.previousId
+  || taskState.task?.plan?.registryGeneration?.sequence !== execution.generation.previousSequence
+  || refreshAfter.runtimeState?.activeGenerationId !== execution.generation.currentId
+  || refreshAfter.runtimeState?.activeGenerationSequence !== execution.generation.currentSequence
 ) {
   throw new Error(`observer runtime refresh task readback mismatch: ${JSON.stringify(taskState)}`);
 }
-for (const secret of [
-  "OBSERVER_RUNTIME_REFRESH_ROOT_SECRET_BUILD_BODY",
-  "OBSERVER_RUNTIME_REFRESH_SDK_SECRET_BUILD_BODY",
-  "OBSERVER_RUNTIME_REFRESH_SDK_SECRET_SOURCE_CONTENT",
-  "0.0.0-observer-runtime-refresh-evidence-fixture",
-]) {
-  if (raw.includes(secret)) {
-    throw new Error(`Observer runtime refresh task leaked source contents, script bodies, or package versions: ${secret}`);
-  }
-}
-
 console.log(JSON.stringify({
   observerOpenClawNativePluginRuntimeRefreshTask: {
     taskId: taskState.task.id,

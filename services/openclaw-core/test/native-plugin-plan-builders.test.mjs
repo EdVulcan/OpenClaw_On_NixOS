@@ -65,6 +65,32 @@ test("native plugin plan builders preserve runtime preflight and adapter contrac
   assert.equal(refreshedEvidence.runtimeState.activeGenerationId, refresh.active.id);
 });
 
+test("native plugin runtime refresh uses the built-in registry without a reviewed SDK package", async () => {
+  const { deps } = createTaskLifecycleHarness({
+    deps: {
+      buildNativePluginManifestProfile: () => {
+        throw new Error("reviewed SDK package should not be required for runtime refresh");
+      },
+    },
+  });
+  const builders = createNativePluginPlanBuilders(deps);
+
+  const evidence = builders.buildNativePluginRuntimeRefreshEvidence();
+  const draft = builders.buildNativePluginRuntimeRefreshTaskDraft();
+  const taskResponse = await builders.createNativePluginRuntimeRefreshTask({ confirm: true });
+
+  assert.equal(evidence.summary.refreshEvidenceReady, true);
+  assert.equal(evidence.runtimeState.activeGenerationSequence, 1);
+  assert.deepEqual(draft.plan.registryGeneration, {
+    id: "native-registry-generation-1",
+    sequence: 1,
+    hash: evidence.runtimeState.activeGenerationHash,
+  });
+  assert.deepEqual(draft.plan.steps[0].params.registryGeneration, draft.plan.registryGeneration);
+  assert.equal(taskResponse.task.nativePluginRuntimeRefresh.packagePath, undefined);
+  assert.deepEqual(taskResponse.task.nativePluginRuntimeRefresh.registryGeneration, draft.plan.registryGeneration);
+});
+
 test("native plugin plan builders create approval-gated task shells", async () => {
   const { deps, calls, events } = createNativePluginHarness();
   const builders = createNativePluginPlanBuilders(deps);

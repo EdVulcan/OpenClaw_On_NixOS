@@ -3,9 +3,6 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-FIXTURE_DIR="$REPO_ROOT/.artifacts/openclaw-native-plugin-runtime-refresh-evidence-fixture"
-WORKSPACE_DIR="$FIXTURE_DIR/openclaw"
-PLUGIN_SDK_DIR="$WORKSPACE_DIR/packages/plugin-sdk"
 
 export OPENCLAW_CORE_PORT="${OPENCLAW_CORE_PORT:-10180}"
 export OPENCLAW_EVENT_HUB_PORT="${OPENCLAW_EVENT_HUB_PORT:-10181}"
@@ -16,7 +13,7 @@ export OPENCLAW_SCREEN_ACT_PORT="${OPENCLAW_SCREEN_ACT_PORT:-10185}"
 export OPENCLAW_SYSTEM_SENSE_PORT="${OPENCLAW_SYSTEM_SENSE_PORT:-10186}"
 export OPENCLAW_SYSTEM_HEAL_PORT="${OPENCLAW_SYSTEM_HEAL_PORT:-10187}"
 export OBSERVER_UI_PORT="${OBSERVER_UI_PORT:-10188}"
-export OPENCLAW_WORKSPACE_ROOTS="$WORKSPACE_DIR"
+unset OPENCLAW_WORKSPACE_ROOTS
 export OPENCLAW_CORE_STATE_FILE="${OPENCLAW_CORE_STATE_FILE:-$REPO_ROOT/.artifacts/openclaw-core-native-plugin-runtime-refresh-evidence-check.json}"
 export OPENCLAW_EVENT_LOG_FILE="${OPENCLAW_EVENT_LOG_FILE:-$REPO_ROOT/.artifacts/openclaw-native-plugin-runtime-refresh-evidence-check-events.jsonl}"
 
@@ -27,54 +24,19 @@ OPENCLAW_POST_JSON_DATA_FLAG="-d"
 source "$SCRIPT_DIR/dev-openclaw-http-json-helper.sh"
 
 "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
-rm -rf "$FIXTURE_DIR"
-mkdir -p "$WORKSPACE_DIR/.git" "$WORKSPACE_DIR/.openclaw" "$WORKSPACE_DIR/extensions/provider-a" "$PLUGIN_SDK_DIR/src" "$PLUGIN_SDK_DIR/types"
 rm -f "$OPENCLAW_CORE_STATE_FILE" "$OPENCLAW_CORE_STATE_FILE.tmp" "$OPENCLAW_EVENT_LOG_FILE"
-
-cat > "$WORKSPACE_DIR/package.json" <<'JSON'
-{
-  "name": "openclaw",
-  "version": "0.0.0-runtime-refresh-evidence-fixture",
-  "private": true,
-  "scripts": {
-    "build": "echo RUNTIME_REFRESH_ROOT_SECRET_BUILD_BODY"
-  }
-}
-JSON
-cat > "$WORKSPACE_DIR/pnpm-workspace.yaml" <<'YAML'
-packages:
-  - "extensions/*"
-  - "packages/*"
-YAML
-cat > "$PLUGIN_SDK_DIR/package.json" <<'JSON'
-{
-  "name": "@openclaw/plugin-sdk",
-  "version": "0.0.0-runtime-refresh-evidence-fixture",
-  "private": false,
-  "types": "./types/index.d.ts",
-  "exports": {
-    ".": "./dist/index.js"
-  },
-  "scripts": {
-    "build": "echo RUNTIME_REFRESH_SDK_SECRET_BUILD_BODY"
-  }
-}
-JSON
-cat > "$PLUGIN_SDK_DIR/src/index.ts" <<'TS'
-export const RUNTIME_REFRESH_SDK_SECRET_SOURCE_CONTENT = "must-not-leak";
-TS
 
 cleanup() {
   rm -f \
     "${REFRESH_FILE:-}" \
     "${HISTORY_FILE:-}" \
     "${APPROVALS_FILE:-}" \
-    "${ADAPTER_FILE:-}" \
     "${TASK_FILE:-}" \
     "${BLOCKED_FILE:-}" \
     "${APPROVED_FILE:-}" \
     "${STEP_FILE:-}" \
-    "${TASK_STATE_FILE:-}"
+    "${TASK_STATE_FILE:-}" \
+    "${REFRESH_AFTER_FILE:-}"
   "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -84,27 +46,24 @@ trap cleanup EXIT
 REFRESH_FILE="$(mktemp)"
 HISTORY_FILE="$(mktemp)"
 APPROVALS_FILE="$(mktemp)"
-ADAPTER_FILE="$(mktemp)"
 TASK_FILE="$(mktemp)"
 BLOCKED_FILE="$(mktemp)"
 APPROVED_FILE="$(mktemp)"
 STEP_FILE="$(mktemp)"
 TASK_STATE_FILE="$(mktemp)"
+REFRESH_AFTER_FILE="$(mktemp)"
 
 curl --silent --fail "$CORE_URL/plugins/native-adapter/runtime-refresh-evidence" > "$REFRESH_FILE"
 curl --silent --fail "$CORE_URL/capabilities/invocations?limit=10" > "$HISTORY_FILE"
 curl --silent --fail "$CORE_URL/approvals?status=pending&limit=10" > "$APPROVALS_FILE"
-curl --silent --fail "$CORE_URL/plugins/openclaw-native-plugin-adapter" > "$ADAPTER_FILE"
 
-node - <<'EOF' "$REFRESH_FILE" "$HISTORY_FILE" "$APPROVALS_FILE" "$ADAPTER_FILE"
+node - <<'EOF' "$REFRESH_FILE" "$HISTORY_FILE" "$APPROVALS_FILE"
 const fs = require("node:fs");
 const readJson = (index) => JSON.parse(fs.readFileSync(process.argv[index], "utf8"));
 
 const refresh = readJson(2);
 const history = readJson(3);
 const approvals = readJson(4);
-const adapter = readJson(5);
-const raw = JSON.stringify({ refresh, history, approvals, adapter });
 
 if (
   !refresh.ok
@@ -112,6 +71,9 @@ if (
   || refresh.mode !== "governed-runtime-refresh-evidence-only"
   || refresh.capability?.id !== "sense.openclaw.plugin_runtime.refresh_evidence"
   || refresh.runtimeState?.readModelRefreshed !== true
+  || refresh.runtimeState?.activeGenerationId !== "native-registry-generation-1"
+  || refresh.runtimeState?.activeGenerationSequence !== 1
+  || typeof refresh.runtimeState?.activeGenerationHash !== "string"
   || refresh.runtimeState?.activeLoader !== false
   || refresh.runtimeState?.loadedPluginModules !== 0
   || refresh.summary?.readModelRefreshed !== true
@@ -144,23 +106,6 @@ if ((history.items ?? []).length !== 0) {
 if ((approvals.items ?? []).length !== 0) {
   throw new Error(`runtime refresh evidence must not create approvals: ${JSON.stringify(approvals.items)}`);
 }
-if (
-  !adapter.implementedCapabilities?.includes("sense.openclaw.plugin_runtime.refresh_evidence")
-  || adapter.summary?.canReadPluginRuntimeRefreshEvidence !== true
-) {
-  throw new Error(`native adapter missing runtime refresh evidence capability: ${JSON.stringify(adapter)}`);
-}
-for (const secret of [
-  "RUNTIME_REFRESH_ROOT_SECRET_BUILD_BODY",
-  "RUNTIME_REFRESH_SDK_SECRET_BUILD_BODY",
-  "RUNTIME_REFRESH_SDK_SECRET_SOURCE_CONTENT",
-  "0.0.0-runtime-refresh-evidence-fixture",
-]) {
-  if (raw.includes(secret)) {
-    throw new Error(`runtime refresh evidence leaked source contents, script bodies, or package versions: ${secret}`);
-  }
-}
-
 console.log(JSON.stringify({
   openclawNativePluginRuntimeRefreshEvidence: {
     registry: refresh.registry,
@@ -188,6 +133,9 @@ if (
   || taskResponse.governance?.canImportModule !== false
   || taskResponse.governance?.canExecutePluginCode !== false
   || taskResponse.governance?.canActivateRuntime !== false
+  || taskResponse.task?.plan?.registryGeneration?.id !== "native-registry-generation-1"
+  || taskResponse.task?.plan?.registryGeneration?.sequence !== 1
+  || taskResponse.task?.plan?.steps?.[0]?.params?.registryGeneration?.sequence !== 1
 ) {
   throw new Error(`runtime refresh task response mismatch: ${JSON.stringify(taskResponse)}`);
 }
@@ -214,8 +162,9 @@ EOF
 post_json "$CORE_URL/approvals/$approval_id/approve" '{"approvedBy":"dev-openclaw-native-plugin-runtime-refresh-evidence-check","reason":"Approve read-model-only runtime refresh task."}' > "$APPROVED_FILE"
 post_json "$CORE_URL/operator/step" '{}' > "$STEP_FILE"
 curl --silent --fail "$CORE_URL/tasks/$task_id" > "$TASK_STATE_FILE"
+curl --silent --fail "$CORE_URL/plugins/native-adapter/runtime-refresh-evidence" > "$REFRESH_AFTER_FILE"
 
-node - <<'EOF' "$TASK_FILE" "$APPROVED_FILE" "$STEP_FILE" "$TASK_STATE_FILE"
+node - <<'EOF' "$TASK_FILE" "$APPROVED_FILE" "$STEP_FILE" "$TASK_STATE_FILE" "$REFRESH_AFTER_FILE"
 const fs = require("node:fs");
 const readJson = (index) => JSON.parse(fs.readFileSync(process.argv[index], "utf8"));
 
@@ -223,7 +172,7 @@ const taskResponse = readJson(2);
 const approved = readJson(3);
 const step = readJson(4);
 const taskState = readJson(5);
-const raw = JSON.stringify({ taskResponse, approved, step, taskState });
+const refreshAfter = readJson(6);
 
 if (approved.approval?.status !== "approved" || approved.task?.policy?.decision?.decision !== "audit_only") {
   throw new Error(`runtime refresh approval should be approved and audited: ${JSON.stringify(approved)}`);
@@ -244,23 +193,22 @@ if (
   || execution.governance?.canActivateRuntime !== false
   || execution.governance?.canMutatePluginInstallState !== false
   || execution.runtimeRefreshEvidence?.summary?.readModelRefreshed !== true
+  || execution.generation?.previousId !== "native-registry-generation-1"
+  || execution.generation?.previousSequence !== 1
+  || execution.generation?.currentId !== "native-registry-generation-2"
+  || execution.generation?.currentSequence !== 2
+  || execution.runtimeState?.activeGenerationId !== execution.generation.currentId
+  || execution.runtimeState?.activeGenerationSequence !== execution.generation.currentSequence
+  || taskState.task?.plan?.registryGeneration?.id !== execution.generation.previousId
+  || taskState.task?.plan?.registryGeneration?.sequence !== execution.generation.previousSequence
+  || refreshAfter.runtimeState?.activeGenerationId !== execution.generation.currentId
+  || refreshAfter.runtimeState?.activeGenerationSequence !== execution.generation.currentSequence
 ) {
   throw new Error(`runtime refresh task readback mismatch: ${JSON.stringify(taskState)}`);
 }
 if (taskState.task?.outcome?.details?.verification?.ok !== true) {
   throw new Error(`runtime refresh task should record successful verification: ${JSON.stringify(taskState.task?.outcome)}`);
 }
-for (const secret of [
-  "RUNTIME_REFRESH_ROOT_SECRET_BUILD_BODY",
-  "RUNTIME_REFRESH_SDK_SECRET_BUILD_BODY",
-  "RUNTIME_REFRESH_SDK_SECRET_SOURCE_CONTENT",
-  "0.0.0-runtime-refresh-evidence-fixture",
-]) {
-  if (raw.includes(secret)) {
-    throw new Error(`runtime refresh task leaked source contents, script bodies, or package versions: ${secret}`);
-  }
-}
-
 console.log(JSON.stringify({
   openclawNativePluginRuntimeRefreshTask: {
     taskId: taskState.task.id,

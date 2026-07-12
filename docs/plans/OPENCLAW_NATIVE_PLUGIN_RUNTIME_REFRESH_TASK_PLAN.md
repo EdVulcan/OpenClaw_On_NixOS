@@ -1,6 +1,6 @@
 # OpenClaw Native Plugin Runtime Refresh Task Plan
 
-Updated: 2026-07-11
+Updated: 2026-07-12
 
 ## Active Slice
 
@@ -28,8 +28,13 @@ The runtime refresh task now proves:
 - approval converts the policy decision to audited execution
 - approved operator execution builds and validates a new fixed native registry
   generation and atomically swaps it into the shared plan/runtime owner
+- refresh evidence and task materialization use only the built-in native
+  registry generation; they do not require a reviewed SDK package or manifest
+  profile
 - failed candidate validation leaves the old generation active
 - the immediately previous generation remains available in memory
+- the task plan records the pre-approval generation and task execution/readback
+  records the previous-to-current generation transition
 - subsequent native plugin capability plans resolve against the active
   generation and expose its id, sequence, and content hash
 - task outcome stores refresh execution evidence and verification checks

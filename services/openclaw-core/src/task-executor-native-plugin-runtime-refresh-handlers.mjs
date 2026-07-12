@@ -139,15 +139,21 @@ export function createNativePluginRuntimeRefreshTaskHandlers({
     if (!refresh.ok || !refresh.swapped) {
       throw new Error("Native plugin registry generation refresh validation failed.");
     }
-    const evidence = planBuilder.buildNativePluginRuntimeRefreshEvidence({
-      packagePath: metadata.packagePath ?? null,
-      capabilityId: metadata.capabilityId ?? "act.plugin.capability.invoke",
-    });
+    const evidence = planBuilder.buildNativePluginRuntimeRefreshEvidence();
+    if (
+      evidence.runtimeState?.activeGenerationId !== refresh.active.id
+      || evidence.runtimeState?.activeGenerationSequence !== refresh.active.sequence
+      || evidence.runtimeState?.activeGenerationHash !== refresh.active.hash
+    ) {
+      throw new Error("Native plugin runtime refresh evidence does not match the active registry generation.");
+    }
     const execution = {
       ...buildRuntimeRefreshExecutionRecord({ task, evidence, approval }),
       generation: {
         previousId: refresh.previous?.id ?? null,
+        previousSequence: refresh.previous?.sequence ?? null,
         currentId: refresh.active.id,
+        currentSequence: refresh.active.sequence,
         previousHash: refresh.previous?.hash ?? null,
         currentHash: refresh.active.hash,
         swapped: true,

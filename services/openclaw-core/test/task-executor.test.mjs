@@ -136,8 +136,8 @@ function buildDefaultPlanBuilder() {
     refreshNativePluginRuntimeRegistry: () => ({
       ok: true,
       swapped: true,
-      previous: { id: "native-registry-generation-1", hash: "hash-1" },
-      active: { id: "native-registry-generation-2", hash: "hash-2" },
+      previous: { id: "native-registry-generation-1", sequence: 1, hash: "hash-1" },
+      active: { id: "native-registry-generation-2", sequence: 2, hash: "hash-2" },
     }),
   };
   for (const [name, predicate, execute] of DELEGATED_NON_RECOVERABLE_TASK_HANDLERS) {
@@ -550,43 +550,50 @@ test("native plugin runtime refresh task waits for approval before execution", a
 });
 
 test("approved native plugin runtime refresh task completes with read-model evidence", async () => {
+  const refreshEvidenceInputs = [];
   const { executor, state, events } = createExecutorHarness({
     planBuilder: {
-      buildNativePluginRuntimeRefreshEvidence: () => ({
-        ok: true,
-        registry: "openclaw-native-plugin-runtime-refresh-evidence-v0",
-        mode: "governed-runtime-refresh-evidence-only",
-        generatedAt: "2026-07-10T00:00:00.000Z",
-        capability: {
-          id: "sense.openclaw.plugin_runtime.refresh_evidence",
-          risk: "medium",
-        },
-        runtimeState: {
-          readModelRefreshed: true,
-          validationOk: true,
-          activeLoader: false,
-          loadedPluginModules: 0,
-          moduleCacheInvalidated: false,
-        },
-        summary: {
-          readModelRefreshed: true,
-          validationOk: true,
-          canImportModule: false,
-          canExecutePluginCode: false,
-          canActivateRuntime: false,
-        },
-        governance: {
-          canRefreshReadModel: true,
-          canInvalidateModuleCache: false,
-          canImportModule: false,
-          canExecutePluginCode: false,
-          canActivateRuntime: false,
-        },
-        auditEvidence: {
-          operation: "plugin_runtime_refresh_evidence",
-        },
-        deferredExecutionBoundaries: ["no plugin module import"],
-      }),
+      buildNativePluginRuntimeRefreshEvidence: (...args) => {
+        refreshEvidenceInputs.push(args);
+        return {
+          ok: true,
+          registry: "openclaw-native-plugin-runtime-refresh-evidence-v0",
+          mode: "governed-runtime-refresh-evidence-only",
+          generatedAt: "2026-07-10T00:00:00.000Z",
+          capability: {
+            id: "sense.openclaw.plugin_runtime.refresh_evidence",
+            risk: "medium",
+          },
+          runtimeState: {
+            readModelRefreshed: true,
+            validationOk: true,
+            activeGenerationId: "native-registry-generation-2",
+            activeGenerationSequence: 2,
+            activeGenerationHash: "hash-2",
+            activeLoader: false,
+            loadedPluginModules: 0,
+            moduleCacheInvalidated: false,
+          },
+          summary: {
+            readModelRefreshed: true,
+            validationOk: true,
+            canImportModule: false,
+            canExecutePluginCode: false,
+            canActivateRuntime: false,
+          },
+          governance: {
+            canRefreshReadModel: true,
+            canInvalidateModuleCache: false,
+            canImportModule: false,
+            canExecutePluginCode: false,
+            canActivateRuntime: false,
+          },
+          auditEvidence: {
+            operation: "plugin_runtime_refresh_evidence",
+          },
+          deferredExecutionBoundaries: ["no plugin module import"],
+        };
+      },
     },
   });
   state.approvals.set("approval-runtime-refresh-approved", {
@@ -633,6 +640,7 @@ test("approved native plugin runtime refresh task completes with read-model evid
   assert.equal(execution.governance.canActivateRuntime, false);
   assert.equal(result.finalExecution.task.nativePluginRuntimeRefresh.execution.registry, execution.registry);
   assert.equal(result.finalExecution.task.outcome.details.verification.ok, true);
+  assert.deepEqual(refreshEvidenceInputs, [[]]);
   assert(events.some((event) => event.name === "task.completed"));
 });
 

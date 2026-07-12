@@ -38,6 +38,7 @@ The native builder:
 
 ```text
 recomputes the native plugin contract registry read model
+reads the active built-in registry generation without requiring a reviewed SDK package
 summarizes runtime activation plan gates
 reports cache invalidation intent while keeping cache mutation disabled
 reports plugin module load, code execution, and runtime activation as blocked
@@ -136,3 +137,8 @@ recomputes read-model evidence only after approval, stores execution evidence in
 `nativePluginRuntimeRefresh.execution`, and keeps plugin module import, plugin
 code execution, runtime activation, cache mutation, provider egress, and root
 work disabled.
+
+The runtime refresh milestone checks now run without a workspace or reviewed SDK
+fixture. They assert the initial generation in GET evidence and task plan
+readback, then assert the approved generation transition through task execution
+and the subsequent GET evidence.

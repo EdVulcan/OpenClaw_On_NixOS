@@ -555,10 +555,9 @@ function buildNativePluginRuntimeAdapterContract({ packagePath = null, capabilit
   };
 }
 
-function buildNativePluginRuntimeRefreshEvidence({ packagePath = null, capabilityId = "act.plugin.capability.invoke" } = {}) {
+function buildNativePluginRuntimeRefreshEvidence() {
   const activeGeneration = nativePluginRegistryStore.getActiveGeneration();
   return buildNativePluginRuntimeRefreshEvidenceEnvelope({
-    activationPlan: buildNativePluginRuntimeActivationPlan({ packagePath, capabilityId }),
     nativeRegistry: activeGeneration.registry,
     registryGeneration: activeGeneration,
   });

@@ -2,7 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { Readable } from "node:stream";
 
+import { createNativePluginPlanBuilders } from "../src/native-plugin-plan-builders.mjs";
 import { handleNativePluginRuntimeRoute } from "../src/native-plugin-runtime-routes.mjs";
+import { createTaskLifecycleHarness } from "./task-builder-harness.mjs";
 
 async function invokeNativePluginRuntimeRoute(planBuilder, method, path, body = null) {
   const chunks = body === null ? [] : [Buffer.from(JSON.stringify(body))];
@@ -191,4 +193,34 @@ test("native plugin runtime route reports misses without writing a response", as
   assert.equal(missed.handled, false);
   assert.equal(missed.statusCode, null);
   assert.equal(missed.body, null);
+});
+
+test("native plugin runtime refresh routes use the built-in registry without a reviewed SDK package", async () => {
+  const { deps, calls } = createTaskLifecycleHarness({
+    deps: {
+      buildNativePluginManifestProfile: () => {
+        throw new Error("reviewed SDK package should not be required for runtime refresh routes");
+      },
+    },
+  });
+  const planBuilder = createNativePluginPlanBuilders(deps);
+
+  const evidence = await invokeNativePluginRuntimeRoute(
+    planBuilder,
+    "GET",
+    "/plugins/native-adapter/runtime-refresh-evidence",
+  );
+  assert.equal(evidence.statusCode, 200);
+  assert.equal(evidence.body.runtimeState.activeGenerationSequence, 1);
+
+  const task = await invokeNativePluginRuntimeRoute(
+    planBuilder,
+    "POST",
+    "/plugins/native-adapter/runtime-refresh-tasks",
+    { confirm: true },
+  );
+  assert.equal(task.statusCode, 201);
+  assert.equal(task.body.runtimeRefreshEvidence.runtimeState.activeGenerationSequence, 1);
+  assert.equal(task.body.task.id, "task-1");
+  assert.equal(calls.find((call) => call.name === "createTask")?.input?.plan?.registryGeneration?.sequence, 1);
 });

@@ -33,11 +33,13 @@ export function createNativePluginRuntimeRefreshTaskBuilders(deps) {
     serialisePlanForPublic,
   } = deps;
 
-  function buildNativePluginRuntimeRefreshTaskDraft({
-    packagePath = null,
-    capabilityId = "act.plugin.capability.invoke",
-  } = {}) {
-    const refreshEvidence = buildNativePluginRuntimeRefreshEvidence({ packagePath, capabilityId });
+  function buildNativePluginRuntimeRefreshTaskDraft() {
+    const refreshEvidence = buildNativePluginRuntimeRefreshEvidence();
+    const registryGeneration = {
+      id: refreshEvidence.runtimeState?.activeGenerationId ?? null,
+      sequence: refreshEvidence.runtimeState?.activeGenerationSequence ?? null,
+      hash: refreshEvidence.runtimeState?.activeGenerationHash ?? null,
+    };
     const now = new Date().toISOString();
     const policyRequest = {
       intent: "plugin.runtime_refresh",
@@ -83,6 +85,7 @@ export function createNativePluginRuntimeRefreshTaskBuilders(deps) {
       intent: policyRequest.intent,
       createdAt: now,
       updatedAt: now,
+      registryGeneration,
       capabilitySummary: {
         total: 3,
         approvalGates: 1,
@@ -111,6 +114,7 @@ export function createNativePluginRuntimeRefreshTaskBuilders(deps) {
             sourceRegistry: refreshEvidence.registry,
             readModelRefreshed: refreshEvidence.summary?.readModelRefreshed === true,
             validationOk: refreshEvidence.summary?.validationOk === true,
+            registryGeneration,
           },
         },
         {
@@ -135,8 +139,6 @@ export function createNativePluginRuntimeRefreshTaskBuilders(deps) {
           governance: "require_approval",
           requiresApproval: true,
           params: {
-            packagePath,
-            capabilityId,
             canRefreshReadModel: true,
             canInvalidateDiscoveryCache: false,
             canInvalidateModuleCache: false,
@@ -193,15 +195,13 @@ export function createNativePluginRuntimeRefreshTaskBuilders(deps) {
   }
 
   async function createNativePluginRuntimeRefreshTask({
-    packagePath = null,
-    capabilityId = "act.plugin.capability.invoke",
     confirm = false,
   } = {}) {
     if (confirm !== true) {
       throw new Error("Native plugin runtime refresh task creation requires confirm=true.");
     }
 
-    const draft = buildNativePluginRuntimeRefreshTaskDraft({ packagePath, capabilityId });
+    const draft = buildNativePluginRuntimeRefreshTaskDraft();
     const task = createTask({
       goal: draft.plan.goal,
       type: "native_plugin_runtime_refresh",
@@ -213,11 +213,10 @@ export function createNativePluginRuntimeRefreshTaskBuilders(deps) {
     task.nativePluginRuntimeRefresh = {
       registry: NATIVE_PLUGIN_RUNTIME_REFRESH_TASK_REGISTRY,
       mode: "approval-gated-native-plugin-runtime-refresh-task",
-      packagePath,
-      capabilityId,
       sourceRegistry: draft.sourceRegistry,
       sourceMode: draft.sourceMode,
       runtimeRefreshEvidence: draft.runtimeRefreshEvidence,
+      registryGeneration: draft.plan.registryGeneration,
       execution: null,
       governance: draft.governance,
     };

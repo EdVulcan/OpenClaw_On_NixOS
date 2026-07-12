@@ -104,7 +104,7 @@ export function buildNativePluginRuntimeRefreshEvidence({
     },
     sourceRegistries: [
       nativeRegistry.registry,
-      activationPlan?.registry ?? "openclaw-native-plugin-runtime-activation-plan-v0",
+      ...(activationPlan?.registry ? [activationPlan.registry] : []),
     ],
     runtimeState: {
       activeGenerationId: registryGeneration?.id ?? null,
