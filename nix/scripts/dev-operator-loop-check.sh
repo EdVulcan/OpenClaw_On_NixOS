@@ -17,6 +17,7 @@ export OPENCLAW_SYSTEM_SENSE_PORT="${OPENCLAW_SYSTEM_SENSE_PORT:-5506}"
 export OPENCLAW_SYSTEM_HEAL_PORT="${OPENCLAW_SYSTEM_HEAL_PORT:-5507}"
 export OBSERVER_UI_PORT="${OBSERVER_UI_PORT:-5570}"
 export OPENCLAW_CORE_STATE_FILE="${OPENCLAW_CORE_STATE_FILE:-$REPO_ROOT/.artifacts/openclaw-core-operator-loop-check.json}"
+RESULT_DIR="$(mktemp -d)"
 
 CORE_URL="http://127.0.0.1:$OPENCLAW_CORE_PORT"
 
@@ -24,6 +25,7 @@ CORE_URL="http://127.0.0.1:$OPENCLAW_CORE_PORT"
 rm -f "$OPENCLAW_CORE_STATE_FILE" "$OPENCLAW_CORE_STATE_FILE.tmp"
 
 cleanup() {
+  rm -rf "$RESULT_DIR"
   "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -37,13 +39,13 @@ source "$SCRIPT_DIR/dev-openclaw-http-json-helper.sh"
 json_value() {
   local json="$1"
   local script="$2"
-  node -e "$script" "$json"
+  openclaw_eval_json "$json" "$script"
 }
 
 assert_json() {
   local json="$1"
   local script="$2"
-  node -e "$script" "$json"
+  openclaw_eval_json "$json" "$script"
 }
 
 "$SCRIPT_DIR/dev-up.sh"
@@ -76,14 +78,24 @@ restored_one="$(curl --silent "$CORE_URL/tasks/$task_one_id")"
 restored_two="$(curl --silent "$CORE_URL/tasks/$task_two_id")"
 tasks_list="$(curl --silent "$CORE_URL/tasks?limit=10")"
 
-node - <<'EOF' "$step_result" "$run_result" "$before_summary" "$after_summary" "$restored_one" "$restored_two" "$tasks_list"
-const stepResult = JSON.parse(process.argv[2]);
-const runResult = JSON.parse(process.argv[3]);
-const beforeSummary = JSON.parse(process.argv[4]);
-const afterSummary = JSON.parse(process.argv[5]);
-const restoredOne = JSON.parse(process.argv[6]).task;
-const restoredTwo = JSON.parse(process.argv[7]).task;
-const tasksList = JSON.parse(process.argv[8]);
+printf '%s' "$step_result" > "$RESULT_DIR/step-result.json"
+printf '%s' "$run_result" > "$RESULT_DIR/run-result.json"
+printf '%s' "$before_summary" > "$RESULT_DIR/before-summary.json"
+printf '%s' "$after_summary" > "$RESULT_DIR/after-summary.json"
+printf '%s' "$restored_one" > "$RESULT_DIR/restored-one.json"
+printf '%s' "$restored_two" > "$RESULT_DIR/restored-two.json"
+printf '%s' "$tasks_list" > "$RESULT_DIR/tasks-list.json"
+
+node - <<'EOF' "$RESULT_DIR/step-result.json" "$RESULT_DIR/run-result.json" "$RESULT_DIR/before-summary.json" "$RESULT_DIR/after-summary.json" "$RESULT_DIR/restored-one.json" "$RESULT_DIR/restored-two.json" "$RESULT_DIR/tasks-list.json"
+const fs = require("node:fs");
+const readJson = (file) => JSON.parse(fs.readFileSync(file, "utf8"));
+const stepResult = readJson(process.argv[2]);
+const runResult = readJson(process.argv[3]);
+const beforeSummary = readJson(process.argv[4]);
+const afterSummary = readJson(process.argv[5]);
+const restoredOne = readJson(process.argv[6]).task;
+const restoredTwo = readJson(process.argv[7]).task;
+const tasksList = readJson(process.argv[8]);
 
 const beforeCounts = beforeSummary.summary?.counts ?? {};
 const afterCounts = afterSummary.summary?.counts ?? {};

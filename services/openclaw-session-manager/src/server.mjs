@@ -82,7 +82,8 @@ function updateSessionState(patch) {
 
 function serialiseWorkViewState() {
   const supervisedSidecar = trustedWorkViewSidecarSupervisor.snapshot();
-  const sidecar = !supervisedSidecar.taskId && sidecarLifecycleIntent?.taskId
+  const persistedSidecarIsActive = ["running", "recovery_required"].includes(sidecarLifecycleIntent?.status);
+  const sidecar = !supervisedSidecar.taskId && persistedSidecarIsActive && sidecarLifecycleIntent?.taskId
     ? {
         ...supervisedSidecar,
         taskId: sidecarLifecycleIntent.taskId,

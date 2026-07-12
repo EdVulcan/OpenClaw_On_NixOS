@@ -176,7 +176,7 @@ if (!recoveredFailedTask || recoveredFailedTask.status !== "superseded") {
 if (runtimeRunning.runtime?.status !== "running" || runtimeRunning.currentTask?.id !== taskTwoId) {
   throw new Error("Expected runtime to track final active task.");
 }
-if (workViewState.workView?.activeUrl !== "https://www.deepseek.com" || workViewState.workView?.visibility !== "visible") {
+if (workViewState.workView?.activeUrl !== "https://www.deepseek.com/" || workViewState.workView?.visibility !== "visible") {
   throw new Error("Expected work view to follow final active task URL.");
 }
 if (taskSummary.summary?.counts?.active !== 1 || taskSummary.summary?.counts?.recoverable < 3) {

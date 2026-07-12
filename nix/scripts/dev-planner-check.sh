@@ -17,6 +17,7 @@ export OPENCLAW_SYSTEM_SENSE_PORT="${OPENCLAW_SYSTEM_SENSE_PORT:-5406}"
 export OPENCLAW_SYSTEM_HEAL_PORT="${OPENCLAW_SYSTEM_HEAL_PORT:-5407}"
 export OBSERVER_UI_PORT="${OBSERVER_UI_PORT:-5470}"
 export OPENCLAW_CORE_STATE_FILE="${OPENCLAW_CORE_STATE_FILE:-$REPO_ROOT/.artifacts/openclaw-core-planner-check.json}"
+RESULT_DIR="$(mktemp -d)"
 
 CORE_URL="http://127.0.0.1:$OPENCLAW_CORE_PORT"
 
@@ -24,6 +25,7 @@ CORE_URL="http://127.0.0.1:$OPENCLAW_CORE_PORT"
 rm -f "$OPENCLAW_CORE_STATE_FILE" "$OPENCLAW_CORE_STATE_FILE.tmp"
 
 cleanup() {
+  rm -rf "$RESULT_DIR"
   "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -37,13 +39,13 @@ source "$SCRIPT_DIR/dev-openclaw-http-json-helper.sh"
 json_value() {
   local json="$1"
   local script="$2"
-  node -e "$script" "$json"
+  openclaw_eval_json "$json" "$script"
 }
 
 assert_json() {
   local json="$1"
   local script="$2"
-  node -e "$script" "$json"
+  openclaw_eval_json "$json" "$script"
 }
 
 "$SCRIPT_DIR/dev-up.sh"
@@ -67,25 +69,46 @@ restored_plan_only="$(curl --silent "$CORE_URL/tasks/$planned_task_id")"
 restored_executed="$(curl --silent "$CORE_URL/tasks/$planned_execution_id")"
 tasks_list="$(curl --silent "$CORE_URL/tasks?limit=10")"
 
-node - <<'EOF' "$planned_task" "$planned_execution" "$before_summary" "$after_summary" "$restored_plan_only" "$restored_executed" "$tasks_list"
-const plannedTask = JSON.parse(process.argv[2]);
-const plannedExecution = JSON.parse(process.argv[3]);
-const beforeSummary = JSON.parse(process.argv[4]);
-const afterSummary = JSON.parse(process.argv[5]);
-const restoredPlanOnly = JSON.parse(process.argv[6]);
-const restoredExecuted = JSON.parse(process.argv[7]);
-const tasksList = JSON.parse(process.argv[8]);
+printf '%s' "$planned_task" > "$RESULT_DIR/planned-task.json"
+printf '%s' "$planned_execution" > "$RESULT_DIR/planned-execution.json"
+printf '%s' "$before_summary" > "$RESULT_DIR/before-summary.json"
+printf '%s' "$after_summary" > "$RESULT_DIR/after-summary.json"
+printf '%s' "$restored_plan_only" > "$RESULT_DIR/restored-plan-only.json"
+printf '%s' "$restored_executed" > "$RESULT_DIR/restored-executed.json"
+printf '%s' "$tasks_list" > "$RESULT_DIR/tasks-list.json"
+
+node - <<'EOF' "$RESULT_DIR/planned-task.json" "$RESULT_DIR/planned-execution.json" "$RESULT_DIR/before-summary.json" "$RESULT_DIR/after-summary.json" "$RESULT_DIR/restored-plan-only.json" "$RESULT_DIR/restored-executed.json" "$RESULT_DIR/tasks-list.json"
+const fs = require("node:fs");
+const readJson = (file) => JSON.parse(fs.readFileSync(file, "utf8"));
+const plannedTask = readJson(process.argv[2]);
+const plannedExecution = readJson(process.argv[3]);
+const beforeSummary = readJson(process.argv[4]);
+const afterSummary = readJson(process.argv[5]);
+const restoredPlanOnly = readJson(process.argv[6]);
+const restoredExecuted = readJson(process.argv[7]);
+const tasksList = readJson(process.argv[8]);
 
 const beforeCounts = beforeSummary.summary?.counts ?? {};
 const afterCounts = afterSummary.summary?.counts ?? {};
-if (JSON.stringify(beforeCounts) !== JSON.stringify(afterCounts)) {
-  throw new Error(`planner counts changed across restart: before=${JSON.stringify(beforeCounts)} after=${JSON.stringify(afterCounts)}`);
+if (afterCounts.total !== beforeCounts.total
+  || afterCounts.completed !== beforeCounts.completed
+  || afterCounts.failed !== beforeCounts.failed + 1
+  || afterCounts.queued !== 0
+  || afterCounts.active !== 0
+  || afterCounts.recoverable !== beforeCounts.recoverable + 1) {
+  throw new Error(`planner restart did not fail closed for transient input: before=${JSON.stringify(beforeCounts)} after=${JSON.stringify(afterCounts)}`);
 }
 
 const planOnly = restoredPlanOnly.task;
 const executed = restoredExecuted.task;
-if (!planOnly || planOnly.id !== plannedTask.task?.id || planOnly.plan?.status !== "planned") {
-  throw new Error("plan-only task did not survive restart with planned status");
+if (!planOnly
+  || planOnly.id !== plannedTask.task?.id
+  || planOnly.status !== "failed"
+  || planOnly.executionPhase !== "input_reentry_required"
+  || planOnly.plan?.status !== "planned"
+  || planOnly.outcome?.details?.reason !== "write_only_input_reentry_required"
+  || planOnly.outcome?.details?.automaticReplay !== false) {
+  throw new Error("plan-only task did not survive restart with transient input closed for re-entry");
 }
 if (!executed || executed.id !== plannedExecution.task?.id || executed.plan?.status !== "completed") {
   throw new Error("executed planned task did not survive restart with completed plan");
@@ -96,8 +119,8 @@ const actionSteps = (executed.plan?.steps ?? []).filter((step) => step.phase ===
 if (completedSteps.length < 6 || actionSteps.length !== 2 || !actionSteps.every((step) => step.status === "completed")) {
   throw new Error("executed plan steps were not completed as expected");
 }
-if (afterSummary.summary?.currentTaskId !== planOnly.id || afterSummary.summary?.counts?.active !== 1) {
-  throw new Error("plan-only queued task should remain the current active task after restart");
+if (afterSummary.summary?.currentTaskId !== null || afterSummary.summary?.counts?.active !== 0) {
+  throw new Error("plan-only transient-input task should not remain active after restart");
 }
 
 console.log(JSON.stringify({
@@ -109,7 +132,9 @@ console.log(JSON.stringify({
   planOnly: {
     id: planOnly.id,
     status: planOnly.status,
+    executionPhase: planOnly.executionPhase ?? null,
     planStatus: planOnly.plan?.status ?? null,
+    reentryRequired: planOnly.outcome?.details?.reason === "write_only_input_reentry_required",
     stepCount: planOnly.plan?.steps?.length ?? 0,
   },
   plannedExecution: {

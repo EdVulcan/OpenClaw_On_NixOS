@@ -52,3 +52,14 @@ openclaw_post_json() {
 post_json() {
   openclaw_post_json "$@"
 }
+
+openclaw_eval_json() {
+  local json="$1"
+  local script="$2"
+
+  printf '%s' "$json" | OPENCLAW_JSON_SCRIPT="$script" node -e '
+    const fs = require("node:fs");
+    process.argv[1] = fs.readFileSync(0, "utf8");
+    eval(process.env.OPENCLAW_JSON_SCRIPT);
+  '
+}

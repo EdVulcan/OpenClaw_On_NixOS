@@ -17,6 +17,7 @@ export OPENCLAW_SYSTEM_SENSE_PORT="${OPENCLAW_SYSTEM_SENSE_PORT:-5306}"
 export OPENCLAW_SYSTEM_HEAL_PORT="${OPENCLAW_SYSTEM_HEAL_PORT:-5307}"
 export OBSERVER_UI_PORT="${OBSERVER_UI_PORT:-5370}"
 export OPENCLAW_CORE_STATE_FILE="${OPENCLAW_CORE_STATE_FILE:-$REPO_ROOT/.artifacts/openclaw-core-persistence-check.json}"
+RESULT_DIR="$(mktemp -d)"
 
 CORE_URL="http://127.0.0.1:$OPENCLAW_CORE_PORT"
 
@@ -24,6 +25,7 @@ CORE_URL="http://127.0.0.1:$OPENCLAW_CORE_PORT"
 rm -f "$OPENCLAW_CORE_STATE_FILE" "$OPENCLAW_CORE_STATE_FILE.tmp"
 
 cleanup() {
+  rm -rf "$RESULT_DIR"
   "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -37,7 +39,7 @@ source "$SCRIPT_DIR/dev-openclaw-http-json-helper.sh"
 assert_json() {
   local json="$1"
   local script="$2"
-  node -e "$script" "$json"
+  openclaw_eval_json "$json" "$script"
 }
 
 "$SCRIPT_DIR/dev-up.sh"
@@ -59,14 +61,24 @@ after_tasks="$(curl --silent "$CORE_URL/tasks?limit=10")"
 latest_finished="$(curl --silent "$CORE_URL/tasks/latest-finished")"
 latest_failed="$(curl --silent "$CORE_URL/tasks/latest-failed")"
 
-node - <<'EOF' "$completed_execution" "$auto_recovered_execution" "$before_summary" "$after_summary" "$after_tasks" "$latest_finished" "$latest_failed"
-const completedExecution = JSON.parse(process.argv[2]);
-const autoRecoveredExecution = JSON.parse(process.argv[3]);
-const beforeSummary = JSON.parse(process.argv[4]);
-const afterSummary = JSON.parse(process.argv[5]);
-const afterTasks = JSON.parse(process.argv[6]);
-const latestFinished = JSON.parse(process.argv[7]);
-const latestFailed = JSON.parse(process.argv[8]);
+printf '%s' "$completed_execution" > "$RESULT_DIR/completed-execution.json"
+printf '%s' "$auto_recovered_execution" > "$RESULT_DIR/auto-recovered-execution.json"
+printf '%s' "$before_summary" > "$RESULT_DIR/before-summary.json"
+printf '%s' "$after_summary" > "$RESULT_DIR/after-summary.json"
+printf '%s' "$after_tasks" > "$RESULT_DIR/after-tasks.json"
+printf '%s' "$latest_finished" > "$RESULT_DIR/latest-finished.json"
+printf '%s' "$latest_failed" > "$RESULT_DIR/latest-failed.json"
+
+node - <<'EOF' "$RESULT_DIR/completed-execution.json" "$RESULT_DIR/auto-recovered-execution.json" "$RESULT_DIR/before-summary.json" "$RESULT_DIR/after-summary.json" "$RESULT_DIR/after-tasks.json" "$RESULT_DIR/latest-finished.json" "$RESULT_DIR/latest-failed.json"
+const fs = require("node:fs");
+const readJson = (file) => JSON.parse(fs.readFileSync(file, "utf8"));
+const completedExecution = readJson(process.argv[2]);
+const autoRecoveredExecution = readJson(process.argv[3]);
+const beforeSummary = readJson(process.argv[4]);
+const afterSummary = readJson(process.argv[5]);
+const afterTasks = readJson(process.argv[6]);
+const latestFinished = readJson(process.argv[7]);
+const latestFailed = readJson(process.argv[8]);
 
 const beforeCounts = beforeSummary.summary?.counts ?? {};
 const afterCounts = afterSummary.summary?.counts ?? {};
