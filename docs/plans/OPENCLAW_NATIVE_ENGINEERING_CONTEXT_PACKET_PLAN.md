@@ -1,6 +1,6 @@
 # OpenClaw Native Engineering Context Packet Plan
 
-Updated: 2026-07-11
+Updated: 2026-07-12
 
 ## Active Slice
 
@@ -39,6 +39,8 @@ applies the native in-memory microcompact projection
 marks verification and recovery summaries as protected evidence
 persists a summary-only audit event before returning packet content
 fails closed with HTTP 503 when audit persistence is unavailable
+is available from an explicit Observer control that reuses the same core route
+and displays bounded packet summaries and messages without provider consumption
 ```
 
 ## Governance
@@ -73,11 +75,17 @@ Tests:
 services/openclaw-core/test/native-engineering-context-packet.test.mjs
 services/openclaw-core/test/native-engineering-context-routes.test.mjs
 services/openclaw-core/test/route-handlers.test.mjs
+apps/observer-ui/src/observer-panels-engineering-context.mjs
+apps/observer-ui/src/client-script-renderers-engineering-context.mjs
+apps/observer-ui/src/client-script-refreshers-engineering-context.mjs
+nix/scripts/dev-openclaw-native-engineering-context-packet-common-check.sh
 ```
 
 Tests prove task filtering, output bounds, credential-like redaction,
 microcompaction, verification/recovery protection, no provider/network flags,
-and summary-only audit publication.
+and summary-only audit publication. The core/Observer milestone also proves an
+explicit packet build from an approved command transcript, visible HTML/client
+tokens, redaction and microcompaction evidence, and no provider/network use.
 
 ## Deferred
 
@@ -89,6 +97,14 @@ automatic packet persistence
 automatic task execution or recovery
 unbounded transcript/output inclusion
 ```
+
+## Observer Follow-Up Complete
+
+Observer now exposes a `Build Context Packet` control in a dedicated panel. It
+uses the selected task when present, otherwise the bounded current ledger, and
+renders the returned packet only after the operator requests it. The control
+does not create a task, approval, command, provider request, or persistent packet
+artifact.
 
 ## Next Slice
 

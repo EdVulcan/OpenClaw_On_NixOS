@@ -854,9 +854,9 @@ log. Observer and Phase 3 takeover/recovery milestones remain green. This
 closes the current Level 2 bounded browser eye-hand exit gate; do not add more
 horizontal browser action variants by inertia.
 
-The next active route should return to the kernel evolution whitepaper's Phase
-A Nix purity gap. The smallest real non-root slice is to package one cohesive
-OpenClaw service closure into a read-only Nix derivation and run its systemd
-unit from `/nix/store` instead of mutable `/opt/openclaw`, while preserving the
-existing login-user ownership, routes, state paths, and milestones. Expand to
-the remaining services only after that real unit proof is stable.
+The historical Phase A next-step text above is complete evidence, not the active
+roadmap. All nine service closures and the trusted sidecar template now run from
+reviewed read-only Nix store paths, and the fixed Phase B native D-Bus inventory
+and system-sense restart slices are complete. The active route returns to a
+concrete Level 1 local capability; hostd expansion, provider egress, and ACPX or
+Codex live process execution remain explicitly deferred.

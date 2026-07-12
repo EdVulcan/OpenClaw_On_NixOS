@@ -451,20 +451,17 @@ existing edit/write/verification controls. The core recomputes the action from
 persisted workbench state and exposes only compact provenance in task and
 Observer readback.
 
-The next autonomous slice should leave Level 1 horizontal engineering expansion
-and advance the smallest real Level 2 trusted AI work-view/session-helper
-behavior. Stay within existing governed local body and Observer surfaces unless
-the operator explicitly authorizes helper process start, root, desktop-wide
-capture, provider egress, or another blocked boundary above.
+The following Level 2 transition records are historical completion evidence, not
+the current next step. The session-manager lease is enforced through existing
+browser action mediation, operator takeover suspends it, and explicit resume
+rotates and rebinds it. The bounded sidecar lifecycle, user-session recovery,
+browser navigation, semantic type, and real Firefox evidence are also complete.
 
-That transition has started with a session-manager owned in-process helper lease
-that browser-runtime matches for the AI-owned work-view session. The next Level
-2 slice should enforce the same lease through existing browser action mediation,
-not return to another native engineering evidence shell.
-
-The lease is now enforced for screen-act mediated browser input and click. The
-next Level 2 slice should bind explicit operator takeover to lease suspension and
-explicit resume/rebind.
+The bounded Level 2 browser eye-hand exit gate is closed. The kernel-whitepaper
+Phase A Nix store packaging and the fixed Phase B native D-Bus systemd inventory
+and restart slices are closed as well. The active route returns to a concrete
+Level 1 local capability; helper process execution, desktop-wide capture, hostd,
+provider egress, and ACPX/Codex live process execution remain deferred.
 
 ## Current Route Correction
 

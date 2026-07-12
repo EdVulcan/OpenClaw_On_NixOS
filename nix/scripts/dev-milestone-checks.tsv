@@ -341,6 +341,7 @@ openclaw-native-engineering-verification-evidence	dev-openclaw-native-engineerin
 openclaw-native-engineering-recovery-evidence	dev-openclaw-native-engineering-recovery-evidence-check.sh	Native governed recovery evidence from failed engineering verification outcomes
 openclaw-native-engineering-microcompact-evidence	dev-openclaw-native-engineering-microcompact-evidence-check.sh	Native governed microcompact context-management evidence from command transcripts
 openclaw-native-engineering-plan-todo-evidence	dev-openclaw-native-engineering-plan-todo-evidence-check.sh	Native governed planning and todo evidence from task workbench state
+openclaw-native-engineering-context-packet	dev-openclaw-native-engineering-context-packet-check.sh	Native governed local engineering context packet assembly with redaction and microcompaction
 openclaw-native-engineering-lsp-evidence	dev-openclaw-native-engineering-lsp-evidence-check.sh	Native governed LSP availability, lifecycle, and bounded process probe evidence
 openclaw-native-workspace-semantic-index	dev-openclaw-native-workspace-semantic-index-check.sh	Native read-only semantic index for enhanced OpenClaw workspace files
 openclaw-native-workspace-symbol-lookup	dev-openclaw-native-workspace-symbol-lookup-check.sh	Governed read-only executable symbol lookup for enhanced OpenClaw workspace files
@@ -442,6 +443,7 @@ observer-openclaw-native-engineering-verification-evidence	dev-observer-openclaw
 observer-openclaw-native-engineering-recovery-evidence	dev-observer-openclaw-native-engineering-recovery-evidence-check.sh	Observer visibility for native governed engineering recovery evidence
 observer-openclaw-native-engineering-microcompact-evidence	dev-observer-openclaw-native-engineering-microcompact-evidence-check.sh	Observer visibility for native governed engineering microcompact evidence
 observer-openclaw-native-engineering-plan-todo-evidence	dev-observer-openclaw-native-engineering-plan-todo-evidence-check.sh	Observer visibility for native governed engineering planning and todo evidence
+observer-openclaw-native-engineering-context-packet	dev-observer-openclaw-native-engineering-context-packet-check.sh	Observer control and readback for native governed local engineering context packets
 observer-openclaw-native-engineering-lsp-evidence	dev-observer-openclaw-native-engineering-lsp-evidence-check.sh	Observer visibility for native governed engineering LSP evidence
 observer-openclaw-native-workspace-semantic-index	dev-observer-openclaw-native-workspace-semantic-index-check.sh	Observer visibility for native OpenClaw workspace semantic index
 observer-openclaw-native-workspace-symbol-lookup	dev-observer-openclaw-native-workspace-symbol-lookup-check.sh	Observer visibility for governed native OpenClaw workspace symbol lookup
