@@ -142,6 +142,12 @@ let
     after = [ "network-online.target" ];
     environment = {
       OPENCLAW_HOSTD_SOCKET_PATH = hostdSocketPath;
+      OPENCLAW_HOSTD_PEER_CREDENTIAL_HELPER =
+        if cfg.runtimePackages.hostd != null
+        then "${cfg.runtimePackages.hostd}/bin/openclaw-hostd-peer-credentials"
+        else "";
+      OPENCLAW_HOSTD_PEER_EXPECTED_USER = if cfg.user != null then cfg.user else "openclaw-service";
+      OPENCLAW_HOSTD_PEER_EXPECTED_GROUP = cfg.group;
       OPENCLAW_BODY_RUNTIME_SOURCE = if cfg.runtimePackages.hostd != null then "nix-store" else "mutable-repo";
     };
     serviceConfig = {

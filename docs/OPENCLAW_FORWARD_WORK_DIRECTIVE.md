@@ -597,7 +597,10 @@ owner-separation follow-up makes desktop system services run under
 `openclaw-hostd` service account and Polkit subject, and keeps core submission
 on the shared `openclaw` socket group. The new core and Observer real-execution
 checks both completed through that account combination. The response keeps the
-remaining lack of kernel-level peer credential verification explicit.
+kernel-level peer credential verification explicit: hostd now passes each
+accepted socket FD to a fixed Nix-native `SO_PEERCRED` helper, matches only
+`openclaw-service` with the `openclaw` group, and rejects the fixed mutation
+before the D-Bus handler on mismatch or unavailable verification.
 Core reaches hostd only through its bounded Unix socket, reuses the existing
 approved next-repair lifecycle, and has no direct systemctl/sudo fallback. The
 switched generation removed the historical host sudo helper. Core and Observer
@@ -609,8 +612,8 @@ declarative-generation recovery and never issue an automatic second restart.
 It uses a bounded read-only readiness poll because systemd process readiness can
 precede the restarted service's HTTP-listener readiness. Hostd rejects unknown
 fields, arbitrary units/methods, and response evidence whose request id is not
-bound to the originating core request. Broader systemd mutation remains
-deferred.
+bound to the originating core request; core also requires the compact matching
+peer-identity evidence. Broader systemd mutation remains deferred.
 
 The Level 1 live-plugin-refresh migration now owns a real fixed-registry
 generation lifecycle. An approved existing refresh task builds and validates a

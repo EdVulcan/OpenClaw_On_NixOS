@@ -142,16 +142,19 @@ the Polkit subject and hostd process ran as `openclaw-hostd`.
 an `AF_UNIX` socket, and an independent `openclaw-hostd` service identity. Core
 continues to run as `openclaw-service`; the socket uses the shared `openclaw`
 group for request submission, while only the hostd identity matches the fixed
-Polkit rule. The protocol rejects unknown fields, arbitrary units, arbitrary
-methods, and non-fixed operations. The hostd response carries the request id,
-owner, transport, method, unit, job path, before/after PID evidence, and the
-truthful group-socket caller boundary; the core client rejects a response whose
-request id does not match the request it sent.
+Polkit rule. The accepted socket FD now passes through a fixed Nix-native
+`SO_PEERCRED` helper that matches `openclaw-service` and `openclaw` before the
+request handler runs. The protocol rejects unknown fields, arbitrary units,
+arbitrary methods, non-fixed operations, and mismatched peer identities. The
+hostd response carries the request id, owner, transport, method, unit, job path,
+before/after PID evidence, and compact kernel-peer verification state; the core
+client rejects a response whose request id or peer evidence does not match the
+request it sent.
 
 Focused hostd tests, core executor tests, auth-delegation checks, Nix closure
-builds, body configuration, and the switched core/Observer milestones prove the
-owner/socket contract. No new public route or arbitrary privileged API was
-added.
+builds, body configuration, a real helper socket check, and the switched
+core/Observer milestones prove the owner/socket contract. No new public route
+or arbitrary privileged API was added.
 
 ## Deferred
 
@@ -159,14 +162,12 @@ added.
   system-sense unit.
 - Any hostd capability beyond the fixed system-sense restart, including
   arbitrary unit names, methods, arguments, or caller-supplied D-Bus paths.
-- Kernel-level peer credential verification for the Unix socket remains a
-  separate hardening slice; the current boundary relies on the Nix/systemd
-  socket owner/group and keeps that limitation explicit in response evidence.
 - eBPF kernel event transport and declarative Nix self-evolution.
 
 ## Next Slice
 
-Continue with the selected Level 2 trusted work-view/session-helper route. Any
-future Level 3 slice must add a separately justified capability behind the
-existing hostd owner; do not broaden this fixed restart into an arbitrary
-systemd control API.
+The fixed Level 3 hostd socket boundary is now complete for peer identity:
+future work must keep the native helper, exact user/group match, and compact
+verified/matched readback. Continue with a separately justified capability
+behind the existing hostd owner; do not broaden this fixed restart into an
+arbitrary systemd control API.

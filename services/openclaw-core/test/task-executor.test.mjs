@@ -1627,6 +1627,11 @@ test("approved next systemd repair executes only through the fixed hostd boundar
           transport: "unix_socket",
           method: "org.freedesktop.systemd1.Manager.RestartUnit",
           unit: "openclaw-system-sense.service",
+          governance: {
+            callerBoundary: "kernel_so_peercred",
+            socketPeerIdentityVerified: true,
+            socketPeerIdentityMatched: true,
+          },
           nativeMutation: {
             ok: true,
             owner: "openclaw-hostd",
@@ -1668,6 +1673,11 @@ test("approved next systemd repair executes only through the fixed hostd boundar
   assert.equal(transcript.authDelegation.mode, "polkit-dbus-fixed-unit");
   assert.equal(transcript.authDelegation.transport, "unix_socket");
   assert.equal(transcript.authDelegation.sudo, null);
+  assert.deepEqual(transcript.peerIdentity, {
+    boundary: "kernel_so_peercred",
+    verified: true,
+    matched: true,
+  });
   assert.equal(finalTask.outcome.details.postExecutionVerification.summary.targetHealthy, true);
   assert.equal(finalTask.outcome.details.postExecutionVerification.summary.nativeMutationVerified, true);
   assert.equal(finalTask.outcome.details.postExecutionVerification.summary.restoredHealthy, true);

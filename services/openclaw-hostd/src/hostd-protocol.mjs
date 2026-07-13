@@ -14,7 +14,20 @@ function boundedError(error) {
   return message.slice(0, 256);
 }
 
-function errorResponse({ requestId = null, code, error }) {
+export function buildHostdGovernance(peerIdentity = null) {
+  const verified = peerIdentity?.verified === true;
+  const matched = verified && peerIdentity?.matched === true;
+  return {
+    callerBoundary: verified ? "kernel_so_peercred" : "openclaw-service-group-socket",
+    socketPeerIdentityVerified: verified,
+    socketPeerIdentityMatched: matched,
+    arbitraryUnit: false,
+    arbitraryMethod: false,
+    automaticRestart: false,
+  };
+}
+
+function errorResponse({ requestId = null, code, error, peerIdentity = null }) {
   return {
     ok: false,
     registry: HOSTD_RESPONSE_REGISTRY,
@@ -22,13 +35,7 @@ function errorResponse({ requestId = null, code, error }) {
     requestId,
     owner: "openclaw-hostd",
     error: { code, message: error },
-    governance: {
-      callerBoundary: "openclaw-service-group-socket",
-      socketPeerIdentityVerified: false,
-      arbitraryUnit: false,
-      arbitraryMethod: false,
-      automaticRestart: false,
-    },
+    governance: buildHostdGovernance(peerIdentity),
   };
 }
 
@@ -67,12 +74,23 @@ export function parseHostdRequest(line) {
   return { ok: true, request };
 }
 
-export function createHostdRequestHandler({ runRestart = runFixedSystemdRestart } = {}) {
-  return async function handleHostdRequest(line) {
+export function createHostdRequestHandler({
+  runRestart = runFixedSystemdRestart,
+  requirePeerIdentity = true,
+} = {}) {
+  return async function handleHostdRequest(line, { peerIdentity = null } = {}) {
     const parsed = parseHostdRequest(line);
     if (!parsed.ok) return parsed.response;
 
     const { request } = parsed;
+    if (requirePeerIdentity && (peerIdentity?.verified !== true || peerIdentity?.matched !== true)) {
+      return errorResponse({
+        requestId: request.requestId,
+        code: "peer_identity_denied",
+        error: "Hostd requires a matching kernel peer identity before privileged mutation.",
+        peerIdentity,
+      });
+    }
     try {
       const nativeMutation = await runRestart({ args: [] });
       if (nativeMutation?.ok !== true
@@ -84,6 +102,7 @@ export function createHostdRequestHandler({ runRestart = runFixedSystemdRestart 
           requestId: request.requestId,
           code: "invalid_mutation_evidence",
           error: "Hostd restart owner returned invalid native mutation evidence.",
+          peerIdentity,
         });
       }
       return {
@@ -98,11 +117,7 @@ export function createHostdRequestHandler({ runRestart = runFixedSystemdRestart 
         unit: HOSTD_TARGET_UNIT,
         nativeMutation,
         governance: {
-          callerBoundary: "openclaw-service-group-socket",
-          socketPeerIdentityVerified: false,
-          arbitraryUnit: false,
-          arbitraryMethod: false,
-          automaticRestart: false,
+          ...buildHostdGovernance(peerIdentity),
           passwordPromptAllowed: false,
         },
       };
@@ -111,6 +126,7 @@ export function createHostdRequestHandler({ runRestart = runFixedSystemdRestart 
         requestId: request.requestId,
         code: "native_restart_failed",
         error: boundedError(error),
+        peerIdentity,
       });
     }
   };

@@ -166,6 +166,7 @@ export function createSystemBodyTaskHandlers({
       jobPath: result.nativeMutation?.jobPath ?? null,
       beforeMainPid: result.nativeMutation?.before?.mainPid ?? null,
       afterMainPid: result.nativeMutation?.after?.mainPid ?? null,
+      peerIdentity: result.peerIdentity ?? null,
       skipped: false,
       skipReason: null,
       condition: null,
@@ -173,6 +174,16 @@ export function createSystemBodyTaskHandlers({
       timedOut: result.timedOut,
       stdout: result.stdout,
       stderr: result.stderr,
+    };
+  }
+
+  function compactHostdPeerIdentity(hostdResponse) {
+    const governance = hostdResponse?.governance;
+    if (!governance || typeof governance !== "object") return null;
+    return {
+      boundary: governance.callerBoundary ?? null,
+      verified: governance.socketPeerIdentityVerified === true,
+      matched: governance.socketPeerIdentityMatched === true,
     };
   }
 
@@ -235,6 +246,7 @@ export function createSystemBodyTaskHandlers({
         timeoutMs: SYSTEMD_REPAIR_EXECUTION_TIMEOUT_MS,
       });
       const nativeMutation = hostdResponse?.nativeMutation;
+      const peerIdentity = compactHostdPeerIdentity(hostdResponse);
       if (hostdResponse?.ok !== true
         || hostdResponse.owner !== "openclaw-hostd"
         || hostdResponse.transport !== "unix_socket"
@@ -248,8 +260,13 @@ export function createSystemBodyTaskHandlers({
         || !Number.isInteger(nativeMutation.after?.mainPid)
         || nativeMutation.before.mainPid === nativeMutation.after.mainPid
         || nativeMutation.after.activeState !== "active"
-        || nativeMutation.after.subState !== "running") {
-        throw new Error("OpenClaw hostd returned invalid native mutation evidence.");
+        || nativeMutation.after.subState !== "running"
+        || hostdResponse.governance?.callerBoundary !== "kernel_so_peercred"
+        || hostdResponse.governance?.socketPeerIdentityVerified !== true
+        || hostdResponse.governance?.socketPeerIdentityMatched !== true) {
+        const error = new Error("OpenClaw hostd returned invalid native mutation evidence.");
+        error.peerIdentity = peerIdentity;
+        throw error;
       }
       return {
         invocationId: randomUUID(),
@@ -266,6 +283,7 @@ export function createSystemBodyTaskHandlers({
         stderr: "",
         nativeMutation,
         hostdResponse,
+        peerIdentity,
         ok: true,
       };
     } catch (error) {
@@ -287,6 +305,7 @@ export function createSystemBodyTaskHandlers({
           : error instanceof Error
             ? error.message
             : "Native systemd restart failed.",
+        peerIdentity: error?.peerIdentity ?? null,
         ok: false,
       };
     }

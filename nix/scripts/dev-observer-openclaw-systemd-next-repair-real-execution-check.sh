@@ -10,10 +10,14 @@ OBSERVER_URL="${OPENCLAW_INSTALLED_OBSERVER_URL:-http://127.0.0.1:4170}"
 core_user="$(systemctl show openclaw-core.service --property=User --value)"
 hostd_user="$(systemctl show openclaw-hostd.service --property=User --value)"
 core_environment="$(systemctl show openclaw-core.service --property=Environment --value)"
+hostd_environment="$(systemctl show openclaw-hostd.service --property=Environment --value)"
 if [[ "$core_user" != "openclaw-service"
   || "$hostd_user" != "openclaw-hostd"
   || "$core_environment" != *"OPENCLAW_SYSTEMD_REPAIR_AUTH_DELEGATION=polkit-dbus-fixed-unit"*
   || "$core_environment" != *"OPENCLAW_HOSTD_SOCKET_PATH=/run/openclaw/hostd.sock"*
+  || "$hostd_environment" != *"OPENCLAW_HOSTD_PEER_CREDENTIAL_HELPER=/nix/store/"*
+  || "$hostd_environment" != *"OPENCLAW_HOSTD_PEER_EXPECTED_USER=openclaw-service"*
+  || "$hostd_environment" != *"OPENCLAW_HOSTD_PEER_EXPECTED_GROUP=openclaw"*
   || "$core_environment" == *"sudo-nopasswd-fixed-helper"* ]]; then
   echo "installed OpenClaw core has not loaded the native Polkit D-Bus generation" >&2
   exit 65
@@ -96,6 +100,9 @@ if (details.hostMutationAttempted !== true
   || transcript?.beforeMainPid === transcript?.afterMainPid
   || transcript?.authDelegation?.mode !== "polkit-dbus-fixed-unit"
   || transcript?.authDelegation?.sudo !== null
+  || transcript?.peerIdentity?.boundary !== "kernel_so_peercred"
+  || transcript?.peerIdentity?.verified !== true
+  || transcript?.peerIdentity?.matched !== true
   || details.postExecutionVerification?.summary?.restoredHealthy !== true
   || details.postExecutionVerification?.recoveryRecommendation !== null) {
   throw new Error(`Observer source should expose next real execution evidence: ${JSON.stringify(details)}`);
