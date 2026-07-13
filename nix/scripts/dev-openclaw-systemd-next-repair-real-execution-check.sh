@@ -42,7 +42,7 @@ for (const token of [
   "Second Slice: Fixed Native Restart",
   "org.freedesktop.systemd1.Manager.RestartUnit",
   "There is no direct",
-  "changed PID",
+  "changed positive main PIDs",
 ]) {
   if (!plan.includes(token)) {
     throw new Error(`Phase 2 plan missing next real-execution token: ${token}`);

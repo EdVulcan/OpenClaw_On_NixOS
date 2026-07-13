@@ -18,7 +18,7 @@ export function createHostdServer({
   requestHandler = createHostdRequestHandler(),
 } = {}) {
   let requestChain = Promise.resolve();
-  const server = net.createServer((socket) => {
+  const server = net.createServer({ allowHalfOpen: true }, (socket) => {
     let buffer = "";
     let handled = false;
     socket.setEncoding("utf8");

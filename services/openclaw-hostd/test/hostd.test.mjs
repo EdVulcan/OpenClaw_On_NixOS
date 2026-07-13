@@ -111,6 +111,37 @@ test("hostd socket boundary carries compact owner evidence to the core client", 
   }
 });
 
+test("hostd keeps the response channel open after a client half-closes its request", async () => {
+  const socketPath = path.join(mkdtempSync(path.join(tmpdir(), "openclaw-hostd-half-close-")), "hostd.sock");
+  const runtime = createHostdServer({
+    socketPath,
+    requestHandler: createHostdRequestHandler({
+      runRestart: async () => {
+        await new Promise((resolve) => setTimeout(resolve, 25));
+        return {
+          ok: true,
+          owner: "openclaw-hostd",
+          transport: "dbus_native",
+          method: "org.freedesktop.systemd1.Manager.RestartUnit",
+          unit: HOSTD_TARGET_UNIT,
+          jobPath: "/org/freedesktop/systemd1/job/43",
+          before: { mainPid: 300 },
+          after: { activeState: "active", subState: "running", mainPid: 400 },
+        };
+      },
+    }),
+  });
+  await runtime.listen();
+  try {
+    const response = await requestHostdSystemSenseRestart({ socketPath, requestId: "half-close-request" });
+    assert.equal(response.ok, true);
+    assert.equal(response.requestId, "half-close-request");
+    assert.equal(response.nativeMutation.after.mainPid, 400);
+  } finally {
+    await runtime.close();
+  }
+});
+
 test("hostd client rejects a response bound to a different request", async () => {
   const socketPath = path.join(mkdtempSync(path.join(tmpdir(), "openclaw-hostd-mismatch-")), "hostd.sock");
   const runtime = createHostdServer({

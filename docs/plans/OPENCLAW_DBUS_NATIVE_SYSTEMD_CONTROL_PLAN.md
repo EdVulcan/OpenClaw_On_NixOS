@@ -120,11 +120,14 @@ follow-up tightens its owner split before the next generation is switched:
 
 Focused tests prove the exact D-Bus message, no-argument boundary, PID-change
 verification, production helper subprocess bridge, negative fallback, and
-non-retrying recovery recommendation. A restart-race test proves one transient
-post-restart fetch failure is absorbed without a second mutation. The
-auth-delegation and full body-config gates prove Nix/Polkit evaluation and all
-store closures. The existing core and Observer real-execution milestones now
-require successful native transport rather than accepting a failed attempt.
+non-retrying recovery recommendation. The hostd socket keeps its response side
+open after the core client half-closes its line-delimited request, so delayed
+native D-Bus results cannot be dropped; a delayed-handler socket regression
+proves that boundary. A restart-race test proves one transient post-restart
+fetch failure is absorbed without a second mutation. The auth-delegation and
+full body-config gates prove Nix/Polkit evaluation and all store closures. The
+existing core and Observer real-execution milestones now require successful
+native transport rather than accepting a failed attempt.
 
 Existing real VM evidence proves two separately approved executions, one through
 the core milestone and one through the Observer milestone. Both returned exit
