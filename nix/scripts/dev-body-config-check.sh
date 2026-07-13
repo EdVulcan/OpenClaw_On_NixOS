@@ -25,6 +25,29 @@ for file in "${required_files[@]}"; do
   fi
 done
 
+body_config_nixpkgs_override="${OPENCLAW_BODY_CONFIG_NIXPKGS_OVERRIDE:-}"
+system_nixpkgs_channel="/nix/var/nix/profiles/per-user/root/channels/nixos"
+if [[ -z "$body_config_nixpkgs_override" && -f "$system_nixpkgs_channel/flake.nix" ]]; then
+  body_config_nixpkgs_override="$(readlink -f "$system_nixpkgs_channel")"
+fi
+NIXPKGS_OVERRIDE_ARGS=( )
+if [[ -n "$body_config_nixpkgs_override" ]]; then
+  if [[ ! -f "$body_config_nixpkgs_override/flake.nix" ]]; then
+    echo "OPENCLAW_BODY_CONFIG_NIXPKGS_OVERRIDE must point to a flake source: $body_config_nixpkgs_override" >&2
+    exit 64
+  fi
+  NIXPKGS_OVERRIDE_ARGS=(--override-input nixpkgs "$body_config_nixpkgs_override")
+  echo "body-config nixpkgs source: $body_config_nixpkgs_override"
+else
+  echo "body-config nixpkgs source: flake.lock"
+fi
+
+nix_flake() {
+  local subcommand="$1"
+  shift
+  nix --extra-experimental-features 'nix-command flakes' "$subcommand" "${NIXPKGS_OVERRIDE_ARGS[@]}" --no-write-lock-file "$@"
+}
+
 if command -v nix-instantiate >/dev/null 2>&1; then
   while IFS= read -r nix_file; do
     nix-instantiate --parse "$nix_file" >/dev/null
@@ -227,7 +250,7 @@ console.log(JSON.stringify({
 EOF
 
 if command -v nix >/dev/null 2>&1; then
-  ownership_json="$(nix --extra-experimental-features 'nix-command flakes' eval \
+  ownership_json="$(nix_flake eval \
     --no-update-lock-file --json \
     .#nixosConfigurations.openclaw-local-dev.config \
     --apply 'config: let
@@ -434,7 +457,7 @@ console.log(JSON.stringify({
 }, null, 2));
 EOF
 
-  user_unit_json="$(nix --extra-experimental-features 'nix-command flakes' eval \
+  user_unit_json="$(nix_flake eval \
     --no-update-lock-file --json \
     .#nixosConfigurations.openclaw-local-dev.config.systemd.user.services \
     --apply 'services: let unit = services."openclaw-trusted-sidecar@"; service = unit.serviceConfig; in {
@@ -481,7 +504,7 @@ console.log(JSON.stringify({
 }, null, 2));
 EOF
 
-  event_hub_out="$(nix --extra-experimental-features 'nix-command flakes' build \
+  event_hub_out="$(nix_flake build \
     --no-update-lock-file --no-link --print-out-paths .#openclaw-event-hub)"
   event_hub_working_dir="$event_hub_out/share/openclaw/services/openclaw-event-hub"
   event_hub_server="$event_hub_working_dir/src/server.mjs"
@@ -553,7 +576,7 @@ console.log(JSON.stringify({
 EOF
   )
 
-  core_out="$(nix --extra-experimental-features 'nix-command flakes' build \
+  core_out="$(nix_flake build \
     --no-update-lock-file --no-link --print-out-paths .#openclaw-core)"
   core_working_dir="$core_out/share/openclaw/services/openclaw-core"
   core_server="$core_working_dir/src/server.mjs"
@@ -678,7 +701,7 @@ console.log(JSON.stringify({
 EOF
   )
 
-  session_manager_out="$(nix --extra-experimental-features 'nix-command flakes' build \
+  session_manager_out="$(nix_flake build \
     --no-update-lock-file --no-link --print-out-paths .#openclaw-session-manager)"
   session_manager_working_dir="$session_manager_out/share/openclaw/services/openclaw-session-manager"
   session_manager_server="$session_manager_working_dir/src/server.mjs"
@@ -781,7 +804,7 @@ console.log(JSON.stringify({
 EOF
   )
 
-  browser_runtime_out="$(nix --extra-experimental-features 'nix-command flakes' build \
+  browser_runtime_out="$(nix_flake build \
     --no-update-lock-file --no-link --print-out-paths .#openclaw-browser-runtime)"
   browser_runtime_working_dir="$browser_runtime_out/share/openclaw/services/openclaw-browser-runtime"
   browser_runtime_server="$browser_runtime_working_dir/src/server.mjs"
@@ -895,7 +918,7 @@ console.log(JSON.stringify({
 EOF
   )
 
-  screen_sense_out="$(nix --extra-experimental-features 'nix-command flakes' build \
+  screen_sense_out="$(nix_flake build \
     --no-update-lock-file --no-link --print-out-paths .#openclaw-screen-sense)"
   screen_sense_working_dir="$screen_sense_out/share/openclaw/services/openclaw-screen-sense"
   screen_sense_server="$screen_sense_working_dir/src/server.mjs"
@@ -976,7 +999,7 @@ console.log(JSON.stringify({
 EOF
   )
 
-  screen_act_out="$(nix --extra-experimental-features 'nix-command flakes' build \
+  screen_act_out="$(nix_flake build \
     --no-update-lock-file --no-link --print-out-paths .#openclaw-screen-act)"
   screen_act_working_dir="$screen_act_out/share/openclaw/services/openclaw-screen-act"
   screen_act_server="$screen_act_working_dir/src/server.mjs"
@@ -1073,7 +1096,7 @@ console.log(JSON.stringify({
 EOF
   )
 
-  system_sense_out="$(nix --extra-experimental-features 'nix-command flakes' build \
+  system_sense_out="$(nix_flake build \
     --no-update-lock-file --no-link --print-out-paths .#openclaw-system-sense)"
   system_sense_working_dir="$system_sense_out/share/openclaw/services/openclaw-system-sense"
   system_sense_server="$system_sense_working_dir/src/server.mjs"
@@ -1100,7 +1123,7 @@ EOF
     exit 1
   fi
 
-  kernel_probe_out="$(nix --extra-experimental-features 'nix-command flakes' build \
+  kernel_probe_out="$(nix_flake build \
     --no-update-lock-file --no-link --print-out-paths .#openclaw-kernel-event-probe)"
   if [[ "$kernel_probe_out" != /nix/store/*
     || ! -x "$kernel_probe_out/bin/openclaw-kernel-process-exec"
@@ -1110,7 +1133,7 @@ EOF
     exit 1
   fi
 
-  hostd_out="$(nix --extra-experimental-features 'nix-command flakes' build \
+  hostd_out="$(nix_flake build \
     --no-update-lock-file --no-link --print-out-paths .#openclaw-hostd)"
   hostd_working_dir="$hostd_out/share/openclaw/services/openclaw-hostd"
   if [[ "$hostd_out" != /nix/store/*
@@ -1204,7 +1227,7 @@ console.log(JSON.stringify({
 EOF
   )
 
-  system_heal_out="$(nix --extra-experimental-features 'nix-command flakes' build \
+  system_heal_out="$(nix_flake build \
     --no-update-lock-file --no-link --print-out-paths .#openclaw-system-heal)"
   system_heal_working_dir="$system_heal_out/share/openclaw/services/openclaw-system-heal"
   system_heal_server="$system_heal_working_dir/src/server.mjs"
@@ -1312,7 +1335,7 @@ console.log(JSON.stringify({
 EOF
   )
 
-  observer_ui_out="$(nix --extra-experimental-features 'nix-command flakes' build \
+  observer_ui_out="$(nix_flake build \
     --no-update-lock-file --no-link --print-out-paths .#observer-ui)"
   observer_ui_working_dir="$observer_ui_out/share/openclaw/apps/observer-ui"
   observer_ui_server="$observer_ui_working_dir/src/server.mjs"
@@ -1323,7 +1346,7 @@ EOF
     || ! -f "$observer_ui_out/share/openclaw/packages/shared-client/src/service-descriptors.mjs"
     || -w "$observer_ui_server"
     || -e "$observer_ui_out/share/openclaw/apps/observer-ui/scripts"
-    || "$(find "$observer_ui_out" -type f | wc -l)" -ne 56 ]]; then
+    || "$(find "$observer_ui_out" -type f | wc -l)" -ne 59 ]]; then
     echo "observer-ui Nix closure is not exact and read-only: $observer_ui_out" >&2
     exit 1
   fi

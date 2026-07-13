@@ -1,7 +1,7 @@
 # Phase C Kernel Process-Exec Capture Plan
 
-Status: implementation and switched-VM acceptance passed; full body-config
-rerun deferred after duplicate flake closure fetch stalled, 2026-07-13
+Status: implementation, switched-VM acceptance, and full body-config passed,
+2026-07-13
 
 ## Purpose
 
@@ -55,7 +55,9 @@ bounded read model through the existing core system-sense proxy and Observer.
   and validation child process observed through the core proxy.
 - `dev-body-config-check.sh` is the acceptance check for the probe derivation,
   system-sense source closure, desktop service environment, and capability
-  bounding set.
+  bounding set. On a NixOS host it reuses the installed system channel as the
+  flake nixpkgs input, with `OPENCLAW_BODY_CONFIG_NIXPKGS_OVERRIDE` available
+  for an explicit source and the locked flake input as the fallback.
 
 Local implementation, Nix evaluation/parse, shell validation, system-sense
 tests (45/45), core route tests (32/32), and Observer served-source assembly
@@ -63,9 +65,9 @@ checks pass. The corrected derivation compiled in the switched system, which
 loaded the raw tracepoint probe with only `CAP_BPF`, `CAP_PERFMON`, and
 `LimitMEMLOCK=infinity`. The core acceptance check captured 8 events and the
 Observer acceptance check captured 8 events including the external `true`
-validation process. A later duplicate `body-config` closure build was
-intentionally interrupted while downloading the flake's clang closure from
-TUNA; its preceding Nix evaluation, ownership, and store-native checks passed.
+  validation process. The full `body-config` check then passed while reusing
+  the installed NixOS 25.11 channel, so it did not redownload the separate
+  unstable clang closure.
 
 ## Deliberately Deferred
 
