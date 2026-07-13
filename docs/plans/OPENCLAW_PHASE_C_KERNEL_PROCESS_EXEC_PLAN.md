@@ -39,7 +39,9 @@ bounded read model through the existing core system-sense proxy and Observer.
 - Raw output fields: `timestampNs`, `pid`, `uid`, `comm` only.
 - Executable identity: CO-RE reads `linux_binprm.filename`, accepts at most
   255 bytes per value, and exposes at most 16 entries in the readback. This is
-  the exec filename only, not arbitrary VFS path capture.
+  the exec filename only, not arbitrary VFS path capture. If the bounded
+  filename cannot be read, the raw four-field event remains and only its
+  executable identity entry is omitted.
 - Runtime behavior: one capture at a time, no automatic retry, no persistence,
   no policy execution, and no host mutation.
 - Readback: the existing response includes a bounded in-memory summary with a

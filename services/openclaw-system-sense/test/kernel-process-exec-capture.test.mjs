@@ -75,6 +75,40 @@ test("kernel process exec capture validates bounded JSON Lines output", async ()
   assert.equal(observed[2].killSignal, "SIGTERM");
 });
 
+test("kernel process exec capture keeps the raw event when executable identity is unavailable", async () => {
+  const capture = createKernelProcessExecCapture({
+    enabled: true,
+    probeCommand: "/nix/store/probe/bin/openclaw-kernel-process-exec",
+    execFile: async () => ({
+      stdout: `${JSON.stringify({ ...event, executable: "" })}\n`,
+    }),
+  });
+
+  const result = await capture.capture();
+
+  assert.equal(result.status, "captured");
+  assert.deepEqual(result.events, [rawEvent]);
+  assert.equal(result.executableIdentityCount, 0);
+  assert.deepEqual(result.readback.executableIdentity.entries, []);
+  assert.equal(result.readback.eventCount, 1);
+});
+
+test("kernel process exec capture bounds executable identity by UTF-8 bytes", async () => {
+  const capture = createKernelProcessExecCapture({
+    enabled: true,
+    probeCommand: "/nix/store/probe/bin/openclaw-kernel-process-exec",
+    execFile: async () => ({
+      stdout: `${JSON.stringify({ ...event, executable: "é".repeat(128) })}\n`,
+    }),
+  });
+
+  const result = await capture.capture();
+
+  assert.equal(result.status, "invalid_output");
+  assert.equal(result.error.code, "invalid_output");
+  assert.equal(result.readback.eventCount, 0);
+});
+
 test("kernel process exec capture exposes permission failure without raw probe output", async () => {
   const error = new Error("spawn /secret/probe EPERM: operation not permitted");
   error.code = "EPERM";

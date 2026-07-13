@@ -119,8 +119,7 @@ function parseEvents(stdout, maxEvents) {
       throw invalidOutput("probe output command name was invalid");
     }
     if (typeof value.executable !== "string"
-      || value.executable.length === 0
-      || value.executable.length > MAX_EXECUTABLE_LENGTH
+      || Buffer.byteLength(value.executable, "utf8") > MAX_EXECUTABLE_LENGTH
       || /[\u0000\r\n]/.test(value.executable)) {
       throw invalidOutput("probe output executable identity was invalid");
     }
@@ -131,13 +130,15 @@ function parseEvents(stdout, maxEvents) {
         uid: value.uid,
         comm: value.comm,
       },
-      executableIdentity: {
-        timestampNs: value.timestampNs,
-        pid: value.pid,
-        uid: value.uid,
-        comm: value.comm,
-        executable: value.executable,
-      },
+      executableIdentity: value.executable.length > 0
+        ? {
+            timestampNs: value.timestampNs,
+            pid: value.pid,
+            uid: value.uid,
+            comm: value.comm,
+            executable: value.executable,
+          }
+        : null,
     };
   });
 }
@@ -199,7 +200,8 @@ export function createKernelProcessExecCapture({
       });
       const parsedEvents = parseEvents(result?.stdout, boundedMaxEvents);
       const events = parsedEvents.map(({ event }) => event);
-      const executableIdentities = parsedEvents.map(({ executableIdentity }) => executableIdentity);
+      const executableIdentities = parsedEvents
+        .flatMap(({ executableIdentity }) => (executableIdentity ? [executableIdentity] : []));
       return buildReadModel({
         enabled: true,
         status: "captured",
