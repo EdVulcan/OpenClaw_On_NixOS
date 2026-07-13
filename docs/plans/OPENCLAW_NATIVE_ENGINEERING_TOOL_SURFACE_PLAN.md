@@ -485,6 +485,15 @@ outside the explicit DeepSeek handoff require explicit operator authorization.
 The context-packet handoff consumes the local packet only for the current
 approved operator call and returns only a review-required recommendation;
 preserve that boundary and select only concrete local capabilities that close a
-user-visible gap. The next slice is an existing Observer readback bridge for a
-valid recommendation, not automatic task creation or execution. Do not create
-another readiness or evidence-only shell.
+user-visible gap.
+
+The existing Observer readback bridge for a valid recommendation is now
+complete. `/operator/step` and `/operator/run` return the bounded transient
+recommendation, Observer revalidates its contract and allowlisted control id,
+and the explicit use action calls only the existing governed control. Route
+fixtures prove the reason remains absent from compact evidence. This does not
+create tasks, approvals, execution, or provider egress automatically.
+
+The next route should advance the smallest concrete Level 2 trusted
+work-view/session-helper capability through an existing owner. Do not create
+another Level 1 readiness or evidence-only shell.
