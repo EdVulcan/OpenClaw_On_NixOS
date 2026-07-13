@@ -1,6 +1,6 @@
 # Phase C Kernel Process-Exec Capture Plan
 
-Status: active first slice, 2026-07-13
+Status: implementation pushed; package build and switched-VM acceptance pending, 2026-07-13
 
 ## Purpose
 
@@ -45,11 +45,18 @@ bounded read model through the existing core system-sense proxy and Observer.
   proves the read-only route dispatch contract.
 - `services/openclaw-core/test/route-handlers.test.mjs` proves the production
   core proxy forwards the route to system-sense.
-- `openclaw-kernel-process-exec-capture` and its Observer pair prove the
-  switched VM service has the explicit Nix probe path and capabilities and
-  observes a validation child process through the core proxy.
-- `dev-body-config-check.sh` proves the probe derivation, system-sense source
-  closure, desktop service environment, and capability bounding set.
+- `openclaw-kernel-process-exec-capture` and its Observer pair are the
+  switched-VM acceptance checks for the explicit Nix probe path, capabilities,
+  and validation child process observed through the core proxy.
+- `dev-body-config-check.sh` is the acceptance check for the probe derivation,
+  system-sense source closure, desktop service environment, and capability
+  bounding set.
+
+Local implementation, Nix evaluation/parse, shell validation, system-sense
+tests (45/45), core route tests (32/32), and Observer served-source assembly
+checks pass. The actual derivation build was started but stopped after the
+environment's cache transfer stalled at approximately 1.4 KB/s for the clang
+closure; no compiler result or switched-VM event result is claimed yet.
 
 ## Deliberately Deferred
 
