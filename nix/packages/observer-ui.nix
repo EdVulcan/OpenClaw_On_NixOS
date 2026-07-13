@@ -10,7 +10,9 @@ mkOpenClawSourceClosure {
   files = [
     ../../apps/observer-ui/package.json
     ../../apps/observer-ui/src/client-script-config-dom-cloud-provider.mjs
+    ../../apps/observer-ui/src/client-script-config-dom-engineering-context.mjs
     ../../apps/observer-ui/src/client-script-config-dom-mvp-memory.mjs
+    ../../apps/observer-ui/src/client-script-config-dom-native-runtime-refresh.mjs
     ../../apps/observer-ui/src/client-script-config-dom-system-body.mjs
     ../../apps/observer-ui/src/client-script-config-dom-workspace-source.mjs
     ../../apps/observer-ui/src/client-script-config-dom.mjs
@@ -22,6 +24,7 @@ mkOpenClawSourceClosure {
     ../../apps/observer-ui/src/client-script-refreshers-cloud-live-result-envelope.mjs
     ../../apps/observer-ui/src/client-script-refreshers-cloud-live-runbook.mjs
     ../../apps/observer-ui/src/client-script-refreshers-cloud.mjs
+    ../../apps/observer-ui/src/client-script-refreshers-engineering-context.mjs
     ../../apps/observer-ui/src/client-script-refreshers-memory-phases.mjs
     ../../apps/observer-ui/src/client-script-refreshers-mvp-phases.mjs
     ../../apps/observer-ui/src/client-script-refreshers-runtime.mjs
@@ -29,6 +32,7 @@ mkOpenClawSourceClosure {
     ../../apps/observer-ui/src/client-script-refreshers-workspace-source.mjs
     ../../apps/observer-ui/src/client-script-renderers-acpx-codex-bridge.mjs
     ../../apps/observer-ui/src/client-script-renderers-engineering-edit.mjs
+    ../../apps/observer-ui/src/client-script-renderers-engineering-context.mjs
     ../../apps/observer-ui/src/client-script-renderers-engineering-lsp.mjs
     ../../apps/observer-ui/src/client-script-renderers-engineering-microcompact.mjs
     ../../apps/observer-ui/src/client-script-renderers-engineering-plan-todo.mjs
@@ -43,13 +47,16 @@ mkOpenClawSourceClosure {
     ../../apps/observer-ui/src/client-script-runtime-approval-tasks.mjs
     ../../apps/observer-ui/src/client-script-runtime-bindings.mjs
     ../../apps/observer-ui/src/client-script-runtime-engineering-loop-controls.mjs
+    ../../apps/observer-ui/src/client-script-runtime-engineering-recommendation.mjs
     ../../apps/observer-ui/src/client-script-runtime-engineering-suggested-action.mjs
+    ../../apps/observer-ui/src/client-script-runtime-native-runtime-refresh.mjs
     ../../apps/observer-ui/src/client-script-runtime-system-body-tasks.mjs
     ../../apps/observer-ui/src/client-script-startup-refreshes.mjs
     ../../apps/observer-ui/src/client-script-startup.mjs
     ../../apps/observer-ui/src/client-script.mjs
     ../../apps/observer-ui/src/observer-html.mjs
     ../../apps/observer-ui/src/observer-panels-cloud.mjs
+    ../../apps/observer-ui/src/observer-panels-engineering-context.mjs
     ../../apps/observer-ui/src/observer-panels-foundation.mjs
     ../../apps/observer-ui/src/observer-panels-operations.mjs
     ../../apps/observer-ui/src/observer-panels-system.mjs

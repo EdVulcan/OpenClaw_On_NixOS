@@ -19,7 +19,7 @@ export function createSystemdTaskBuilders(deps) {
     SYSTEMD_NEXT_REPAIR_REAL_EXECUTION_REGISTRY,
     SYSTEMD_REPAIR_REAL_EXECUTION_UNIT,
     SYSTEMD_NEXT_REPAIR_REAL_EXECUTION_UNIT,
-    SYSTEMD_REPAIR_RESTART_HELPER,
+    HOSTD_SOCKET_PATH,
     SYSTEMD_REPAIR_AUTH_DELEGATION,
   } = deps;
 
@@ -136,10 +136,10 @@ export function createSystemdTaskBuilders(deps) {
             futureExecutionRequiresSeparateMilestone: !realExecution,
             selectedRealExecutionUnit: realExecution ? SYSTEMD_REPAIR_REAL_EXECUTION_UNIT : null,
             authDelegation: {
-              mode: "native-dbus-helper-required",
+              mode: "hostd-control-required",
               helperConfigured: false,
               passwordlessExpected: false,
-              scope: "legacy browser system-unit mutation is disabled",
+              scope: "fixed openclaw-hostd system-sense restart only",
             },
           },
         },
@@ -262,8 +262,8 @@ export function createSystemdTaskBuilders(deps) {
     let dryRunEvidence;
     let targetUnit;
     if (execute === true) {
-      if (!SYSTEMD_REPAIR_RESTART_HELPER || SYSTEMD_REPAIR_AUTH_DELEGATION !== "polkit-dbus-fixed-unit") {
-        throw new Error("Native systemd repair execution requires the fixed Polkit D-Bus helper.");
+      if (!HOSTD_SOCKET_PATH || SYSTEMD_REPAIR_AUTH_DELEGATION !== "polkit-dbus-fixed-unit") {
+        throw new Error("Native systemd repair execution requires the fixed OpenClaw hostd boundary.");
       }
       const inventory = await fetchJson(`${systemSenseUrl}/system/systemd/units`);
       const target = inventory.units?.find((unit) => unit.unit === SYSTEMD_NEXT_REPAIR_REAL_EXECUTION_UNIT);

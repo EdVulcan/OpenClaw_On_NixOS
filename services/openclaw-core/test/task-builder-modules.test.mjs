@@ -105,9 +105,9 @@ test("native systemd execution task uses observed inventory without historical l
 
 test("native systemd execution task fails closed without the fixed helper authorization", async () => {
   const { deps, fetchUrls } = createTaskLifecycleHarness();
-  const buildersWithoutHelper = createSystemdTaskBuilders({
+  const buildersWithoutHostd = createSystemdTaskBuilders({
     ...deps,
-    SYSTEMD_REPAIR_RESTART_HELPER: null,
+    HOSTD_SOCKET_PATH: null,
   });
   const buildersWithoutPolkit = createSystemdTaskBuilders({
     ...deps,
@@ -115,12 +115,12 @@ test("native systemd execution task fails closed without the fixed helper author
   });
 
   await assert.rejects(
-    buildersWithoutHelper.createSystemdNextRepairTaskShell({ confirm: true, execute: true }),
-    /requires the fixed Polkit D-Bus helper/u,
+    buildersWithoutHostd.createSystemdNextRepairTaskShell({ confirm: true, execute: true }),
+    /requires the fixed OpenClaw hostd boundary/u,
   );
   await assert.rejects(
     buildersWithoutPolkit.createSystemdNextRepairTaskShell({ confirm: true, execute: true }),
-    /requires the fixed Polkit D-Bus helper/u,
+    /requires the fixed OpenClaw hostd boundary/u,
   );
   assert.deepEqual(fetchUrls, []);
 });

@@ -5,6 +5,7 @@ import { createNativePluginRuntimeRefreshTaskHandlers } from "./task-executor-na
 import { createNativeAcpxCodexBridgeTaskHandlers } from "./task-executor-native-acpx-codex-bridge-handlers.mjs";
 import { createNativeEngineeringLspLifecycleTaskHandlers } from "./native-engineering-lsp-lifecycle-tasks.mjs";
 import { createSystemBodyTaskHandlers } from "./task-executor-system-body-handlers.mjs";
+import { requestHostdSystemSenseRestart } from "./hostd-control-client.mjs";
 import { planCapabilityActionSteps } from "./task-recovery.mjs";
 import {
   browserTaskActionsForExecution,
@@ -25,7 +26,17 @@ import {
 } from "./cloud-live-provider-runtime-context-packet.mjs";
 
 export function createTaskExecutor(deps) {
-  const { client, state, taskManager, planBuilder, approvalEngine, workspaceOps, policyEvaluator, publishEvent } = deps;
+  const {
+    client,
+    state,
+    taskManager,
+    planBuilder,
+    approvalEngine,
+    workspaceOps,
+    policyEvaluator,
+    publishEvent,
+    hostdControlClient = requestHostdSystemSenseRestart,
+  } = deps;
   const {
     fetchJson,
     postJson,
@@ -1154,7 +1165,7 @@ const NON_RECOVERABLE_TASK_HANDLERS = [
   ...createNativePluginRuntimeRefreshTaskHandlers({ state, taskManager, approvalEngine, policyEvaluator, planBuilder, publishEvent }),
   ...createNativeAcpxCodexBridgeTaskHandlers({ state, taskManager, approvalEngine, policyEvaluator, planBuilder, publishEvent }),
   ...createNativeDeferredTaskHandlers({ state, taskManager, approvalEngine, policyEvaluator, publishEvent }),
-  ...createSystemBodyTaskHandlers({ client, state, taskManager, publishEvent }),
+  ...createSystemBodyTaskHandlers({ client, state, taskManager, publishEvent, hostdControlClient }),
   ...createDelegatedPlanTaskHandlers(planBuilder),
   { name: "capability-plan", predicate: shouldExecuteCapabilityPlan, execute: executeCapabilityPlanTask },
 ];

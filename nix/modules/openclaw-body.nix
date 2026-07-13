@@ -122,23 +122,41 @@ let
     then "${cfg.runtimePackages.sessionManager}/share/openclaw"
     else cfg.repoRoot;
 
-  systemSenseRuntimeRoot =
-    if cfg.runtimePackages.systemSense != null
-    then "${cfg.runtimePackages.systemSense}/share/openclaw/services/openclaw-system-sense"
-    else "${cfg.repoRoot}/services/openclaw-system-sense";
-
   urlFor = port: "http://${cfg.connectHost}:${toString port}";
+  hostdSocketPath = "/run/openclaw/hostd.sock";
+  hostdRuntimeRoot =
+    if cfg.runtimePackages.hostd != null
+    then "${cfg.runtimePackages.hostd}/share/openclaw"
+    else "${cfg.repoRoot}";
 
-  systemdRepairRestartHelper = pkgs.writeShellScriptBin "openclaw-systemd-native-restart-system-sense" ''
-    set -euo pipefail
-
-    if [ "$#" -ne 0 ]; then
-      echo "openclaw-systemd-native-restart-system-sense accepts no arguments" >&2
-      exit 64
-    fi
-
-    exec ${pkgs.nodejs}/bin/node ${systemSenseRuntimeRoot}/src/systemd-dbus-restart-helper.mjs
-  '';
+  hostdService = {
+    description = "OpenClaw Fixed Host Control Boundary";
+    wantedBy = [ "multi-user.target" ];
+    wants = [ "network-online.target" ];
+    after = [ "network-online.target" ];
+    environment = {
+      OPENCLAW_HOSTD_SOCKET_PATH = hostdSocketPath;
+      OPENCLAW_BODY_RUNTIME_SOURCE = if cfg.runtimePackages.hostd != null then "nix-store" else "mutable-repo";
+    };
+    serviceConfig = {
+      Type = "simple";
+      WorkingDirectory = "${hostdRuntimeRoot}/services/openclaw-hostd";
+      ExecStart = "${cfg.nodePackage}/bin/node src/server.mjs";
+      Restart = "on-failure";
+      RestartSec = "2s";
+      RuntimeDirectory = "openclaw";
+      RuntimeDirectoryMode = "0750";
+      UMask = "0007";
+      NoNewPrivileges = true;
+      PrivateTmp = true;
+      ProtectSystem = "strict";
+      ProtectHome = true;
+      RestrictAddressFamilies = [ "AF_UNIX" ];
+    } // optionalAttrs (cfg.user != null) {
+      User = cfg.user;
+      Group = cfg.group;
+    };
+  };
 
   eventLogOwnershipMigration = pkgs.writeShellScript "openclaw-event-log-ownership-migration" ''
     set -euo pipefail
@@ -165,7 +183,7 @@ let
     OPENCLAW_EVENT_LOG_FILE = "${stateDir}/openclaw-events.jsonl";
     OPENCLAW_BODY_EVIDENCE_LEDGER_DIR = "${stateDir}/body-evidence-ledger";
   } // optionalAttrs cfg.systemdRepairAuthDelegation.enable {
-    OPENCLAW_SYSTEMD_REPAIR_RESTART_HELPER = "${systemdRepairRestartHelper}/bin/openclaw-systemd-native-restart-system-sense";
+    OPENCLAW_HOSTD_SOCKET_PATH = hostdSocketPath;
     OPENCLAW_SYSTEMD_REPAIR_AUTH_DELEGATION = "polkit-dbus-fixed-unit";
   };
 
@@ -356,6 +374,12 @@ in
       description = "Read-only Nix package used by system-sense; null keeps the mutable repository fallback.";
     };
 
+    runtimePackages.hostd = mkOption {
+      type = types.nullOr types.package;
+      default = pkgs.callPackage ../packages/openclaw-hostd.nix { };
+      description = "Read-only Nix package used by the fixed host control boundary; null keeps the mutable repository fallback.";
+    };
+
     runtimePackages.systemHeal = mkOption {
       type = types.nullOr types.package;
       default = pkgs.callPackage ../packages/openclaw-system-heal.nix { };
@@ -478,8 +502,9 @@ in
         assertion = !cfg.systemdRepairAuthDelegation.enable
           || (builtins.elem "systemSense" cfg.components
             && !builtins.elem "systemSense" cfg.componentOwnership.user
-            && cfg.runtimePackages.systemSense != null);
-        message = "systemd repair delegation requires a store-native system-owned systemSense component.";
+            && cfg.runtimePackages.systemSense != null
+            && cfg.runtimePackages.hostd != null);
+        message = "systemd repair delegation requires store-native system-sense and hostd components.";
       }
     ];
 
@@ -506,7 +531,9 @@ in
         name = spec.name;
         value = mkService "system" spec;
       })
-      systemOwnedSpecs);
+      systemOwnedSpecs) // optionalAttrs cfg.systemdRepairAuthDelegation.enable {
+      openclaw-hostd = hostdService;
+    };
 
     systemd.user.services = builtins.listToAttrs
       (map

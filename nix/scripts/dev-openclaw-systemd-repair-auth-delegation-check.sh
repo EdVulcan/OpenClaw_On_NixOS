@@ -35,10 +35,8 @@ for (const token of [
 for (const token of [
   "systemdRepairAuthDelegation",
   "Polkit-authorized native D-Bus repair",
-  "openclaw-systemd-native-restart-system-sense",
-  "if [ \"$#\" -ne 0 ]; then",
-  "systemd-dbus-restart-helper.mjs",
-  "OPENCLAW_SYSTEMD_REPAIR_RESTART_HELPER",
+  "openclaw-hostd",
+  "OPENCLAW_HOSTD_SOCKET_PATH",
   "OPENCLAW_SYSTEMD_REPAIR_AUTH_DELEGATION",
   "polkit-dbus-fixed-unit",
   "security.polkit.extraConfig",
@@ -61,13 +59,14 @@ if (!bodyModule.includes("requires services.openclaw.user")) {
 }
 
 for (const token of [
-  "SYSTEMD_REPAIR_RESTART_HELPER",
+  "HOSTD_SOCKET_PATH",
   "SYSTEMD_REPAIR_AUTH_DELEGATION",
   "polkit-dbus-fixed-unit",
   "passwordPromptAllowed: false",
   "scope: \"restart openclaw-system-sense.service only\"",
   "org.freedesktop.systemd1.Manager.RestartUnit",
-  "native-dbus-helper-required",
+  "hostd-control-required",
+  "hostdControlClient",
   "no command fallback",
   "actualCommand",
   "authDelegation",
@@ -100,7 +99,7 @@ console.log(JSON.stringify({
     serviceUser: "openclaw-service",
     delegatedUnit: "openclaw-system-sense.service",
     delegatedAction: "restart",
-    transport: "dbus_native",
+    transport: "unix_socket->dbus_native",
     polkitAction: "org.freedesktop.systemd1.manage-units",
     broadSudoGranted: false,
     arbitrarySystemctlGranted: false,

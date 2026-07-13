@@ -1,3 +1,4 @@
+import dbus from "@homebridge/dbus-native";
 import { createSystemdDbusTransport } from "./systemd-dbus-transport.mjs";
 
 const SYSTEMD_UNIT_INTERFACE = "org.freedesktop.systemd1.Unit";
@@ -19,7 +20,7 @@ function selectProperties(properties, names) {
 
 export function createSystemdDbusAdapter({
   createTransport = (options) => createSystemdDbusTransport(options),
-  createSystemBus,
+  createSystemBus = dbus.systemBus,
   timeoutMs = 1500,
 } = {}) {
   async function inspectUnit(transport, unitName) {

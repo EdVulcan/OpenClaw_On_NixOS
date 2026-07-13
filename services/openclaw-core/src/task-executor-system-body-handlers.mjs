@@ -1,20 +1,23 @@
 import { createHash, randomUUID } from "node:crypto";
-import { execFile } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { promisify } from "node:util";
 import { createEventName } from "../../../packages/shared-events/src/event-factory.mjs";
+import { requestHostdSystemSenseRestart } from "./hostd-control-client.mjs";
 
-const execFileAsync = promisify(execFile);
-
-export function createSystemBodyTaskHandlers({ client, state, taskManager, publishEvent }) {
+export function createSystemBodyTaskHandlers({
+  client,
+  state,
+  taskManager,
+  publishEvent,
+  hostdControlClient = requestHostdSystemSenseRestart,
+}) {
   const { fetchJson, postJson, systemSenseUrl } = client;
   const {
     persistState,
     SYSTEMD_REPAIR_EXECUTION_TIMEOUT_MS,
     SYSTEMD_REPAIR_POST_VERIFICATION_ATTEMPTS = 30,
     SYSTEMD_REPAIR_POST_VERIFICATION_POLL_MS = 100,
-    SYSTEMD_REPAIR_RESTART_HELPER,
+    HOSTD_SOCKET_PATH,
     SYSTEMD_REPAIR_AUTH_DELEGATION,
     SYSTEMD_REPAIR_EXECUTION_TASK_REGISTRY,
     SYSTEMD_NEXT_REPAIR_TASK_SHELL_REGISTRY,
@@ -177,28 +180,29 @@ export function createSystemBodyTaskHandlers({ client, state, taskManager, publi
     const repair = task.systemdRepair ?? task.systemdNextRepair ?? {};
     const command = repair.command ?? {};
     const requestedArgs = Array.isArray(command.args) ? command.args : ["restart", repair.target?.unit ?? SYSTEMD_REPAIR_REAL_EXECUTION_UNIT];
-    const useRestartHelper = Boolean(
-      SYSTEMD_REPAIR_RESTART_HELPER
+    const useHostd = Boolean(
+      HOSTD_SOCKET_PATH
       && repair.target?.unit === SYSTEMD_NEXT_REPAIR_REAL_EXECUTION_UNIT
       && command.command === "systemctl"
       && requestedArgs[0] === "restart"
       && requestedArgs[1] === SYSTEMD_NEXT_REPAIR_REAL_EXECUTION_UNIT
     );
-    const executable = useRestartHelper ? SYSTEMD_REPAIR_RESTART_HELPER : null;
     const args = [];
-    const authDelegation = useRestartHelper
+    const authDelegation = useHostd
       ? {
           mode: SYSTEMD_REPAIR_AUTH_DELEGATION ?? "polkit-dbus-fixed-unit",
-          helper: SYSTEMD_REPAIR_RESTART_HELPER,
+          helper: null,
+          socketPath: HOSTD_SOCKET_PATH,
           sudo: null,
-          transport: "dbus_native",
+          transport: "unix_socket",
           method: "org.freedesktop.systemd1.Manager.RestartUnit",
           passwordPromptAllowed: false,
           scope: "restart openclaw-system-sense.service only",
         }
       : {
-          mode: "native-dbus-helper-required",
+          mode: "hostd-control-required",
           helper: null,
+          socketPath: null,
           sudo: null,
           transport: null,
           method: null,
@@ -207,7 +211,7 @@ export function createSystemBodyTaskHandlers({ client, state, taskManager, publi
         };
     const startedAt = new Date().toISOString();
 
-    if (!useRestartHelper) {
+    if (!useHostd) {
       return {
         invocationId: randomUUID(),
         command: "not-executed",
@@ -220,19 +224,22 @@ export function createSystemBodyTaskHandlers({ client, state, taskManager, publi
         exitCode: 126,
         timedOut: false,
         stdout: "",
-        stderr: "Native D-Bus fixed-unit restart helper is not configured for this target.",
+        stderr: "OpenClaw hostd fixed-unit control is not configured for this target.",
         ok: false,
       };
     }
 
     try {
-      const result = await execFileAsync(executable, args, {
-        timeout: SYSTEMD_REPAIR_EXECUTION_TIMEOUT_MS,
-        windowsHide: true,
-        maxBuffer: 16384,
+      const hostdResponse = await hostdControlClient({
+        socketPath: HOSTD_SOCKET_PATH,
+        timeoutMs: SYSTEMD_REPAIR_EXECUTION_TIMEOUT_MS,
       });
-      const nativeMutation = JSON.parse((result.stdout ?? "").trim());
-      if (nativeMutation.ok !== true
+      const nativeMutation = hostdResponse?.nativeMutation;
+      if (hostdResponse?.ok !== true
+        || hostdResponse.owner !== "openclaw-hostd"
+        || hostdResponse.transport !== "unix_socket"
+        || nativeMutation?.ok !== true
+        || nativeMutation.owner !== "openclaw-hostd"
         || nativeMutation.transport !== "dbus_native"
         || nativeMutation.method !== "org.freedesktop.systemd1.Manager.RestartUnit"
         || nativeMutation.unit !== SYSTEMD_NEXT_REPAIR_REAL_EXECUTION_UNIT
@@ -242,11 +249,11 @@ export function createSystemBodyTaskHandlers({ client, state, taskManager, publi
         || nativeMutation.before.mainPid === nativeMutation.after.mainPid
         || nativeMutation.after.activeState !== "active"
         || nativeMutation.after.subState !== "running") {
-        throw new Error("Native D-Bus restart helper returned invalid mutation evidence.");
+        throw new Error("OpenClaw hostd returned invalid native mutation evidence.");
       }
       return {
         invocationId: randomUUID(),
-        command: executable,
+        command: "openclaw-hostd",
         args,
         requestedCommand: command.command ?? "systemctl",
         requestedArgs,
@@ -255,16 +262,17 @@ export function createSystemBodyTaskHandlers({ client, state, taskManager, publi
         completedAt: new Date().toISOString(),
         exitCode: 0,
         timedOut: false,
-        stdout: result.stdout ?? "",
-        stderr: result.stderr ?? "",
+        stdout: JSON.stringify(hostdResponse),
+        stderr: "",
         nativeMutation,
+        hostdResponse,
         ok: true,
       };
     } catch (error) {
       const exitCode = Number.isInteger(error?.code) ? error.code : 1;
       return {
         invocationId: randomUUID(),
-        command: executable,
+        command: "openclaw-hostd",
         args,
         requestedCommand: command.command ?? "systemctl",
         requestedArgs,

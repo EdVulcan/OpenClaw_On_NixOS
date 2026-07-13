@@ -63,7 +63,7 @@ function createPlanBuilderHarness({ acpxDraft }) {
       SYSTEMD_NEXT_REPAIR_TASK_SHELL_REGISTRY: "systemd-next-repair-shell",
       SYSTEMD_NEXT_REPAIR_REAL_EXECUTION_REGISTRY: "systemd-next-repair-real-execution",
       SYSTEMD_REPAIR_REAL_EXECUTION_UNIT: "openclaw-core.service",
-      SYSTEMD_REPAIR_RESTART_HELPER: "systemctl restart",
+      HOSTD_SOCKET_PATH: "/run/openclaw/hostd.sock",
       SYSTEMD_REPAIR_AUTH_DELEGATION: "polkit",
       LONG_TERM_MEMORY_TASK_REGISTRY: "long-term-memory-task",
       LONG_TERM_MEMORY_DIR_DISPLAY_PATH: ".openclaw/memory",

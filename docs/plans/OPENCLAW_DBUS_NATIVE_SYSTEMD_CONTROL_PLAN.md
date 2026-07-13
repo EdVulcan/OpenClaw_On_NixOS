@@ -7,6 +7,11 @@ wrappers with a native Node.js D-Bus boundary. Start with real read-only systemd
 unit inventory from the local system bus, then prove one fixed Polkit-authorized
 restart through the existing governed repair lifecycle.
 
+The fixed restart is now owned by a dedicated `openclaw-hostd` system service.
+Core reaches it through a bounded Unix socket protocol, and hostd accepts only
+the fixed system-sense restart capability. This boundary is deliberately
+smaller than a general systemd RPC surface.
+
 ## Phase A Prerequisite
 
 Phase A is complete: all nine main services and the non-auto-started trusted
@@ -38,7 +43,10 @@ unit, and runs representative behavior from each store path.
 5. Prove at least one real OpenClaw unit inventory result through D-Bus and
    attach transport evidence to the existing readback.
 
-## Boundaries
+## First-Slice Boundaries (Historical)
+
+The following limits governed the initial read-only inventory slice. The later
+fixed restart slice has its own hostd, approval, Polkit, audit, and VM evidence.
 
 - Identity route: first bounded Level 3 substrate, still initiated by the
   existing user-space control plane.
@@ -81,7 +89,8 @@ The fixed native restart slice is complete in the running VM generation:
 1. Desktop system services run as the dedicated `openclaw-service` account
    instead of root; session-manager and browser-runtime remain user-manager
    services.
-2. A no-argument store-native helper invokes only
+2. A dedicated `openclaw-hostd` store-native service accepts one no-argument
+   restart capability and invokes only
    `org.freedesktop.systemd1.Manager.RestartUnit` for
    `openclaw-system-sense.service` with mode `replace`.
 3. The helper waits for the unit to return to `active/running` with a different
@@ -89,8 +98,9 @@ The fixed native restart slice is complete in the running VM generation:
 4. Polkit grants only `org.freedesktop.systemd1.manage-units` when unit,
    verb, and subject match that fixed restart and service account.
 5. Core reuses the existing next-repair proposal, high-risk approval, operator
-   step, audit, post-verification, and Observer path. There is no direct
-   `systemctl` or sudo fallback; unmatched targets fail closed.
+   step, audit, post-verification, and Observer path, reaching hostd over its
+   Unix socket. There is no direct `systemctl` or sudo fallback; unmatched
+   targets fail closed.
 6. Store-native core execution resolves body-ledger readiness and writes through
    `OPENCLAW_BODY_EVIDENCE_LEDGER_DIR` at
    `/var/lib/openclaw/body-evidence-ledger`; public evidence continues to use
@@ -115,19 +125,34 @@ require successful native transport rather than accepting a failed attempt.
 Real VM evidence proves two separately approved executions, one through the
 core milestone and one through the Observer milestone. Both returned exit zero,
 an `org.freedesktop.systemd1` job path, changed positive main PIDs, restored
-readiness, `polkit-dbus-fixed-unit`, and the fixed store helper with no sudo or
-direct systemctl execution.
+readiness, `polkit-dbus-fixed-unit`, and the fixed hostd store closure with no
+sudo or direct systemctl execution.
+
+## Completed Hostd Boundary
+
+`openclaw-hostd` is now a separate system service with a read-only Nix closure,
+an `AF_UNIX` socket, and the same dedicated OpenClaw service identity used by
+the governed core path. Its protocol rejects unknown fields, arbitrary units,
+arbitrary methods, and non-fixed operations. The hostd response carries the
+request id, owner, transport, method, unit, job path, and before/after PID
+evidence; the core client rejects a response whose request id does not match
+the request it sent.
+
+Focused hostd tests, core executor tests, auth-delegation checks, Nix closure
+builds, and the body configuration check prove this boundary. No new public
+route or arbitrary privileged API was added.
 
 ## Deferred
 
 - D-Bus start/stop/reload operations and any restart target other than the fixed
   system-sense unit.
-- Dedicated `openclaw-hostd` ownership boundary.
+- Any hostd capability beyond the fixed system-sense restart, including
+  arbitrary unit names, methods, arguments, or caller-supplied D-Bus paths.
 - eBPF kernel event transport and declarative Nix self-evolution.
 
 ## Next Slice
 
-Return to the Level 1 native governed engineering capability route. Any future
-Level 3 slice must introduce a cohesive hostd ownership boundary or another
-whitepaper capability, not broaden this fixed helper into an arbitrary systemd
-control API.
+Continue with the selected Level 2 trusted work-view/session-helper route. Any
+future Level 3 slice must add a separately justified capability behind the
+existing hostd owner; do not broaden this fixed restart into an arbitrary
+systemd control API.

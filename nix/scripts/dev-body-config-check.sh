@@ -220,6 +220,8 @@ if command -v nix >/dev/null 2>&1; then
           User = unit.serviceConfig.User or null;
           WorkingDirectory = unit.serviceConfig.WorkingDirectory;
           ExecStart = unit.serviceConfig.ExecStart;
+          RuntimeDirectory = unit.serviceConfig.RuntimeDirectory or null;
+          RuntimeDirectoryMode = unit.serviceConfig.RuntimeDirectoryMode or null;
         };
       };
     in {
@@ -236,6 +238,9 @@ if command -v nix >/dev/null 2>&1; then
       systemSense = project config.systemd.services.openclaw-system-sense;
       systemHeal = project config.systemd.services.openclaw-system-heal;
       observerUi = project config.systemd.services.observer-ui;
+      hostd = if builtins.hasAttr "openclaw-hostd" config.systemd.services
+        then project config.systemd.services.openclaw-hostd
+        else null;
     }')"
   node - <<'EOF' "$ownership_json"
 const ownership = JSON.parse(process.argv[2]);
@@ -302,11 +307,21 @@ if (ownership.core.environment?.OPENCLAW_BODY_RUNTIME_SOURCE !== "nix-store"
   || ownership.core.environment?.OPENCLAW_CORE_STATE_FILE !== "/var/lib/openclaw/openclaw-core-state.json"
   || ownership.core.environment?.OPENCLAW_BODY_EVIDENCE_LEDGER_DIR !== "/var/lib/openclaw/body-evidence-ledger"
   || ownership.core.environment?.OPENCLAW_SYSTEMD_REPAIR_AUTH_DELEGATION !== "polkit-dbus-fixed-unit"
-  || !String(ownership.core.environment?.OPENCLAW_SYSTEMD_REPAIR_RESTART_HELPER ?? "").startsWith("/nix/store/")
+  || ownership.core.environment?.OPENCLAW_HOSTD_SOCKET_PATH !== "/run/openclaw/hostd.sock"
   || !String(ownership.core.serviceConfig?.WorkingDirectory ?? "").startsWith("/nix/store/")
   || !String(ownership.core.serviceConfig?.WorkingDirectory ?? "").endsWith("/share/openclaw/services/openclaw-core")
   || ownership.core.serviceConfig?.WorkingDirectory?.includes("/opt/openclaw")) {
   throw new Error(`core must execute from its read-only Nix closure with writable state: ${JSON.stringify(ownership.core)}`);
+}
+if (ownership.hostd == null
+  || ownership.hostd.environment?.OPENCLAW_BODY_RUNTIME_SOURCE !== "nix-store"
+  || ownership.hostd.environment?.OPENCLAW_HOSTD_SOCKET_PATH !== "/run/openclaw/hostd.sock"
+  || ownership.hostd.serviceConfig?.User !== "openclaw-service"
+  || ownership.hostd.serviceConfig?.RuntimeDirectory !== "openclaw"
+  || !String(ownership.hostd.serviceConfig?.WorkingDirectory ?? "").startsWith("/nix/store/")
+  || !String(ownership.hostd.serviceConfig?.WorkingDirectory ?? "").endsWith("/share/openclaw/services/openclaw-hostd")
+  || ownership.hostd.serviceConfig?.WorkingDirectory?.includes("/opt/openclaw")) {
+  throw new Error(`hostd must execute from its fixed read-only Nix closure: ${JSON.stringify(ownership.hostd)}`);
 }
 if (ownership.screenSense.environment?.OPENCLAW_BODY_RUNTIME_SOURCE !== "nix-store"
   || !String(ownership.screenSense.serviceConfig?.WorkingDirectory ?? "").startsWith("/nix/store/")
@@ -496,12 +511,13 @@ EOF
     || ! -f "$core_out/share/openclaw/services/openclaw-core/src/native-engineering-context-routes.mjs"
     || ! -f "$core_out/share/openclaw/services/openclaw-core/src/native-engineering-context-packet.mjs"
     || ! -f "$core_out/share/openclaw/services/openclaw-core/src/native-engineering-microcompact-projection.mjs"
+    || ! -f "$core_out/share/openclaw/services/openclaw-core/src/hostd-control-client.mjs"
     || ! -f "$core_out/share/openclaw/packages/plugin-runtime/src/plugin-registry.mjs"
     || ! -f "$core_out/share/openclaw/packages/plugin-runtime/src/plugin-registry-generation-store.mjs"
     || ! -f "$core_out/share/openclaw/packages/shared-utils/src/persist.mjs"
     || -w "$core_server"
     || -e "$core_out/share/openclaw/services/openclaw-core/test"
-    || "$(find "$core_out" -type f | wc -l)" -ne 153 ]]; then
+    || "$(find "$core_out" -type f | wc -l)" -ne 158 ]]; then
     echo "core Nix closure is not exact and read-only: $core_out" >&2
     exit 1
   fi
@@ -1024,10 +1040,24 @@ EOF
     || -e "$system_sense_working_dir/node_modules/@openclaw"
     || -e "$system_sense_working_dir/node_modules/puppeteer-core"
     || -e "$system_sense_working_dir/node_modules/typescript"
-    || ! -f "$system_sense_out/share/openclaw/services/openclaw-system-sense/src/systemd-dbus-restart-helper.mjs"
     || ! -f "$system_sense_out/share/openclaw/services/openclaw-system-sense/src/systemd-dbus-transport.mjs"
+    || ! -f "$system_sense_out/share/openclaw/packages/shared-systemd/src/systemd-dbus-transport.mjs"
     || "$system_sense_source_count" -ne 22 ]]; then
     echo "system-sense Nix closure is not exact, production-only, and read-only: $system_sense_out" >&2
+    exit 1
+  fi
+
+  hostd_out="$(nix --extra-experimental-features 'nix-command flakes' build \
+    --no-update-lock-file --no-link --print-out-paths .#openclaw-hostd)"
+  hostd_working_dir="$hostd_out/share/openclaw/services/openclaw-hostd"
+  if [[ "$hostd_out" != /nix/store/*
+    || ! -f "$hostd_working_dir/src/server.mjs"
+    || ! -f "$hostd_working_dir/src/hostd-protocol.mjs"
+    || ! -f "$hostd_out/share/openclaw/packages/shared-systemd/src/systemd-dbus-transport.mjs"
+    || ! -f "$hostd_working_dir/node_modules/@homebridge/dbus-native/package.json"
+    || -w "$hostd_working_dir/src/server.mjs"
+    || -e "$hostd_working_dir/test" ]]; then
+    echo "openclaw-hostd Nix closure is not fixed, production-only, and read-only: $hostd_out" >&2
     exit 1
   fi
 
@@ -1230,7 +1260,7 @@ EOF
     || ! -f "$observer_ui_out/share/openclaw/packages/shared-client/src/service-descriptors.mjs"
     || -w "$observer_ui_server"
     || -e "$observer_ui_out/share/openclaw/apps/observer-ui/scripts"
-    || "$(find "$observer_ui_out" -type f | wc -l)" -ne 49 ]]; then
+    || "$(find "$observer_ui_out" -type f | wc -l)" -ne 56 ]]; then
     echo "observer-ui Nix closure is not exact and read-only: $observer_ui_out" >&2
     exit 1
   fi

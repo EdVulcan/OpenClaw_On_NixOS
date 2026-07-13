@@ -367,7 +367,7 @@ export function createTaskLifecycleHarness(overrides = {}) {
     SYSTEMD_NEXT_REPAIR_REAL_EXECUTION_REGISTRY: "openclaw-systemd-next-repair-real-execution-v0",
     SYSTEMD_REPAIR_REAL_EXECUTION_UNIT: "openclaw-browser-runtime.service",
     SYSTEMD_NEXT_REPAIR_REAL_EXECUTION_UNIT: "openclaw-system-sense.service",
-    SYSTEMD_REPAIR_RESTART_HELPER: "/run/current-system/sw/bin/openclaw-systemd-native-restart-system-sense",
+    HOSTD_SOCKET_PATH: "/run/openclaw/hostd.sock",
     SYSTEMD_REPAIR_AUTH_DELEGATION: "polkit-dbus-fixed-unit",
     LONG_TERM_MEMORY_TASK_REGISTRY: "openclaw-long-term-memory-write-task-v0",
     LONG_TERM_MEMORY_DIR_DISPLAY_PATH: ".artifacts/openclaw-long-term-memory",

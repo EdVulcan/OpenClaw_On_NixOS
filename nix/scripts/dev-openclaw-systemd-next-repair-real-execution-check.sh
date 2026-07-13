@@ -10,13 +10,12 @@ core_user="$(systemctl show openclaw-core.service --property=User --value)"
 core_environment="$(systemctl show openclaw-core.service --property=Environment --value)"
 if [[ "$core_user" != "openclaw-service"
   || "$core_environment" != *"OPENCLAW_SYSTEMD_REPAIR_AUTH_DELEGATION=polkit-dbus-fixed-unit"*
-  || "$core_environment" != *"OPENCLAW_SYSTEMD_REPAIR_RESTART_HELPER=/nix/store/"*
-  || "$core_environment" == *"OPENCLAW_SYSTEMD_REPAIR_RESTART_HELPER_SUDO"*
+  || "$core_environment" != *"OPENCLAW_HOSTD_SOCKET_PATH=/run/openclaw/hostd.sock"*
   || "$core_environment" == *"sudo-nopasswd-fixed-helper"* ]]; then
   echo "installed OpenClaw core has not loaded the native Polkit D-Bus generation" >&2
   exit 65
 fi
-systemctl is-active --quiet openclaw-core.service openclaw-system-sense.service
+systemctl is-active --quiet openclaw-core.service openclaw-system-sense.service openclaw-hostd.service
 curl --silent --fail "$CORE_URL/health" >/dev/null
 
 # shellcheck source=/dev/null
