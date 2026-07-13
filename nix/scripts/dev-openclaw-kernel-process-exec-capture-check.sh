@@ -21,6 +21,11 @@ systemctl is-active --quiet openclaw-core.service "$SERVICE"
 curl --silent --fail "$CORE_URL/health" >/dev/null
 
 capture_file="$(mktemp)"
+true_binary="$(type -P true)"
+if [[ -z "$true_binary" ]]; then
+  echo "could not resolve an external true binary for process-exec validation" >&2
+  exit 66
+fi
 cleanup() {
   rm -f "$capture_file"
 }
@@ -29,7 +34,7 @@ trap cleanup EXIT
 (
   sleep 0.2
   for _ in 1 2 3 4 5 6 7 8; do
-    /usr/bin/true
+    "$true_binary"
   done
 ) &
 generator_pid=$!

@@ -1,6 +1,7 @@
 # Phase C Kernel Process-Exec Capture Plan
 
-Status: implementation pushed; package build and switched-VM acceptance pending, 2026-07-13
+Status: implementation and switched-VM acceptance passed; full body-config
+rerun deferred after duplicate flake closure fetch stalled, 2026-07-13
 
 ## Purpose
 
@@ -22,10 +23,14 @@ bounded read model through the existing core system-sense proxy and Observer.
   invalid-output states.
 - Authority: desktop-body configuration explicitly enables the capability and
   grants only `CAP_BPF` and `CAP_PERFMON` to the system-sense service.
+- Runtime prerequisite: the system-sense unit sets `LimitMEMLOCK=infinity` so
+  libbpf can establish its bounded ring-buffer probe without widening the
+  capability set.
 
 ## Implementation Contract
 
-- BPF attachment: `sched_process_exec` tracepoint.
+- BPF attachment: raw `sched_process_exec` tracepoint, avoiding a tracefs
+  event-ID read permission for the non-root service.
 - Transport: libbpf ring buffer.
 - Capture bounds: one fixed configuration window of at most 5 seconds and at
   most 4096 events; desktop defaults are 1000ms and 128 events.
@@ -54,9 +59,13 @@ bounded read model through the existing core system-sense proxy and Observer.
 
 Local implementation, Nix evaluation/parse, shell validation, system-sense
 tests (45/45), core route tests (32/32), and Observer served-source assembly
-checks pass. The actual derivation build was started but stopped after the
-environment's cache transfer stalled at approximately 1.4 KB/s for the clang
-closure; no compiler result or switched-VM event result is claimed yet.
+checks pass. The corrected derivation compiled in the switched system, which
+loaded the raw tracepoint probe with only `CAP_BPF`, `CAP_PERFMON`, and
+`LimitMEMLOCK=infinity`. The core acceptance check captured 8 events and the
+Observer acceptance check captured 8 events including the external `true`
+validation process. A later duplicate `body-config` closure build was
+intentionally interrupted while downloading the flake's clang closure from
+TUNA; its preceding Nix evaluation, ownership, and store-native checks passed.
 
 ## Deliberately Deferred
 

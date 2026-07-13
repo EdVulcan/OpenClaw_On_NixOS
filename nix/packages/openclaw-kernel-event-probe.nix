@@ -1,4 +1,4 @@
-{ lib, stdenv, clang, elfutils, libbpf, linuxHeaders, makeWrapper, zlib }:
+{ lib, stdenv, clang, llvmPackages, elfutils, libbpf, linuxHeaders, makeWrapper, zlib }:
 
 stdenv.mkDerivation {
   pname = "openclaw-kernel-event-probe";
@@ -15,13 +15,13 @@ stdenv.mkDerivation {
 
   buildPhase = ''
     runHook preBuild
-    clang -O2 -g -target bpf -D__TARGET_ARCH_x86 \
+    ${llvmPackages.clang-unwrapped}/bin/clang -O2 -g -target bpf -D__TARGET_ARCH_x86 \
       -I${linuxHeaders}/include \
       -I${libbpf}/include \
-      -c src/openclaw-kernel-process-exec.bpf.c \
+      -c packages/kernel-event-probe/src/openclaw-kernel-process-exec.bpf.c \
       -o openclaw-kernel-process-exec.bpf.o
     $CC -O2 -g -I${libbpf}/include \
-      src/openclaw-kernel-process-exec-loader.c \
+      packages/kernel-event-probe/src/openclaw-kernel-process-exec-loader.c \
       -L${libbpf}/lib -L${elfutils}/lib -L${zlib}/lib \
       -Wl,-rpath,${lib.makeLibraryPath [ elfutils libbpf zlib ]} \
       -lbpf -lelf -lz \

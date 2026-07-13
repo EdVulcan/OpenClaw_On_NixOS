@@ -246,6 +246,7 @@ let
       } // optionalAttrs (!userScope && spec.key == "systemSense" && cfg.kernelEventCapture.enable) {
         AmbientCapabilities = [ "CAP_BPF" "CAP_PERFMON" ];
         CapabilityBoundingSet = [ "CAP_BPF" "CAP_PERFMON" ];
+        LimitMEMLOCK = "infinity";
       };
     };
 

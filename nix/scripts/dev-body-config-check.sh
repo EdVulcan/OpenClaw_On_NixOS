@@ -242,6 +242,7 @@ if command -v nix >/dev/null 2>&1; then
           RuntimeDirectoryMode = unit.serviceConfig.RuntimeDirectoryMode or null;
           AmbientCapabilities = unit.serviceConfig.AmbientCapabilities or [ ];
           CapabilityBoundingSet = unit.serviceConfig.CapabilityBoundingSet or [ ];
+          LimitMEMLOCK = unit.serviceConfig.LimitMEMLOCK or null;
         };
       };
     in {
@@ -390,7 +391,8 @@ if (ownership.systemSense.environment?.OPENCLAW_KERNEL_EVENT_CAPTURE_ENABLED !==
   || !ownership.systemSense.serviceConfig?.AmbientCapabilities?.includes("CAP_BPF")
   || !ownership.systemSense.serviceConfig?.AmbientCapabilities?.includes("CAP_PERFMON")
   || !ownership.systemSense.serviceConfig?.CapabilityBoundingSet?.includes("CAP_BPF")
-  || !ownership.systemSense.serviceConfig?.CapabilityBoundingSet?.includes("CAP_PERFMON")) {
+  || !ownership.systemSense.serviceConfig?.CapabilityBoundingSet?.includes("CAP_PERFMON")
+  || ownership.systemSense.serviceConfig?.LimitMEMLOCK !== "infinity") {
   throw new Error(`desktop system-sense must expose only the bounded eBPF capabilities: ${JSON.stringify(ownership.systemSense)}`);
 }
 if (ownership.observerUi.environment?.OPENCLAW_BODY_RUNTIME_SOURCE !== "nix-store"
@@ -423,6 +425,7 @@ console.log(JSON.stringify({
     screenActWorkingDirectory: ownership.screenAct.serviceConfig.WorkingDirectory,
     systemSenseRuntimeSource: ownership.systemSense.environment.OPENCLAW_BODY_RUNTIME_SOURCE,
     systemSenseWorkingDirectory: ownership.systemSense.serviceConfig.WorkingDirectory,
+    systemSenseLimitMEMLOCK: ownership.systemSense.serviceConfig.LimitMEMLOCK,
     systemHealRuntimeSource: ownership.systemHeal.environment.OPENCLAW_BODY_RUNTIME_SOURCE,
     systemHealWorkingDirectory: ownership.systemHeal.serviceConfig.WorkingDirectory,
     observerUiRuntimeSource: ownership.observerUi.environment.OPENCLAW_BODY_RUNTIME_SOURCE,

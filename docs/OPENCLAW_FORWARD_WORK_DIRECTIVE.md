@@ -649,12 +649,14 @@ history path renders the same recovery recommendation after refresh.
 The next real kernel-whitepaper capability is the first bounded eBPF process
 execution observation, documented in
 `docs/plans/OPENCLAW_PHASE_C_KERNEL_PROCESS_EXEC_PLAN.md`. Store-native
-system-sense attaches only the `sched_process_exec` tracepoint through a
-libbpf ring buffer and returns only `timestampNs`, `pid`, `uid`, and `comm`.
+system-sense attaches only the raw `sched_process_exec` tracepoint through a
+libbpf ring buffer and returns only `timestampNs`, `pid`, `uid`, and `comm`;
+raw attachment avoids granting the service broad tracefs read access.
 The capability is opt-in in the Nix body module; the desktop profile grants
-only `CAP_BPF` and `CAP_PERFMON` to the non-root system-sense service when it is
-enabled. The existing core system-sense proxy and Observer expose the bounded
-read model and explicit permission/unavailable states.
+only `CAP_BPF` and `CAP_PERFMON` plus the required `LimitMEMLOCK=infinity`
+resource limit to the non-root system-sense service when it is enabled. The
+existing core system-sense proxy and Observer expose the bounded read model and
+explicit permission/unavailable states.
 
 This slice deliberately does not capture command lines, paths, file content,
 environment, or network traffic; it does not persist events, enforce policy,

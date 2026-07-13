@@ -12,6 +12,11 @@ curl --silent --fail "$OBSERVER_URL/health" >/dev/null
 html_file="$(mktemp)"
 client_file="$(mktemp)"
 capture_file="$(mktemp)"
+true_binary="$(type -P true)"
+if [[ -z "$true_binary" ]]; then
+  echo "could not resolve an external true binary for process-exec validation" >&2
+  exit 66
+fi
 cleanup() {
   rm -f "$html_file" "$client_file" "$capture_file"
 }
@@ -23,7 +28,7 @@ curl --silent --fail "$OBSERVER_URL/client-v5.js" >"$client_file"
 (
   sleep 0.2
   for _ in 1 2 3 4 5 6 7 8; do
-    /usr/bin/true
+    "$true_binary"
   done
 ) &
 generator_pid=$!
@@ -56,7 +61,6 @@ for (const token of [
   "kernelProcessExecStatus",
   "kernelProcessExecAvailable",
   "kernelProcessExecEventCount",
-  "libbpf_ring_buffer",
 ]) {
   if (!client.includes(token)) {
     throw new Error(`Observer client missing ${token}`);

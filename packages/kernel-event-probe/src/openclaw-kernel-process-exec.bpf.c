@@ -13,7 +13,7 @@ struct {
   __uint(max_entries, 1 << 20);
 } events SEC(".maps");
 
-SEC("tracepoint/sched/sched_process_exec")
+SEC("raw_tracepoint/sched_process_exec")
 int record_process_exec(void *ctx) {
   struct openclaw_process_exec_event *event;
   __u64 pid_tgid;
