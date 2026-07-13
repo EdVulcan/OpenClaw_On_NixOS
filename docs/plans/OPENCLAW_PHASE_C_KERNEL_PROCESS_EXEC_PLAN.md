@@ -1,7 +1,7 @@
 # Phase C Kernel Process-Exec Capture Plan
 
 Status: implementation, switched-VM acceptance, full body-config, bounded
-readback, continuity, and executable identity proof in progress, 2026-07-13
+readback, continuity, and executable identity proof complete, 2026-07-13
 
 ## Purpose
 
@@ -78,10 +78,10 @@ bounded read model through the existing core system-sense proxy and Observer.
 Local implementation, Nix evaluation/parse, shell validation, system-sense
 tests (49/49), core route tests (32/32), and Observer served-source assembly
 checks pass. The updated derivation compiles the CO-RE raw tracepoint probe;
-switched-VM loading and the full body-config check remain part of this slice's
-acceptance. The prior switched system loaded the raw tracepoint with only
-`CAP_BPF`, `CAP_PERFMON`, and `LimitMEMLOCK=infinity`; the updated acceptance
-must preserve that boundary while proving the external `true` filename.
+switched-VM loading and the full body-config check pass. The switched system
+loads the raw tracepoint with only `CAP_BPF`, `CAP_PERFMON`, and
+`LimitMEMLOCK=infinity`, and the acceptance captures the external `true`
+filename. The core and Observer milestones both pass.
 
 The bounded readback evidence includes deterministic summary ordering, identity
 counts, and the fixed command summary bound in the system-sense tests. Observer

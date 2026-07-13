@@ -644,10 +644,10 @@ The recovery task receives that provenance without the session lease id and
 does not restart or replay the task automatically; the existing Observer task
 history path renders the same recovery recommendation after refresh.
 
-## Active Phase C Slice
+## Completed Phase C Slice
 
-The next real kernel-whitepaper capability is the first bounded eBPF process
-execution observation, documented in
+The first bounded kernel-whitepaper eBPF process-execution observation is
+complete and documented in
 `docs/plans/OPENCLAW_PHASE_C_KERNEL_PROCESS_EXEC_PLAN.md`. Store-native
 system-sense attaches only the raw `sched_process_exec` tracepoint through a
 libbpf ring buffer and returns raw `timestampNs`, `pid`, `uid`, and `comm`
@@ -681,7 +681,7 @@ in-memory only and is not a process event ledger. Continue from an explicit
 operator need shown by this continuity evidence before adding another event
 class.
 
-The next concrete operator gap is executable identity ambiguity. A `comm` value
+The final concrete operator gap in this slice was executable identity ambiguity. A `comm` value
 can be truncated or shared by unrelated binaries, so the same raw capture now
 derives a separate `openclaw-kernel-process-exec-executable-identity-v0`
 readback. The raw tracepoint uses CO-RE to read only
@@ -690,6 +690,14 @@ identity entries, and keeps the values in the current response only. The
 existing four-field raw event contract remains unchanged. No `/proc` lookup,
 command-line, environment, arbitrary VFS path, file-content, network, policy,
 or persistence capability is introduced.
+
+Phase C is now closed for this operator loop. The switched core and Observer
+milestones pass, full `body-config` passes, and the running system-sense service
+returns the bounded executable identity readback. Do not add another eBPF event
+kind or a second readiness chain without a new operator need demonstrated by
+the current capture evidence. The next capability must be selected from a
+concrete user-visible gap and must preserve the existing local-first,
+non-persistent, policy-deferred boundary.
 
 ## Identity-Upgrade Alignment
 
