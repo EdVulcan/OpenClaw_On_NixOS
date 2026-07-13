@@ -7,9 +7,10 @@ import {
   CLOUD_PROVIDER_API_KEY_ENV,
   CLOUD_PROVIDER_ENDPOINT_ENV,
   CLOUD_PROVIDER_LIVE_EGRESS_ENV,
+  DEEPSEEK_CREDENTIAL_REFERENCE,
 } from "../src/cloud-live-provider-network-sender.mjs";
 
-const credentialReference = "openclaw://credential/test-provider-key";
+const credentialReference = DEEPSEEK_CREDENTIAL_REFERENCE;
 const authorised = {
   state: "authorized",
   confirmed: true,
@@ -18,10 +19,10 @@ const authorised = {
   liveProviderCallEnabled: true,
 };
 
-function providerRequest(body = {}) {
+function providerRequest(body = {}, reference = credentialReference) {
   return {
     request: {
-      credentialReference,
+      credentialReference: reference,
       body: {
         model: "operator-selected-model",
         messages: [{ role: "user", content: "hello" }],
@@ -133,6 +134,53 @@ test("authorised DeepSeek request sends only bounded chat fields and redacts cre
   assert.equal(result.governance.credentialValueExposed, false);
   assert.equal(result.audit.providerResponseCreated, true);
   assert.equal(JSON.stringify(result).includes(secret), false);
+});
+
+test("DeepSeek sender rejects redirects without a second hop", async () => {
+  let fetchCalls = 0;
+  let capturedOptions;
+  const result = await sendLiveProviderRequest({
+    env: {
+      [CLOUD_PROVIDER_ENDPOINT_ENV]: "https://api.deepseek.com",
+      [CLOUD_PROVIDER_API_KEY_ENV]: "test-secret-value",
+      [CLOUD_PROVIDER_LIVE_EGRESS_ENV]: "true",
+    },
+    providerRequest: providerRequest(),
+    credentialResolution: { credential: { reference: credentialReference } },
+    operatorAuthorization: authorised,
+    fetchImpl: async (_url, options) => {
+      fetchCalls += 1;
+      capturedOptions = options;
+      return responseFromJson({ location: "https://unexpected.example" }, { status: 307, ok: false });
+    },
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, "provider_redirect_rejected");
+  assert.equal(fetchCalls, 1);
+  assert.equal(capturedOptions.redirect, "error");
+});
+
+test("DeepSeek sender rejects a credential reference that is not the configured key", async () => {
+  let fetchCalled = false;
+  const result = await sendLiveProviderRequest({
+    env: {
+      [CLOUD_PROVIDER_ENDPOINT_ENV]: "https://api.deepseek.com",
+      [CLOUD_PROVIDER_API_KEY_ENV]: "test-secret-value",
+      [CLOUD_PROVIDER_LIVE_EGRESS_ENV]: "true",
+    },
+    providerRequest: providerRequest({}, "openclaw://credential/other-provider-key"),
+    credentialResolution: { credential: { reference: "openclaw://credential/other-provider-key" } },
+    operatorAuthorization: authorised,
+    fetchImpl: async () => {
+      fetchCalled = true;
+      throw new Error("fetch should not run");
+    },
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, "credential_reference_not_allowed");
+  assert.equal(fetchCalled, false);
 });
 
 test("provider HTTP errors remain bounded and do not expose the credential", async () => {

@@ -1,6 +1,6 @@
 # OpenClaw Forward Work Directive
 
-Updated: 2026-07-11
+Updated: 2026-07-13
 
 This is the active guidance document for continuing OpenClaw development after
 the Phase 136 checkpoint and the discovery that the locally optimized
@@ -224,6 +224,16 @@ and no persisted transcript mutation. A local Engineering Context Packet now
 assembles bounded task/transcript context with credential-like redaction and
 protected verification/recovery summaries without provider use. Do not reopen completed LSP symbol-request slices or add another
 standalone engineering evidence/readiness shell without a concrete operator gap.
+
+The approved DeepSeek handoff and recommendation bridge are now bounded by the
+existing egress task. Task creation records only a redacted binding containing
+the allowlisted endpoint fingerprint, model, exact
+`openclaw://credential/deepseek-api-key` reference, request hash, optional
+context hash, response contract, and egress authorization flags. `/operator/step`
+rebuilds that binding and rejects any mismatch before the credential or network
+sender runs. The sender rejects non-DeepSeek credential references and HTTP
+redirects. Recommendations remain review-only and cannot create a task,
+approval, execution, or provider egress automatically.
 
 The next autonomous product route is the smallest real Level 2 trusted AI
 work-view/session-helper behavior. Keep helper installation, root/system daemon
@@ -578,23 +588,27 @@ store closure, exposes only an eight-property inventory allowlist, and reports
 the transport through the existing route and Observer panel. VM milestones
 prove a real `loaded/active/running` core unit and no command evidence. The
 temporary read-only `systemctl` fallback has been removed; bus failure is
-fail-closed. Broader Phase B hostd and mutation work remains separate from this
-first inventory slice.
+fail-closed. This first inventory slice intentionally excluded privileged
+mutation; the separately governed fixed hostd restart is recorded below.
 
 The second fixed Phase B slice is now complete in the running VM generation.
 Desktop system services run under the dedicated `openclaw-service` account; a
-no-argument store helper can
-restart only `openclaw-system-sense.service` through native D-Bus; and Polkit
+dedicated `openclaw-hostd` store closure accepts only a no-argument request to
+restart `openclaw-system-sense.service` through native D-Bus; and Polkit
 matches the exact manage-units action, restart verb, unit, and service subject.
-Core reuses the existing approved next-repair lifecycle and has no direct
-systemctl/sudo fallback. The switched generation removed the historical host
-sudo helper. Core and Observer real-execution milestones prove exit zero, D-Bus
-job paths, changed PIDs, restored health, and no password prompt.
+Core reaches hostd only through its bounded Unix socket, reuses the existing
+approved next-repair lifecycle, and has no direct systemctl/sudo fallback. The
+switched generation removed the historical host sudo helper. Core and Observer
+real-execution milestones prove exit zero, D-Bus job paths, changed PIDs,
+restored health, and no password prompt.
 Post-verification now derives restored health from the selected unit's native
 inventory state and helper PID evidence; failures recommend operator-reviewed
 declarative-generation recovery and never issue an automatic second restart.
 It uses a bounded read-only readiness poll because systemd process readiness can
-precede the restarted service's HTTP-listener readiness.
+precede the restarted service's HTTP-listener readiness. Hostd rejects unknown
+fields, arbitrary units/methods, and response evidence whose request id is not
+bound to the originating core request. Broader systemd mutation remains
+deferred.
 
 The Level 1 live-plugin-refresh migration now owns a real fixed-registry
 generation lifecycle. An approved existing refresh task builds and validates a

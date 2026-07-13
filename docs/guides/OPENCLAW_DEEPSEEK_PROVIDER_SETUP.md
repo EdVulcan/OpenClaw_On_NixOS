@@ -32,8 +32,28 @@ unset OPENCLAW_CLOUD_PROVIDER_API_KEY
 unset OPENCLAW_CLOUD_PROVIDER_LIVE_EGRESS
 ```
 
-For the existing approval-gated egress execution task, provide the request only
-on the operator execution call so the prompt is not persisted in task state:
+For an approval-gated egress execution task, bind the request when the task is
+created. The task stores only the endpoint fingerprint, model, exact
+credential reference, request hash, optional context hash, response contract,
+and authorization flags; it does not store the prompt or credential value:
+
+```json
+{
+  "confirm": true,
+  "liveProviderExecution": {
+    "requested": true,
+    "credentialReference": "openclaw://credential/deepseek-api-key",
+    "requestEnvelope": {
+      "model": "deepseek-chat",
+      "messages": [{"role": "user", "content": "<bounded prompt>"}]
+    }
+  }
+}
+```
+
+POST that body to `/cloud-consciousness/live-provider-egress-execution-tasks`,
+then wait for the returned task approval. Execute only the same bound request
+on `/operator/step`:
 
 ```json
 {
@@ -56,11 +76,18 @@ on the operator execution call so the prompt is not persisted in task state:
 ```
 
 Send that object as the body of `POST /operator/step` after the task approval
-is recorded. The response content is returned only in that execution response;
+is recorded. The endpoint fingerprint, model, credential reference, request
+hash, context hash, response contract, and authorization flags are rechecked
+against the approval binding before any credential read or network request.
+Changing the prompt, model, credential reference, or egress flags is rejected;
+the response content is returned only in that execution response;
 the durable task record keeps hashes, status, usage, and endpoint evidence.
 
 To send the existing local Engineering Context Packet instead of supplying a
-manual prompt, replace `requestEnvelope` with this bounded context request:
+manual prompt, the materialized packet request and its `contextContentHash`
+must first be used to create the task binding. Do not send an unbound context
+request to `/operator/step`. After that binding exists, the execution request
+can use this bounded context form:
 
 ```json
 {
@@ -75,6 +102,7 @@ manual prompt, replace `requestEnvelope` with this bounded context request:
       "maxOutputChars": 1800,
       "instruction": "Review the local engineering evidence and recommend the next verification step."
     },
+    "contextContentHash": "<sha256-of-the-bound-materialized-context>",
     "authorization": {
       "confirmed": true,
       "credentialValueAccessAuthorized": true,
@@ -87,8 +115,10 @@ manual prompt, replace `requestEnvelope` with this bounded context request:
 
 The context packet is assembled in memory for that operator call. Existing
 command output is bounded, credential-like text is redacted, and only packet
-counts, hashes, and truncation evidence are retained on the task. Do not send
-both `contextPacket` and `requestEnvelope` in the same request. The context
+counts, hashes, and truncation evidence are retained on the task. The binding
+must describe that same materialized request; a changed context hash is
+rejected. Do not send both `contextPacket` and `requestEnvelope` in the same
+execution request. The context
 packet defaults to `engineering_recommendation_v0`; the provider must return
 JSON that selects one existing allowlisted Observer action and sets
 `requiresOperatorReview` to `true`. The response cannot create a task, approval,

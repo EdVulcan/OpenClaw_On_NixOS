@@ -6,6 +6,7 @@ export const CLOUD_PROVIDER_MODEL_ENV = "OPENCLAW_CLOUD_PROVIDER_MODEL";
 export const CLOUD_PROVIDER_LIVE_EGRESS_ENV = "OPENCLAW_CLOUD_PROVIDER_LIVE_EGRESS";
 export const DEEPSEEK_PROVIDER_HOST = "api.deepseek.com";
 export const DEEPSEEK_DEFAULT_MODEL = "deepseek-chat";
+export const DEEPSEEK_CREDENTIAL_REFERENCE = "openclaw://credential/deepseek-api-key";
 export const LIVE_PROVIDER_REQUEST_PATH = "/v1/chat/completions";
 
 const LIVE_PROVIDER_SENDER_REGISTRY =
@@ -169,6 +170,87 @@ function buildOutboundBody(providerRequest, model) {
   return { ok: true, body, bodyText, requestContentHash: hashText(bodyText) };
 }
 
+function isSha256(value) {
+  return typeof value === "string" && /^[a-f0-9]{64}$/u.test(value);
+}
+
+function bindingHash(binding) {
+  const { bindingHash: _ignored, ...hashable } = binding;
+  return hashText(stableJson(hashable));
+}
+
+export function validateLiveProviderRequestBinding(binding) {
+  if (!binding || typeof binding !== "object" || Array.isArray(binding)) {
+    return { ok: false, reason: "provider_request_binding_missing" };
+  }
+  if (binding.registry !== "openclaw-cloud-consciousness-live-provider-request-binding-v0"
+    || binding.provider !== "deepseek"
+    || binding.credentialReference !== DEEPSEEK_CREDENTIAL_REFERENCE
+    || typeof binding.model !== "string"
+    || binding.model.length === 0
+    || !isSha256(binding.endpointFingerprint)
+    || !isSha256(binding.requestContentHash)
+    || (binding.contextContentHash !== null && !isSha256(binding.contextContentHash))
+    || (binding.responseContract !== null && typeof binding.responseContract !== "string")
+    || binding.requestContentIncluded !== false
+    || binding.credentialValueIncluded !== false
+    || binding.executionAuthorization?.credentialValueAccessAuthorized !== true
+    || binding.executionAuthorization?.endpointNetworkEgressAuthorized !== true
+    || binding.executionAuthorization?.liveProviderCallEnabled !== true
+    || !isSha256(binding.bindingHash)
+    || binding.bindingHash !== bindingHash(binding)) {
+    return { ok: false, reason: "provider_request_binding_invalid" };
+  }
+  return { ok: true, binding };
+}
+
+export function buildLiveProviderRequestBinding({
+  providerRequest = null,
+  requestEnvelope = null,
+  credentialReference = null,
+  responseContract = null,
+  contextContentHash = null,
+  env = process.env,
+} = {}) {
+  const config = buildLiveProviderConfig({ env });
+  const request = providerRequest ?? {
+    request: {
+      credentialReference,
+      body: requestEnvelope,
+    },
+  };
+  const actualCredentialReference = request?.request?.credentialReference
+    ?? credentialReference
+    ?? null;
+  if (actualCredentialReference !== DEEPSEEK_CREDENTIAL_REFERENCE) {
+    return { ok: false, reason: "credential_reference_not_allowed" };
+  }
+  if (!config.endpointFingerprint) {
+    return { ok: false, reason: "provider_endpoint_not_bound" };
+  }
+  const outbound = buildOutboundBody(request, config.model);
+  if (!outbound.ok) return { ok: false, reason: outbound.reason };
+  const binding = {
+    registry: "openclaw-cloud-consciousness-live-provider-request-binding-v0",
+    provider: "deepseek",
+    model: outbound.body.model,
+    endpointFingerprint: config.endpointFingerprint,
+    credentialReference: actualCredentialReference,
+    requestContentHash: outbound.requestContentHash,
+    contextContentHash: contextContentHash ?? null,
+    responseContract: responseContract ?? null,
+    requestContentIncluded: false,
+    credentialValueIncluded: false,
+    executionAuthorization: {
+      credentialValueAccessAuthorized: true,
+      endpointNetworkEgressAuthorized: true,
+      liveProviderCallEnabled: true,
+    },
+  };
+  const result = validateLiveProviderRequestBinding({ ...binding, bindingHash: bindingHash(binding) });
+  return result.ok ? result : { ok: false, reason: result.reason };
+}
+
 function safeUsage(usage) {
   if (!usage || typeof usage !== "object") return null;
   const result = {};
@@ -262,8 +344,8 @@ export async function sendLiveProviderRequest({
   const result = baseResult({ config, gate, credentialReference });
   if (!gate.allowed) return { ...result, reason: gate.reason, configurationError: config.error };
   if (typeof fetchImpl !== "function") return { ...result, reason: "fetch_unavailable" };
-  if (typeof credentialReference !== "string" || !credentialReference.startsWith("openclaw://credential/")) {
-    return { ...result, reason: "credential_reference_invalid" };
+  if (credentialReference !== DEEPSEEK_CREDENTIAL_REFERENCE) {
+    return { ...result, reason: "credential_reference_not_allowed" };
   }
 
   const outbound = buildOutboundBody(providerRequest, config.model);
@@ -283,6 +365,7 @@ export async function sendLiveProviderRequest({
   try {
     response = await fetchImpl(config.endpoint.requestUrl, {
       method: "POST",
+      redirect: "error",
       headers: {
         "content-type": "application/json",
         authorization: `Bearer ${credentialValue}`,
@@ -299,6 +382,22 @@ export async function sendLiveProviderRequest({
     result.governance.networkEgress = true;
     result.governance.transmitsExternally = true;
     result.governance.liveProviderCallEnabled = true;
+    if (response.status >= 300 && response.status < 400) {
+      return {
+        ...result,
+        reason: "provider_redirect_rejected",
+        status: response.status,
+        governance: {
+          ...result.governance,
+          providerCredentialRead: true,
+          credentialValueRead: true,
+          endpointContacted: true,
+          networkEgress: true,
+          transmitsExternally: true,
+          liveProviderCallEnabled: true,
+        },
+      };
+    }
     responseBody = await readBoundedResponse(response);
   } catch (error) {
     result.audit.endpointContacted = true;

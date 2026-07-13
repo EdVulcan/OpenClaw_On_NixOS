@@ -31,6 +31,7 @@ const CREDENTIAL_POST_ROUTES = new Map([
     "/cloud-consciousness/live-provider-egress-execution-tasks",
     "createCloudConsciousnessLiveProviderEgressExecutionTask",
     ["sourceRegistry", "sourceTaskId", "preflight", serialisedTaskField, serialisedApprovalField],
+    { inputFields: ["liveProviderExecution"] },
   ),
   postRoute(
     "/cloud-consciousness/live-provider-credential-value-readiness-preflight",

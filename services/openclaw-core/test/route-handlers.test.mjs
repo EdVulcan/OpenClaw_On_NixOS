@@ -1026,6 +1026,46 @@ test("operator step route preserves transient recommendation and compact evidenc
   assert.doesNotMatch(JSON.stringify(response.body.execution.recommendationEvidence), /Transient route fixture recommendation reason/);
 });
 
+test("egress task route forwards only the allowlisted live provider binding input", async () => {
+  let observedInput = null;
+  const liveProviderExecution = {
+    requested: true,
+    credentialReference: "openclaw://credential/deepseek-api-key",
+    requestEnvelope: {
+      model: "deepseek-chat",
+      messages: [{ role: "user", content: "A bounded approval request." }],
+    },
+  };
+  const deps = createBaseDeps({
+    planBuilder: {
+      createCloudConsciousnessLiveProviderEgressExecutionTask: async (input) => {
+        observedInput = input;
+        return {
+          registry: "openclaw-cloud-consciousness-live-provider-egress-execution-task-v0",
+          mode: "test",
+          generatedAt: "2026-07-13T00:00:00.000Z",
+          sourceRegistry: "source-registry",
+          sourceTaskId: "source-task",
+          preflight: { summary: { ready: true } },
+          task: { id: "egress-task" },
+          approval: { id: "egress-approval" },
+          governance: {},
+        };
+      },
+    },
+  });
+
+  const response = await invokeRoute(deps, "POST", "/cloud-consciousness/live-provider-egress-execution-tasks", {
+    confirm: true,
+    liveProviderExecution,
+    ignored: "not forwarded",
+  });
+
+  assert.equal(response.statusCode, 201, JSON.stringify(response.body));
+  assert.deepEqual(observedInput, { confirm: true, liveProviderExecution });
+  assert.equal(response.body.task.id, "egress-task");
+});
+
 test("control stop route fails current task and emits task failed event", async () => {
   const task = { id: "task-stop", status: "running", updatedAt: "2026-07-08T00:00:00.000Z" };
   const phases = [];

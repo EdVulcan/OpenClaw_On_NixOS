@@ -3,8 +3,8 @@ import { sendJson, readJsonBody } from "../../../packages/shared-utils/src/http.
 export const serialisedTaskField = { output: "task", source: "task", transform: "task" };
 export const serialisedApprovalField = { output: "approval", source: "approval", transform: "approval" };
 
-export function postRoute(pathname, action, fields) {
-  return [pathname, { action, fields }];
+export function postRoute(pathname, action, fields, { inputFields = [] } = {}) {
+  return [pathname, { action, fields, inputFields }];
 }
 
 function routeFieldValue(field, result, { serialiseTask, serialiseApproval }) {
@@ -69,9 +69,16 @@ export function createConfirmPostRouteHandler({ routes, missingHandlerLabel }) {
         throw new Error(`Missing ${missingHandlerLabel} POST handler: ${route.action}`);
       }
 
-      const result = await action.call(planBuilder, {
+      const actionInput = {
         confirm: body.confirm === true,
-      });
+      };
+      for (const field of route.inputFields ?? []) {
+        if (Object.prototype.hasOwnProperty.call(body, field)) {
+          actionInput[field] = body[field];
+        }
+      }
+
+      const result = await action.call(planBuilder, actionInput);
       sendJson(res, 201, buildConfirmPostResponse(result, route, {
         serialiseTask,
         serialiseApproval,

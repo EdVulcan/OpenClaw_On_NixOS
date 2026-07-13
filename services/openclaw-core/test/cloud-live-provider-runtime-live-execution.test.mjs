@@ -5,7 +5,17 @@ import {
   CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_LIVE_EXECUTION_REGISTRY,
   executeCloudConsciousnessLiveProviderRequest,
 } from "../src/cloud-live-provider-runtime-live-execution.mjs";
+import { buildProviderRequest } from "../src/cloud-live-provider-runtime-adapter.mjs";
+import {
+  buildLiveProviderRequestBinding,
+  DEEPSEEK_CREDENTIAL_REFERENCE,
+} from "../src/cloud-live-provider-network-sender.mjs";
 import { CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_ENGINEERING_RECOMMENDATION_CONTRACT } from "../src/cloud-live-provider-runtime-response-contract.mjs";
+
+const LIVE_PROVIDER_TEST_ENV = {
+  OPENCLAW_CLOUD_PROVIDER_ENDPOINT: "https://api.deepseek.com",
+  OPENCLAW_CLOUD_PROVIDER_LIVE_EGRESS: "true",
+};
 
 function createHarness() {
   const calls = [];
@@ -46,7 +56,7 @@ function createHarness() {
   return { approvals, calls, events, deps };
 }
 
-function createTask() {
+function createTask({ requestBinding = null } = {}) {
   return {
     id: "task-1",
     type: "cloud_consciousness_live_provider_egress_execution_task",
@@ -54,6 +64,7 @@ function createTask() {
     approval: { requestId: "approval-1" },
     cloudConsciousnessLiveProviderEgressExecution: {
       registry: "openclaw-cloud-consciousness-live-provider-egress-execution-task-v0",
+      requestBinding,
     },
   };
 }
@@ -63,7 +74,7 @@ function liveOptions(overrides = {}) {
     liveProviderExecution: {
       requested: true,
       taskId: "task-1",
-      credentialReference: "openclaw://credential/deepseek-api-key",
+      credentialReference: DEEPSEEK_CREDENTIAL_REFERENCE,
       requestEnvelope: {
         model: "deepseek-chat",
         messages: [{ role: "user", content: "Summarise this bounded test." }],
@@ -77,6 +88,26 @@ function liveOptions(overrides = {}) {
       ...overrides,
     },
   };
+}
+
+function createBoundTask(options, env = LIVE_PROVIDER_TEST_ENV) {
+  const request = options.liveProviderExecution;
+  const providerRequest = buildProviderRequest({
+    executionPlan: {
+      credentialReference: request.credentialReference,
+      endpointFingerprint: null,
+    },
+    requestEnvelope: request.requestEnvelope,
+    operatorAuthorization: { state: "authorized" },
+  });
+  const binding = buildLiveProviderRequestBinding({
+    providerRequest,
+    responseContract: request.responseContract ?? request.contextPacket?.responseContract ?? null,
+    contextContentHash: null,
+    env,
+  });
+  assert.equal(binding.ok, true, binding.reason);
+  return createTask({ requestBinding: binding.binding });
 }
 
 test("live execution is inert when the operator does not request it", async () => {
@@ -96,7 +127,7 @@ test("live execution is inert when the operator does not request it", async () =
 
 test("live execution rejects a request bound to a different task", async () => {
   const harness = createHarness();
-  const task = createTask();
+  const task = createBoundTask(liveOptions());
   let senderCalled = false;
   const result = await executeCloudConsciousnessLiveProviderRequest({
     ...harness.deps,
@@ -113,18 +144,71 @@ test("live execution rejects a request bound to a different task", async () => {
   assert.equal(task.status, "queued");
 });
 
+test("live execution rejects a request whose content changed after approval", async () => {
+  const harness = createHarness();
+  const approvedOptions = liveOptions();
+  const task = createBoundTask(approvedOptions);
+  let senderCalled = false;
+  const result = await executeCloudConsciousnessLiveProviderRequest({
+    ...harness.deps,
+    task,
+    options: liveOptions({
+      requestEnvelope: {
+        model: "deepseek-chat",
+        messages: [{ role: "user", content: "Changed after approval." }],
+      },
+    }),
+    env: LIVE_PROVIDER_TEST_ENV,
+    sendLiveProviderRequestImpl: async () => {
+      senderCalled = true;
+      return { ok: true };
+    },
+  });
+
+  assert.equal(result.blocked, true);
+  assert.equal(result.reason, "live_provider_request_binding_mismatch");
+  assert.equal(senderCalled, false);
+  assert.equal(task.status, "queued");
+});
+
+test("live execution rejects authorization flags that changed after approval", async () => {
+  const harness = createHarness();
+  const task = createBoundTask(liveOptions());
+  let senderCalled = false;
+  const result = await executeCloudConsciousnessLiveProviderRequest({
+    ...harness.deps,
+    task,
+    options: liveOptions({
+      authorization: {
+        confirmed: true,
+        credentialValueAccessAuthorized: true,
+        endpointNetworkEgressAuthorized: true,
+        liveProviderCallEnabled: false,
+      },
+    }),
+    env: LIVE_PROVIDER_TEST_ENV,
+    sendLiveProviderRequestImpl: async () => {
+      senderCalled = true;
+      return { ok: true };
+    },
+  });
+
+  assert.equal(result.blocked, true);
+  assert.equal(result.reason, "live_provider_authorization_binding_mismatch");
+  assert.equal(senderCalled, false);
+  assert.equal(task.status, "queued");
+});
+
 test("approved live execution returns transient content but persists only compact evidence", async () => {
   const harness = createHarness();
-  const task = createTask();
+  const options = liveOptions();
+  const task = createBoundTask(options);
   let received;
   const result = await executeCloudConsciousnessLiveProviderRequest({
     ...harness.deps,
     task,
-    options: liveOptions(),
-    env: {
-      OPENCLAW_CLOUD_PROVIDER_ENDPOINT: "https://api.deepseek.com",
-      OPENCLAW_CLOUD_PROVIDER_LIVE_EGRESS: "true",
-    },
+    options,
+    env: LIVE_PROVIDER_TEST_ENV,
     sendLiveProviderRequestImpl: async (input) => {
       received = input;
       return {
@@ -180,11 +264,13 @@ test("approved live execution returns transient content but persists only compac
 
 test("a blocked sender result fails the task without creating response evidence", async () => {
   const harness = createHarness();
-  const task = createTask();
+  const options = liveOptions();
+  const task = createBoundTask(options);
   const result = await executeCloudConsciousnessLiveProviderRequest({
     ...harness.deps,
     task,
-    options: liveOptions(),
+    options,
+    env: LIVE_PROVIDER_TEST_ENV,
     sendLiveProviderRequestImpl: async () => ({
       ok: false,
       reason: "provider_credential_missing",
@@ -217,14 +303,16 @@ test("a blocked sender result fails the task without creating response evidence"
 
 test("valid structured recommendation is transient while task state keeps compact evidence", async () => {
   const harness = createHarness();
-  const task = createTask();
   const reason = "The bounded todo evidence supports a manual verification task.";
+  const options = liveOptions({
+    responseContract: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_ENGINEERING_RECOMMENDATION_CONTRACT,
+  });
+  const task = createBoundTask(options);
   const result = await executeCloudConsciousnessLiveProviderRequest({
     ...harness.deps,
     task,
-    options: liveOptions({
-      responseContract: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_ENGINEERING_RECOMMENDATION_CONTRACT,
-    }),
+    options,
+    env: LIVE_PROVIDER_TEST_ENV,
     sendLiveProviderRequestImpl: async () => ({
       ok: true,
       audit: {
@@ -268,19 +356,21 @@ test("valid structured recommendation is transient while task state keeps compac
 
 test("invalid structured recommendation fails the task without persisting assistant content", async () => {
   const harness = createHarness();
-  const task = createTask();
   const rawContent = JSON.stringify({
     actionId: "run_arbitrary_command",
     reason: "Run a command without review.",
     confidence: 0.99,
     requiresOperatorReview: true,
   });
+  const options = liveOptions({
+    responseContract: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_ENGINEERING_RECOMMENDATION_CONTRACT,
+  });
+  const task = createBoundTask(options);
   const result = await executeCloudConsciousnessLiveProviderRequest({
     ...harness.deps,
     task,
-    options: liveOptions({
-      responseContract: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_ENGINEERING_RECOMMENDATION_CONTRACT,
-    }),
+    options,
+    env: LIVE_PROVIDER_TEST_ENV,
     sendLiveProviderRequestImpl: async () => ({
       ok: true,
       audit: {
@@ -321,17 +411,19 @@ test("invalid structured recommendation fails the task without persisting assist
 
 test("live execution ignores caller-supplied context evidence without internal materialisation", async () => {
   const harness = createHarness();
-  const task = createTask();
+  const options = liveOptions({
+    contextPacketEvidence: {
+      registry: "forged",
+      contextContentHash: "forged",
+      contextContentIncluded: true,
+    },
+  });
+  const task = createBoundTask(options);
   const result = await executeCloudConsciousnessLiveProviderRequest({
     ...harness.deps,
     task,
-    options: liveOptions({
-      contextPacketEvidence: {
-        registry: "forged",
-        contextContentHash: "forged",
-        contextContentIncluded: true,
-      },
-    }),
+    options,
+    env: LIVE_PROVIDER_TEST_ENV,
     sendLiveProviderRequestImpl: async () => ({
       ok: true,
       audit: {

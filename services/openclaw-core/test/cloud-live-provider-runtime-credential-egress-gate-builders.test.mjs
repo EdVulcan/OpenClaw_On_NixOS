@@ -2,6 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { createCloudLiveProviderRuntimeCredentialEgressGateBuilders } from "../src/cloud-live-provider-runtime-credential-egress-gate-builders.mjs";
+import {
+  buildLiveProviderRequestBinding,
+  DEEPSEEK_CREDENTIAL_REFERENCE,
+} from "../src/cloud-live-provider-network-sender.mjs";
 import { createTaskLifecycleHarness } from "./task-builder-harness.mjs";
 
 const REAL_LAUNCH_TASK_REGISTRY =
@@ -165,6 +169,10 @@ function createCredentialEgressHarness(extraDeps = {}) {
       }),
       isCloudConsciousnessLiveProviderRealLaunchTask: (task) => task?.type === "cloud_consciousness_live_provider_real_launch_task"
         && task?.cloudConsciousnessLiveProviderRealLaunch?.registry === REAL_LAUNCH_TASK_REGISTRY,
+      providerEnv: {
+        OPENCLAW_CLOUD_PROVIDER_ENDPOINT: "https://api.deepseek.com",
+        OPENCLAW_CLOUD_PROVIDER_LIVE_EGRESS: "true",
+      },
       getTaskById: (id) => taskStore.get(id) ?? null,
       listTasks: () => [...taskStore.values()],
       ...deps,
@@ -269,6 +277,36 @@ test("credential egress gate builders create and execute Phase 63 egress executi
   assert.equal(approvedHarness.calls.filter((call) => call.name === "completeTask").length, 1);
 });
 
+test("credential egress task binds the approved request without persisting its content", async () => {
+  const sourceTask = createEgressRouteTaskPreflightTask();
+  const { deps } = createCredentialEgressHarness({ tasks: [sourceTask] });
+  const builders = createCloudLiveProviderRuntimeCredentialEgressGateBuilders(deps);
+  const prompt = "This bounded prompt must remain outside durable task state.";
+
+  const taskShell = await builders.createCloudConsciousnessLiveProviderEgressExecutionTask({
+    confirm: true,
+    liveProviderExecution: {
+      requested: true,
+      credentialReference: DEEPSEEK_CREDENTIAL_REFERENCE,
+      requestEnvelope: {
+        model: "deepseek-chat",
+        messages: [{ role: "user", content: prompt }],
+      },
+      responseContract: null,
+    },
+  });
+
+  const requestBinding = taskShell.task.cloudConsciousnessLiveProviderEgressExecution.requestBinding;
+  assert.equal(requestBinding.credentialReference, DEEPSEEK_CREDENTIAL_REFERENCE);
+  assert.equal(requestBinding.model, "deepseek-chat");
+  assert.equal(requestBinding.requestContentIncluded, false);
+  assert.equal(requestBinding.credentialValueIncluded, false);
+  assert.match(requestBinding.requestContentHash, /^[a-f0-9]{64}$/u);
+  assert.match(requestBinding.bindingHash, /^[a-f0-9]{64}$/u);
+  assert.doesNotMatch(JSON.stringify(taskShell.task), /bounded prompt must remain/);
+  assert.deepEqual(taskShell.task.plan.approvalBinding, requestBinding);
+});
+
 test("credential egress execution dispatches an explicitly bound live request", async () => {
   const approvedHarness = createCredentialEgressHarness({
     approvals: new Map([
@@ -286,12 +324,23 @@ test("credential egress execution dispatches an explicitly bound live request", 
     }),
   });
   const builders = createCloudLiveProviderRuntimeCredentialEgressGateBuilders(approvedHarness.deps);
+  const requestEnvelope = {
+    model: "deepseek-chat",
+    messages: [{ role: "user", content: "Bounded provider request." }],
+  };
+  const binding = buildLiveProviderRequestBinding({
+    requestEnvelope,
+    credentialReference: DEEPSEEK_CREDENTIAL_REFERENCE,
+    env: approvedHarness.deps.providerEnv,
+  });
+  assert.equal(binding.ok, true, binding.reason);
   const task = {
     id: "task-egress-execution",
     type: "cloud_consciousness_live_provider_egress_execution_task",
     approval: { requestId: "approval-egress-execution" },
     cloudConsciousnessLiveProviderEgressExecution: {
       registry: EGRESS_EXECUTION_TASK_REGISTRY,
+      requestBinding: binding.binding,
     },
   };
 
@@ -299,6 +348,14 @@ test("credential egress execution dispatches an explicitly bound live request", 
     liveProviderExecution: {
       requested: true,
       taskId: task.id,
+      credentialReference: DEEPSEEK_CREDENTIAL_REFERENCE,
+      requestEnvelope,
+      authorization: {
+        confirmed: true,
+        credentialValueAccessAuthorized: true,
+        endpointNetworkEgressAuthorized: true,
+        liveProviderCallEnabled: true,
+      },
     },
   });
 

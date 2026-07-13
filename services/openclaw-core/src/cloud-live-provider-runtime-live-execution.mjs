@@ -1,7 +1,9 @@
 import { buildProviderRequest } from "./cloud-live-provider-runtime-adapter.mjs";
 import {
+  buildLiveProviderRequestBinding,
   buildLiveProviderConfig,
   sendLiveProviderRequest,
+  validateLiveProviderRequestBinding,
 } from "./cloud-live-provider-network-sender.mjs";
 import { CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CONTEXT_PACKET_EVIDENCE } from "./cloud-live-provider-runtime-context-packet.mjs";
 import {
@@ -235,6 +237,49 @@ export async function executeCloudConsciousnessLiveProviderRequest({
     requestEnvelope: request.requestEnvelope,
     operatorAuthorization: authorization,
   });
+  const contextPacketEvidence = compactContextPacketEvidence(
+    options[CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CONTEXT_PACKET_EVIDENCE],
+  );
+  const requestedResponseContract = request.responseContract ?? request.contextPacket?.responseContract ?? null;
+  const expectedBinding = task.cloudConsciousnessLiveProviderEgressExecution?.requestBinding ?? null;
+  const expectedBindingResult = validateLiveProviderRequestBinding(expectedBinding);
+  if (!expectedBindingResult.ok) {
+    return {
+      blocked: true,
+      reason: "live_provider_request_binding_missing",
+      task,
+      approval: { ...approval },
+    };
+  }
+  const actualBindingResult = buildLiveProviderRequestBinding({
+    providerRequest,
+    responseContract: requestedResponseContract,
+    contextContentHash: contextPacketEvidence?.contextContentHash ?? null,
+    env,
+  });
+  if (!actualBindingResult.ok
+    || actualBindingResult.binding.bindingHash !== expectedBindingResult.binding.bindingHash) {
+    return {
+      blocked: true,
+      reason: "live_provider_request_binding_mismatch",
+      task,
+      approval: { ...approval },
+    };
+  }
+  const requestedAuthorization = request.authorization && typeof request.authorization === "object"
+    ? request.authorization
+    : {};
+  const expectedAuthorization = expectedBindingResult.binding.executionAuthorization;
+  if (requestedAuthorization.credentialValueAccessAuthorized !== expectedAuthorization.credentialValueAccessAuthorized
+    || requestedAuthorization.endpointNetworkEgressAuthorized !== expectedAuthorization.endpointNetworkEgressAuthorized
+    || requestedAuthorization.liveProviderCallEnabled !== expectedAuthorization.liveProviderCallEnabled) {
+    return {
+      blocked: true,
+      reason: "live_provider_authorization_binding_mismatch",
+      task,
+      approval: { ...approval },
+    };
+  }
   const result = await sendLiveProviderRequestImpl({
     providerRequest,
     credentialResolution: {
@@ -248,10 +293,6 @@ export async function executeCloudConsciousnessLiveProviderRequest({
     env,
   });
   const evidence = compactProviderEvidence(result);
-  const contextPacketEvidence = compactContextPacketEvidence(
-    options[CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CONTEXT_PACKET_EVIDENCE],
-  );
-  const requestedResponseContract = request.responseContract ?? request.contextPacket?.responseContract ?? null;
   const responseContract = requestedResponseContract
     === CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_ENGINEERING_RECOMMENDATION_CONTRACT
     ? requestedResponseContract

@@ -1,6 +1,10 @@
 import {
   CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_REAL_LAUNCH_EXECUTION_PREFLIGHT_REGISTRY,
 } from "./cloud-live-provider-runtime-real-launch-builders.mjs";
+import {
+  buildLiveProviderRequestBinding,
+  validateLiveProviderRequestBinding,
+} from "./cloud-live-provider-network-sender.mjs";
 import * as liveProviderPhaseGovernance from "./cloud-live-provider-runtime-governance.mjs";
 
 const CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CREDENTIAL_VALUE_ACCESS_GATE_REGISTRY =
@@ -44,6 +48,7 @@ export function createCloudLiveProviderRuntimeCredentialEgressGateBuilders(deps)
     getTaskById,
     listTasks,
     executeGovernedLiveProviderRequest,
+    providerEnv = process.env,
   } = deps;
 
   function findLatestRealLaunchExecutionPreflightTask() {
@@ -855,7 +860,10 @@ export function createCloudLiveProviderRuntimeCredentialEgressGateBuilders(deps)
     };
   }
 
-  async function createCloudConsciousnessLiveProviderEgressExecutionTask({ confirm = false } = {}) {
+  async function createCloudConsciousnessLiveProviderEgressExecutionTask({
+    confirm = false,
+    liveProviderExecution = null,
+  } = {}) {
     if (confirm !== true) {
       throw new Error("Cloud consciousness live provider egress execution task creation requires confirm=true.");
     }
@@ -870,6 +878,31 @@ export function createCloudLiveProviderRuntimeCredentialEgressGateBuilders(deps)
     const sourceTask = findLatestEgressExecutionRouteTaskPreflightTask();
     if (!sourceTask) {
       throw new Error("Unable to locate Phase 62 egress execution route/task preflight evidence.");
+    }
+
+    let requestBinding = null;
+    if (liveProviderExecution?.requested === true) {
+      if (liveProviderExecution.requestEnvelope && typeof liveProviderExecution.requestEnvelope === "object") {
+        const builtBinding = buildLiveProviderRequestBinding({
+          requestEnvelope: liveProviderExecution.requestEnvelope,
+          credentialReference: liveProviderExecution.credentialReference,
+          responseContract: liveProviderExecution.responseContract ?? null,
+          contextContentHash: liveProviderExecution.contextContentHash ?? null,
+          env: providerEnv,
+        });
+        if (!builtBinding.ok) {
+          throw new Error(`Live provider egress task request binding rejected: ${builtBinding.reason}.`);
+        }
+        requestBinding = builtBinding.binding;
+      } else if (liveProviderExecution.requestBinding) {
+        const validatedBinding = validateLiveProviderRequestBinding(liveProviderExecution.requestBinding);
+        if (!validatedBinding.ok) {
+          throw new Error(`Live provider egress task request binding rejected: ${validatedBinding.reason}.`);
+        }
+        requestBinding = validatedBinding.binding;
+      } else {
+        throw new Error("Live provider egress task creation requires a redacted request binding summary.");
+      }
     }
 
     const policyRequest = {
@@ -900,6 +933,7 @@ export function createCloudLiveProviderRuntimeCredentialEgressGateBuilders(deps)
         planner: "cloud-consciousness-live-provider-egress-execution-task-v0",
         strategy: "approval-gated-cloud-consciousness-live-provider-egress-execution-shell",
         summary: "Create an approval-gated egress execution task shell while keeping credential values, endpoint contact, network egress, provider responses, rollback execution, host mutation, and live provider calls disabled.",
+        approvalBinding: requestBinding,
         governance: liveProviderPhaseGovernance.phase63Governance({ createsTask: true, createsApproval: true, egressExecutionTaskCreated: true }),
         steps: [
           {
@@ -939,6 +973,8 @@ export function createCloudLiveProviderRuntimeCredentialEgressGateBuilders(deps)
       sourceTaskId: sourceTask.id,
       sourceRegistry: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_EGRESS_EXECUTION_ROUTE_TASK_PREFLIGHT_REGISTRY,
       implementationStatus: "task_shell_only",
+      requestBinding,
+      requestBindingRequired: liveProviderExecution?.requested === true,
       egressExecutionTaskCreated: true,
       egressExecutionTaskApproved: false,
       egressExecutionDeferred: true,
