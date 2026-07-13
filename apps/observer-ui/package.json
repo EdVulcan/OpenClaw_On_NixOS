@@ -6,6 +6,7 @@
   "scripts": {
     "build": "node --check src/*.mjs && node scripts/check-client-script.mjs",
     "start": "node src/server.mjs",
+    "test": "node --test test/*.mjs",
     "typecheck": "node --check src/*.mjs && node scripts/check-client-script.mjs"
   }
 }

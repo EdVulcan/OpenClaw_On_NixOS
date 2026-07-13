@@ -147,9 +147,29 @@ compact contract evidence and hashes, never the assistant reason or raw response
 This is an initial Level 1 governance loop; it does not auto-create a task,
 auto-approve, auto-execute, mutate the workspace, or add a provider transcript.
 
+## Observer Recommendation Follow-Up Complete
+
+The valid transient recommendation is now rendered in the existing Observer
+Engineering Loop State panel after an operator step or operator loop returns a
+structured provider recommendation. The panel shows the bounded action id,
+review requirement, expected existing control id, and transient reason. A
+disabled-by-default `Use AI Recommendation` control becomes available only
+after the client revalidates the recommendation contract, allowlisted action,
+matching Observer control id, required review, confidence, and all automatic
+control flags.
+
+Using the control calls only the existing allowlisted Observer control
+function. It does not send the provider response back to core, create an
+approval implicitly, approve or execute a task, persist the recommendation, or
+accept an endpoint, command, path, or provider payload from the model.
+
+Evidence is served through the existing `/operator/step` and `/operator/run`
+response serialization paths. No new provider route or task type was added.
+
 ## Next Slice
 
-The next smallest provider-related slice, if selected, should expose the valid
-transient recommendation through the existing Observer state/readback surface
-and let an operator choose the existing control there. Keep provider response
-content transient and do not resume the historical Phase 59-136 wrapper chain.
+The next smallest provider-related slice, if selected, should add a focused
+operator fixture that supplies a valid transient recommendation to the existing
+execution response and proves the Observer control handoff without contacting
+an external provider. Keep provider response content transient and do not
+resume the historical Phase 59-136 wrapper chain.

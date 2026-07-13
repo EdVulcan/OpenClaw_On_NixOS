@@ -187,6 +187,11 @@ if (observerCheck) {
     "engineering-context-packet-audit",
     "engineering-context-packet-build-button",
     "engineering-context-packet-json",
+    "engineering-loop-state-recommendation",
+    "engineering-loop-state-recommendation-review",
+    "engineering-loop-state-recommendation-control",
+    "engineering-loop-recommendation-use-button",
+    "engineering-loop-recommendation-json",
   ]) {
     if (!html.includes(token)) throw new Error(`Observer HTML missing context packet token: ${token}`);
   }
@@ -197,6 +202,10 @@ if (observerCheck) {
     "Local governed engineering context packet",
     "sense.openclaw.engineering_context.packet",
     "engineeringContextPacketBuildButton",
+    "renderEngineeringRecommendationFromOperatorResult",
+    "useEngineeringRecommendation",
+    "ENGINEERING_RECOMMENDATION_CONTRACT",
+    "GOVERNED_PLAN_TODO_SUGGESTION_CONTROLS",
   ]) {
     if (!client.includes(token)) throw new Error(`Observer client missing context packet token: ${token}`);
   }

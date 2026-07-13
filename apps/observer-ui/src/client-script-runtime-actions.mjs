@@ -1,6 +1,7 @@
 import { observerClientRuntimeApprovalTasksScript } from "./client-script-runtime-approval-tasks.mjs";
 import { observerClientRuntimeEngineeringLoopControlsScript } from "./client-script-runtime-engineering-loop-controls.mjs";
 import { observerClientRuntimeEngineeringSuggestedActionScript } from "./client-script-runtime-engineering-suggested-action.mjs";
+import { observerClientRuntimeEngineeringRecommendationScript } from "./client-script-runtime-engineering-recommendation.mjs";
 import { observerClientRuntimeSystemBodyTasksScript } from "./client-script-runtime-system-body-tasks.mjs";
 import { observerClientRuntimeBindingsScript } from "./client-script-runtime-bindings.mjs";
 import { observerClientNativeRuntimeRefreshTasksScript } from "./client-script-runtime-native-runtime-refresh.mjs";
@@ -69,7 +70,7 @@ async function createPlannedTask() {
   await refreshOperatorState();
 }
 
-${observerClientRuntimeApprovalTasksScript}${observerClientRuntimeEngineeringLoopControlsScript}${observerClientRuntimeEngineeringSuggestedActionScript}${observerClientNativeRuntimeRefreshTasksScript}async function runOperatorStepFromUi() {
+${observerClientRuntimeApprovalTasksScript}${observerClientRuntimeEngineeringLoopControlsScript}${observerClientRuntimeEngineeringSuggestedActionScript}${observerClientRuntimeEngineeringRecommendationScript}${observerClientNativeRuntimeRefreshTasksScript}async function runOperatorStepFromUi() {
   const result = await fetchJson(\`\${observerConfig.coreUrl}/operator/step\`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -77,6 +78,7 @@ ${observerClientRuntimeApprovalTasksScript}${observerClientRuntimeEngineeringLoo
   });
 
   renderOperatorPanel(result);
+  renderEngineeringRecommendationFromOperatorResult(result);
   taskHistoryFocus = result.task?.id ? "selected-task" : taskHistoryFocus;
   selectedHistoryTaskId = result.task?.id ?? selectedHistoryTaskId;
   if (result.task?.id) {
@@ -105,6 +107,7 @@ async function runOperatorLoopFromUi() {
   });
 
   renderOperatorPanel(result);
+  renderEngineeringRecommendationFromOperatorResult(result);
   const lastTask = [...(result.steps ?? [])].reverse().find((step) => step.task?.id)?.task ?? null;
   taskHistoryFocus = lastTask?.id ? "selected-task" : taskHistoryFocus;
   selectedHistoryTaskId = lastTask?.id ?? selectedHistoryTaskId;

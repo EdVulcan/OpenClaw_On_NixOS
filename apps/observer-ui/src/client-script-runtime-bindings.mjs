@@ -94,6 +94,12 @@ engineeringLoopRestoreButton.addEventListener("click", () => {
   });
 });
 
+engineeringLoopRecommendationUseButton.addEventListener("click", () => {
+  useEngineeringRecommendation().catch((error) => {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  });
+});
+
 engineeringRecoveryDraftButton.addEventListener("click", () => {
   draftEngineeringRecoveryLoopAction().catch((error) => {
     setControlMessage(\`Request failed: \${formatError(error)}\`);

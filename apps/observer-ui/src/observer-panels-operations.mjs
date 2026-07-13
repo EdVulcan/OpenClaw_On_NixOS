@@ -139,13 +139,18 @@ export function observerOperationsPanels() {
           <div class="metric"><span>Standards</span><span id="engineering-loop-state-standards">not loaded</span></div>
           <div class="metric"><span>Missing Evidence</span><span id="engineering-loop-state-missing">0</span></div>
           <div class="metric"><span>Standards Next</span><span id="engineering-loop-state-standards-next">inspect work standards</span></div>
+          <div class="metric"><span>AI Recommendation</span><span id="engineering-loop-state-recommendation">none</span></div>
+          <div class="metric"><span>AI Review</span><span id="engineering-loop-state-recommendation-review">not available</span></div>
+          <div class="metric"><span>AI Control</span><span id="engineering-loop-state-recommendation-control">none</span></div>
           <div class="actions tight">
             <button id="engineering-loop-completion-button" class="secondary" type="button">Refresh Completion</button>
             <button id="engineering-loop-selected-target-read-button" class="secondary" type="button">Read Selected Target</button>
             <button id="engineering-loop-selected-target-edit-seed-button" class="secondary" type="button">Seed Edit Proposal</button>
             <button id="engineering-loop-restore-button" class="secondary" type="button">Restore Loop State</button>
+            <button id="engineering-loop-recommendation-use-button" class="secondary" type="button" disabled>Use AI Recommendation</button>
           </div>
           <pre id="engineering-loop-state-json">No engineering loop task created from Observer controls yet.</pre>
+          <pre id="engineering-loop-recommendation-json">No transient AI engineering recommendation in the latest operator result.</pre>
         </section>
         <section class="panel">
           <h2>Engineering Verification Evidence</h2>
