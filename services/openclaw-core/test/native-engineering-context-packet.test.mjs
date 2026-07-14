@@ -76,10 +76,27 @@ test("engineering context packet carries compact trusted work-view association w
       leaseMatched: true,
       bindingStatus: "bound",
       recoveryAction: "none",
+      workViewObservationIncluded: true,
+      workViewObservationStatus: "ready",
+      workViewObservationFreshness: "fresh",
+      workViewObservationSequence: 7,
+      semanticTargetCount: 2,
+    },
+    observation: {
+      registry: "openclaw-native-engineering-work-view-observation-v0",
+      status: "ready",
+      freshness: "fresh",
+      sequence: 7,
+      visualFrame: { available: true, fresh: true, sha256: "a".repeat(64), width: 960, height: 540 },
+      semanticTargets: { available: true, itemCount: 2, itemsRetained: false },
+      pageReferencePresent: true,
+      fullPayloadRetained: false,
     },
     governance: {
       exposesLeaseId: false,
       exposesActiveUrl: false,
+      exposesVisualFrameBytes: false,
+      exposesSemanticTargetItems: false,
     },
   };
   const packet = buildNativeEngineeringContextPacket({
@@ -90,7 +107,11 @@ test("engineering context packet carries compact trusted work-view association w
 
   assert.equal(packet.summary.workViewAssociationIncluded, true);
   assert.equal(packet.summary.workViewAssociationStatus, "bound");
+  assert.equal(packet.summary.workViewObservationIncluded, true);
+  assert.equal(packet.summary.workViewObservationStatus, "ready");
+  assert.equal(packet.summary.semanticTargetCount, 2);
   assert.equal(packet.provenance.workViewAssociationRegistry, "openclaw-native-engineering-work-view-association-v0");
+  assert.equal(packet.governance.readsTrustedWorkViewObservation, true);
   assert.equal(packet.messages.at(-3).toolName, "trusted_work_view");
   assert.equal(JSON.stringify(packet).includes("leaseId"), false);
   assert.equal(JSON.stringify(packet).includes("activeUrl"), false);

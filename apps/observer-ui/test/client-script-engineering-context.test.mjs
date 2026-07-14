@@ -31,6 +31,8 @@ function rendererContext() {
     engineeringContextPacketWorkView: element(),
     engineeringContextPacketBinding: element(),
     engineeringContextPacketAuthority: element(),
+    engineeringContextPacketCapture: element(),
+    engineeringContextPacketTargets: element(),
     engineeringContextPacketRecovery: element(),
     engineeringContextPacketBindWorkViewButton: element(),
     engineeringContextPacketRecoveryButton: element({ hidden: true }),
@@ -43,6 +45,8 @@ test("Observer exposes only the allowlisted trusted work-view recovery actions",
   for (const token of [
     "engineering-context-packet-recovery",
     "engineering-context-packet-recovery-button",
+    "engineering-context-packet-capture",
+    "engineering-context-packet-targets",
   ]) {
     assert.equal(panel.includes(token), true, `panel is missing ${token}`);
   }
@@ -62,6 +66,7 @@ test("Observer exposes only the allowlisted trusted work-view recovery actions",
         actionAuthority: "inactive",
         recoveryAction: "prepare_work_view",
       },
+      observation: { status: "ready", freshness: "fresh", semanticTargets: { itemCount: 3 } },
     },
     messages: [],
   });
@@ -70,6 +75,8 @@ test("Observer exposes only the allowlisted trusted work-view recovery actions",
   assert.equal(context.engineeringContextPacketRecoveryButton.textContent, "Prepare Trusted Work View");
   assert.equal(context.engineeringContextPacketRecoveryButton.hidden, false);
   assert.equal(context.engineeringContextPacketRecoveryButton.disabled, false);
+  assert.equal(context.engineeringContextPacketCapture.textContent, "ready/fresh");
+  assert.equal(context.engineeringContextPacketTargets.textContent, "3");
   assert.match(context.engineeringContextPacketJson.textContent, /recovery=prepare_work_view/);
 
   context.renderEngineeringContextPacket({

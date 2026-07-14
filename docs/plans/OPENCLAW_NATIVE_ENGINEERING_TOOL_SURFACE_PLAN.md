@@ -525,6 +525,14 @@ browser action variant or create another Level 1 readiness/evidence-only shell
 from historical plan text; preserve the existing provider, root, desktop-wide
 capture, and arbitrary endpoint execution boundaries.
 
+The existing context packet now also has an explicit observation bridge,
+documented in `OPENCLAW_NATIVE_ENGINEERING_WORK_VIEW_OBSERVATION_BRIDGE_PLAN.md`.
+When requested, it carries only capture freshness, frame digest/dimensions, and
+semantic-target counts from the session-manager sidecar. It does not transfer
+pixels, page URLs, page text, target items, input values, or selectors. Use this
+metadata to close a demonstrated operator decision before adding another
+Level 2 action.
+
 The bound-task context workflow now also exposes the concrete trusted-session
 recovery recommendation in the existing Observer packet panel. When the
 authoritative readback recommends `prepare_work_view`, the operator can invoke

@@ -170,6 +170,11 @@ export function buildNativeEngineeringContextPacket({
       recoveryEvidenceProtected: true,
       workViewAssociationIncluded: Boolean(workViewAssociation),
       workViewAssociationStatus: workViewAssociation?.summary?.status ?? null,
+      workViewObservationIncluded: workViewAssociation?.observation != null,
+      workViewObservationStatus: workViewAssociation?.summary?.workViewObservationStatus ?? null,
+      workViewObservationFreshness: workViewAssociation?.summary?.workViewObservationFreshness ?? null,
+      workViewObservationSequence: workViewAssociation?.summary?.workViewObservationSequence ?? null,
+      semanticTargetCount: workViewAssociation?.summary?.semanticTargetCount ?? null,
     },
     bounds: {
       maxTranscriptRecords: MAX_LIMIT,
@@ -195,6 +200,7 @@ export function buildNativeEngineeringContextPacket({
       createsTask: false,
       createsApproval: false,
       readsTrustedWorkViewState: Boolean(workViewAssociation),
+      readsTrustedWorkViewObservation: workViewAssociation?.observation != null,
       localServiceReadOnly: Boolean(workViewAssociation),
     },
     auditEvidence: {

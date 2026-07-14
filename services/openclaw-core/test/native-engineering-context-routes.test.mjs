@@ -137,7 +137,7 @@ test("engineering context packet route reads the existing session-manager owner 
   };
   const response = await invoke({
     path: "/plugins/native-adapter/engineering-context/packet",
-    body: { taskId: task.id, includeWorkView: true },
+    body: { taskId: task.id, includeWorkView: true, includeWorkViewObservation: true },
     state: { tasks: new Map([[task.id, task]]), runtimeState: {} },
     readWorkViewState: async () => ({
       ok: true,
@@ -149,7 +149,21 @@ test("engineering context packet route reads the existing session-manager owner 
           helperStatus: "active",
           trustedSession: {
             sessionIdentity: { status: "authoritative" },
-            helperRuntime: { status: "active", actionAuthority: "active", leaseMatched: true },
+            helperRuntime: {
+              status: "active",
+              actionAuthority: "active",
+              leaseMatched: true,
+              sidecar: {
+                captureSourceStatus: "ready",
+                captureFreshness: "fresh",
+                captureObservation: {
+                  registry: "openclaw-trusted-work-view-sidecar-capture-observation-v0",
+                  sequence: 4,
+                  semanticTargets: { available: true, itemCount: 1 },
+                  visualFrame: { available: true, fresh: true, sequence: 4, sha256: "c".repeat(64) },
+                },
+              },
+            },
             recoveryRecommendation: { action: "none" },
           },
         },
@@ -160,6 +174,10 @@ test("engineering context packet route reads the existing session-manager owner 
   assert.equal(response.statusCode, 200);
   assert.equal(response.body.workViewAssociation.registry, "openclaw-native-engineering-work-view-association-v0");
   assert.equal(response.body.workViewAssociation.summary.status, "bound");
+  assert.equal(response.body.workViewAssociation.observation.status, "ready");
+  assert.equal(response.body.workViewAssociation.observation.semanticTargets.itemCount, 1);
+  assert.equal(response.body.summary.workViewObservationIncluded, true);
+  assert.equal(response.body.governance.readsTrustedWorkViewObservation, true);
   assert.equal(response.body.governance.readsTrustedWorkViewState, true);
   assert.equal(JSON.stringify(response.body).includes("leaseId"), false);
 });

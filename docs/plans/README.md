@@ -40,6 +40,7 @@ OPENCLAW_NATIVE_ENGINEERING_MICROCOMPACT_PROJECTION_PLAN.md
 OPENCLAW_NATIVE_ENGINEERING_CONTEXT_PACKET_PLAN.md
 OPENCLAW_NATIVE_ENGINEERING_WORK_VIEW_ASSOCIATION_PLAN.md
 OPENCLAW_NATIVE_ENGINEERING_WORK_VIEW_BIND_PLAN.md
+OPENCLAW_NATIVE_ENGINEERING_WORK_VIEW_OBSERVATION_BRIDGE_PLAN.md
 OPENCLAW_NATIVE_PLUGIN_RUNTIME_REFRESH_EVIDENCE_PLAN.md
 OPENCLAW_NATIVE_PLUGIN_RUNTIME_REFRESH_TASK_PLAN.md
 OPENCLAW_NATIVE_ACPX_CODEX_BRIDGE_COMPATIBILITY_PLAN.md
@@ -116,6 +117,16 @@ The active Level 2 bridge is documented in:
 ```text
 OPENCLAW_TRUSTED_WORK_VIEW_SESSION_CONTRACT_PLAN.md
 ```
+
+The current native engineering extension of that bridge is documented in:
+
+```text
+OPENCLAW_NATIVE_ENGINEERING_WORK_VIEW_OBSERVATION_BRIDGE_PLAN.md
+```
+
+It reuses the existing context packet and reports only bounded capture
+freshness, frame provenance, and semantic-target counts; it does not create a
+new endpoint or action path.
 
 The bounded Level 2 browser eye-hand exit gate and kernel-whitepaper Phase A are
 complete. The active Phase B route is documented alongside the Phase A record:

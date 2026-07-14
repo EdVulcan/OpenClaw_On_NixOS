@@ -219,3 +219,10 @@ explicitly rebound through the existing bind route with `rebind: true` after
 authority recovery; automatic rebinding remains disabled. The dedicated
 work-view bind plan records the boundary and evidence. Keep provider response
 content transient and do not resume the historical Phase 59-136 wrapper chain.
+
+The same packet can now explicitly request the bounded AI-owned work-view
+observation bridge from
+`OPENCLAW_NATIVE_ENGINEERING_WORK_VIEW_OBSERVATION_BRIDGE_PLAN.md`. It reports
+capture status/freshness, frame provenance, and semantic-target counts without
+transferring page URLs, pixels, text blocks, target items, input values, or
+selectors. It remains read-only and does not select or dispatch an action.

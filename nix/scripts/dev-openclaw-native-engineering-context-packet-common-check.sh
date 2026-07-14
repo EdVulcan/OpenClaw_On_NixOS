@@ -135,16 +135,16 @@ NODE
 )
 post_json "$CORE_URL/approvals/$second_approval_id/approve" '{"approvedBy":"dev-openclaw-native-engineering-context-packet-check","reason":"approve second bounded local context fixture command"}' > "$SECOND_APPROVED_FILE"
 post_json "$CORE_URL/operator/step" '{}' > "$SECOND_STEP_FILE"
-post_json "$CORE_URL/plugins/native-adapter/engineering-context/packet" "{\"taskId\":\"$second_task_id\",\"limit\":8,\"maxOutputChars\":2000,\"thresholdChars\":256,\"protectRecentAssistantTurns\":0,\"includeWorkView\":true}" > "$PRE_RECOVERY_PACKET_FILE"
+post_json "$CORE_URL/plugins/native-adapter/engineering-context/packet" "{\"taskId\":\"$second_task_id\",\"limit\":8,\"maxOutputChars\":2000,\"thresholdChars\":256,\"protectRecentAssistantTurns\":0,\"includeWorkView\":true,\"includeWorkViewObservation\":true}" > "$PRE_RECOVERY_PACKET_FILE"
 post_json "$SESSION_MANAGER_URL/work-view/prepare" '{"displayTarget":"workspace-2","entryUrl":"https://example.com/engineering-context-bind"}' > "$PREPARE_FILE"
 post_json "$CORE_URL/plugins/native-adapter/engineering-context/work-view/bind" "{\"taskId\":\"$second_task_id\",\"confirm\":true}" > "$BIND_FILE"
-post_json "$CORE_URL/plugins/native-adapter/engineering-context/packet" "{\"limit\":8,\"maxOutputChars\":2000,\"thresholdChars\":256,\"protectRecentAssistantTurns\":0,\"includeWorkView\":true}" > "$PACKET_FILE"
+post_json "$CORE_URL/plugins/native-adapter/engineering-context/packet" "{\"limit\":8,\"maxOutputChars\":2000,\"thresholdChars\":256,\"protectRecentAssistantTurns\":0,\"includeWorkView\":true,\"includeWorkViewObservation\":true}" > "$PACKET_FILE"
 post_json "$SESSION_MANAGER_URL/session/restart" '{"displayTarget":"workspace-2"}' > "$SESSION_RESTART_FILE"
 post_json "$SESSION_MANAGER_URL/work-view/prepare" '{"displayTarget":"workspace-2","entryUrl":"https://example.com/engineering-context-rebind"}' > "$REBIND_PREPARE_FILE"
-post_json "$CORE_URL/plugins/native-adapter/engineering-context/packet" "{\"taskId\":\"$second_task_id\",\"limit\":8,\"maxOutputChars\":2000,\"thresholdChars\":256,\"protectRecentAssistantTurns\":0,\"includeWorkView\":true}" > "$STALE_PACKET_FILE"
+post_json "$CORE_URL/plugins/native-adapter/engineering-context/packet" "{\"taskId\":\"$second_task_id\",\"limit\":8,\"maxOutputChars\":2000,\"thresholdChars\":256,\"protectRecentAssistantTurns\":0,\"includeWorkView\":true,\"includeWorkViewObservation\":true}" > "$STALE_PACKET_FILE"
 OPENCLAW_POST_JSON_FAILURE=allow post_json "$CORE_URL/plugins/native-adapter/engineering-context/work-view/bind" "{\"taskId\":\"$second_task_id\",\"confirm\":true}" > "$STALE_BIND_FILE"
 post_json "$CORE_URL/plugins/native-adapter/engineering-context/work-view/bind" "{\"taskId\":\"$second_task_id\",\"confirm\":true,\"rebind\":true}" > "$REBOUND_FILE"
-post_json "$CORE_URL/plugins/native-adapter/engineering-context/packet" "{\"taskId\":\"$second_task_id\",\"limit\":8,\"maxOutputChars\":2000,\"thresholdChars\":256,\"protectRecentAssistantTurns\":0,\"includeWorkView\":true}" > "$REBOUND_PACKET_FILE"
+post_json "$CORE_URL/plugins/native-adapter/engineering-context/packet" "{\"taskId\":\"$second_task_id\",\"limit\":8,\"maxOutputChars\":2000,\"thresholdChars\":256,\"protectRecentAssistantTurns\":0,\"includeWorkView\":true,\"includeWorkViewObservation\":true}" > "$REBOUND_PACKET_FILE"
 curl --silent --fail "$CORE_URL/plugins/openclaw-native-plugin-adapter" > "$ADAPTER_FILE"
 
 node - <<'NODE' "$TASK_FILE" "$STEP_FILE" "$SECOND_STEP_FILE" "$PRE_RECOVERY_PACKET_FILE" "$PREPARE_FILE" "$BIND_FILE" "$PACKET_FILE" "$SESSION_RESTART_FILE" "$REBIND_PREPARE_FILE" "$STALE_PACKET_FILE" "$STALE_BIND_FILE" "$REBOUND_FILE" "$REBOUND_PACKET_FILE" "$ADAPTER_FILE" "$HTML_FILE" "$CLIENT_FILE" "$OUTPUT_SECRET" "$OBSERVER_CHECK"
@@ -184,6 +184,7 @@ if (
   !preRecoveryPacket.ok
   || preRecoveryPacket.summary?.workViewAssociationIncluded !== true
   || preRecoveryPacket.workViewAssociation?.summary?.recoveryAction !== "prepare_work_view"
+  || preRecoveryPacket.summary?.workViewObservationIncluded !== true
   || (!pairResetSession && preRecoveryPacket.workViewAssociation?.summary?.actionAuthority !== "inactive")
   || (pairResetSession && (
     preRecoveryPacket.workViewAssociation?.summary?.helperStatus !== "divergent"
@@ -218,11 +219,22 @@ if (
   || packet.summary?.verificationEvidenceProtected !== true
   || packet.summary?.recoveryEvidenceProtected !== true
   || packet.summary?.workViewAssociationIncluded !== true
+  || packet.summary?.workViewObservationIncluded !== true
   || !packet.workViewAssociation?.registry
+  || packet.workViewAssociation?.observation?.registry !== "openclaw-native-engineering-work-view-observation-v0"
+  || packet.workViewAssociation?.observation?.fullPayloadRetained !== false
+  || packet.workViewAssociation?.observation?.desktopWideCapture !== false
+  || packet.workViewAssociation?.observation?.semanticTargets?.itemsRetained !== false
+  || packet.workViewAssociation?.observation?.semanticTargets?.inputValuesExposed !== false
+  || packet.workViewAssociation?.observation?.semanticTargets?.selectorsExposed !== false
+  || packet.workViewAssociation?.observation?.visualFrame?.pageUrl !== undefined
   || packet.workViewAssociation?.summary?.recoveryAction !== "reveal_work_view"
   || packet.workViewAssociation?.source?.owner !== "openclaw-session-manager"
   || packet.workViewAssociation?.governance?.exposesLeaseId !== false
   || packet.workViewAssociation?.governance?.exposesActiveUrl !== false
+  || packet.workViewAssociation?.governance?.exposesVisualFrameBytes !== false
+  || packet.workViewAssociation?.governance?.exposesSemanticTargetItems !== false
+  || packet.workViewAssociation?.governance?.readsTrustedWorkViewObservation !== true
   || packet.provenance?.taskId !== null
   || packet.governance?.localAssemblyOnly !== true
   || packet.governance?.readsCredentialStore !== false
@@ -258,6 +270,7 @@ if (
   || rebound.association?.summary?.status !== "bound"
   || !reboundPacket.ok
   || reboundPacket.workViewAssociation?.summary?.status !== "bound"
+  || reboundPacket.summary?.workViewObservationIncluded !== true
   || reboundPacket.provenance?.taskId !== secondStep.task?.id
 ) {
   throw new Error(`context packet stale binding recovery mismatch: ${JSON.stringify({ sessionRestart, rebindPrepare, stalePacket, staleBind, rebound, reboundPacket })}`);
@@ -290,6 +303,8 @@ if (observerCheck) {
     "engineering-context-packet-work-view",
     "engineering-context-packet-binding",
     "engineering-context-packet-authority",
+    "engineering-context-packet-capture",
+    "engineering-context-packet-targets",
     "engineering-context-packet-recovery",
     "engineering-context-packet-build-button",
     "engineering-context-packet-bind-work-view-button",
@@ -321,6 +336,8 @@ if (observerCheck) {
     "runRecommendedWorkViewAction",
     "prepare_work_view",
     "includeWorkView",
+    "includeWorkViewObservation",
+    "openclaw-native-engineering-work-view-observation-v0",
     "trusted_work_view",
     "renderEngineeringRecommendationFromOperatorResult",
     "useEngineeringRecommendation",

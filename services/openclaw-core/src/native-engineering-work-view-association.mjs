@@ -1,5 +1,7 @@
 export const NATIVE_ENGINEERING_WORK_VIEW_ASSOCIATION_REGISTRY =
   "openclaw-native-engineering-work-view-association-v0";
+export const NATIVE_ENGINEERING_WORK_VIEW_OBSERVATION_REGISTRY =
+  "openclaw-native-engineering-work-view-observation-v0";
 
 export async function readNativeEngineeringWorkViewState({
   sessionManagerUrl,
@@ -25,6 +27,87 @@ function hasText(value) {
 
 function asObject(value) {
   return value && typeof value === "object" ? value : {};
+}
+
+function boundedCount(value, max) {
+  return Number.isInteger(value) && value >= 0 ? Math.min(value, max) : 0;
+}
+
+function boundedDigest(value) {
+  return typeof value === "string" && /^[a-f0-9]{64}$/u.test(value) ? value : null;
+}
+
+function boundedTimestamp(value) {
+  return typeof value === "string" && value.trim() ? value.trim().slice(0, 40) : null;
+}
+
+function boundedEnum(value, allowed, fallback) {
+  return allowed.includes(value) ? value : fallback;
+}
+
+function buildWorkViewObservation({ helperRuntime } = {}) {
+  const sidecar = asObject(helperRuntime.sidecar);
+  const capture = asObject(sidecar.captureObservation);
+  const visualFrame = asObject(capture.visualFrame);
+  const semanticTargets = asObject(capture.semanticTargets);
+  const statusCandidate = typeof sidecar.captureSourceStatus === "string"
+    ? sidecar.captureSourceStatus.trim()
+    : null;
+  const freshnessCandidate = typeof sidecar.captureFreshness === "string"
+    ? sidecar.captureFreshness.trim()
+    : null;
+  const status = boundedEnum(
+    statusCandidate,
+    ["ready", "waiting", "recovery_required"],
+    capture.registry ? "unknown" : "missing",
+  );
+  const freshness = boundedEnum(
+    freshnessCandidate,
+    ["fresh", "stale", "missing"],
+    capture.registry ? "unknown" : "missing",
+  );
+
+  return {
+    registry: NATIVE_ENGINEERING_WORK_VIEW_OBSERVATION_REGISTRY,
+    sourceRegistry: hasText(capture.registry)
+      ? capture.registry.trim().slice(0, 120)
+      : "openclaw-trusted-work-view-sidecar-capture-observation-v0",
+    status,
+    freshness,
+    sequence: boundedCount(capture.sequence, 2 ** 31 - 1),
+    capturedAt: boundedTimestamp(capture.capturedAt),
+    observedAt: boundedTimestamp(capture.observedAt),
+    ageMs: boundedCount(sidecar.captureAgeMs, 86_400_000),
+    staleAfterMs: boundedCount(sidecar.captureStaleAfterMs, 86_400_000),
+    tabCount: boundedCount(capture.tabCount, 32),
+    visibleTextBlockCount: boundedCount(capture.visibleTextBlockCount, 128),
+    pageReferencePresent: hasText(capture.activeUrl),
+    titlePresent: hasText(capture.title),
+    visualFrame: {
+      available: visualFrame.available === true,
+      fresh: visualFrame.fresh === true,
+      sequence: boundedCount(visualFrame.sequence, 2 ** 31 - 1),
+      sha256: boundedDigest(visualFrame.sha256),
+      width: boundedCount(visualFrame.width, 4_096),
+      height: boundedCount(visualFrame.height, 4_096),
+      byteLength: boundedCount(visualFrame.byteLength, 262_144),
+      sourceScope: hasText(visualFrame.sourceScope) ? visualFrame.sourceScope.trim().slice(0, 80) : null,
+    },
+    semanticTargets: {
+      available: semanticTargets.available === true,
+      itemCount: boundedCount(semanticTargets.itemCount, 64),
+      truncated: semanticTargets.truncated === true,
+      inventorySha256: boundedDigest(semanticTargets.inventorySha256),
+      frameSequence: boundedCount(semanticTargets.frameSequence, 2 ** 31 - 1),
+      frameSha256: boundedDigest(semanticTargets.frameSha256),
+      itemsRetained: false,
+      inputValuesExposed: false,
+      selectorsExposed: false,
+      mutation: false,
+    },
+    fullPayloadRetained: false,
+    desktopWideCapture: false,
+  };
 }
 
 function buildBinding({ task, requestedTaskId, session, workView, trustedSession, helperRuntime }) {
@@ -92,6 +175,7 @@ export function buildNativeEngineeringWorkViewAssociation({
   taskId = null,
   workViewState = null,
   readStatus = "available",
+  includeWorkViewObservation = false,
   now = () => new Date().toISOString(),
 } = {}) {
   const source = asObject(workViewState);
@@ -118,6 +202,9 @@ export function buildNativeEngineeringWorkViewAssociation({
   const status = stateAvailable
     ? binding.status === "no_task_selected" ? "work_view_observed" : binding.status
     : "work_view_state_unavailable";
+  const observation = stateAvailable && includeWorkViewObservation
+    ? buildWorkViewObservation({ helperRuntime })
+    : null;
   const summary = {
     status,
     taskId: selectedTaskId ?? null,
@@ -130,6 +217,11 @@ export function buildNativeEngineeringWorkViewAssociation({
     leaseMatched: stateAvailable ? helperRuntime.leaseMatched === true : false,
     bindingStatus: binding.status,
     recoveryAction,
+    workViewObservationIncluded: Boolean(observation),
+    workViewObservationStatus: observation?.status ?? null,
+    workViewObservationFreshness: observation?.freshness ?? null,
+    workViewObservationSequence: observation?.sequence ?? null,
+    semanticTargetCount: observation?.semanticTargets?.itemCount ?? null,
   };
 
   return {
@@ -177,6 +269,7 @@ export function buildNativeEngineeringWorkViewAssociation({
       recoveryAction,
     },
     binding,
+    observation,
     summary,
     governance: {
       readOnly: true,
@@ -187,6 +280,9 @@ export function buildNativeEngineeringWorkViewAssociation({
       exposesLeaseId: false,
       exposesActiveUrl: false,
       exposesCapturePayload: false,
+      exposesVisualFrameBytes: false,
+      exposesSemanticTargetItems: false,
+      readsTrustedWorkViewObservation: Boolean(observation),
       createsTask: false,
       createsApproval: false,
       executesAction: false,

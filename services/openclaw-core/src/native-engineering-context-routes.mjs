@@ -80,6 +80,7 @@ export async function handleNativeEngineeringContextRoute({
           taskId: selectedTaskId,
           workViewState: workViewRead.data,
           readStatus: workViewRead.ok ? "available" : "unavailable",
+          includeWorkViewObservation: body.includeWorkViewObservation === true,
         });
       }
       const packet = buildNativeEngineeringContextPacket({

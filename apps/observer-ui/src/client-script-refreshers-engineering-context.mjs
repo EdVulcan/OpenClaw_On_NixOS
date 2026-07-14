@@ -18,6 +18,7 @@ export const observerClientEngineeringContextRefreshersScript = `async function 
         thresholdChars: 2000,
         protectRecentAssistantTurns: 3,
         includeWorkView: true,
+        includeWorkViewObservation: true,
       }),
     });
     renderEngineeringContextPacket(data);

@@ -10,6 +10,8 @@ export function observerEngineeringContextPanels() {
           <div class="metric"><span>Work View</span><span id="engineering-context-packet-work-view">none</span></div>
           <div class="metric"><span>Binding</span><span id="engineering-context-packet-binding">none</span></div>
           <div class="metric"><span>Authority</span><span id="engineering-context-packet-authority">inactive</span></div>
+          <div class="metric"><span>Capture</span><span id="engineering-context-packet-capture">none</span></div>
+          <div class="metric"><span>Targets</span><span id="engineering-context-packet-targets">none</span></div>
           <div class="metric"><span>Recovery</span><span id="engineering-context-packet-recovery">none</span></div>
           <div class="actions tight">
             <button id="engineering-context-packet-build-button" class="secondary" type="button">Build Context Packet</button>

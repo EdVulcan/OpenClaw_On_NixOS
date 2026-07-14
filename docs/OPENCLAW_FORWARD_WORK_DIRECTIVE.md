@@ -737,7 +737,11 @@ or automatic recovery path. If a selected task retains an old session binding
 after that recovery, the same packet Bind control now becomes an explicit
 `Rebind Task to Work View` action; it requires `confirm:true` plus
 `rebind:true`, revalidates fresh authority, preserves task execution state, and
-does not replay the task.
+does not replay the task. The same packet can now explicitly request the bounded
+work-view observation bridge, which reports capture freshness, frame
+provenance, and semantic-target counts without transferring page URLs, pixels,
+page text, target items, input values, or selectors. Use that metadata to close
+a demonstrated operator decision before adding another Level 2 action.
 
 ## Identity-Upgrade Alignment
 
