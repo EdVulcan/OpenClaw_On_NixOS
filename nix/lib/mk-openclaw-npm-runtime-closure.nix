@@ -8,6 +8,8 @@
   npmDepsHash,
   version ? "0.1.0",
   removeModules ? [ ],
+  nativeBuildInputs ? [ ],
+  extraPostInstall ? "",
 }:
 
 buildNpmPackage {
@@ -22,6 +24,7 @@ buildNpmPackage {
     src = servicePath;
     hash = npmDepsHash;
   };
+  inherit nativeBuildInputs;
   npmRoot = "services/${serviceName}";
   npmInstallFlags = [ "--ignore-scripts" ];
   dontNpmBuild = true;
@@ -50,5 +53,6 @@ buildNpmPackage {
       find -L "$runtimeRoot/node_modules/.bin" -type l -delete
     fi
     runHook postInstall
+    ${extraPostInstall}
   '';
 }

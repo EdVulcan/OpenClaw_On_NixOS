@@ -1,7 +1,7 @@
 # Phase C Kernel Process-Exec Capture Plan
 
 Status: implementation, switched-VM acceptance, full body-config, bounded
-readback, continuity, and executable identity proof passed, 2026-07-14
+readback, continuity, and executable identity proof complete, 2026-07-13
 
 ## Purpose
 
@@ -39,7 +39,9 @@ bounded read model through the existing core system-sense proxy and Observer.
 - Raw output fields: `timestampNs`, `pid`, `uid`, `comm` only.
 - Executable identity: CO-RE reads `linux_binprm.filename`, accepts at most
   255 bytes per value, and exposes at most 16 entries in the readback. This is
-  the exec filename only, not arbitrary VFS path capture.
+  the exec filename only, not arbitrary VFS path capture. If the bounded
+  filename cannot be read, the raw four-field event remains and only its
+  executable identity entry is omitted.
 - Runtime behavior: one capture at a time, no automatic retry, no persistence,
   no policy execution, and no host mutation.
 - Readback: the existing response includes a bounded in-memory summary with a
@@ -77,12 +79,11 @@ bounded read model through the existing core system-sense proxy and Observer.
 
 Local implementation, Nix evaluation/parse, shell validation, system-sense
 tests (49/49), core route tests (32/32), and Observer served-source assembly
-checks (3/3) pass. The updated derivation compiles the CO-RE raw tracepoint
-probe. The current switched generation loaded the probe with only `CAP_BPF`,
-`CAP_PERFMON`, and `LimitMEMLOCK=infinity`; the full body-config check passed
-with the same boundary. The current core and Observer acceptance checks each
-captured 18 events and observed `/run/current-system/sw/bin/true` through the
-executable identity readback.
+checks pass. The updated derivation compiles the CO-RE raw tracepoint probe;
+switched-VM loading and the full body-config check pass. The switched system
+loads the raw tracepoint with only `CAP_BPF`, `CAP_PERFMON`, and
+`LimitMEMLOCK=infinity`, and the acceptance captures the external `true`
+filename. The core and Observer milestones both pass.
 
 The bounded readback evidence includes deterministic summary ordering, identity
 counts, and the fixed command summary bound in the system-sense tests. Observer

@@ -4,8 +4,12 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   HOSTD_REQUEST_MAX_BYTES,
+  HOSTD_RESPONSE_REGISTRY,
+  HOSTD_PROTOCOL_VERSION,
+  buildHostdGovernance,
   createHostdRequestHandler,
 } from "./hostd-protocol.mjs";
+import { createHostdPeerCredentialVerifier } from "./hostd-peer-credentials.mjs";
 
 export const DEFAULT_HOSTD_SOCKET_PATH = "/run/openclaw/hostd.sock";
 
@@ -13,14 +17,33 @@ function writeResponse(socket, response) {
   if (!socket.destroyed) socket.end(`${JSON.stringify(response)}\n`);
 }
 
+function handlerFailureResponse(error, peerIdentity) {
+  return {
+    ok: false,
+    registry: HOSTD_RESPONSE_REGISTRY,
+    protocolVersion: HOSTD_PROTOCOL_VERSION,
+    requestId: null,
+    owner: "openclaw-hostd",
+    error: {
+      code: "handler_failed",
+      message: error instanceof Error ? error.message.slice(0, 256) : "Hostd request handler failed.",
+    },
+    governance: buildHostdGovernance(peerIdentity),
+  };
+}
+
 export function createHostdServer({
   socketPath = DEFAULT_HOSTD_SOCKET_PATH,
   requestHandler = createHostdRequestHandler(),
+  peerVerifier = createHostdPeerCredentialVerifier(),
 } = {}) {
   let requestChain = Promise.resolve();
   const server = net.createServer({ allowHalfOpen: true }, (socket) => {
     let buffer = "";
     let handled = false;
+    const peerIdentityPromise = Promise.resolve()
+      .then(() => peerVerifier(socket))
+      .catch(() => ({ verified: false, matched: false, reason: "peer_identity_unavailable" }));
     socket.setEncoding("utf8");
     socket.on("error", () => {});
     socket.on("data", (chunk) => {
@@ -42,20 +65,15 @@ export function createHostdServer({
       if (newlineIndex < 0) return;
       handled = true;
       const line = buffer.slice(0, newlineIndex);
+      let peerIdentity = null;
       requestChain = requestChain
         .catch(() => null)
-        .then(() => requestHandler(line))
-        .catch((error) => ({
-          ok: false,
-          registry: "openclaw-hostd-systemd-restart-response-v0",
-          protocolVersion: 1,
-          requestId: null,
-          owner: "openclaw-hostd",
-          error: {
-            code: "handler_failed",
-            message: error instanceof Error ? error.message.slice(0, 256) : "Hostd request handler failed.",
-          },
-        }));
+        .then(() => peerIdentityPromise)
+        .then((identity) => {
+          peerIdentity = identity;
+          return requestHandler(line, { peerIdentity: identity });
+        })
+        .catch((error) => handlerFailureResponse(error, peerIdentity));
       requestChain.then((response) => writeResponse(socket, response));
     });
   });

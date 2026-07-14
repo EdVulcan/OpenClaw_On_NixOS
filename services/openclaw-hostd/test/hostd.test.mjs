@@ -8,6 +8,8 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
+const allowPeer = async () => ({ verified: true, matched: true, reason: null });
+
 test("hostd protocol accepts only the fixed system-sense restart capability", () => {
   const parsed = parseHostdRequest(JSON.stringify({
     version: 1,
@@ -82,6 +84,7 @@ test("hostd socket boundary carries compact owner evidence to the core client", 
   const socketPath = path.join(mkdtempSync(path.join(tmpdir(), "openclaw-hostd-test-")), "hostd.sock");
   const runtime = createHostdServer({
     socketPath,
+    peerVerifier: allowPeer,
     requestHandler: createHostdRequestHandler({
       runRestart: async () => ({
         ok: true,
@@ -104,8 +107,9 @@ test("hostd socket boundary carries compact owner evidence to the core client", 
     assert.equal(response.nativeMutation.owner, "openclaw-hostd");
     assert.equal(response.nativeMutation.before.mainPid, 100);
     assert.equal(response.nativeMutation.after.mainPid, 200);
-    assert.equal(response.governance.callerBoundary, "openclaw-service-group-socket");
-    assert.equal(response.governance.socketPeerIdentityVerified, false);
+    assert.equal(response.governance.callerBoundary, "kernel_so_peercred");
+    assert.equal(response.governance.socketPeerIdentityVerified, true);
+    assert.equal(response.governance.socketPeerIdentityMatched, true);
   } finally {
     await runtime.close();
   }
@@ -115,6 +119,7 @@ test("hostd keeps the response channel open after a client half-closes its reque
   const socketPath = path.join(mkdtempSync(path.join(tmpdir(), "openclaw-hostd-half-close-")), "hostd.sock");
   const runtime = createHostdServer({
     socketPath,
+    peerVerifier: allowPeer,
     requestHandler: createHostdRequestHandler({
       runRestart: async () => {
         await new Promise((resolve) => setTimeout(resolve, 25));
@@ -146,6 +151,7 @@ test("hostd client rejects a response bound to a different request", async () =>
   const socketPath = path.join(mkdtempSync(path.join(tmpdir(), "openclaw-hostd-mismatch-")), "hostd.sock");
   const runtime = createHostdServer({
     socketPath,
+    peerVerifier: allowPeer,
     requestHandler: async () => ({
       ok: true,
       registry: "openclaw-hostd-systemd-restart-response-v0",
@@ -160,6 +166,32 @@ test("hostd client rejects a response bound to a different request", async () =>
       requestHostdSystemSenseRestart({ socketPath, requestId: "expected-request" }),
       /request id does not match the request/,
     );
+  } finally {
+    await runtime.close();
+  }
+});
+
+test("hostd denies the fixed mutation when kernel peer identity does not match", async () => {
+  const socketPath = path.join(mkdtempSync(path.join(tmpdir(), "openclaw-hostd-peer-denied-")), "hostd.sock");
+  let restartCalled = false;
+  const runtime = createHostdServer({
+    socketPath,
+    peerVerifier: async () => ({ verified: true, matched: false, reason: "peer_identity_mismatch" }),
+    requestHandler: createHostdRequestHandler({
+      runRestart: async () => {
+        restartCalled = true;
+        return { ok: true };
+      },
+    }),
+  });
+  await runtime.listen();
+  try {
+    const response = await requestHostdSystemSenseRestart({ socketPath, requestId: "peer-denied-request" });
+    assert.equal(response.ok, false);
+    assert.equal(response.error.code, "peer_identity_denied");
+    assert.equal(response.governance.socketPeerIdentityVerified, true);
+    assert.equal(response.governance.socketPeerIdentityMatched, false);
+    assert.equal(restartCalled, false);
   } finally {
     await runtime.close();
   }

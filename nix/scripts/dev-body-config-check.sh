@@ -375,6 +375,9 @@ if (ownership.core.environment?.OPENCLAW_BODY_RUNTIME_SOURCE !== "nix-store"
 if (ownership.hostd == null
   || ownership.hostd.environment?.OPENCLAW_BODY_RUNTIME_SOURCE !== "nix-store"
   || ownership.hostd.environment?.OPENCLAW_HOSTD_SOCKET_PATH !== "/run/openclaw/hostd.sock"
+  || !String(ownership.hostd.environment?.OPENCLAW_HOSTD_PEER_CREDENTIAL_HELPER ?? "").startsWith("/nix/store/")
+  || ownership.hostd.environment?.OPENCLAW_HOSTD_PEER_EXPECTED_USER !== "openclaw-service"
+  || ownership.hostd.environment?.OPENCLAW_HOSTD_PEER_EXPECTED_GROUP !== "openclaw"
   || ownership.hostd.serviceConfig?.User !== "openclaw-hostd"
   || ownership.hostd.serviceConfig?.Group !== "openclaw"
   || ownership.hostd.serviceConfig?.RuntimeDirectory !== "openclaw"
@@ -1140,6 +1143,8 @@ EOF
   if [[ "$hostd_out" != /nix/store/*
     || ! -f "$hostd_working_dir/src/server.mjs"
     || ! -f "$hostd_working_dir/src/hostd-protocol.mjs"
+    || ! -f "$hostd_working_dir/src/openclaw-hostd-peer-credentials.c"
+    || ! -x "$hostd_out/bin/openclaw-hostd-peer-credentials"
     || ! -f "$hostd_out/share/openclaw/packages/shared-systemd/src/systemd-dbus-transport.mjs"
     || ! -f "$hostd_working_dir/node_modules/@homebridge/dbus-native/package.json"
     || -w "$hostd_working_dir/src/server.mjs"

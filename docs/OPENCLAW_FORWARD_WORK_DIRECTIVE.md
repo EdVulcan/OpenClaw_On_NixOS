@@ -597,7 +597,10 @@ owner-separation follow-up makes desktop system services run under
 `openclaw-hostd` service account and Polkit subject, and keeps core submission
 on the shared `openclaw` socket group. The new core and Observer real-execution
 checks both completed through that account combination. The response keeps the
-remaining lack of kernel-level peer credential verification explicit.
+kernel-level peer credential verification explicit: hostd now passes each
+accepted socket FD to a fixed Nix-native `SO_PEERCRED` helper, matches only
+`openclaw-service` with the `openclaw` group, and rejects the fixed mutation
+before the D-Bus handler on mismatch or unavailable verification.
 Core reaches hostd only through its bounded Unix socket, reuses the existing
 approved next-repair lifecycle, and has no direct systemctl/sudo fallback. The
 switched generation removed the historical host sudo helper. Core and Observer
@@ -609,8 +612,8 @@ declarative-generation recovery and never issue an automatic second restart.
 It uses a bounded read-only readiness poll because systemd process readiness can
 precede the restarted service's HTTP-listener readiness. Hostd rejects unknown
 fields, arbitrary units/methods, and response evidence whose request id is not
-bound to the originating core request. Broader systemd mutation remains
-deferred.
+bound to the originating core request; core also requires the compact matching
+peer-identity evidence. Broader systemd mutation remains deferred.
 
 The Level 1 live-plugin-refresh migration now owns a real fixed-registry
 generation lifecycle. An approved existing refresh task builds and validates a
@@ -644,10 +647,10 @@ The recovery task receives that provenance without the session lease id and
 does not restart or replay the task automatically; the existing Observer task
 history path renders the same recovery recommendation after refresh.
 
-## Phase C Slice Status
+## Completed Phase C Slice
 
-The first bounded eBPF process-execution observation is now complete. It is
-documented in
+The first bounded kernel-whitepaper eBPF process-execution observation is
+complete and documented in
 `docs/plans/OPENCLAW_PHASE_C_KERNEL_PROCESS_EXEC_PLAN.md`. Store-native
 system-sense attaches only the raw `sched_process_exec` tracepoint through a
 libbpf ring buffer and returns raw `timestampNs`, `pid`, `uid`, and `comm`
@@ -681,22 +684,23 @@ in-memory only and is not a process event ledger. Continue from an explicit
 operator need shown by this continuity evidence before adding another event
 class.
 
-The executable identity refinement is also complete on the same route. A
-`comm` value can be truncated or shared by unrelated binaries, so the same raw
-capture derives a separate `openclaw-kernel-process-exec-executable-identity-v0`
+The final concrete operator gap in this slice was executable identity ambiguity. A `comm` value
+can be truncated or shared by unrelated binaries, so the same raw capture now
+derives a separate `openclaw-kernel-process-exec-executable-identity-v0`
 readback. The raw tracepoint uses CO-RE to read only
 `linux_binprm.filename`, limits each filename to 255 bytes, returns at most 16
 identity entries, and keeps the values in the current response only. The
 existing four-field raw event contract remains unchanged. No `/proc` lookup,
 command-line, environment, arbitrary VFS path, file-content, network, policy,
-or persistence capability is introduced. The current switched-generation core
-and Observer checks each captured 18 events and observed
-`/run/current-system/sw/bin/true`; the body-config check passed with only
-`CAP_BPF`, `CAP_PERFMON`, and `LimitMEMLOCK=infinity`.
+or persistence capability is introduced.
 
-The bounded readback, continuity, and executable identity requirements are now
-one cohesive Phase C operator loop. Do not add another eBPF event kind until a
-new concrete operator need is demonstrated by this evidence.
+Phase C is now closed for this operator loop. The switched core and Observer
+milestones pass, full `body-config` passes, and the running system-sense service
+returns the bounded executable identity readback. Do not add another eBPF event
+kind or a second readiness chain without a new operator need demonstrated by
+the current capture evidence. The next capability must be selected from a
+concrete user-visible gap and must preserve the existing local-first,
+non-persistent, policy-deferred boundary.
 
 ## Identity-Upgrade Alignment
 

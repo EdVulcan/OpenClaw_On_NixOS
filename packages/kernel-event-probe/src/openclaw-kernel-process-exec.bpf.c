@@ -56,6 +56,20 @@ int record_process_exec(void *ctx) {
   event->pid = (__u32)(pid_tgid >> 32);
   event->uid = (__u32)uid_gid;
   bpf_get_current_comm(event->comm, sizeof(event->comm));
+
+  /* Keep the raw event even when the optional bounded filename is unavailable. */
+  event->executable[0] = '\0';
+  bprm = (struct linux_binprm *)(unsigned long)raw_args->args[2];
+  filename = bprm ? BPF_CORE_READ(bprm, filename) : NULL;
+  if (filename) {
+    filename_length = bpf_probe_read_kernel_str(
+      event->executable,
+      sizeof(event->executable),
+      filename);
+    if (filename_length <= 0 || filename_length >= sizeof(event->executable)) {
+      event->executable[0] = '\0';
+    }
+  }
   bpf_ringbuf_submit(event, 0);
   return 0;
 }
