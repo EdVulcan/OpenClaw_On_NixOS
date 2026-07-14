@@ -120,12 +120,19 @@ export async function handleNativeEngineeringWorkViewBindRoute({
     }
 
     if (!decision.shouldMutate) {
+      const association = buildNativeEngineeringWorkViewAssociation({
+        task,
+        taskId,
+        workViewState: workViewRead.data,
+        readStatus: "available",
+      });
       sendJson(res, 200, {
         ok: true,
         changed: false,
         registry: NATIVE_ENGINEERING_WORK_VIEW_BIND_REGISTRY,
-        task: serialiseTask(task),
+        task: taskSummary(task),
         bind: decision.readback,
+        association,
       });
       return true;
     }
@@ -147,7 +154,7 @@ export async function handleNativeEngineeringWorkViewBindRoute({
       ok: true,
       changed: true,
       registry: NATIVE_ENGINEERING_WORK_VIEW_BIND_REGISTRY,
-      task: serialiseTask(updatedTask),
+      task: taskSummary(updatedTask),
       bind: completedBind,
       association,
     });

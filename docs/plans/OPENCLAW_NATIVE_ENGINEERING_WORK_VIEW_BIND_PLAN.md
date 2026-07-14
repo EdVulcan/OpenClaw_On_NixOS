@@ -45,6 +45,9 @@ or work-view action is dispatched, and repeated binding to the same current
 identity is idempotent. A stale session or work-view binding is rejected rather
 than silently replaced. The mutation emits the existing event stream through
 `task.work_view_bound` without pretending the execution phase changed.
+The HTTP response keeps the task projection compact (`id` and `status`); full
+task serialization remains internal to the audit event and existing task
+readback routes.
 
 ## Governance
 

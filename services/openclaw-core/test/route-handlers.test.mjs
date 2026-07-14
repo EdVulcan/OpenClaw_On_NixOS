@@ -1652,10 +1652,10 @@ test("engineering work-view bind route revalidates authority and preserves the t
   assert.equal(response.body.bind.registry, "openclaw-native-engineering-work-view-bind-v0");
   assert.equal(response.body.bind.summary.status, "bound");
   assert.equal(response.body.association.summary.status, "bound");
-  assert.equal(response.body.task.status, "completed");
-  assert.equal(response.body.task.workView.sessionId, "session-current");
-  assert.equal(response.body.task.workView.workViewId, "work-view-primary");
+  assert.deepEqual(response.body.task, { id: task.id, status: "completed" });
   assert.equal(events[0].name, "task.work_view_bound");
+  assert.equal(JSON.stringify(response.body).includes("session-current"), false);
+  assert.equal(JSON.stringify(response.body).includes("work-view-primary"), true);
   assert.equal(JSON.stringify(response.body.bind).includes("session-current"), false);
   assert.equal(JSON.stringify(response.body.bind).includes("leaseId"), false);
   assert.equal(JSON.stringify(response.body.bind).includes("activeUrl"), false);
