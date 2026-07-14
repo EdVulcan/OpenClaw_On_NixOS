@@ -644,14 +644,15 @@ The recovery task receives that provenance without the session lease id and
 does not restart or replay the task automatically; the existing Observer task
 history path renders the same recovery recommendation after refresh.
 
-## Active Phase C Slice
+## Phase C Slice Status
 
-The next real kernel-whitepaper capability is the first bounded eBPF process
-execution observation, documented in
+The first bounded eBPF process-execution observation is now complete. It is
+documented in
 `docs/plans/OPENCLAW_PHASE_C_KERNEL_PROCESS_EXEC_PLAN.md`. Store-native
 system-sense attaches only the raw `sched_process_exec` tracepoint through a
-libbpf ring buffer and returns only `timestampNs`, `pid`, `uid`, and `comm`;
-raw attachment avoids granting the service broad tracefs read access.
+libbpf ring buffer and returns raw `timestampNs`, `pid`, `uid`, and `comm`
+fields plus a separate bounded executable-identity readback; raw attachment
+avoids granting the service broad tracefs read access.
 The capability is opt-in in the Nix body module; the desktop profile grants
 only `CAP_BPF` and `CAP_PERFMON` plus the required `LimitMEMLOCK=infinity`
 resource limit to the non-root system-sense service when it is enabled. The
@@ -679,6 +680,23 @@ unavailable without changing the last successful baseline. This remains
 in-memory only and is not a process event ledger. Continue from an explicit
 operator need shown by this continuity evidence before adding another event
 class.
+
+The executable identity refinement is also complete on the same route. A
+`comm` value can be truncated or shared by unrelated binaries, so the same raw
+capture derives a separate `openclaw-kernel-process-exec-executable-identity-v0`
+readback. The raw tracepoint uses CO-RE to read only
+`linux_binprm.filename`, limits each filename to 255 bytes, returns at most 16
+identity entries, and keeps the values in the current response only. The
+existing four-field raw event contract remains unchanged. No `/proc` lookup,
+command-line, environment, arbitrary VFS path, file-content, network, policy,
+or persistence capability is introduced. The current switched-generation core
+and Observer checks each captured 18 events and observed
+`/run/current-system/sw/bin/true`; the body-config check passed with only
+`CAP_BPF`, `CAP_PERFMON`, and `LimitMEMLOCK=infinity`.
+
+The bounded readback, continuity, and executable identity requirements are now
+one cohesive Phase C operator loop. Do not add another eBPF event kind until a
+new concrete operator need is demonstrated by this evidence.
 
 ## Identity-Upgrade Alignment
 
