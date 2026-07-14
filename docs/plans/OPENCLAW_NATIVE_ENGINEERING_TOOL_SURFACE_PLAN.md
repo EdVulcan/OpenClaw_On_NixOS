@@ -1,6 +1,6 @@
 # OpenClaw Native Engineering Tool Surface Plan
 
-Updated: 2026-07-12
+Updated: 2026-07-14
 
 ## Active Slice
 
@@ -472,7 +472,7 @@ deferred.
 
 ## Current Route Correction
 
-Updated: 2026-07-13
+Updated: 2026-07-14
 
 The historical LSP next-step text above is evidence history, not an instruction
 to reopen completed variants. The current native engineering frontier includes
@@ -494,6 +494,16 @@ and the explicit use action calls only the existing governed control. Route
 fixtures prove the reason remains absent from compact evidence. This does not
 create tasks, approvals, execution, or provider egress automatically.
 
-The next route should advance the smallest concrete Level 2 trusted
-work-view/session-helper capability through an existing owner. Do not create
-another Level 1 readiness or evidence-only shell.
+The current installed generation also closes the adjacent system boundary
+evidence without changing this Level 1 surface: Phase C process-exec capture
+returns bounded CO-RE executable identity, and the fixed hostd restart path
+verifies the kernel socket peer before native D-Bus mutation. Body-config and
+real core/Observer checks pass for both boundaries; neither is a reason to
+reopen the engineering evidence chain.
+
+The next route remains the smallest concrete Level 2 trusted
+work-view/session-helper capability through an existing owner. Select it only
+from a demonstrated user-visible work-view gap. Do not infer another browser
+action variant or create another Level 1 readiness/evidence-only shell from
+historical plan text; preserve the existing provider, root, desktop-wide
+capture, and arbitrary endpoint execution boundaries until that gap is explicit.
