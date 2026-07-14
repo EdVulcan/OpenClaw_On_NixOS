@@ -524,3 +524,10 @@ identity, and remains separate from action execution. Do not infer another
 browser action variant or create another Level 1 readiness/evidence-only shell
 from historical plan text; preserve the existing provider, root, desktop-wide
 capture, and arbitrary endpoint execution boundaries.
+
+The bound-task context workflow now also exposes the concrete trusted-session
+recovery recommendation in the existing Observer packet panel. When the
+authoritative readback recommends `prepare_work_view`, the operator can invoke
+the existing allowlisted prepare action from that panel and receive a refreshed
+association. No new endpoint, bind variant, automatic recovery, action replay,
+provider call, or arbitrary endpoint execution was added.

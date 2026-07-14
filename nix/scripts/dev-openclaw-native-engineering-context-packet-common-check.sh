@@ -52,7 +52,8 @@ cleanup() {
     "${HTML_FILE:-}" "${CLIENT_FILE:-}" "${TASK_FILE:-}" "${BLOCKED_FILE:-}" \
     "${APPROVED_FILE:-}" "${STEP_FILE:-}" "${SECOND_TASK_FILE:-}" \
     "${SECOND_BLOCKED_FILE:-}" "${SECOND_APPROVED_FILE:-}" "${SECOND_STEP_FILE:-}" \
-    "${PACKET_FILE:-}" "${ADAPTER_FILE:-}" "${PREPARE_FILE:-}" "${BIND_FILE:-}"
+    "${PACKET_FILE:-}" "${ADAPTER_FILE:-}" "${PREPARE_FILE:-}" \
+    "${PRE_RECOVERY_PACKET_FILE:-}" "${BIND_FILE:-}"
   "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -74,6 +75,7 @@ SECOND_STEP_FILE="$(mktemp)"
 PACKET_FILE="$(mktemp)"
 ADAPTER_FILE="$(mktemp)"
 PREPARE_FILE="$(mktemp)"
+PRE_RECOVERY_PACKET_FILE="$(mktemp)"
 BIND_FILE="$(mktemp)"
 HTML_FILE=""
 CLIENT_FILE=""
@@ -119,25 +121,27 @@ NODE
 )
 post_json "$CORE_URL/approvals/$second_approval_id/approve" '{"approvedBy":"dev-openclaw-native-engineering-context-packet-check","reason":"approve second bounded local context fixture command"}' > "$SECOND_APPROVED_FILE"
 post_json "$CORE_URL/operator/step" '{}' > "$SECOND_STEP_FILE"
+post_json "$CORE_URL/plugins/native-adapter/engineering-context/packet" "{\"taskId\":\"$second_task_id\",\"limit\":8,\"maxOutputChars\":2000,\"thresholdChars\":256,\"protectRecentAssistantTurns\":0,\"includeWorkView\":true}" > "$PRE_RECOVERY_PACKET_FILE"
 post_json "$SESSION_MANAGER_URL/work-view/prepare" '{"displayTarget":"workspace-2","entryUrl":"https://example.com/engineering-context-bind"}' > "$PREPARE_FILE"
 post_json "$CORE_URL/plugins/native-adapter/engineering-context/work-view/bind" "{\"taskId\":\"$second_task_id\",\"confirm\":true}" > "$BIND_FILE"
 post_json "$CORE_URL/plugins/native-adapter/engineering-context/packet" "{\"limit\":8,\"maxOutputChars\":2000,\"thresholdChars\":256,\"protectRecentAssistantTurns\":0,\"includeWorkView\":true}" > "$PACKET_FILE"
 curl --silent --fail "$CORE_URL/plugins/openclaw-native-plugin-adapter" > "$ADAPTER_FILE"
 
-node - <<'NODE' "$TASK_FILE" "$STEP_FILE" "$SECOND_STEP_FILE" "$PREPARE_FILE" "$BIND_FILE" "$PACKET_FILE" "$ADAPTER_FILE" "$HTML_FILE" "$CLIENT_FILE" "$OUTPUT_SECRET" "$OBSERVER_CHECK"
+node - <<'NODE' "$TASK_FILE" "$STEP_FILE" "$SECOND_STEP_FILE" "$PRE_RECOVERY_PACKET_FILE" "$PREPARE_FILE" "$BIND_FILE" "$PACKET_FILE" "$ADAPTER_FILE" "$HTML_FILE" "$CLIENT_FILE" "$OUTPUT_SECRET" "$OBSERVER_CHECK"
 const fs = require("node:fs");
 const readJson = (index) => JSON.parse(fs.readFileSync(process.argv[index], "utf8"));
 const taskResponse = readJson(2);
 const step = readJson(3);
 const secondStep = readJson(4);
-const prepare = readJson(5);
-const bind = readJson(6);
-const packet = readJson(7);
-const adapter = readJson(8);
-const htmlPath = process.argv[9];
-const clientPath = process.argv[10];
-const outputSecret = process.argv[11];
-const observerCheck = process.argv[12] === "true";
+const preRecoveryPacket = readJson(5);
+const prepare = readJson(6);
+const bind = readJson(7);
+const packet = readJson(8);
+const adapter = readJson(9);
+const htmlPath = process.argv[10];
+const clientPath = process.argv[11];
+const outputSecret = process.argv[12];
+const observerCheck = process.argv[13] === "true";
 const packetRaw = JSON.stringify({ packet, adapter });
 
 if (!step.ok || step.ran !== true || step.task?.status !== "completed" || !secondStep.ok || secondStep.ran !== true || secondStep.task?.status !== "completed") {
@@ -148,6 +152,14 @@ if (!String(step.execution?.commandTranscript?.[0]?.stdout ?? "").includes(`pass
 }
 if (!prepare.ok || prepare.workView?.helperRuntime?.status !== "active") {
   throw new Error(`context packet bind fixture should prepare the trusted work view: ${JSON.stringify(prepare)}`);
+}
+if (
+  !preRecoveryPacket.ok
+  || preRecoveryPacket.summary?.workViewAssociationIncluded !== true
+  || preRecoveryPacket.workViewAssociation?.summary?.recoveryAction !== "prepare_work_view"
+  || preRecoveryPacket.workViewAssociation?.summary?.actionAuthority !== "inactive"
+) {
+  throw new Error(`context packet should expose the existing work-view recovery recommendation before prepare: ${JSON.stringify(preRecoveryPacket.workViewAssociation?.summary)}`);
 }
 if (
   !bind.ok
@@ -222,8 +234,10 @@ if (observerCheck) {
     "engineering-context-packet-work-view",
     "engineering-context-packet-binding",
     "engineering-context-packet-authority",
+    "engineering-context-packet-recovery",
     "engineering-context-packet-build-button",
     "engineering-context-packet-bind-work-view-button",
+    "engineering-context-packet-recovery-button",
     "engineering-context-packet-json",
     "engineering-loop-state-recommendation",
     "engineering-loop-state-recommendation-review",
@@ -241,8 +255,13 @@ if (observerCheck) {
     "sense.openclaw.engineering_context.packet",
     "engineeringContextPacketBuildButton",
     "engineeringContextPacketBindWorkViewButton",
+    "engineeringContextPacketRecovery",
+    "engineeringContextPacketRecoveryButton",
     "/plugins/native-adapter/engineering-context/work-view/bind",
     "bindEngineeringContextTaskToWorkView",
+    "prepareEngineeringContextWorkView",
+    "runRecommendedWorkViewAction",
+    "prepare_work_view",
     "includeWorkView",
     "trusted_work_view",
     "renderEngineeringRecommendationFromOperatorResult",

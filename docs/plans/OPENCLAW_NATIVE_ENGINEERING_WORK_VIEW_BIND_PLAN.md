@@ -49,6 +49,21 @@ The HTTP response keeps the task projection compact (`id` and `status`); full
 task serialization remains internal to the audit event and existing task
 readback routes.
 
+## Operator Recovery Bridge Follow-Up
+
+The live trusted work-view readback can recommend the existing
+`prepare_work_view` action when helper authority is inactive or divergent. The
+Engineering Context Packet Observer panel now renders that recovery action and
+exposes a contextual `Prepare Trusted Work View` control only for that exact
+allowlisted action. The control re-reads the current session-manager state
+through the existing `runRecommendedWorkViewAction` path, calls the existing
+`/work-view/prepare` route, and rebuilds the context packet afterward.
+
+This is an operator-visible bridge to an existing recovery contract, not a new
+bind variant. It does not accept an endpoint from readback, auto-run on packet
+assembly, rebind a task, replay work, or bypass the existing work-view
+authority gates.
+
 ## Governance
 
 ```text
@@ -80,6 +95,7 @@ Tests and milestone:
 ```text
 services/openclaw-core/test/native-engineering-work-view-binding.test.mjs
 services/openclaw-core/test/route-handlers.test.mjs
+apps/observer-ui/test/client-script-engineering-context.test.mjs
 nix/scripts/dev-openclaw-native-engineering-context-packet-common-check.sh
 openclaw-native-engineering-context-packet
 observer-openclaw-native-engineering-context-packet
@@ -101,9 +117,13 @@ root/system daemon ownership
 provider egress or ACPX/Codex live process execution
 ```
 
+The recovery bridge reuses the existing operator-reviewed prepare action and
+does not change these deferred boundaries.
+
 ## Next Smallest Capability
 
-Use the bound task in a real operator context workflow only if the Observer
-readback shows a concrete missing association or recovery decision. Do not add
-another bind variant or a readiness-only endpoint; authority loss must continue
-through the existing fail-closed recovery paths.
+The bound-task context workflow now includes the concrete
+`prepare_work_view` recovery bridge. Select the next Level 2 capability only
+from a new operator-visible gap in the refreshed readback. Do not add another
+bind variant or a readiness-only endpoint; authority loss must continue through
+the existing fail-closed recovery paths.

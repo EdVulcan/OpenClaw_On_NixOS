@@ -7,7 +7,9 @@ const engineeringContextPacketAudit = document.querySelector("#engineering-conte
 const engineeringContextPacketWorkView = document.querySelector("#engineering-context-packet-work-view");
 const engineeringContextPacketBinding = document.querySelector("#engineering-context-packet-binding");
 const engineeringContextPacketAuthority = document.querySelector("#engineering-context-packet-authority");
+const engineeringContextPacketRecovery = document.querySelector("#engineering-context-packet-recovery");
 const engineeringContextPacketBuildButton = document.querySelector("#engineering-context-packet-build-button");
 const engineeringContextPacketBindWorkViewButton = document.querySelector("#engineering-context-packet-bind-work-view-button");
+const engineeringContextPacketRecoveryButton = document.querySelector("#engineering-context-packet-recovery-button");
 const engineeringContextPacketJson = document.querySelector("#engineering-context-packet-json");
 `;

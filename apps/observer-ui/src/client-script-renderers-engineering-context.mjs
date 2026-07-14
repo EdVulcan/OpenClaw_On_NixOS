@@ -15,6 +15,13 @@ export const observerClientEngineeringContextRenderersScript = `function renderE
   engineeringContextPacketWorkView.textContent = workViewSummary.workViewId ?? "none";
   engineeringContextPacketBinding.textContent = workViewSummary.bindingStatus ?? "none";
   engineeringContextPacketAuthority.textContent = workViewSummary.actionAuthority ?? "inactive";
+  const recoveryAction = workViewSummary.recoveryAction ?? "none";
+  engineeringContextPacketRecovery.textContent = recoveryAction;
+  if (engineeringContextPacketRecoveryButton) {
+    const canPrepare = recoveryAction === "prepare_work_view";
+    engineeringContextPacketRecoveryButton.hidden = !canPrepare;
+    engineeringContextPacketRecoveryButton.disabled = !canPrepare;
+  }
   engineeringContextPacketJson.textContent = [
     "Local governed engineering context packet: bounded task and transcript evidence for later explicit consumption.",
     "The packet is built only after this explicit Observer action; it does not create tasks, execute commands, call providers, or perform network egress.",
@@ -23,7 +30,7 @@ export const observerClientEngineeringContextRenderersScript = `function renderE
     \`Capability: \${data?.capability?.id ?? "sense.openclaw.engineering_context.packet"} risk=\${data?.capability?.risk ?? "medium"} approval=\${Boolean(data?.capability?.approvalRequired)}\`,
     \`Summary: records=\${summary.sourceTranscriptRecords ?? 0} messages=\${summary.messageCount ?? messages.length} redactions=\${summary.redactions ?? 0} compacted=\${summary.compactedMessages ?? 0} reclaimedChars=\${summary.reclaimedChars ?? 0}\`,
     \`Protection: verification=\${Boolean(summary.verificationEvidenceProtected)} recovery=\${Boolean(summary.recoveryEvidenceProtected)}\`,
-    \`Trusted Work View (\${workViewAssociationToolName}): included=\${Boolean(summary.workViewAssociationIncluded)} status=\${workViewSummary.status ?? "none"} workView=\${workViewSummary.workViewId ?? "none"} binding=\${workViewSummary.bindingStatus ?? "none"} leaseMatched=\${Boolean(workViewSummary.leaseMatched)}\`,
+    \`Trusted Work View (\${workViewAssociationToolName}): included=\${Boolean(summary.workViewAssociationIncluded)} status=\${workViewSummary.status ?? "none"} workView=\${workViewSummary.workViewId ?? "none"} binding=\${workViewSummary.bindingStatus ?? "none"} authority=\${workViewSummary.actionAuthority ?? "inactive"} recovery=\${recoveryAction} leaseMatched=\${Boolean(workViewSummary.leaseMatched)}\`,
     \`Governance: local=\${Boolean(governance.localAssemblyOnly)} credentialStore=\${Boolean(governance.readsCredentialStore)} taskMutation=\${Boolean(governance.mutatesTaskState)} provider=\${Boolean(governance.callsProvider)} network=\${Boolean(governance.networkEgress)}\`,
     \`Audit: operation=\${data?.auditEvidence?.operation ?? "missing"} inputContent=\${Boolean(data?.auditEvidence?.inputContentRecorded)} outputContent=\${Boolean(data?.auditEvidence?.outputContentRecorded)}\`,
     "",

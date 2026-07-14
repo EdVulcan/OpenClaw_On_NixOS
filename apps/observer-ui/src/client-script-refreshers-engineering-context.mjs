@@ -59,12 +59,34 @@ async function bindEngineeringContextTaskToWorkView() {
   }
 }
 
+async function prepareEngineeringContextWorkView() {
+  if (!engineeringContextPacketRecoveryButton) {
+    return;
+  }
+
+  engineeringContextPacketRecoveryButton.disabled = true;
+  try {
+    await runRecommendedWorkViewAction();
+    await refreshEngineeringContextPacket();
+    setControlMessage("Prepared the trusted work view from the context packet recovery recommendation.");
+  } catch (error) {
+    setControlMessage(\`Trusted work-view recovery was blocked: \${formatError(error)}.\`);
+    throw error;
+  } finally {
+    engineeringContextPacketRecoveryButton.disabled = false;
+  }
+}
+
 engineeringContextPacketBuildButton?.addEventListener("click", () => {
   void refreshEngineeringContextPacket();
 });
 
 engineeringContextPacketBindWorkViewButton?.addEventListener("click", () => {
   void bindEngineeringContextTaskToWorkView().catch(() => {});
+});
+
+engineeringContextPacketRecoveryButton?.addEventListener("click", () => {
+  void prepareEngineeringContextWorkView().catch(() => {});
 });
 
 `;

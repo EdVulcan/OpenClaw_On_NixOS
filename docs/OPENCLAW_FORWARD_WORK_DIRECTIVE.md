@@ -723,6 +723,15 @@ readiness/evidence-only shell from historical plan text; preserve the existing
 provider, root, desktop-wide capture, and arbitrary endpoint execution
 boundaries.
 
+The next concrete operator gap was the recovery decision shown by that same
+readback: a divergent or inactive trusted helper recommends the existing
+`prepare_work_view` action, but the context packet panel previously exposed only
+status. The panel now renders the recovery action and, only for that exact
+allowlisted recommendation, bridges to the existing reviewed Prepare Work View
+control before rebuilding the packet. It revalidates current state, does not
+rebind tasks or replay actions, and does not create a new endpoint or automatic
+recovery path.
+
 ## Identity-Upgrade Alignment
 
 Every new capability must state which identity level it serves:
