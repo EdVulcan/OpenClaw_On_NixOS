@@ -31,6 +31,8 @@ rm -f "$OPENCLAW_CORE_STATE_FILE" "$OPENCLAW_CORE_STATE_FILE.tmp" "$OPENCLAW_EVE
 cleanup() {
   rm -f \
     "${REFRESH_FILE:-}" \
+    "${CAPABILITY_EVIDENCE_FILE:-}" \
+    "${CAPABILITY_TASK_FILE:-}" \
     "${HISTORY_FILE:-}" \
     "${APPROVALS_FILE:-}" \
     "${TASK_FILE:-}" \
@@ -48,6 +50,8 @@ trap cleanup EXIT
 "$SCRIPT_DIR/dev-up.sh"
 
 REFRESH_FILE="$(mktemp)"
+CAPABILITY_EVIDENCE_FILE="$(mktemp)"
+CAPABILITY_TASK_FILE="$(mktemp)"
 HISTORY_FILE="$(mktemp)"
 APPROVALS_FILE="$(mktemp)"
 TASK_FILE="$(mktemp)"
@@ -122,7 +126,61 @@ console.log(JSON.stringify({
 }, null, 2));
 EOF
 
-post_json "$CORE_URL/plugins/native-adapter/runtime-refresh-tasks" '{"confirm":true}' > "$TASK_FILE"
+post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"sense.openclaw.plugin_runtime.refresh_evidence"}' > "$CAPABILITY_EVIDENCE_FILE"
+post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"act.openclaw.plugin_runtime.refresh_task","params":{"confirm":true}}' > "$CAPABILITY_TASK_FILE"
+
+node - <<'EOF' "$CAPABILITY_EVIDENCE_FILE" "$CAPABILITY_TASK_FILE" "$TASK_FILE"
+const fs = require("node:fs");
+const readJson = (index) => JSON.parse(fs.readFileSync(process.argv[index], "utf8"));
+
+const evidence = readJson(2);
+const task = readJson(3);
+if (
+  !evidence.ok
+  || evidence.invoked !== true
+  || evidence.capability?.id !== "sense.openclaw.plugin_runtime.refresh_evidence"
+  || evidence.result?.registry !== "openclaw-native-plugin-runtime-refresh-evidence-v0"
+  || evidence.summary?.kind !== "plugin_runtime.refresh_evidence"
+  || evidence.summary?.readModelRefreshed !== true
+  || evidence.summary?.noTaskCreation !== true
+  || evidence.summary?.noApprovalCreation !== true
+  || evidence.summary?.noProviderEgress !== true
+  || evidence.result?.governance?.canImportModule !== false
+  || evidence.result?.governance?.canExecutePluginCode !== false
+  || evidence.result?.governance?.canActivateRuntime !== false
+) {
+  throw new Error(`common plugin refresh evidence capability mismatch: ${JSON.stringify(evidence)}`);
+}
+if (
+  !task.ok
+  || task.invoked !== true
+  || task.capability?.id !== "act.openclaw.plugin_runtime.refresh_task"
+  || task.result?.ok !== true
+  || task.result?.task?.type !== "native_plugin_runtime_refresh"
+  || task.result?.approval?.status !== "pending"
+  || task.summary?.kind !== "plugin_runtime.refresh_task"
+  || task.summary?.createsTask !== true
+  || task.summary?.createsApproval !== true
+  || task.summary?.canExecuteWithoutApproval !== false
+) {
+  throw new Error(`common plugin refresh task creation boundary mismatch: ${JSON.stringify(task)}`);
+}
+if (task.result?.governance?.canImportModule !== false || task.result?.governance?.canExecutePluginCode !== false || task.result?.governance?.canActivateRuntime !== false) {
+  throw new Error(`common plugin refresh task widened the runtime boundary: ${JSON.stringify(task)}`);
+}
+const commonTaskResult = task.result;
+fs.writeFileSync(process.argv[4], JSON.stringify(commonTaskResult));
+console.log(JSON.stringify({
+  commonPluginRuntimeRefreshCapability: {
+    evidence: evidence.summary.kind,
+    task: task.summary.kind,
+    confirmationRequired: true,
+    taskCreated: task.summary.createsTask,
+    noModuleLoad: evidence.result.governance.canImportModule === false,
+  },
+}, null, 2));
+EOF
+
 post_json "$CORE_URL/operator/step" '{}' > "$BLOCKED_FILE"
 
 approval_id="$(node - <<'EOF' "$TASK_FILE" "$BLOCKED_FILE"

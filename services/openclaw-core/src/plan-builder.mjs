@@ -108,6 +108,9 @@ export function createPlanBuilder(deps) {
     buildNativeAcpxCodexBridgeWrapperDraft,
   } = pluginReview;
 
+  // Native plugin refresh builders depend on the rule-plan serializer below;
+  // expose them lazily so the common capability runtime can share the same owner.
+  let nativePluginPlanBuilders = null;
   const capabilityRuntime = createCapabilityRuntime({
     host,
     port,
@@ -119,6 +122,20 @@ export function createPlanBuilder(deps) {
     publishEvent,
     listCommandTranscriptRecords,
     listFilesystemChangeRecords,
+    pluginRuntime: {
+      buildNativePluginRuntimeRefreshEvidence: (...args) => {
+        if (!nativePluginPlanBuilders) {
+          throw new Error("Native plugin runtime refresh builders are not initialized.");
+        }
+        return nativePluginPlanBuilders.buildNativePluginRuntimeRefreshEvidence(...args);
+      },
+      createNativePluginRuntimeRefreshTask: (...args) => {
+        if (!nativePluginPlanBuilders) {
+          throw new Error("Native plugin runtime refresh builders are not initialized.");
+        }
+        return nativePluginPlanBuilders.createNativePluginRuntimeRefreshTask(...args);
+      },
+    },
   });
   const {
     capabilityById,
@@ -153,7 +170,7 @@ export function createPlanBuilder(deps) {
     return nativePluginRegistryStore.restore(runtimeState.nativePluginRegistryGeneration);
   }
 
-  const nativePluginPlanBuilders = createNativePluginPlanBuilders({
+  nativePluginPlanBuilders = createNativePluginPlanBuilders({
     nativePluginRegistryStore,
     buildNativePluginManifestProfile,
     autonomyMode,

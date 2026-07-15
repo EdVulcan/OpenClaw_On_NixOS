@@ -314,6 +314,17 @@ provider state. The direct Core/Observer microcompact checks now invoke both
 common capabilities. Details are in
 `docs/plans/OPENCLAW_NATIVE_ENGINEERING_MICROCOMPACT_EVIDENCE_PLAN.md`.
 
+The existing fixed native plugin-registry refresh lifecycle is now also
+available through the common capability runtime as
+`sense.openclaw.plugin_runtime.refresh_evidence` and
+`act.openclaw.plugin_runtime.refresh_task`. The task bridge requires explicit
+confirmation, then reuses the existing pending-approval task and operator-step
+owner; it only swaps the validated built-in registry generation. Module import,
+plugin code execution, runtime activation, cache mutation, provider egress,
+and network access remain disabled. Core and Observer refresh checks exercise
+the common evidence path and its confirmation boundary. Details are in
+`docs/plans/OPENCLAW_NATIVE_PLUGIN_RUNTIME_REFRESH_TASK_PLAN.md`.
+
 The first common capability-runtime entry point for the Level 2 trusted
 work-view is now available as
 `sense.openclaw.engineering_context.work_view_observation`. It reads the

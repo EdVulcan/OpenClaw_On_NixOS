@@ -11,6 +11,7 @@ import { createEngineeringExecutionEvidenceCapabilityHandlers } from "./capabili
 import { createEngineeringContextCapabilityHandlers } from "./capability-runtime-engineering-context.mjs";
 import { createEngineeringPlanTodoCapabilityHandlers } from "./capability-runtime-engineering-plan-todo.mjs";
 import { createEngineeringWorkViewCapabilityHandlers } from "./capability-runtime-work-view.mjs";
+import { createPluginRuntimeRefreshCapabilityHandlers } from "./capability-runtime-plugin-refresh.mjs";
 
 export function createCapabilityRuntime(deps) {
   const {
@@ -28,6 +29,7 @@ export function createCapabilityRuntime(deps) {
     readWorkViewState,
     listCommandTranscriptRecords = () => [],
     listFilesystemChangeRecords = () => [],
+    pluginRuntime = {},
   } = deps;
   const {
     fetchJson,
@@ -121,6 +123,7 @@ export function createCapabilityRuntime(deps) {
     readWorkViewState,
     publishEvent,
   });
+  const pluginRuntimeRefreshHandlers = createPluginRuntimeRefreshCapabilityHandlers(pluginRuntime);
 
   function baseCapabilities() {
     return buildBaseCapabilities({
@@ -341,6 +344,10 @@ export function createCapabilityRuntime(deps) {
     if (engineeringWorkView.handled) {
       return engineeringWorkView.result;
     }
+    const pluginRuntimeRefresh = await pluginRuntimeRefreshHandlers.callBackend(capability, request);
+    if (pluginRuntimeRefresh.handled) {
+      return pluginRuntimeRefresh.result;
+    }
 
     if (capability.id === "sense.system.vitals") {
       return fetchJson(`${systemSenseUrl}/system/health`);
@@ -551,6 +558,10 @@ export function createCapabilityRuntime(deps) {
     const engineeringWorkViewSummary = engineeringWorkViewHandlers.summariseResult(capability, result);
     if (engineeringWorkViewSummary) {
       return engineeringWorkViewSummary;
+    }
+    const pluginRuntimeRefreshSummary = pluginRuntimeRefreshHandlers.summariseResult(capability, result);
+    if (pluginRuntimeRefreshSummary) {
+      return pluginRuntimeRefreshSummary;
     }
 
     if (capability.id === "sense.system.vitals") {
@@ -846,6 +857,13 @@ export function createCapabilityRuntime(deps) {
       return {
         statusCode: 400,
         response: { ok: false, error: engineeringMicrocompactValidationError },
+      };
+    }
+    const pluginRuntimeRefreshValidationError = pluginRuntimeRefreshHandlers.validateRequest(capability, request);
+    if (pluginRuntimeRefreshValidationError) {
+      return {
+        statusCode: 400,
+        response: { ok: false, error: pluginRuntimeRefreshValidationError },
       };
     }
 

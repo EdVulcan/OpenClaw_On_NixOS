@@ -157,6 +157,12 @@ governed surfaces:
   `act.openclaw.engineering_context.microcompact_projection` transforms only a
   bounded caller-owned message copy and is now available through the common
   capability runtime with summary-only audit evidence.
+- Native plugin runtime refresh:
+  `sense.openclaw.plugin_runtime.refresh_evidence` and
+  `act.openclaw.plugin_runtime.refresh_task` now share the common capability
+  runtime with the existing fixed-registry evidence/task owners. The task still
+  requires explicit confirmation and pending approval before a validated
+  generation swap; it never imports or executes plugin modules.
 - Native engineering plan/todo evidence:
   `sense.openclaw.engineering_context.plan_todo_evidence` maps
   `cc_plan_enter`, `cc_plan_exit`, and `cc_todo_write` into visible

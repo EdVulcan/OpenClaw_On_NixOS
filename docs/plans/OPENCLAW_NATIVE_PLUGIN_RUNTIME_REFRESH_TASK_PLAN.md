@@ -1,6 +1,6 @@
 # OpenClaw Native Plugin Runtime Refresh Task Plan
 
-Updated: 2026-07-12
+Updated: 2026-07-15
 
 ## Active Slice
 
@@ -62,6 +62,23 @@ swap; no workspace or external module path is accepted. Restart recovery
 rehydrates only compact generation metadata and reconstructs the current
 fixed registry locally.
 
+## Common Capability Runtime Bridge
+
+The existing evidence and task owners are also available through the common
+`POST /capabilities/invoke` path as:
+
+```text
+sense.openclaw.plugin_runtime.refresh_evidence
+act.openclaw.plugin_runtime.refresh_task
+```
+
+The evidence capability is read-only. The task capability requires an explicit
+`confirm: true` parameter before it calls the existing task builder; that
+builder creates the normal pending approval and the operator still must approve
+and run the task. The common bridge adds no module import, plugin execution,
+runtime activation, cache mutation, provider call, or network egress path.
+The invocation ledger stores only generation/count/governance summaries.
+
 ## Governance
 
 Capability mapping:
@@ -117,6 +134,9 @@ Task executor:
 ```text
 services/openclaw-core/src/task-executor-native-plugin-runtime-refresh-handlers.mjs
 packages/plugin-runtime/src/plugin-registry-generation-store.mjs
+services/openclaw-core/src/capability-runtime-plugin-refresh.mjs
+services/openclaw-core/src/capability-runtime.mjs
+services/openclaw-core/src/capability-descriptors.mjs
 ```
 
 Task readback field:
@@ -132,8 +152,11 @@ services/openclaw-core/test/native-plugin-plan-builders.test.mjs
 services/openclaw-core/test/native-plugin-runtime-routes.test.mjs
 services/openclaw-core/test/task-executor.test.mjs
 packages/plugin-runtime/test/plugin-runtime.test.mjs
+services/openclaw-core/test/capability-runtime-plugin-refresh.test.mjs
 openclaw-native-plugin-runtime-refresh-evidence
 observer-openclaw-native-plugin-runtime-refresh-evidence
+capability-invoke
+observer-capability-invoke
 ```
 
 ## Deferred
@@ -152,9 +175,13 @@ root/system daemon work
 explicit rollback action
 ```
 
-## Next Smallest Real Capability
+The common capability bridge does not change these deferred boundaries.
 
-The next high-density product target is:
+## Route Status
+
+The dedicated route, approval-gated fixed-registry lifecycle, restart recovery,
+and common capability-runtime bridge are closed for this Level 1 plugin
+governance slice. The next high-density product target remains:
 
 ```text
 consume the governed Engineering Context Packet at an explicitly authorized
