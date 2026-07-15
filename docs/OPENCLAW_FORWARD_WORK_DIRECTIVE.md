@@ -310,6 +310,16 @@ Packet messages remain transient; invocation/event evidence stores summaries onl
 and no provider or credential path is added. The boundary is documented in
 `docs/plans/OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_CONTEXT_PACKET_PLAN.md`.
 
+The existing native `cc_edit` exact-match diff proposal is now also available as
+the common capability `act.openclaw.engineering_tool.edit_proposal`. It reuses
+the workspace-constrained proposal builder and exposes only a transient bounded
+diff for review; capability invocation and audit evidence retain hashes and
+compact counts, not search/replacement text or diff lines. It does not write,
+apply, create a task or approval, execute commands, or call a provider. Apply
+continues through the existing approval-gated edit task path. The boundary is
+documented in
+`docs/plans/OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_EDIT_PROPOSAL_PLAN.md`.
+
 The selected Level 1 consistency closures are complete. Do not reopen the LSP
 symbol chain or add another evidence/readiness shell; choose the next concrete
 identity-upgrade capability only after its Level 2 authority boundary is

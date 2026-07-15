@@ -40,6 +40,7 @@ cleanup() {
     "${ENGINEERING_GLOB_FILE:-}" \
     "${ENGINEERING_GREP_FILE:-}" \
     "${ENGINEERING_VERIFY_FILE:-}" \
+    "${ENGINEERING_EDIT_PROPOSAL_FILE:-}" \
     "${WORK_VIEW_FILE:-}" \
     "${WORK_VIEW_CONTROL_FILE:-}" \
     "${CONTEXT_PACKET_FILE:-}" \
@@ -65,6 +66,7 @@ ENGINEERING_READ_FILE="$(mktemp)"
 ENGINEERING_GLOB_FILE="$(mktemp)"
 ENGINEERING_GREP_FILE="$(mktemp)"
 ENGINEERING_VERIFY_FILE="$(mktemp)"
+ENGINEERING_EDIT_PROPOSAL_FILE="$(mktemp)"
 WORK_VIEW_FILE="$(mktemp)"
 WORK_VIEW_CONTROL_FILE="$(mktemp)"
 CONTEXT_PACKET_FILE="$(mktemp)"
@@ -80,6 +82,7 @@ post_json "$CORE_URL/capabilities/invoke" "{\"capabilityId\":\"sense.openclaw.en
 post_json "$CORE_URL/capabilities/invoke" "{\"capabilityId\":\"sense.openclaw.engineering_tool.glob\",\"params\":{\"workspacePath\":\"$FIXTURE_DIR\",\"pattern\":\"src/**/*.ts\",\"limit\":4}}" > "$ENGINEERING_GLOB_FILE"
 post_json "$CORE_URL/capabilities/invoke" "{\"capabilityId\":\"sense.openclaw.engineering_tool.grep\",\"params\":{\"workspacePath\":\"$FIXTURE_DIR\",\"query\":\"capabilityNeedle\",\"include\":\"src/**/*.ts\",\"literal\":true,\"limit\":4}}" > "$ENGINEERING_GREP_FILE"
 post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"sense.openclaw.engineering_tool.verify_evidence","params":{"limit":4,"maxOutputChars":500}}' > "$ENGINEERING_VERIFY_FILE"
+post_json "$CORE_URL/capabilities/invoke" "{\"capabilityId\":\"act.openclaw.engineering_tool.edit_proposal\",\"params\":{\"workspacePath\":\"$FIXTURE_DIR\",\"relativePath\":\"src/app.ts\",\"oldString\":\"capabilityNeedle\",\"newString\":\"governedNeedle\",\"contextLines\":1}}" > "$ENGINEERING_EDIT_PROPOSAL_FILE"
 post_json "$SESSION_MANAGER_URL/work-view/prepare" '{"displayTarget":"workspace-2","entryUrl":"https://example.com/capability-work-view"}' > /dev/null
 post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"act.work_view.control","operation":"work_view.reveal","params":{"entryUrl":"https://example.com/capability-work-view"}}' > "$WORK_VIEW_CONTROL_FILE"
 post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"sense.openclaw.engineering_context.packet","params":{"limit":4,"thresholdChars":256,"protectRecentAssistantTurns":0}}' > "$CONTEXT_PACKET_FILE"
@@ -101,6 +104,7 @@ node - <<'EOF' \
   "$APPROVED_COMMAND_FILE" \
   "$EVENTS_FILE" \
   "$ENGINEERING_VERIFY_FILE" \
+  "$ENGINEERING_EDIT_PROPOSAL_FILE" \
   "$WORK_VIEW_FILE" \
   "$WORK_VIEW_CONTROL_FILE" \
   "$CONTEXT_PACKET_FILE" \
@@ -118,10 +122,11 @@ const blockedCommand = readJson(9);
 const approvedCommand = readJson(10);
 const events = readJson(11);
 const engineeringVerify = readJson(12);
-const workView = readJson(13);
-const workViewControl = readJson(14);
-const contextPacket = readJson(15);
-const fixtureDir = process.argv[16];
+const engineeringEditProposal = readJson(13);
+const workView = readJson(14);
+const workViewControl = readJson(15);
+const contextPacket = readJson(16);
+const fixtureDir = process.argv[17];
 
 if (!vitals.ok || vitals.invoked !== true || vitals.capability?.id !== "sense.system.vitals" || vitals.policy?.decision !== "audit_only") {
   throw new Error("system vitals capability should be invoked with audit-only governance");
@@ -177,6 +182,25 @@ if (
   || engineeringVerify.result?.governance?.canExecuteCommand !== false
 ) {
   throw new Error(`verification evidence capability should remain read-only through the governed builder: ${JSON.stringify(engineeringVerify)}`);
+}
+if (
+  !engineeringEditProposal.ok
+  || engineeringEditProposal.invoked !== true
+  || engineeringEditProposal.capability?.id !== "act.openclaw.engineering_tool.edit_proposal"
+  || engineeringEditProposal.result?.registry !== "openclaw-native-engineering-edit-proposal-v0"
+  || engineeringEditProposal.result?.summary?.editCount !== 1
+  || engineeringEditProposal.result?.governance?.canMutate !== false
+  || engineeringEditProposal.result?.governance?.createsTask !== false
+  || engineeringEditProposal.summary?.kind !== "engineering.edit_proposal"
+  || engineeringEditProposal.summary?.noMutation !== true
+  || engineeringEditProposal.summary?.noTaskCreation !== true
+  || engineeringEditProposal.summary?.noProviderEgress !== true
+  || JSON.stringify(engineeringEditProposal).includes("governedNeedle") === false
+) {
+  throw new Error(`engineering edit proposal capability should expose only a transient bounded diff proposal: ${JSON.stringify(engineeringEditProposal)}`);
+}
+if (JSON.stringify(events).includes("governedNeedle")) {
+  throw new Error("engineering edit proposal content must not enter the audit event payload");
 }
 if (
   !workView.ok
@@ -264,6 +288,11 @@ console.log(JSON.stringify({
       globMatches: engineeringGlob.result.summary.matchedResults,
       grepMatches: engineeringGrep.result.summary.matchedResults,
       verificationRecords: engineeringVerify.result.summary.total,
+      editProposal: {
+        edits: engineeringEditProposal.summary.editCount,
+        path: engineeringEditProposal.summary.relativePath,
+        noMutation: engineeringEditProposal.summary.noMutation,
+      },
       workViewObservation: {
         status: workView.summary.status,
         freshness: workView.summary.observationFreshness,

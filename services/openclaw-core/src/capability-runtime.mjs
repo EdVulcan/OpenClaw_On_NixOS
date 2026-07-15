@@ -4,6 +4,7 @@ import { createEventName } from "../../../packages/shared-events/src/event-facto
 import { buildBaseCapabilities } from "./capability-descriptors.mjs";
 import { createEngineeringReadSearchCapabilityHandlers } from "./capability-runtime-engineering-read-search.mjs";
 import { createEngineeringVerificationCapabilityHandlers } from "./capability-runtime-engineering-verification.mjs";
+import { createEngineeringProposalCapabilityHandlers } from "./capability-runtime-engineering-proposals.mjs";
 import { createEngineeringContextCapabilityHandlers } from "./capability-runtime-engineering-context.mjs";
 import { createEngineeringWorkViewCapabilityHandlers } from "./capability-runtime-work-view.mjs";
 
@@ -63,6 +64,9 @@ export function createCapabilityRuntime(deps) {
     listCommandTranscriptRecords,
     listCapabilityInvocations: (options) => listCapabilityInvocations(options),
     tasks: state.tasks ?? new Map(),
+  });
+  const engineeringProposalHandlers = createEngineeringProposalCapabilityHandlers({
+    buildNativeEngineeringEditProposal: pluginReview.buildNativeEngineeringEditProposal,
   });
   const engineeringContextHandlers = createEngineeringContextCapabilityHandlers({
     tasks: state.tasks ?? new Map(),
@@ -272,6 +276,10 @@ export function createCapabilityRuntime(deps) {
     if (engineeringVerification.handled) {
       return engineeringVerification.result;
     }
+    const engineeringProposal = engineeringProposalHandlers.callBackend(capability, request);
+    if (engineeringProposal.handled) {
+      return engineeringProposal.result;
+    }
     const engineeringContext = await engineeringContextHandlers.callBackend(capability, request);
     if (engineeringContext.handled) {
       return engineeringContext.result;
@@ -462,6 +470,10 @@ export function createCapabilityRuntime(deps) {
     const engineeringVerificationSummary = engineeringVerificationHandlers.summariseResult(capability, result);
     if (engineeringVerificationSummary) {
       return engineeringVerificationSummary;
+    }
+    const engineeringProposalSummary = engineeringProposalHandlers.summariseResult(capability, result);
+    if (engineeringProposalSummary) {
+      return engineeringProposalSummary;
     }
     const engineeringContextSummary = engineeringContextHandlers.summariseResult(capability, result);
     if (engineeringContextSummary) {

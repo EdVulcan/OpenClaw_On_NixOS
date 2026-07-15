@@ -702,3 +702,80 @@ test("capability runtime validates context packet source and observation selecto
   assert.equal(state.capabilityInvocationLog.length, 0);
   assert.deepEqual(events, []);
 });
+
+test("capability runtime exposes the existing bounded edit proposal without mutation", async () => {
+  let receivedInput = null;
+  const { runtime, state, events } = createHarness({
+    pluginReview: {
+      buildNativeEngineeringEditProposal: (input) => {
+        receivedInput = input;
+        return {
+          ok: true,
+          registry: "openclaw-native-engineering-edit-proposal-v0",
+          target: {
+            relativePath: "src/app.ts",
+            originalSha256: "a".repeat(64),
+            proposedSha256: "b".repeat(64),
+          },
+          summary: {
+            editCount: 1,
+            replacementsAvailable: 1,
+            changedAtLine: 1,
+            previewLineCount: 2,
+            previewTruncated: false,
+          },
+          governance: {
+            canMutate: false,
+            canApplyPatch: false,
+            createsTask: false,
+            requiresApprovalBeforeApply: true,
+          },
+          diffPreview: { lines: [{ text: "transient proposal content" }] },
+          deferredExecutionBoundaries: ["no provider call"],
+        };
+      },
+    },
+  });
+
+  const registry = await runtime.buildCapabilityRegistry();
+  const capability = registry.capabilities.find((item) => item.id === "act.openclaw.engineering_tool.edit_proposal");
+  assert.equal(capability?.kind, "planner");
+  assert.equal(capability?.governance, "audit_only");
+
+  const result = await runtime.invokeCapability({
+    capabilityId: "act.openclaw.engineering_tool.edit_proposal",
+    params: {
+      workspacePath: "/workspace/fixture",
+      relativePath: "src/app.ts",
+      oldString: "before",
+      newString: "after",
+      contextLines: 2,
+      maxOutputChars: 500,
+      maxFileSizeBytes: 8_000,
+    },
+  });
+
+  assert.deepEqual(receivedInput, {
+    workspacePath: "/workspace/fixture",
+    relativePath: "src/app.ts",
+    oldString: "before",
+    newString: "after",
+    contextLines: 2,
+    maxOutputChars: 500,
+    maxFileSizeBytes: 8_000,
+  });
+  assert.equal(result.response.invoked, true);
+  assert.equal(result.response.result.registry, "openclaw-native-engineering-edit-proposal-v0");
+  assert.equal(result.response.result.diffPreview.lines[0].text, "transient proposal content");
+  assert.equal(result.response.summary.kind, "engineering.edit_proposal");
+  assert.equal(result.response.summary.noMutation, true);
+  assert.equal(result.response.summary.noTaskCreation, true);
+  assert.equal(result.response.summary.noProviderEgress, true);
+  assert.equal(result.response.summary.requiresApprovalBeforeApply, true);
+  assert.equal(JSON.stringify(state.capabilityInvocationLog).includes("transient proposal content"), false);
+  assert.equal(JSON.stringify(events).includes("transient proposal content"), false);
+  assert.deepEqual(events.map((event) => event.name), [
+    "policy.evaluated",
+    "capability.invoked",
+  ]);
+});

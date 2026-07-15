@@ -223,6 +223,22 @@ export function buildBaseCapabilities({
       description: "Read bounded verification evidence from existing governed command transcripts without executing commands or creating tasks.",
     },
     {
+      id: "act.openclaw.engineering_tool.edit_proposal",
+      name: "Native Engineering Edit Proposal",
+      kind: "planner",
+      service: "openclaw-core",
+      endpoint: `http://${host}:${port}/plugins/native-adapter/engineering-edit-proposal/draft`,
+      intents: [
+        "openclaw.engineering.edit_proposal",
+        "engineering.edit.proposal",
+        "engineering.edit_proposal",
+      ],
+      domains: ["body_internal"],
+      risk: "high",
+      governance: "audit_only",
+      description: "Build a bounded exact-match edit diff proposal through the native workspace boundary; applying it still requires the existing approval-gated task path.",
+    },
+    {
       id: "sense.openclaw.engineering_context.packet",
       name: "Native Engineering Context Packet",
       kind: "sensor",

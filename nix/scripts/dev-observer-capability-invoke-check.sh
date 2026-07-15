@@ -38,6 +38,7 @@ cleanup() {
     "${ENGINEERING_GLOB_FILE:-}" \
     "${ENGINEERING_GREP_FILE:-}" \
     "${ENGINEERING_VERIFY_FILE:-}" \
+    "${ENGINEERING_EDIT_PROPOSAL_FILE:-}" \
     "${WORK_VIEW_FILE:-}" \
     "${WORK_VIEW_CONTROL_FILE:-}" \
     "${CONTEXT_PACKET_FILE:-}" \
@@ -64,6 +65,7 @@ ENGINEERING_READ_FILE="$(mktemp)"
 ENGINEERING_GLOB_FILE="$(mktemp)"
 ENGINEERING_GREP_FILE="$(mktemp)"
 ENGINEERING_VERIFY_FILE="$(mktemp)"
+ENGINEERING_EDIT_PROPOSAL_FILE="$(mktemp)"
 WORK_VIEW_FILE="$(mktemp)"
 WORK_VIEW_CONTROL_FILE="$(mktemp)"
 CONTEXT_PACKET_FILE="$(mktemp)"
@@ -79,6 +81,7 @@ post_json "$CORE_URL/capabilities/invoke" "{\"capabilityId\":\"sense.openclaw.en
 post_json "$CORE_URL/capabilities/invoke" "{\"capabilityId\":\"sense.openclaw.engineering_tool.glob\",\"params\":{\"workspacePath\":\"$FIXTURE_DIR\",\"pattern\":\"src/**/*.ts\",\"limit\":4}}" > "$ENGINEERING_GLOB_FILE"
 post_json "$CORE_URL/capabilities/invoke" "{\"capabilityId\":\"sense.openclaw.engineering_tool.grep\",\"params\":{\"workspacePath\":\"$FIXTURE_DIR\",\"query\":\"observerNeedle\",\"include\":\"src/**/*.ts\",\"literal\":true,\"limit\":4}}" > "$ENGINEERING_GREP_FILE"
 post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"sense.openclaw.engineering_tool.verify_evidence","params":{"limit":4,"maxOutputChars":500}}' > "$ENGINEERING_VERIFY_FILE"
+post_json "$CORE_URL/capabilities/invoke" "{\"capabilityId\":\"act.openclaw.engineering_tool.edit_proposal\",\"params\":{\"workspacePath\":\"$FIXTURE_DIR\",\"relativePath\":\"src/app.ts\",\"oldString\":\"observerNeedle\",\"newString\":\"governedObserverNeedle\",\"contextLines\":1}}" > "$ENGINEERING_EDIT_PROPOSAL_FILE"
 post_json "http://127.0.0.1:$OPENCLAW_SESSION_MANAGER_PORT/work-view/prepare" '{"displayTarget":"workspace-2","entryUrl":"https://example.com/observer-capability-work-view"}' > /dev/null
 post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"act.work_view.control","operation":"work_view.reveal","params":{"entryUrl":"https://example.com/observer-capability-work-view"}}' > "$WORK_VIEW_CONTROL_FILE"
 post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"sense.openclaw.engineering_context.packet","params":{"limit":4,"thresholdChars":256,"protectRecentAssistantTurns":0}}' > "$CONTEXT_PACKET_FILE"
@@ -99,6 +102,7 @@ node - <<'EOF' \
   "$APPROVED_FILE" \
   "$EVENTS_FILE" \
   "$ENGINEERING_VERIFY_FILE" \
+  "$ENGINEERING_EDIT_PROPOSAL_FILE" \
   "$WORK_VIEW_FILE" \
   "$WORK_VIEW_CONTROL_FILE" \
   "$CONTEXT_PACKET_FILE"
@@ -114,9 +118,10 @@ const blocked = JSON.parse(fs.readFileSync(process.argv[9], "utf8"));
 const approved = JSON.parse(fs.readFileSync(process.argv[10], "utf8"));
 const events = JSON.parse(fs.readFileSync(process.argv[11], "utf8"));
 const engineeringVerify = JSON.parse(fs.readFileSync(process.argv[12], "utf8"));
-const workView = JSON.parse(fs.readFileSync(process.argv[13], "utf8"));
-const workViewControl = JSON.parse(fs.readFileSync(process.argv[14], "utf8"));
-const contextPacket = JSON.parse(fs.readFileSync(process.argv[15], "utf8"));
+const engineeringEditProposal = JSON.parse(fs.readFileSync(process.argv[13], "utf8"));
+const workView = JSON.parse(fs.readFileSync(process.argv[14], "utf8"));
+const workViewControl = JSON.parse(fs.readFileSync(process.argv[15], "utf8"));
+const contextPacket = JSON.parse(fs.readFileSync(process.argv[16], "utf8"));
 
 for (const token of [
   "invoke-vitals-button",
@@ -170,6 +175,24 @@ if (
   || engineeringVerify.result?.governance?.canExecuteCommand !== false
 ) {
   throw new Error("Observer verification evidence invoke path should remain read-only");
+}
+if (
+  !engineeringEditProposal.ok
+  || engineeringEditProposal.invoked !== true
+  || engineeringEditProposal.capability?.id !== "act.openclaw.engineering_tool.edit_proposal"
+  || engineeringEditProposal.result?.registry !== "openclaw-native-engineering-edit-proposal-v0"
+  || engineeringEditProposal.result?.summary?.editCount !== 1
+  || engineeringEditProposal.result?.governance?.canMutate !== false
+  || engineeringEditProposal.summary?.kind !== "engineering.edit_proposal"
+  || engineeringEditProposal.summary?.noMutation !== true
+  || engineeringEditProposal.summary?.noTaskCreation !== true
+  || engineeringEditProposal.summary?.noProviderEgress !== true
+  || JSON.stringify(engineeringEditProposal).includes("governedObserverNeedle") === false
+) {
+  throw new Error("Observer engineering edit proposal invoke path should remain bounded and proposal-only");
+}
+if (JSON.stringify(events).includes("governedObserverNeedle")) {
+  throw new Error("Observer engineering edit proposal content must not enter the audit event payload");
 }
 if (
   !workView.ok
@@ -246,6 +269,11 @@ console.log(JSON.stringify({
       globMatches: engineeringGlob.result.summary.matchedResults,
       grepMatches: engineeringGrep.result.summary.matchedResults,
       verificationRecords: engineeringVerify.result.summary.total,
+      editProposal: {
+        edits: engineeringEditProposal.summary.editCount,
+        path: engineeringEditProposal.summary.relativePath,
+        noMutation: engineeringEditProposal.summary.noMutation,
+      },
       workViewObservation: {
         status: workView.summary.status,
         freshness: workView.summary.observationFreshness,
