@@ -458,7 +458,10 @@ Current OpenClaw:
   create bounded verification evidence.
 - `sense.openclaw.engineering_tool.recovery_evidence` now reads failed
   verification evidence and failed source-command task outcomes to surface
-  governed recovery recommendations without invoking them.
+  governed recovery recommendations without invoking them. The same readback is
+  available through the common `/capabilities/invoke` path with compact
+  invocation/event summaries and the same no-task/no-command/no-provider
+  boundaries.
 
 Classification: absorbed as evidence.
 

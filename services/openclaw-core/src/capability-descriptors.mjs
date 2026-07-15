@@ -223,6 +223,22 @@ export function buildBaseCapabilities({
       description: "Read bounded verification evidence from existing governed command transcripts without executing commands or creating tasks.",
     },
     {
+      id: "sense.openclaw.engineering_tool.recovery_evidence",
+      name: "Native Engineering Recovery Evidence",
+      kind: "sensor",
+      service: "openclaw-core",
+      endpoint: `http://${host}:${port}/plugins/native-adapter/engineering-recovery/evidence`,
+      intents: [
+        "openclaw.engineering_tool.recovery_evidence",
+        "engineering.tool.recovery_evidence",
+        "engineering.recovery_evidence",
+      ],
+      domains: ["body_internal"],
+      risk: "medium",
+      governance: "audit_only",
+      description: "Read bounded failed verification evidence and operator recovery recommendations without creating recovery tasks or executing commands.",
+    },
+    {
       id: "act.openclaw.engineering_tool.edit_proposal",
       name: "Native Engineering Edit Proposal",
       kind: "planner",

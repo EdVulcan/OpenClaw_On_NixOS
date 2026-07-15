@@ -1,10 +1,11 @@
 # OpenClaw Native Engineering Recovery Evidence Plan
 
-Updated: 2026-07-09
+Updated: 2026-07-15
 
 ## Active Slice
 
-Observer visibility and recovery evidence for native engineering tool failures.
+Observer visibility, common capability access, and recovery evidence for native
+engineering tool failures.
 
 This slice follows the native `cc_verify` evidence route by making failed
 engineering command evidence recoverable to an operator. It does not create a
@@ -54,6 +55,25 @@ The recovery recommendation can include:
 That endpoint is only reported as an operator action. The evidence endpoint does
 not call it.
 
+## Common Capability Runtime Bridge
+
+The same read-only recovery readback is now available through the common
+`POST /capabilities/invoke` path as:
+
+```text
+sense.openclaw.engineering_tool.recovery_evidence
+```
+
+The bridge reuses the existing verification and recovery builders. It reads the
+bounded command-transcript ledger, capability invocation ledger, and task map,
+then records the normal policy, invocation, and capability-event evidence.
+The response may contain the existing bounded failure previews, while the
+invocation and event records keep only failure counts and governance flags.
+
+The direct route remains the Observer read model owner. Neither entry point
+creates a recovery task or approval, executes or retries a command, mutates the
+workspace, calls a provider, or performs network egress.
+
 ## Deferred
 
 The following remain deferred:
@@ -76,6 +96,9 @@ Runtime builder:
 
 ```text
 services/openclaw-core/src/native-engineering-recovery-evidence-builders.mjs
+services/openclaw-core/src/capability-runtime-engineering-recovery.mjs
+services/openclaw-core/src/capability-runtime.mjs
+services/openclaw-core/src/capability-descriptors.mjs
 ```
 
 Route wiring:
@@ -101,11 +124,14 @@ Validation target:
 
 ```text
 services/openclaw-core/test/native-engineering-recovery-evidence-builders.test.mjs
+services/openclaw-core/test/capability-runtime-engineering-recovery.test.mjs
 openclaw-native-engineering-recovery-evidence
 observer-openclaw-native-engineering-recovery-evidence
+capability-invoke
+observer-capability-invoke
 ```
 
-Validated on 2026-07-09:
+Direct route validated on 2026-07-09:
 
 ```text
 node --test services/openclaw-core/test/native-engineering-recovery-evidence-builders.test.mjs services/openclaw-core/test/route-handlers.test.mjs services/openclaw-core/test/native-adapter-plugin-routes.test.mjs
@@ -114,16 +140,23 @@ npm --workspace @openclaw/observer-ui run typecheck
 OPENCLAW_MILESTONE_CHECKS=openclaw-native-engineering-recovery-evidence,observer-openclaw-native-engineering-recovery-evidence bash nix/scripts/dev-milestone-check.sh
 ```
 
-## Follow-On Slice
-
-The direct follow-on slice is:
+Common capability bridge validated on 2026-07-15:
 
 ```text
-Microcompact context-management evidence
+node --test services/openclaw-core/test/capability-runtime-engineering-recovery.test.mjs services/openclaw-core/test/native-engineering-recovery-evidence-builders.test.mjs
+npm --workspace @openclaw/openclaw-core test
+npm --workspace @openclaw/observer-ui run typecheck
+bash nix/scripts/dev-openclaw-native-engineering-recovery-evidence-check.sh
+bash nix/scripts/dev-observer-openclaw-native-engineering-recovery-evidence-check.sh
+bash nix/scripts/dev-capability-invoke-check.sh
+bash nix/scripts/dev-observer-capability-invoke-check.sh
+bash nix/scripts/dev-body-config-check.sh
 ```
 
-It is tracked in:
+## Route Status
 
-```text
-OPENCLAW_NATIVE_ENGINEERING_MICROCOMPACT_EVIDENCE_PLAN.md
-```
+The direct route, Observer readback, and common capability-runtime entry point
+are closed for this Level 1 recovery evidence slice. Do not add another
+recovery/readiness shell. Continue with the smallest concrete Level 2
+trusted-work-view/session-helper behavior while preserving explicit operator
+review and local/provider/root boundaries.

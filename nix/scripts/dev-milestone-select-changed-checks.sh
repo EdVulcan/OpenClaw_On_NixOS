@@ -558,6 +558,7 @@ function selectSourceHeuristics(file) {
     ["services/openclaw-core/src/capability-runtime.mjs", ["openclaw-core-service-unit-tests", "capability-invoke", "observer-capability-invoke"]],
     ["services/openclaw-core/src/capability-runtime-engineering-read-search.mjs", ["openclaw-core-service-unit-tests", "capability-invoke", "observer-capability-invoke"]],
     ["services/openclaw-core/src/capability-runtime-engineering-verification.mjs", ["openclaw-core-service-unit-tests", "capability-invoke", "observer-capability-invoke"]],
+    ["services/openclaw-core/src/capability-runtime-engineering-recovery.mjs", ["openclaw-core-service-unit-tests", "capability-invoke", "observer-capability-invoke", "openclaw-native-engineering-recovery-evidence", "observer-openclaw-native-engineering-recovery-evidence"]],
     ["services/openclaw-core/src/capability-runtime-engineering-proposals.mjs", ["openclaw-core-service-unit-tests", "capability-invoke", "observer-capability-invoke"]],
     ["services/openclaw-core/src/capability-runtime-engineering-context.mjs", ["openclaw-core-service-unit-tests", "capability-invoke", "observer-capability-invoke"]],
     ["services/openclaw-core/src/capability-runtime-engineering-plan-todo.mjs", ["openclaw-core-service-unit-tests", "capability-invoke", "observer-capability-invoke", "openclaw-native-engineering-plan-todo-evidence", "observer-openclaw-native-engineering-plan-todo-evidence"]],

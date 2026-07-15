@@ -293,6 +293,16 @@ keeps command execution, task creation, approvals, retries, mutation, and
 provider egress disabled. This bridge is documented in
 `docs/plans/OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_VERIFICATION_EVIDENCE_PLAN.md`.
 
+The matching failed-verification recovery readback is now also available as
+`sense.openclaw.engineering_tool.recovery_evidence`. It reuses the existing
+verification and recovery builders through one bounded handler, keeps failure
+previews transient, and records only compact counts and governance flags in the
+common invocation/event path. Recovery recommendations remain operator review
+only: the capability does not create recovery tasks or approvals, execute or
+retry commands, mutate workspaces, or call a provider. The direct Observer
+route and its real Core/Observer checks remain the read-model proof. Details are
+in `docs/plans/OPENCLAW_NATIVE_ENGINEERING_RECOVERY_EVIDENCE_PLAN.md`.
+
 The first common capability-runtime entry point for the Level 2 trusted
 work-view is now available as
 `sense.openclaw.engineering_context.work_view_observation`. It reads the

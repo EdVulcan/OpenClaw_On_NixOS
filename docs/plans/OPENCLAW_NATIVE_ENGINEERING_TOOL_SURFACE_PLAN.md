@@ -114,6 +114,7 @@ services/openclaw-core/src/capability-descriptors.mjs
 services/openclaw-core/src/capability-runtime.mjs
 services/openclaw-core/src/capability-runtime-engineering-read-search.mjs
 services/openclaw-core/src/capability-runtime-engineering-verification.mjs
+services/openclaw-core/src/capability-runtime-engineering-recovery.mjs
 services/openclaw-core/src/capability-runtime-engineering-execution-evidence.mjs
 services/openclaw-core/src/capability-runtime-work-view.mjs
 ```
@@ -217,6 +218,18 @@ command or creating a task or approval. The focused bridge is documented in:
 
 ```text
 OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_VERIFICATION_EVIDENCE_PLAN.md
+```
+
+The corresponding failed-verification recovery readback is now available as
+`sense.openclaw.engineering_tool.recovery_evidence`. It reuses the existing
+verification and recovery builders, exposes only the bounded recovery response,
+and keeps common invocation/event evidence to compact failure counts and
+governance flags. It cannot create recovery tasks or approvals, execute or retry
+commands, mutate workspaces, or call providers. The direct route and common
+runtime proof are documented in:
+
+```text
+OPENCLAW_NATIVE_ENGINEERING_RECOVERY_EVIDENCE_PLAN.md
 ```
 
 The operator execution-consistency follow-up was completed as:

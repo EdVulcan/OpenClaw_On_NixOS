@@ -44,7 +44,8 @@ cleanup() {
     "${BLOCKED_FILE:-}" \
     "${APPROVED_FILE:-}" \
     "${STEP_FILE:-}" \
-    "${RECOVERY_FILE:-}"
+    "${RECOVERY_FILE:-}" \
+    "${CAPABILITY_FILE:-}"
   "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -62,6 +63,7 @@ BLOCKED_FILE="$(mktemp)"
 APPROVED_FILE="$(mktemp)"
 STEP_FILE="$(mktemp)"
 RECOVERY_FILE="$(mktemp)"
+CAPABILITY_FILE="$(mktemp)"
 
 curl --silent --fail "$OBSERVER_URL/" > "$HTML_FILE"
 curl --silent --fail "$OBSERVER_URL/client-v5.js" > "$CLIENT_FILE"
@@ -86,8 +88,9 @@ EOF
 post_json "$CORE_URL/approvals/$approval_id/approve" '{"approvedBy":"dev-observer-openclaw-native-engineering-recovery-evidence-check","reason":"approve observer recovery evidence failing fixture command"}' > "$APPROVED_FILE"
 post_json "$CORE_URL/operator/step" '{}' > "$STEP_FILE"
 curl --silent --fail "$CORE_URL/plugins/native-adapter/engineering-recovery/evidence?taskId=$task_id&maxOutputChars=1000" > "$RECOVERY_FILE"
+post_json "$CORE_URL/capabilities/invoke" "{\"capabilityId\":\"sense.openclaw.engineering_tool.recovery_evidence\",\"taskId\":\"$task_id\",\"params\":{\"limit\":4,\"maxOutputChars\":1000}}" > "$CAPABILITY_FILE"
 
-node - <<'EOF' "$HTML_FILE" "$CLIENT_FILE" "$TASK_FILE" "$STEP_FILE" "$RECOVERY_FILE" "$PROMPT_SECRET" "$TOOL_SECRET"
+node - <<'EOF' "$HTML_FILE" "$CLIENT_FILE" "$TASK_FILE" "$STEP_FILE" "$RECOVERY_FILE" "$CAPABILITY_FILE" "$PROMPT_SECRET" "$TOOL_SECRET"
 const fs = require("node:fs");
 const readText = (index) => fs.readFileSync(process.argv[index], "utf8");
 const readJson = (index) => JSON.parse(readText(index));
@@ -97,9 +100,10 @@ const client = readText(3);
 const taskResponse = readJson(4);
 const step = readJson(5);
 const recovery = readJson(6);
-const promptSecret = process.argv[7];
-const toolSecret = process.argv[8];
-const raw = JSON.stringify({ html, client, taskResponse, step, recovery });
+const capability = readJson(7);
+const promptSecret = process.argv[8];
+const toolSecret = process.argv[9];
+const raw = JSON.stringify({ html, client, taskResponse, step, recovery, capability });
 
 for (const token of [
   "Engineering Recovery Evidence",
@@ -154,6 +158,23 @@ if (
   || !failure.recommendations?.some((item) => item.id === "recover_task_after_review")
 ) {
   throw new Error(`Observer recovery evidence failure mismatch: ${JSON.stringify(failure)}`);
+}
+if (
+  !capability.ok
+  || capability.invoked !== true
+  || capability.blocked !== false
+  || capability.capability?.id !== "sense.openclaw.engineering_tool.recovery_evidence"
+  || capability.summary?.kind !== "engineering.recovery_evidence"
+  || capability.summary?.totalFailures !== 1
+  || capability.summary?.recoverableFailures !== 1
+  || capability.summary?.noRecoveryTaskCreation !== true
+  || capability.summary?.noCommandExecution !== true
+  || capability.summary?.noProviderEgress !== true
+  || capability.result?.registry !== "openclaw-native-engineering-recovery-evidence-v0"
+  || capability.result?.governance?.canCreateRecoveryTask !== false
+  || capability.result?.governance?.canExecuteCommand !== false
+) {
+  throw new Error(`Observer common recovery capability mismatch: ${JSON.stringify(capability)}`);
 }
 for (const secret of [promptSecret, toolSecret]) {
   if (raw.includes(secret)) {
