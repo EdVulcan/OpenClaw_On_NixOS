@@ -592,13 +592,14 @@ EOF
     || ! -f "$core_out/share/openclaw/services/openclaw-core/src/native-engineering-work-view-binding.mjs"
     || ! -f "$core_out/share/openclaw/services/openclaw-core/src/native-engineering-work-view-bind-routes.mjs"
     || ! -f "$core_out/share/openclaw/services/openclaw-core/src/capability-runtime-engineering-verification.mjs"
+    || ! -f "$core_out/share/openclaw/services/openclaw-core/src/capability-runtime-engineering-plan-todo.mjs"
     || ! -f "$core_out/share/openclaw/services/openclaw-core/src/hostd-control-client.mjs"
     || ! -f "$core_out/share/openclaw/packages/plugin-runtime/src/plugin-registry.mjs"
     || ! -f "$core_out/share/openclaw/packages/plugin-runtime/src/plugin-registry-generation-store.mjs"
     || ! -f "$core_out/share/openclaw/packages/shared-utils/src/persist.mjs"
     || -w "$core_server"
     || -e "$core_out/share/openclaw/services/openclaw-core/test"
-    || "$(find "$core_out" -type f | wc -l)" -ne 164 ]]; then
+    || "$(find "$core_out" -type f | wc -l)" -ne 171 ]]; then
     echo "core Nix closure is not exact and read-only: $core_out" >&2
     exit 1
   fi

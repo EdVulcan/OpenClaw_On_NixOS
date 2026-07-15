@@ -7,6 +7,7 @@ import { createEngineeringVerificationCapabilityHandlers } from "./capability-ru
 import { createEngineeringProposalCapabilityHandlers } from "./capability-runtime-engineering-proposals.mjs";
 import { createEngineeringExecutionEvidenceCapabilityHandlers } from "./capability-runtime-engineering-execution-evidence.mjs";
 import { createEngineeringContextCapabilityHandlers } from "./capability-runtime-engineering-context.mjs";
+import { createEngineeringPlanTodoCapabilityHandlers } from "./capability-runtime-engineering-plan-todo.mjs";
 import { createEngineeringWorkViewCapabilityHandlers } from "./capability-runtime-work-view.mjs";
 
 export function createCapabilityRuntime(deps) {
@@ -88,6 +89,15 @@ export function createCapabilityRuntime(deps) {
     sessionManagerUrl,
     fetchImpl,
     publishEvent,
+  });
+  const engineeringPlanTodoHandlers = createEngineeringPlanTodoCapabilityHandlers({
+    tasks: state.tasks ?? new Map(),
+    taskManager,
+    runtimeState: state.runtimeState ?? {},
+    workbenchRecords: state.nativeEngineeringPlanTodoWorkbenchRecords ?? new Map(),
+    persistState,
+    publishEvent,
+    now,
   });
   const engineeringWorkViewHandlers = createEngineeringWorkViewCapabilityHandlers({
     tasks: state.tasks ?? new Map(),
@@ -302,6 +312,10 @@ export function createCapabilityRuntime(deps) {
     if (engineeringContext.handled) {
       return engineeringContext.result;
     }
+    const engineeringPlanTodo = await engineeringPlanTodoHandlers.callBackend(capability, request);
+    if (engineeringPlanTodo.handled) {
+      return engineeringPlanTodo.result;
+    }
     const engineeringWorkView = await engineeringWorkViewHandlers.callBackend(capability, request);
     if (engineeringWorkView.handled) {
       return engineeringWorkView.result;
@@ -500,6 +514,10 @@ export function createCapabilityRuntime(deps) {
     const engineeringContextSummary = engineeringContextHandlers.summariseResult(capability, result);
     if (engineeringContextSummary) {
       return engineeringContextSummary;
+    }
+    const engineeringPlanTodoSummary = engineeringPlanTodoHandlers.summariseResult(capability, result);
+    if (engineeringPlanTodoSummary) {
+      return engineeringPlanTodoSummary;
     }
     const engineeringWorkViewSummary = engineeringWorkViewHandlers.summariseResult(capability, result);
     if (engineeringWorkViewSummary) {
@@ -778,6 +796,13 @@ export function createCapabilityRuntime(deps) {
       return {
         statusCode: 400,
         response: { ok: false, error: engineeringContextValidationError },
+      };
+    }
+    const engineeringPlanTodoValidationError = engineeringPlanTodoHandlers.validateRequest(capability, request);
+    if (engineeringPlanTodoValidationError) {
+      return {
+        statusCode: 400,
+        response: { ok: false, error: engineeringPlanTodoValidationError },
       };
     }
 

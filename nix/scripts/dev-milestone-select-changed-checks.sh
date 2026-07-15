@@ -560,6 +560,7 @@ function selectSourceHeuristics(file) {
     ["services/openclaw-core/src/capability-runtime-engineering-verification.mjs", ["openclaw-core-service-unit-tests", "capability-invoke", "observer-capability-invoke"]],
     ["services/openclaw-core/src/capability-runtime-engineering-proposals.mjs", ["openclaw-core-service-unit-tests", "capability-invoke", "observer-capability-invoke"]],
     ["services/openclaw-core/src/capability-runtime-engineering-context.mjs", ["openclaw-core-service-unit-tests", "capability-invoke", "observer-capability-invoke"]],
+    ["services/openclaw-core/src/capability-runtime-engineering-plan-todo.mjs", ["openclaw-core-service-unit-tests", "capability-invoke", "observer-capability-invoke", "openclaw-native-engineering-plan-todo-evidence", "observer-openclaw-native-engineering-plan-todo-evidence"]],
     ["services/openclaw-core/src/capability-runtime-work-view.mjs", ["openclaw-core-service-unit-tests", "capability-invoke", "observer-capability-invoke"]],
     ["services/openclaw-core/src/plan-builder.mjs", ["openclaw-core-service-unit-tests", "capability-invoke", "observer-capability-invoke"]],
     ["services/openclaw-core/src/native-engineering-tool-surface-builders.mjs", ["openclaw-native-engineering-tool-surface-inventory", "observer-openclaw-native-engineering-tool-surface-inventory"]],

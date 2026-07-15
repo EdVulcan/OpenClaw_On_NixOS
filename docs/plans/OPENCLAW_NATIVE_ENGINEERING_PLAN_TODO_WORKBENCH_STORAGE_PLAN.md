@@ -1,6 +1,6 @@
 # OpenClaw Native Engineering Plan/Todo Workbench Storage Plan
 
-Updated: 2026-07-10
+Updated: 2026-07-15
 
 ## Active Slice
 
@@ -38,6 +38,20 @@ The route stores one revisioned workbench record per task in OpenClaw core
 state. The plan/todo evidence endpoint now reads this storage and reports
 `todoSource: workbench_storage` when a stored record exists and no explicit
 query todo fixture overrides it.
+
+The same builders and storage owner are now exposed through the common
+capability runtime:
+
+```text
+sense.openclaw.engineering_context.plan_todo_evidence
+act.openclaw.engineering_context.plan_todo_workbench_state
+```
+
+The common evidence invocation remains read-only. The common workbench
+invocation requires `params.confirm: true`, preserves the existing task status,
+increments the record revision, and records only compact counts/revision/status
+metadata in the capability invocation ledger. Plan text and todo descriptions
+remain transient response data.
 
 Observer adds:
 
@@ -132,6 +146,7 @@ Evidence integration:
 
 ```text
 services/openclaw-core/src/native-engineering-plan-todo-evidence-builders.mjs
+services/openclaw-core/src/capability-runtime-engineering-plan-todo.mjs
 services/openclaw-core/src/observer-read-model-routes.mjs
 ```
 
@@ -148,6 +163,7 @@ Validation targets:
 ```text
 services/openclaw-core/test/native-engineering-plan-todo-evidence-builders.test.mjs
 services/openclaw-core/test/native-engineering-plan-todo-suggestion-link.test.mjs
+services/openclaw-core/test/capability-runtime.test.mjs
 services/openclaw-core/test/route-handlers.test.mjs
 openclaw-native-engineering-plan-todo-evidence
 observer-openclaw-native-engineering-plan-todo-evidence

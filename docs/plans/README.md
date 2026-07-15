@@ -106,7 +106,7 @@ phase." The corrected route is:
 preserve enhanced openclaw source on GitHub
 -> perform enhanced source gap audit
 -> migrate governed engineering tool capabilities into OpenClawOnNixOS
--> close the Level 1 operator execution-consistency and capability-runtime boundaries
+-> close the Level 1 operator execution-consistency and declared/runtime capability boundaries
 -> return to identity-upgrade work-view/session-helper/hostd route
 ```
 
@@ -137,6 +137,13 @@ OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_EDIT_PROPOSAL_PLAN.md
 OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_WRITE_PROPOSAL_PLAN.md
 OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_EXECUTION_EVIDENCE_PLAN.md
 ```
+
+The plan/todo workbench direct routes are now aligned with the common capability
+registry and invoke path: bounded evidence is read through
+`sense.openclaw.engineering_context.plan_todo_evidence`, and confirmed storage
+is performed through `act.openclaw.engineering_context.plan_todo_workbench_state`.
+The existing core check proves the two dispatches, explicit confirmation gate,
+revision increment, task-status preservation, and compact invocation metadata.
 
 The browser binding keeps the existing rule-v1 task target and action shape
 linked to operator execution, while the read/search bridge exposes

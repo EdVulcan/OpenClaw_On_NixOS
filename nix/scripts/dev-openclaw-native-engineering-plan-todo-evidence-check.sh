@@ -34,6 +34,9 @@ cleanup() {
     "${EVIDENCE_FILE:-}" \
     "${STORAGE_FILE:-}" \
     "${STORED_EVIDENCE_FILE:-}" \
+    "${CAPABILITY_EVIDENCE_FILE:-}" \
+    "${CAPABILITY_UNCONFIRMED_FILE:-}" \
+    "${CAPABILITY_STORAGE_FILE:-}" \
     "${AFTER_FILE:-}" \
     "${ADAPTER_FILE:-}" \
     "${LINKED_TASK_FILE:-}" \
@@ -53,6 +56,9 @@ BEFORE_FILE="$(mktemp)"
 EVIDENCE_FILE="$(mktemp)"
 STORAGE_FILE="$(mktemp)"
 STORED_EVIDENCE_FILE="$(mktemp)"
+CAPABILITY_EVIDENCE_FILE="$(mktemp)"
+CAPABILITY_UNCONFIRMED_FILE="$(mktemp)"
+CAPABILITY_STORAGE_FILE="$(mktemp)"
 AFTER_FILE="$(mktemp)"
 ADAPTER_FILE="$(mktemp)"
 LINKED_TASK_FILE="$(mktemp)"
@@ -142,7 +148,52 @@ post_json "$CORE_URL/plugins/native-adapter/source-command-proposals/tasks" "$li
 linked_task_id="$(node -e 'const fs=require("node:fs"); const data=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); process.stdout.write(data.task.id);' "$LINKED_TASK_FILE")"
 curl --silent --fail "$CORE_URL/tasks/$linked_task_id" > "$LINKED_TASK_READBACK_FILE"
 
-node - <<'EOF' "$TASK_FILE" "$BEFORE_FILE" "$EVIDENCE_FILE" "$STORAGE_FILE" "$STORED_EVIDENCE_FILE" "$AFTER_FILE" "$ADAPTER_FILE" "$LINKED_TASK_FILE" "$LINKED_TASK_READBACK_FILE" "$WORKSPACE_DIR"
+capability_evidence_body="$(node - <<'EOF' "$task_id"
+const taskId = process.argv[2];
+process.stdout.write(JSON.stringify({
+  capabilityId: "sense.openclaw.engineering_context.plan_todo_evidence",
+  taskId,
+  params: {
+    limit: 8,
+    todos: [
+      { id: "capability-read", description: "Read plan/todo state through common capability runtime", status: "done" },
+      { id: "capability-verify", description: "Verify bounded invocation summary", status: "in_progress" }
+    ]
+  }
+}));
+EOF
+)"
+post_json "$CORE_URL/capabilities/invoke" "$capability_evidence_body" > "$CAPABILITY_EVIDENCE_FILE"
+capability_unconfirmed_body="$(node - <<'EOF' "$task_id"
+const taskId = process.argv[2];
+process.stdout.write(JSON.stringify({
+  capabilityId: "act.openclaw.engineering_context.plan_todo_workbench_state",
+  taskId,
+  params: {
+    todos: [{ id: "capability-blocked", description: "Must remain transient without operator confirmation", status: "pending" }]
+  }
+}));
+EOF
+)"
+post_json "$CORE_URL/capabilities/invoke" "$capability_unconfirmed_body" > "$CAPABILITY_UNCONFIRMED_FILE"
+capability_storage_body="$(node - <<'EOF' "$task_id"
+const taskId = process.argv[2];
+process.stdout.write(JSON.stringify({
+  capabilityId: "act.openclaw.engineering_context.plan_todo_workbench_state",
+  taskId,
+  params: {
+    confirm: true,
+    source: "openclaw-native-engineering-plan-todo-capability-check",
+    planSummary: "common capability persisted summary preview",
+    confirmedPlan: "common capability persisted confirmed plan preview",
+    todos: [{ id: "capability-write", description: "Persist bounded workbench state through common capability runtime", status: "done" }]
+  }
+}));
+EOF
+)"
+post_json "$CORE_URL/capabilities/invoke" "$capability_storage_body" > "$CAPABILITY_STORAGE_FILE"
+
+node - <<'EOF' "$TASK_FILE" "$BEFORE_FILE" "$EVIDENCE_FILE" "$STORAGE_FILE" "$STORED_EVIDENCE_FILE" "$CAPABILITY_EVIDENCE_FILE" "$CAPABILITY_UNCONFIRMED_FILE" "$CAPABILITY_STORAGE_FILE" "$AFTER_FILE" "$ADAPTER_FILE" "$LINKED_TASK_FILE" "$LINKED_TASK_READBACK_FILE" "$WORKSPACE_DIR"
 const fs = require("node:fs");
 const path = require("node:path");
 const readJson = (index) => JSON.parse(fs.readFileSync(process.argv[index], "utf8"));
@@ -152,13 +203,16 @@ const before = readJson(3);
 const evidence = readJson(4);
 const storage = readJson(5);
 const storedEvidence = readJson(6);
-const after = readJson(7);
-const adapter = readJson(8);
-const linkedTask = readJson(9);
-const linkedTaskReadback = readJson(10);
-const workspaceDir = process.argv[11];
+const capabilityEvidence = readJson(7);
+const capabilityUnconfirmed = readJson(8);
+const capabilityStorage = readJson(9);
+const after = readJson(10);
+const adapter = readJson(11);
+const linkedTask = readJson(12);
+const linkedTaskReadback = readJson(13);
+const workspaceDir = process.argv[14];
 const todoPath = path.join(workspaceDir, ".openclaw", "cc-todo.md");
-const raw = JSON.stringify({ evidence, storage, storedEvidence, adapter });
+const raw = JSON.stringify({ evidence, storage, storedEvidence, capabilityEvidence, capabilityUnconfirmed, capabilityStorage, adapter });
 
 if (before.summary?.counts?.total !== after.summary?.counts?.total || before.summary?.counts?.total !== 1) {
   throw new Error(`plan/todo evidence endpoint should not create tasks: before=${JSON.stringify(before)} after=${JSON.stringify(after)}`);
@@ -236,6 +290,45 @@ if (
   throw new Error(`stored plan/todo evidence mismatch: ${JSON.stringify(storedEvidence)}`);
 }
 if (
+  !capabilityEvidence.ok
+  || capabilityEvidence.invoked !== true
+  || capabilityEvidence.capability?.id !== "sense.openclaw.engineering_context.plan_todo_evidence"
+  || capabilityEvidence.result?.capability?.id !== "sense.openclaw.engineering_context.plan_todo_evidence"
+  || capabilityEvidence.summary?.kind !== "engineering.plan_todo_evidence"
+  || capabilityEvidence.summary?.noMutation !== true
+  || capabilityEvidence.summary?.noTodoFileWrite !== true
+  || capabilityEvidence.summary?.noProviderEgress !== true
+) {
+  throw new Error(`common plan/todo evidence capability mismatch: ${JSON.stringify(capabilityEvidence)}`);
+}
+if (
+  !capabilityUnconfirmed.ok
+  || capabilityUnconfirmed.invoked !== true
+  || capabilityUnconfirmed.result?.ok !== false
+  || capabilityUnconfirmed.result?.reason !== "operator_confirmation_required"
+  || capabilityUnconfirmed.summary?.blocked !== true
+  || capabilityUnconfirmed.summary?.taskStatusPreserved !== true
+  || capabilityUnconfirmed.result?.record !== undefined
+) {
+  throw new Error(`unconfirmed plan/todo workbench capability mismatch: ${JSON.stringify(capabilityUnconfirmed)}`);
+}
+if (
+  !capabilityStorage.ok
+  || capabilityStorage.invoked !== true
+  || capabilityStorage.capability?.id !== "act.openclaw.engineering_context.plan_todo_workbench_state"
+  || capabilityStorage.result?.ok !== true
+  || capabilityStorage.result?.record?.revision !== 2
+  || capabilityStorage.result?.record?.counts?.total !== 1
+  || capabilityStorage.summary?.kind !== "engineering.plan_todo_workbench_state"
+  || capabilityStorage.summary?.taskStatusPreserved !== true
+  || capabilityStorage.summary?.noTodoFileWrite !== true
+  || capabilityStorage.summary?.noProviderEgress !== true
+  || JSON.stringify(capabilityStorage.invocation).includes("common capability persisted confirmed plan preview")
+  || JSON.stringify(capabilityStorage.invocation).includes("Persist bounded workbench state")
+) {
+  throw new Error(`common plan/todo workbench capability mismatch: ${JSON.stringify(capabilityStorage)}`);
+}
+if (
   !adapter.implementedCapabilities?.includes("sense.openclaw.engineering_context.plan_todo_evidence")
   || !adapter.implementedCapabilities?.includes("act.openclaw.engineering_context.plan_todo_workbench_state")
   || adapter.summary?.canReadEngineeringPlanTodoEvidence !== true
@@ -284,13 +377,15 @@ for (const token of [
 
 console.log(JSON.stringify({
   openclawNativeEngineeringPlanTodoEvidence: {
-    registry: evidence.registry,
-    storageRegistry: storage.registry,
-    taskId: taskResponse.task.id,
-    todos: storedEvidence.summary.evidenceTodoCounts.total,
+      registry: evidence.registry,
+      storageRegistry: storage.registry,
+      taskId: taskResponse.task.id,
+      todos: storedEvidence.summary.evidenceTodoCounts.total,
     todoSource: storedEvidence.summary.todoSource,
     linkedTaskId: linkedTask.task.id,
     linkedAction: suggestionLink.action.actionId,
+    capabilityEvidence: capabilityEvidence.summary.kind,
+    capabilityWorkbenchRevision: capabilityStorage.result.record.revision,
     todoFileWritten: fs.existsSync(todoPath),
   },
 }, null, 2));

@@ -599,6 +599,115 @@ test("capability runtime rejects stale engineering work-view binding without mut
   assert.equal(state.capabilityInvocationLog.length, 1);
 });
 
+test("capability runtime exposes plan/todo evidence and governed workbench storage", async () => {
+  const taskId = "task-capability-plan-todo";
+  const task = {
+    id: taskId,
+    status: "running",
+    goal: "Keep visible planning state bounded",
+    plan: {
+      summary: "Review and verify the bounded workbench state.",
+      steps: [
+        { id: "inspect", title: "Inspect the existing workbench", status: "completed" },
+        { id: "verify", title: "Verify the common capability path", status: "running" },
+      ],
+    },
+  };
+  const records = new Map();
+  const { runtime, state, events } = createHarness({
+    state: {
+      tasks: new Map([[taskId, task]]),
+      nativeEngineeringPlanTodoWorkbenchRecords: records,
+    },
+    taskManager: {
+      getTaskById: (candidateId) => candidateId === taskId ? task : null,
+    },
+  });
+
+  const registry = await runtime.buildCapabilityRegistry();
+  assert.equal(registry.capabilities.find((item) => item.id === "sense.openclaw.engineering_context.plan_todo_evidence")?.kind, "sensor");
+  assert.equal(registry.capabilities.find((item) => item.id === "act.openclaw.engineering_context.plan_todo_workbench_state")?.kind, "actuator");
+
+  const evidence = await runtime.invokeCapability({
+    capabilityId: "sense.openclaw.engineering_context.plan_todo_evidence",
+    taskId,
+    params: {
+      planSummary: "Transient planning summary must stay out of invocation metadata.",
+      todos: [
+        { id: "current", description: "Transient todo description", status: "in_progress" },
+      ],
+    },
+  });
+  assert.equal(evidence.response.invoked, true);
+  assert.equal(evidence.response.result.capability.id, "sense.openclaw.engineering_context.plan_todo_evidence");
+  assert.equal(evidence.response.result.summary.todoSource, "query_todos");
+  assert.equal(evidence.response.summary.kind, "engineering.plan_todo_evidence");
+  assert.equal(evidence.response.summary.noMutation, true);
+  assert.equal(evidence.response.summary.noTodoFileWrite, true);
+  assert.equal(evidence.response.summary.noProviderEgress, true);
+
+  const unconfirmed = await runtime.invokeCapability({
+    capabilityId: "act.openclaw.engineering_context.plan_todo_workbench_state",
+    taskId,
+    params: {
+      todos: [{ id: "blocked", description: "Must not be stored without confirmation", status: "pending" }],
+    },
+  });
+  assert.equal(unconfirmed.response.invoked, true);
+  assert.equal(unconfirmed.response.result.ok, false);
+  assert.equal(unconfirmed.response.result.reason, "operator_confirmation_required");
+  assert.equal(unconfirmed.response.summary.blocked, true);
+  assert.equal(unconfirmed.response.summary.taskStatusPreserved, true);
+  assert.equal(records.size, 0);
+  assert.equal(task.status, "running");
+
+  const saved = await runtime.invokeCapability({
+    capabilityId: "act.openclaw.engineering_context.plan_todo_workbench_state",
+    taskId,
+    params: {
+      confirm: true,
+      source: "capability-runtime-test",
+      planSummary: "Persisted summary preview",
+      confirmedPlan: "Persisted confirmed plan preview",
+      todos: [{ id: "stored", description: "Persisted visible todo", status: "in_progress" }],
+    },
+  });
+  assert.equal(saved.response.invoked, true);
+  assert.equal(saved.response.result.ok, true);
+  assert.equal(saved.response.result.record.revision, 1);
+  assert.equal(saved.response.result.record.counts.total, 1);
+  assert.equal(saved.response.summary.taskStatusPreserved, true);
+  assert.equal(saved.response.summary.noTodoFileWrite, true);
+  assert.equal(saved.response.summary.noProviderEgress, true);
+  assert.equal(task.status, "running");
+  assert.equal(records.get(taskId).revision, 1);
+
+  const revised = await runtime.invokeCapability({
+    capabilityId: "act.openclaw.engineering_context.plan_todo_workbench_state",
+    taskId,
+    params: {
+      confirm: true,
+      todos: [{ id: "stored-again", description: "Revision two visible todo", status: "done" }],
+    },
+  });
+  assert.equal(revised.response.result.record.revision, 2);
+  assert.equal(records.get(taskId).revision, 2);
+  assert.equal(JSON.stringify(state.capabilityInvocationLog).includes("Transient todo description"), false);
+  assert.equal(JSON.stringify(state.capabilityInvocationLog).includes("Persisted confirmed plan preview"), false);
+  assert.deepEqual(events.map((event) => event.name), [
+    "policy.evaluated",
+    "capability.invoked",
+    "policy.evaluated",
+    "capability.invoked",
+    "policy.evaluated",
+    "native_engineering.plan_todo.workbench_state_saved",
+    "capability.invoked",
+    "policy.evaluated",
+    "native_engineering.plan_todo.workbench_state_saved",
+    "capability.invoked",
+  ]);
+});
+
 test("capability runtime exposes an allowlisted work-view control through the governed invoke path", async () => {
   const { runtime, state, events, calls } = createHarness({
     client: {

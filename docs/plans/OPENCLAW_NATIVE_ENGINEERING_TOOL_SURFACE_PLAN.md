@@ -14,6 +14,11 @@ work-view owner control, and the bounded edit/write proposal entry points are
 now complete; the next identity-upgrade route remains a concrete operator decision
 rather than another horizontal action variant.
 
+The previously route-only plan/todo workbench lane is also closed at the common
+runtime boundary. Its evidence and confirmed core-state storage descriptors now
+dispatch through `/capabilities/invoke`, reuse the existing builders, and keep
+plan text and todo descriptions out of persisted invocation summaries.
+
 The latest completed slices are the compact work-view association, the explicit
 operator-reviewed task bind documented in
 `OPENCLAW_NATIVE_ENGINEERING_WORK_VIEW_ASSOCIATION_PLAN.md` and
@@ -301,6 +306,14 @@ Observer now has a `Use Suggested Action` bridge for that readback. It dispatche
 only through a local whitelist of existing governed controls after the suggested
 control id matches the expected control, so the readback remains guidance rather
 than an arbitrary endpoint, command, provider, or workspace mutation channel.
+
+The plan/todo capability-runtime follow-up is complete. The common registry now
+exposes `sense.openclaw.engineering_context.plan_todo_evidence` and
+`act.openclaw.engineering_context.plan_todo_workbench_state`; the first is
+read-only evidence, and the second requires explicit `confirm: true` before
+revisioned core-state storage. The existing core milestone covers readback,
+confirmation blocking, revision increment, task-status preservation, and no-leak
+invocation summaries. Do not add another plan/todo endpoint or readiness shell.
 
 The LSP lifecycle readiness draft follow-up was completed as:
 

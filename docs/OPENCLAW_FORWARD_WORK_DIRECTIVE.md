@@ -225,6 +225,16 @@ assembles bounded task/transcript context with credential-like redaction and
 protected verification/recovery summaries without provider use. Do not reopen completed LSP symbol-request slices or add another
 standalone engineering evidence/readiness shell without a concrete operator gap.
 
+The planning workbench contract is now closed through the common capability
+runtime as well as its dedicated routes. `sense.openclaw.engineering_context.plan_todo_evidence`
+reads the existing bounded task/workbench builder, while
+`act.openclaw.engineering_context.plan_todo_workbench_state` reuses the existing
+revisioned core-state storage and requires `confirm: true`. Invocation summaries
+retain only counts, revision, status, and governance flags; plan text and todo
+descriptions remain transient. The existing core plan/todo check now proves
+common capability read, unconfirmed blocking, confirmed revisioned storage, and
+no task-status mutation.
+
 The approved DeepSeek handoff and recommendation bridge are now bounded by the
 existing egress task. Task creation records only a redacted binding containing
 the allowlisted endpoint fingerprint, model, exact
