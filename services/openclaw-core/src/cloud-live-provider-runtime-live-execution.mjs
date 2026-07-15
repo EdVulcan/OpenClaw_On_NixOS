@@ -43,6 +43,8 @@ function compactContextPacketEvidence(evidence) {
     registry: evidence.registry ?? CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_LIVE_EXECUTION_REGISTRY,
     sourceRegistry: evidence.sourceRegistry ?? null,
     taskId: evidence.taskId ?? null,
+    executionTaskId: evidence.executionTaskId ?? null,
+    sourceTaskId: evidence.sourceTaskId ?? evidence.taskId ?? null,
     responseContract: evidence.responseContract
       === CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_ENGINEERING_RECOMMENDATION_CONTRACT
       ? evidence.responseContract

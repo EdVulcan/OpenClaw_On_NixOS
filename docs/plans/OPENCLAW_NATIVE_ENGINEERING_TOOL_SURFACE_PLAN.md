@@ -500,6 +500,11 @@ is documented in
 selectors are hash-bound with the provider message and do not transfer page
 payloads or enable automatic actions.
 
+The same handoff now supports an explicit `sourceTaskId` so provider context
+can come from an existing engineering evidence task while approval remains on
+the egress task. Missing or mutated source context fails the existing binding;
+automatic source selection and source-task mutation remain deferred.
+
 The existing Observer readback bridge for a valid recommendation is now
 complete. `/operator/step` and `/operator/run` return the bounded transient
 recommendation, Observer revalidates its contract and allowlisted control id,

@@ -97,6 +97,7 @@ can use this bounded context form:
     "contextPacket": {
       "requested": true,
       "taskId": "<approved-egress-task-id>",
+      "sourceTaskId": "<existing-engineering-evidence-task-id>",
       "responseContract": "engineering_recommendation_v0",
       "limit": 6,
       "maxOutputChars": 1800,
@@ -136,6 +137,12 @@ page text, target items, selectors, input values, lease ids, and credentials.
 `includeWorkViewObservation` requires `includeWorkView`; changing any selector
 changes the materialized request hash and is rejected if it no longer matches
 the approved binding.
+
+`sourceTaskId` is also optional. When provided, it must identify an existing
+source-command, verification, edit, or workbench task whose bounded evidence
+should be reviewed. The egress task remains the approval/execution owner; the
+source task is read-only and is not resumed or mutated. Both ids are retained
+only as compact provenance.
 
 Neither path turns on automatic provider calls for OpenClaw tasks. The existing
 task and Observer lanes remain approval-gated, and the live branch requires the

@@ -33,6 +33,12 @@ function boundedText(value, maxChars) {
   return typeof value === "string" ? value.trim().slice(0, maxChars) : "";
 }
 
+function taskForId(tasks, taskId) {
+  if (!taskId) return null;
+  if (tasks instanceof Map) return tasks.get(taskId) ?? null;
+  return Array.isArray(tasks) ? tasks.find((task) => task?.id === taskId) ?? null : null;
+}
+
 function hashText(value) {
   return createHash("sha256").update(value).digest("hex");
 }
@@ -69,6 +75,8 @@ function packetMessageText(message) {
 
 function compactPacketEvidence(packet, {
   taskId,
+  executionTaskId,
+  sourceTaskId,
   contextText,
   providerMessageChars,
   contextTruncated,
@@ -78,6 +86,8 @@ function compactPacketEvidence(packet, {
     registry: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CONTEXT_PACKET_REGISTRY,
     sourceRegistry: packet.registry,
     taskId,
+    executionTaskId: executionTaskId ?? null,
+    sourceTaskId: sourceTaskId ?? taskId,
     responseContract,
     sourceTranscriptRecords: packet.summary?.sourceTranscriptRecords ?? 0,
     messageCount: packet.summary?.messageCount ?? 0,
@@ -123,14 +133,24 @@ export async function materialiseCloudLiveProviderContextPacketExecution({
     };
   }
 
-  const taskId = task?.id ?? null;
+  const executionTaskId = task?.id ?? null;
   const requestedTaskId = typeof contextRequest.taskId === "string" && contextRequest.taskId.trim()
     ? contextRequest.taskId.trim()
-    : taskId;
-  if (!taskId || requestedTaskId !== taskId) {
+    : executionTaskId;
+  if (!executionTaskId || requestedTaskId !== executionTaskId) {
     return {
       ok: false,
       reason: "live_provider_context_task_mismatch",
+    };
+  }
+  const requestedSourceTaskId = boundedText(contextRequest.sourceTaskId, 200);
+  const sourceTaskId = requestedSourceTaskId || executionTaskId;
+  const contextTask = taskForId(tasks, sourceTaskId)
+    ?? (sourceTaskId === executionTaskId ? task : null);
+  if (!contextTask) {
+    return {
+      ok: false,
+      reason: "live_provider_context_source_task_not_found",
     };
   }
   if (liveProviderExecution.requestEnvelope && typeof liveProviderExecution.requestEnvelope === "object") {
@@ -169,22 +189,22 @@ export async function materialiseCloudLiveProviderContextPacketExecution({
     transcriptRecords,
     capabilityInvocations,
     tasks,
-    taskId,
+    taskId: sourceTaskId,
     limit,
     maxOutputChars,
   });
   const recoveryEvidence = buildNativeEngineeringRecoveryEvidence({
     verificationEvidence,
     tasks,
-    taskId,
+    taskId: sourceTaskId,
     limit,
   });
   let workViewAssociation = null;
   if (includeWorkView) {
     const workViewRead = await readWorkViewState({ sessionManagerUrl });
     workViewAssociation = buildNativeEngineeringWorkViewAssociation({
-      task,
-      taskId,
+      task: contextTask,
+      taskId: sourceTaskId,
       workViewState: workViewRead.data,
       readStatus: workViewRead.ok ? "available" : "unavailable",
       includeWorkViewObservation,
@@ -195,7 +215,7 @@ export async function materialiseCloudLiveProviderContextPacketExecution({
         tasks,
         runtimeState,
         workbenchRecords,
-        taskId,
+        taskId: sourceTaskId,
         limit,
       })
     : null;
@@ -204,7 +224,7 @@ export async function materialiseCloudLiveProviderContextPacketExecution({
     tasks,
     verificationEvidence,
     recoveryEvidence,
-    taskId,
+    taskId: sourceTaskId,
     limit,
     maxOutputChars,
     thresholdChars: contextRequest.thresholdChars,
@@ -240,7 +260,9 @@ export async function materialiseCloudLiveProviderContextPacketExecution({
     `Operator request: ${instruction}`,
   ].filter(Boolean).join("\n\n");
   const evidence = compactPacketEvidence(packet, {
-    taskId,
+    taskId: sourceTaskId,
+    executionTaskId,
+    sourceTaskId,
     contextText: fullContextText,
     providerMessageChars: content.length,
     contextTruncated,
@@ -258,7 +280,8 @@ export async function materialiseCloudLiveProviderContextPacketExecution({
       ...liveProviderExecution,
       contextPacket: {
         requested: true,
-        taskId,
+        taskId: executionTaskId,
+        sourceTaskId,
         responseContract,
         includeWorkView,
         includeWorkViewObservation,

@@ -244,6 +244,13 @@ payloads, URLs, pixels, target items, selectors, input values, lease ids, and
 credentials remain excluded. The focused boundary is documented in
 `docs/plans/OPENCLAW_NATIVE_ENGINEERING_CONTEXT_PROVIDER_HANDOFF_BRIDGE_PLAN.md`.
 
+The handoff also accepts an explicit `sourceTaskId` so the approved provider
+egress task can consume bounded evidence from an existing engineering task.
+The source task must exist, remains read-only, and is never resumed or mutated;
+the egress task remains the approval and execution owner. This continuity
+boundary is documented in
+`docs/plans/OPENCLAW_NATIVE_ENGINEERING_CONTEXT_PROVIDER_SOURCE_TASK_PLAN.md`.
+
 The next autonomous product route is the smallest real Level 2 trusted AI
 work-view/session-helper behavior. Keep helper installation, root/system daemon
 work, desktop-wide capture, unapproved provider egress, and arbitrary endpoint

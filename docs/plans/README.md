@@ -139,6 +139,15 @@ OPENCLAW_NATIVE_ENGINEERING_CONTEXT_PROVIDER_HANDOFF_BRIDGE_PLAN.md
 It reuses the existing approval-bound DeepSeek task and keeps the context
 transient; it does not transfer raw page payloads or create automatic actions.
 
+The provider handoff's explicit source-task continuity is documented in:
+
+```text
+OPENCLAW_NATIVE_ENGINEERING_CONTEXT_PROVIDER_SOURCE_TASK_PLAN.md
+```
+
+It keeps the provider egress task as the approval owner while reading bounded
+evidence from a separately selected existing engineering task.
+
 The bounded Level 2 browser eye-hand exit gate and kernel-whitepaper Phase A are
 complete. The active Phase B route is documented alongside the Phase A record:
 

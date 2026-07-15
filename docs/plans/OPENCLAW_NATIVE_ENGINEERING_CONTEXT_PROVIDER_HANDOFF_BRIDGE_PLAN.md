@@ -70,6 +70,13 @@ The new flags are part of the materialized request shape. Changing them changes
 the provider request content hash and therefore fails the existing approval
 binding instead of turning an approval for one context into approval for another.
 
+The follow-up source-task binding is documented in
+`OPENCLAW_NATIVE_ENGINEERING_CONTEXT_PROVIDER_SOURCE_TASK_PLAN.md`. It keeps
+the provider egress task id as the approval owner while allowing an explicit
+existing engineering task to supply the bounded context. The source task must
+exist, and both ids plus the materialized content hash are retained as compact
+provenance.
+
 ## Evidence
 
 Runtime:

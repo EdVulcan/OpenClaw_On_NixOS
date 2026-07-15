@@ -264,3 +264,56 @@ test("context packet handoff rejects observation without the explicit work-view 
   assert.equal(result.ok, false);
   assert.equal(result.reason, "live_provider_context_observation_requires_work_view");
 });
+
+test("context packet handoff can bind a provider task to a separate source engineering task", async () => {
+  const input = contextInputs();
+  const sourceTask = input.task;
+  const executionTask = {
+    id: "egress-context-task-1",
+    type: "cloud_consciousness_live_provider_egress_execution_task",
+    status: "queued",
+    goal: "Request a bounded provider recommendation",
+  };
+  input.tasks.set(executionTask.id, executionTask);
+
+  const result = await materialiseCloudLiveProviderContextPacketExecution({
+    ...input,
+    task: executionTask,
+    liveProviderExecution: {
+      requested: true,
+      taskId: executionTask.id,
+      contextPacket: {
+        requested: true,
+        taskId: executionTask.id,
+        sourceTaskId: sourceTask.id,
+        instruction: "Review the source task evidence and recommend the next bounded step.",
+      },
+    },
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.evidence.taskId, sourceTask.id);
+  assert.equal(result.evidence.executionTaskId, executionTask.id);
+  assert.equal(result.evidence.sourceTaskId, sourceTask.id);
+  assert.equal(result.evidence.sourceTranscriptRecords, 1);
+  assert.equal(result.liveProviderExecution.contextPacket.taskId, executionTask.id);
+  assert.equal(result.liveProviderExecution.contextPacket.sourceTaskId, sourceTask.id);
+  assert.match(result.liveProviderExecution.requestEnvelope.messages[0].content, /npm test/);
+  assert.match(result.liveProviderExecution.requestEnvelope.messages[0].content, /task-context-1/);
+
+  const missing = await materialiseCloudLiveProviderContextPacketExecution({
+    ...input,
+    task: executionTask,
+    liveProviderExecution: {
+      requested: true,
+      taskId: executionTask.id,
+      contextPacket: {
+        requested: true,
+        taskId: executionTask.id,
+        sourceTaskId: "missing-source-task",
+      },
+    },
+  });
+  assert.equal(missing.ok, false);
+  assert.equal(missing.reason, "live_provider_context_source_task_not_found");
+});

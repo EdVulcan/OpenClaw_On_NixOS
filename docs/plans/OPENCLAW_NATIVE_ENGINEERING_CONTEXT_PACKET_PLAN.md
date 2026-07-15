@@ -146,6 +146,14 @@ URLs, pixels, page text, target items, selectors, input values, lease ids, and
 credentials remain excluded. The focused boundary is documented in
 `OPENCLAW_NATIVE_ENGINEERING_CONTEXT_PROVIDER_HANDOFF_BRIDGE_PLAN.md`.
 
+The approved provider request may also set `sourceTaskId` separately from its
+egress `taskId`. This lets the egress task consume an existing source-command,
+verification, edit, or workbench task's bounded evidence while keeping
+approval, execution, and hash ownership on the egress task. The source task
+must exist and is never mutated or resumed; the two ids are retained only as
+compact provenance. See
+`OPENCLAW_NATIVE_ENGINEERING_CONTEXT_PROVIDER_SOURCE_TASK_PLAN.md`.
+
 ## Structured Recommendation Follow-Up Complete
 
 The approved context-packet handoff now appends the bounded

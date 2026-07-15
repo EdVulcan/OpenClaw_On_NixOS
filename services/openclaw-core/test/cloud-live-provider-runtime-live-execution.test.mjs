@@ -362,6 +362,8 @@ test("live execution retains only compact work-view and plan/todo context eviden
     registry: "openclaw-cloud-consciousness-live-provider-context-packet-v0",
     sourceRegistry: "openclaw-native-engineering-context-packet-v0",
     taskId: "task-1",
+    executionTaskId: "task-1",
+    sourceTaskId: "task-1",
     responseContract: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_ENGINEERING_RECOMMENDATION_CONTRACT,
     sourceTranscriptRecords: 1,
     messageCount: 6,
@@ -435,6 +437,8 @@ test("live execution retains only compact work-view and plan/todo context eviden
   });
 
   assert.equal(result.ok, true);
+  assert.equal(result.summary.contextPacket.executionTaskId, "task-1");
+  assert.equal(result.summary.contextPacket.sourceTaskId, "task-1");
   assert.equal(result.summary.contextPacket.workViewObservationIncluded, true);
   assert.equal(result.summary.contextPacket.semanticTargetCount, 2);
   assert.equal(result.summary.contextPacket.planTodoEvidenceIncluded, true);

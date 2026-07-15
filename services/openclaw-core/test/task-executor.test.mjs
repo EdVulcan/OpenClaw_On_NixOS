@@ -2093,7 +2093,31 @@ test("operator options carry explicitly requested work-view observation and plan
       steps: [{ id: "provider-step", phase: "verify", title: "Review provider context", status: "pending" }],
     },
   };
+  const sourceTask = {
+    id: "provider-context-source-task",
+    type: "source_command_task",
+    goal: "Review the source verification evidence",
+    status: "completed",
+    workView: { sessionId: "provider-context-session", workViewId },
+    outcome: {
+      kind: "completed",
+      details: {
+        commandTranscript: [{
+          invocationId: "provider-context-source-invocation",
+          command: "npm test",
+          exitCode: 0,
+          timedOut: false,
+          stdout: "source verification passed",
+          stderr: "",
+        }],
+      },
+    },
+    plan: {
+      steps: [{ id: "source-step", phase: "verify", title: "Inspect source verification", status: "done" }],
+    },
+  };
   state.tasks.set(task.id, task);
+  state.tasks.set(sourceTask.id, sourceTask);
 
   const options = await executor.buildOperatorOptions(task, {
     liveProviderExecution: {
@@ -2102,6 +2126,7 @@ test("operator options carry explicitly requested work-view observation and plan
       contextPacket: {
         requested: true,
         taskId,
+        sourceTaskId: sourceTask.id,
         includeWorkView: true,
         includeWorkViewObservation: true,
         includePlanTodo: true,
@@ -2110,11 +2135,14 @@ test("operator options carry explicitly requested work-view observation and plan
   });
 
   assert.equal(options[CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CONTEXT_PACKET_EVIDENCE].workViewObservationIncluded, true);
+  assert.equal(options[CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CONTEXT_PACKET_EVIDENCE].executionTaskId, taskId);
+  assert.equal(options[CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CONTEXT_PACKET_EVIDENCE].sourceTaskId, sourceTask.id);
   assert.equal(options[CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CONTEXT_PACKET_EVIDENCE].planTodoEvidenceIncluded, true);
   assert.equal(options.liveProviderExecution.contextPacket.includeWorkView, true);
   assert.equal(options.liveProviderExecution.contextPacket.includePlanTodo, true);
   assert.match(options.liveProviderExecution.requestEnvelope.messages[0].content, /work-view-provider-context/);
-  assert.match(options.liveProviderExecution.requestEnvelope.messages[0].content, /provider context/);
+  assert.match(options.liveProviderExecution.requestEnvelope.messages[0].content, /source verification passed/);
+  assert.equal(options.liveProviderExecution.contextPacket.sourceTaskId, sourceTask.id);
 });
 
 test("execution serializer exposes transient recommendation separately from compact task evidence", () => {
