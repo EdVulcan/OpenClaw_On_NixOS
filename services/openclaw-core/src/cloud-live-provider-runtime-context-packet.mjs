@@ -2,6 +2,11 @@ import { createHash } from "node:crypto";
 import { buildNativeEngineeringContextPacket } from "./native-engineering-context-packet.mjs";
 import { buildNativeEngineeringRecoveryEvidence } from "./native-engineering-recovery-evidence-builders.mjs";
 import { buildNativeEngineeringVerificationEvidence } from "./native-engineering-verification-evidence-builders.mjs";
+import { buildNativeEngineeringPlanTodoEvidence } from "./native-engineering-plan-todo-evidence-builders.mjs";
+import {
+  buildNativeEngineeringWorkViewAssociation,
+  readNativeEngineeringWorkViewState,
+} from "./native-engineering-work-view-association.mjs";
 import {
   CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_ENGINEERING_RECOMMENDATION_CONTRACT,
   buildCloudLiveProviderEngineeringRecommendationInstruction,
@@ -59,7 +64,7 @@ function packetMessageText(message) {
     .join("/");
   const command = boundedText(source.commandShape?.command, 400);
   const commandLine = command ? `command: ${redactInlineText(command)}` : "";
-  return [label ? `[${label}]` : "", commandLine, text].filter(Boolean).join("\n");
+  return [label ? `[${label}]` : "", commandLine, redactInlineText(text)].filter(Boolean).join("\n");
 }
 
 function compactPacketEvidence(packet, {
@@ -80,6 +85,16 @@ function compactPacketEvidence(packet, {
     truncatedOutputs: packet.summary?.truncatedOutputs ?? 0,
     compactedMessages: packet.summary?.compactedMessages ?? 0,
     reclaimedChars: packet.summary?.reclaimedChars ?? 0,
+    workViewAssociationIncluded: packet.summary?.workViewAssociationIncluded === true,
+    workViewAssociationStatus: packet.summary?.workViewAssociationStatus ?? null,
+    workViewObservationIncluded: packet.summary?.workViewObservationIncluded === true,
+    workViewObservationStatus: packet.summary?.workViewObservationStatus ?? null,
+    workViewObservationFreshness: packet.summary?.workViewObservationFreshness ?? null,
+    workViewObservationSequence: packet.summary?.workViewObservationSequence ?? null,
+    semanticTargetCount: packet.summary?.semanticTargetCount ?? null,
+    planTodoEvidenceIncluded: packet.summary?.planTodoEvidenceIncluded === true,
+    planTodoTodoSource: packet.summary?.planTodoTodoSource ?? null,
+    planTodoCurrentAction: packet.summary?.planTodoCurrentAction ?? null,
     contextContentHash: hashText(contextText),
     providerMessageChars,
     contextTruncated,
@@ -88,12 +103,16 @@ function compactPacketEvidence(packet, {
   };
 }
 
-export function materialiseCloudLiveProviderContextPacketExecution({
+export async function materialiseCloudLiveProviderContextPacketExecution({
   task,
   liveProviderExecution,
   transcriptRecords = [],
   capabilityInvocations = [],
   tasks = new Map(),
+  runtimeState = {},
+  workbenchRecords = new Map(),
+  sessionManagerUrl,
+  readWorkViewState = readNativeEngineeringWorkViewState,
 } = {}) {
   const contextRequest = liveProviderExecution?.contextPacket;
   if (!contextRequest || contextRequest.requested !== true) {
@@ -118,6 +137,15 @@ export function materialiseCloudLiveProviderContextPacketExecution({
     return {
       ok: false,
       reason: "live_provider_context_request_envelope_conflict",
+    };
+  }
+
+  const includeWorkView = contextRequest.includeWorkView === true;
+  const includeWorkViewObservation = contextRequest.includeWorkViewObservation === true;
+  if (includeWorkViewObservation && !includeWorkView) {
+    return {
+      ok: false,
+      reason: "live_provider_context_observation_requires_work_view",
     };
   }
 
@@ -151,6 +179,26 @@ export function materialiseCloudLiveProviderContextPacketExecution({
     taskId,
     limit,
   });
+  let workViewAssociation = null;
+  if (includeWorkView) {
+    const workViewRead = await readWorkViewState({ sessionManagerUrl });
+    workViewAssociation = buildNativeEngineeringWorkViewAssociation({
+      task,
+      taskId,
+      workViewState: workViewRead.data,
+      readStatus: workViewRead.ok ? "available" : "unavailable",
+      includeWorkViewObservation,
+    });
+  }
+  const planTodoEvidence = contextRequest.includePlanTodo === true
+    ? buildNativeEngineeringPlanTodoEvidence({
+        tasks,
+        runtimeState,
+        workbenchRecords,
+        taskId,
+        limit,
+      })
+    : null;
   const packet = buildNativeEngineeringContextPacket({
     transcriptRecords,
     tasks,
@@ -161,6 +209,8 @@ export function materialiseCloudLiveProviderContextPacketExecution({
     maxOutputChars,
     thresholdChars: contextRequest.thresholdChars,
     protectRecentAssistantTurns: contextRequest.protectRecentAssistantTurns,
+    workViewAssociation,
+    planTodoEvidence,
   });
   const fullContextText = packet.messages.map(packetMessageText).filter(Boolean).join("\n\n");
   const requestedInstruction = boundedText(
@@ -210,6 +260,9 @@ export function materialiseCloudLiveProviderContextPacketExecution({
         requested: true,
         taskId,
         responseContract,
+        includeWorkView,
+        includeWorkViewObservation,
+        includePlanTodo: contextRequest.includePlanTodo === true,
       },
       responseContract,
       requestEnvelope,

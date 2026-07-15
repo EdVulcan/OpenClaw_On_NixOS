@@ -5,6 +5,7 @@ import {
   CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_LIVE_EXECUTION_REGISTRY,
   executeCloudConsciousnessLiveProviderRequest,
 } from "../src/cloud-live-provider-runtime-live-execution.mjs";
+import { CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CONTEXT_PACKET_EVIDENCE } from "../src/cloud-live-provider-runtime-context-packet.mjs";
 import { buildProviderRequest } from "../src/cloud-live-provider-runtime-adapter.mjs";
 import {
   buildLiveProviderRequestBinding,
@@ -90,7 +91,7 @@ function liveOptions(overrides = {}) {
   };
 }
 
-function createBoundTask(options, env = LIVE_PROVIDER_TEST_ENV) {
+function createBoundTask(options, env = LIVE_PROVIDER_TEST_ENV, contextContentHash = null) {
   const request = options.liveProviderExecution;
   const providerRequest = buildProviderRequest({
     executionPlan: {
@@ -103,7 +104,7 @@ function createBoundTask(options, env = LIVE_PROVIDER_TEST_ENV) {
   const binding = buildLiveProviderRequestBinding({
     providerRequest,
     responseContract: request.responseContract ?? request.contextPacket?.responseContract ?? null,
-    contextContentHash: null,
+    contextContentHash,
     env,
   });
   assert.equal(binding.ok, true, binding.reason);
@@ -352,6 +353,93 @@ test("valid structured recommendation is transient while task state keeps compac
   assert.equal(result.task.cloudConsciousnessLiveProviderEgressExecution.recommendation.reasonIncluded, false);
   assert.doesNotMatch(JSON.stringify(result.task), /bounded todo evidence supports/);
   assert.equal(result.summary.recommendation.actionId, "create_verification_task");
+});
+
+test("live execution retains only compact work-view and plan/todo context evidence", async () => {
+  const harness = createHarness();
+  const contextContentHash = "e".repeat(64);
+  const contextEvidence = {
+    registry: "openclaw-cloud-consciousness-live-provider-context-packet-v0",
+    sourceRegistry: "openclaw-native-engineering-context-packet-v0",
+    taskId: "task-1",
+    responseContract: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_ENGINEERING_RECOMMENDATION_CONTRACT,
+    sourceTranscriptRecords: 1,
+    messageCount: 6,
+    redactions: 1,
+    truncatedOutputs: 0,
+    compactedMessages: 0,
+    reclaimedChars: 0,
+    workViewAssociationIncluded: true,
+    workViewAssociationStatus: "bound",
+    workViewObservationIncluded: true,
+    workViewObservationStatus: "ready",
+    workViewObservationFreshness: "fresh",
+    workViewObservationSequence: 9,
+    semanticTargetCount: 2,
+    planTodoEvidenceIncluded: true,
+    planTodoTodoSource: "workbench_storage",
+    planTodoCurrentAction: "review_current_todo",
+    contextContentHash,
+    providerMessageChars: 1200,
+    contextTruncated: false,
+    contextContentIncluded: false,
+    requestEnvelopeMaterialized: true,
+  };
+  const options = liveOptions({
+    responseContract: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_ENGINEERING_RECOMMENDATION_CONTRACT,
+    contextPacket: {
+      requested: true,
+      taskId: "task-1",
+      includeWorkView: true,
+      includeWorkViewObservation: true,
+      includePlanTodo: true,
+      responseContract: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_ENGINEERING_RECOMMENDATION_CONTRACT,
+    },
+  });
+  const task = createBoundTask(options, LIVE_PROVIDER_TEST_ENV, contextContentHash);
+  options[CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CONTEXT_PACKET_EVIDENCE] = contextEvidence;
+  const result = await executeCloudConsciousnessLiveProviderRequest({
+    ...harness.deps,
+    task,
+    options,
+    env: LIVE_PROVIDER_TEST_ENV,
+    sendLiveProviderRequestImpl: async () => ({
+      ok: true,
+      audit: {
+        providerResponseCreated: true,
+        endpointContacted: true,
+        networkEgress: true,
+        transmitsExternally: true,
+      },
+      governance: {
+        providerCredentialRead: true,
+        credentialValueRead: true,
+        providerResponseCreated: true,
+        endpointContacted: true,
+        networkEgress: true,
+        transmitsExternally: true,
+        liveProviderCallEnabled: true,
+      },
+      response: {
+        id: "context-evidence-response",
+        model: "deepseek-chat",
+        assistantContent: JSON.stringify({
+          actionId: "review_current_todo",
+          reason: "Review the bounded context.",
+          confidence: 0.8,
+          requiresOperatorReview: true,
+        }),
+        responseContentHash: "f".repeat(64),
+      },
+    }),
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.summary.contextPacket.workViewObservationIncluded, true);
+  assert.equal(result.summary.contextPacket.semanticTargetCount, 2);
+  assert.equal(result.summary.contextPacket.planTodoEvidenceIncluded, true);
+  assert.equal(result.task.outcome.details.contextPacket.contextContentIncluded, false);
+  assert.doesNotMatch(JSON.stringify(result.task), /Review the bounded context/);
 });
 
 test("invalid structured recommendation fails the task without persisting assistant content", async () => {

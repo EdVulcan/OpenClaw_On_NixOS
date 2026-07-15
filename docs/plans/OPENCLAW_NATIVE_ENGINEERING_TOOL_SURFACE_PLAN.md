@@ -493,6 +493,13 @@ approved operator call and returns only a review-required recommendation;
 preserve that boundary and select only concrete local capabilities that close a
 user-visible gap.
 
+The approved handoff can now explicitly carry the bounded trusted work-view
+observation and plan/todo summaries through the same materialized request. This
+is documented in
+`OPENCLAW_NATIVE_ENGINEERING_CONTEXT_PROVIDER_HANDOFF_BRIDGE_PLAN.md`; the
+selectors are hash-bound with the provider message and do not transfer page
+payloads or enable automatic actions.
+
 The existing Observer readback bridge for a valid recommendation is now
 complete. `/operator/step` and `/operator/run` return the bounded transient
 recommendation, Observer revalidates its contract and allowlisted control id,

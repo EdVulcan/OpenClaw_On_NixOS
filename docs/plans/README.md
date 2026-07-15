@@ -129,6 +129,16 @@ It reuses the existing context packet and reports only bounded capture
 freshness, frame provenance, and semantic-target counts; it does not create a
 new endpoint or action path.
 
+The explicit provider handoff of those bounded summaries, together with the
+existing plan/todo evidence, is documented in:
+
+```text
+OPENCLAW_NATIVE_ENGINEERING_CONTEXT_PROVIDER_HANDOFF_BRIDGE_PLAN.md
+```
+
+It reuses the existing approval-bound DeepSeek task and keeps the context
+transient; it does not transfer raw page payloads or create automatic actions.
+
 The bounded Level 2 browser eye-hand exit gate and kernel-whitepaper Phase A are
 complete. The active Phase B route is documented alongside the Phase A record:
 

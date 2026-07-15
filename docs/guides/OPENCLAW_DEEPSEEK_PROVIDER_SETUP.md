@@ -100,6 +100,9 @@ can use this bounded context form:
       "responseContract": "engineering_recommendation_v0",
       "limit": 6,
       "maxOutputChars": 1800,
+      "includeWorkView": true,
+      "includeWorkViewObservation": true,
+      "includePlanTodo": true,
       "instruction": "Review the local engineering evidence and recommend the next verification step."
     },
     "contextContentHash": "<sha256-of-the-bound-materialized-context>",
@@ -125,6 +128,14 @@ JSON that selects one existing allowlisted Observer action and sets
 or execution automatically. The full recommendation reason is transient; the
 task keeps only action, control, capability, contract, hash, and governance
 evidence.
+
+The work-view and plan/todo selectors are optional and explicit. When enabled,
+the request includes only bounded capture freshness/frame provenance/target
+counts and bounded visible plan/todo summaries. It excludes page URLs, pixels,
+page text, target items, selectors, input values, lease ids, and credentials.
+`includeWorkViewObservation` requires `includeWorkView`; changing any selector
+changes the materialized request hash and is rejected if it no longer matches
+the approved binding.
 
 Neither path turns on automatic provider calls for OpenClaw tasks. The existing
 task and Observer lanes remain approval-gated, and the live branch requires the

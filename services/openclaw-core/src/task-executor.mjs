@@ -24,6 +24,7 @@ import {
   CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CONTEXT_PACKET_EVIDENCE,
   materialiseCloudLiveProviderContextPacketExecution,
 } from "./cloud-live-provider-runtime-context-packet.mjs";
+import { readNativeEngineeringWorkViewState } from "./native-engineering-work-view-association.mjs";
 
 export function createTaskExecutor(deps) {
   const {
@@ -36,6 +37,7 @@ export function createTaskExecutor(deps) {
     policyEvaluator,
     publishEvent,
     hostdControlClient = requestHostdSystemSenseRestart,
+    readWorkViewState = readNativeEngineeringWorkViewState,
   } = deps;
   const {
     fetchJson,
@@ -1263,7 +1265,7 @@ async function executeTaskWithRecovery(task, options = {}) {
   };
 }
 
-function buildOperatorOptions(task, body = {}) {
+async function buildOperatorOptions(task, body = {}) {
   const planActions = task.plan?.steps
     ?.filter((step) => step.phase === "acting_on_target")
     .map((step) => ({ kind: step.kind, params: step.params ?? {} }));
@@ -1274,7 +1276,7 @@ function buildOperatorOptions(task, body = {}) {
     operator: "loop-v1",
   };
   if (body.liveProviderExecution?.contextPacket?.requested === true) {
-    const materialised = materialiseCloudLiveProviderContextPacketExecution({
+    const materialised = await materialiseCloudLiveProviderContextPacketExecution({
       task,
       liveProviderExecution: body.liveProviderExecution,
       transcriptRecords: listCommandTranscriptRecords({ limit: 100 }),
@@ -1285,6 +1287,10 @@ function buildOperatorOptions(task, body = {}) {
         })
         : [],
       tasks,
+      runtimeState,
+      workbenchRecords: state.nativeEngineeringPlanTodoWorkbenchRecords,
+      sessionManagerUrl,
+      readWorkViewState,
     });
     if (materialised.ok) {
       options.liveProviderExecution = materialised.liveProviderExecution;
@@ -1375,7 +1381,7 @@ async function runOperatorStep(body = {}) {
     };
   }
 
-  const executionResult = await executeTaskWithRecovery(task, buildOperatorOptions(task, body));
+  const executionResult = await executeTaskWithRecovery(task, await buildOperatorOptions(task, body));
   const finalExecution = executionResult.finalExecution ?? executionResult;
   if (finalExecution.blocked === true) {
     return {

@@ -235,6 +235,15 @@ sender runs. The sender rejects non-DeepSeek credential references and HTTP
 redirects. Recommendations remain review-only and cannot create a task,
 approval, execution, or provider egress automatically.
 
+The same approved handoff now accepts explicit `includeWorkView`,
+`includeWorkViewObservation`, and `includePlanTodo` context selectors. It
+reuses the existing local association and plan/todo builders, includes only
+bounded summaries in the transient provider message, and carries their
+materialized content through the existing request-hash binding. Raw page
+payloads, URLs, pixels, target items, selectors, input values, lease ids, and
+credentials remain excluded. The focused boundary is documented in
+`docs/plans/OPENCLAW_NATIVE_ENGINEERING_CONTEXT_PROVIDER_HANDOFF_BRIDGE_PLAN.md`.
+
 The next autonomous product route is the smallest real Level 2 trusted AI
 work-view/session-helper behavior. Keep helper installation, root/system daemon
 work, desktop-wide capture, unapproved provider egress, and arbitrary endpoint

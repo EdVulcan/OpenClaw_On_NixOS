@@ -552,6 +552,8 @@ function selectSourceHeuristics(file) {
     ["services/openclaw-core/src/task-executor.mjs", ["task-executor"]],
     ["services/openclaw-core/src/route-handlers.mjs", ["task-workbench", "operator-loop", "observer-operator"]],
     ["services/openclaw-core/src/cloud-live-provider-result-envelope-routes.mjs", ["openclaw-live-provider-result-envelope-batch-reuse"]],
+    ["services/openclaw-core/src/cloud-live-provider-runtime-context-packet.mjs", [nativeEngineeringContextPacketPairBatchCheck, "openclaw-core-service-unit-tests"]],
+    ["services/openclaw-core/src/cloud-live-provider-runtime-live-execution.mjs", ["openclaw-core-service-unit-tests"]],
     ["services/openclaw-core/src/native-engineering-context-packet.mjs", [nativeEngineeringContextPacketPairBatchCheck]],
     ["services/openclaw-core/src/native-engineering-context-routes.mjs", [nativeEngineeringContextPacketPairBatchCheck]],
     ["services/openclaw-core/src/native-engineering-work-view-association.mjs", [nativeEngineeringContextPacketPairBatchCheck]],
@@ -597,6 +599,11 @@ function selectSourceHeuristics(file) {
     if (file === prefix || file.startsWith(`${prefix.replace(/\.mjs$/, "")}-`)) {
       for (const name of names) selectName(name);
     }
+  }
+
+  if (file === "services/openclaw-core/src/cloud-live-provider-runtime-context-packet.mjs"
+    || file === "services/openclaw-core/src/cloud-live-provider-runtime-live-execution.mjs") {
+    return;
   }
 
   if (file === "services/openclaw-core/package.json" || file.startsWith("services/openclaw-core/test/")) {

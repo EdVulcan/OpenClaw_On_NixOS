@@ -1977,7 +1977,7 @@ test("browser task executor returns recoverable evidence when session authority 
   assert.equal(failed.task.outcome.details.authorityInterruption.recoveryAction, "restore_trusted_work_view_then_recover_task");
 });
 
-test("operator options materialise the existing context packet for live provider execution", () => {
+test("operator options materialise the existing context packet for live provider execution", async () => {
   const { executor, state } = createExecutorHarness();
   const task = {
     id: "provider-context-task",
@@ -2000,7 +2000,7 @@ test("operator options materialise the existing context packet for live provider
   };
   state.tasks.set(task.id, task);
 
-  const options = executor.buildOperatorOptions(task, {
+  const options = await executor.buildOperatorOptions(task, {
     liveProviderExecution: {
       requested: true,
       taskId: task.id,
@@ -2017,6 +2017,104 @@ test("operator options materialise the existing context packet for live provider
   assert.equal(options.liveProviderExecution.requestEnvelope.messages.length, 1);
   assert.match(options.liveProviderExecution.requestEnvelope.messages[0].content, /npm test/);
   assert.match(options.liveProviderExecution.requestEnvelope.messages[0].content, /provider context evidence/);
+});
+
+test("operator options carry explicitly requested work-view observation and plan/todo context", async () => {
+  const workViewId = "work-view-provider-context";
+  const taskId = "provider-context-work-view-task";
+  const { executor, state } = createExecutorHarness({
+    state: {
+      runtimeState: { currentTaskId: taskId },
+      nativeEngineeringPlanTodoWorkbenchRecords: new Map([[taskId, {
+        key: taskId,
+        recordId: "provider-context-workbench",
+        taskId,
+        revision: 1,
+        todos: [{ id: "todo-provider", description: "Review bounded provider context", status: "pending" }],
+      }]]),
+    },
+    deps: {
+      readWorkViewState: async () => ({
+        ok: true,
+        data: {
+          ok: true,
+          workView: {
+            workViewId,
+            status: "ready",
+            visibility: "visible",
+            helperStatus: "active",
+            browserStatus: "running",
+          },
+          session: { sessionId: "provider-context-session", status: "ready" },
+          trustedSession: {
+            sessionIdentity: { status: "authoritative" },
+            helperRuntime: {
+              status: "active",
+              actionAuthority: "active",
+              leaseMatched: true,
+              captureSourceStatus: "ready",
+              captureFreshness: "fresh",
+              sidecar: {
+                captureObservation: {
+                  registry: "capture-v0",
+                  sequence: 4,
+                  visualFrame: {
+                    available: true,
+                    fresh: true,
+                    sequence: 4,
+                    sha256: "c".repeat(64),
+                    width: 960,
+                    height: 540,
+                    byteLength: 9000,
+                    sourceScope: "ai_owned_active_page_only",
+                  },
+                  semanticTargets: {
+                    available: true,
+                    itemCount: 1,
+                    inventorySha256: "d".repeat(64),
+                    frameSequence: 4,
+                    frameSha256: "c".repeat(64),
+                  },
+                },
+              },
+            },
+          },
+        },
+      }),
+    },
+  });
+  const task = {
+    id: taskId,
+    type: "cloud_consciousness_live_provider_egress_execution_task",
+    goal: "Use a bounded trusted context",
+    status: "queued",
+    workView: { sessionId: "provider-context-session", workViewId },
+    plan: {
+      steps: [{ id: "provider-step", phase: "verify", title: "Review provider context", status: "pending" }],
+    },
+  };
+  state.tasks.set(task.id, task);
+
+  const options = await executor.buildOperatorOptions(task, {
+    liveProviderExecution: {
+      requested: true,
+      taskId,
+      contextPacket: {
+        requested: true,
+        taskId,
+        includeWorkView: true,
+        includeWorkViewObservation: true,
+        includePlanTodo: true,
+      },
+    },
+  });
+
+  assert.equal(options[CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CONTEXT_PACKET_EVIDENCE].workViewObservationIncluded, true);
+  assert.equal(options[CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CONTEXT_PACKET_EVIDENCE].planTodoEvidenceIncluded, true);
+  assert.equal(options.liveProviderExecution.contextPacket.includeWorkView, true);
+  assert.equal(options.liveProviderExecution.contextPacket.includePlanTodo, true);
+  assert.match(options.liveProviderExecution.requestEnvelope.messages[0].content, /work-view-provider-context/);
+  assert.match(options.liveProviderExecution.requestEnvelope.messages[0].content, /provider context/);
 });
 
 test("execution serializer exposes transient recommendation separately from compact task evidence", () => {

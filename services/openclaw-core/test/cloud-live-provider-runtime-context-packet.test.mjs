@@ -52,9 +52,9 @@ function contextInputs() {
   };
 }
 
-test("context packet handoff materialises one bounded provider message with compact evidence", () => {
+test("context packet handoff materialises one bounded provider message with compact evidence", async () => {
   const input = contextInputs();
-  const result = materialiseCloudLiveProviderContextPacketExecution({
+  const result = await materialiseCloudLiveProviderContextPacketExecution({
     ...input,
     liveProviderExecution: {
       requested: true,
@@ -81,9 +81,9 @@ test("context packet handoff materialises one bounded provider message with comp
   assert.doesNotMatch(JSON.stringify(result.evidence), /tests passed/);
 });
 
-test("context packet handoff rejects a different task and an ambiguous request envelope", () => {
+test("context packet handoff rejects a different task and an ambiguous request envelope", async () => {
   const input = contextInputs();
-  const mismatch = materialiseCloudLiveProviderContextPacketExecution({
+  const mismatch = await materialiseCloudLiveProviderContextPacketExecution({
     ...input,
     liveProviderExecution: {
       requested: true,
@@ -94,7 +94,7 @@ test("context packet handoff rejects a different task and an ambiguous request e
   assert.equal(mismatch.ok, false);
   assert.equal(mismatch.reason, "live_provider_context_task_mismatch");
 
-  const conflict = materialiseCloudLiveProviderContextPacketExecution({
+  const conflict = await materialiseCloudLiveProviderContextPacketExecution({
     ...input,
     liveProviderExecution: {
       requested: true,
@@ -106,7 +106,7 @@ test("context packet handoff rejects a different task and an ambiguous request e
   assert.equal(conflict.ok, false);
   assert.equal(conflict.reason, "live_provider_context_request_envelope_conflict");
 
-  const unsupportedContract = materialiseCloudLiveProviderContextPacketExecution({
+  const unsupportedContract = await materialiseCloudLiveProviderContextPacketExecution({
     ...input,
     liveProviderExecution: {
       requested: true,
@@ -120,4 +120,147 @@ test("context packet handoff rejects a different task and an ambiguous request e
   });
   assert.equal(unsupportedContract.ok, false);
   assert.equal(unsupportedContract.reason, "live_provider_context_response_contract_not_supported");
+});
+
+test("context packet handoff can explicitly carry work-view observation and plan/todo summaries", async () => {
+  const input = contextInputs();
+  input.tasks.get(input.task.id).workView = {
+    sessionId: "session-context-1",
+    workViewId: "work-view-context-1",
+  };
+  input.tasks.get(input.task.id).goal = "Review api_key=plan-secret without exposing it";
+  input.tasks.get(input.task.id).plan = {
+    planner: "test-planner",
+    strategy: "bounded-verification",
+    steps: [{
+      id: "verify-step",
+      phase: "verify",
+      title: "Inspect the bounded verification evidence",
+      status: "pending",
+    }],
+  };
+  const result = await materialiseCloudLiveProviderContextPacketExecution({
+    ...input,
+    runtimeState: { currentTaskId: input.task.id },
+    workbenchRecords: new Map([[input.task.id, {
+      key: input.task.id,
+      recordId: "workbench-context-1",
+      taskId: input.task.id,
+      revision: 2,
+      todos: [{ id: "todo-1", description: "Review the provider recommendation", status: "in_progress" }],
+    }]]),
+    sessionManagerUrl: "http://session-manager",
+    readWorkViewState: async () => ({
+      ok: true,
+      data: {
+        ok: true,
+        workView: {
+          workViewId: "work-view-context-1",
+          status: "ready",
+          visibility: "visible",
+          helperStatus: "active",
+          browserStatus: "running",
+        },
+        session: {
+          sessionId: "session-context-1",
+          status: "ready",
+          role: "ai-work-view",
+        },
+        trustedSession: {
+          sessionIdentity: {
+            status: "authoritative",
+            sessionManagerBacked: true,
+            browserRuntimeBacked: true,
+          },
+          helperRuntime: {
+            status: "active",
+            actionAuthority: "active",
+            leaseMatched: true,
+            sidecar: {
+              captureSourceStatus: "ready",
+              captureFreshness: "fresh",
+              captureAgeMs: 42,
+              captureObservation: {
+                registry: "capture-v0",
+                sequence: 9,
+                capturedAt: "2026-07-14T01:00:00.000Z",
+                observedAt: "2026-07-14T01:00:00.100Z",
+                activeUrl: "https://private.example/should-not-escape",
+                title: "Private page title",
+                visibleTextBlockCount: 3,
+                visualFrame: {
+                  available: true,
+                  fresh: true,
+                  sequence: 9,
+                  sha256: "a".repeat(64),
+                  width: 960,
+                  height: 540,
+                  byteLength: 12000,
+                  sourceScope: "ai_owned_active_page_only",
+                  dataUrl: "data:image/jpeg;base64,private",
+                },
+                semanticTargets: {
+                  available: true,
+                  itemCount: 2,
+                  inventorySha256: "b".repeat(64),
+                  frameSequence: 9,
+                  frameSha256: "a".repeat(64),
+                  items: [{ selector: "#private", inputValue: "secret" }],
+                },
+              },
+            },
+          },
+        },
+      },
+    }),
+    liveProviderExecution: {
+      requested: true,
+      taskId: input.task.id,
+      contextPacket: {
+        requested: true,
+        taskId: input.task.id,
+        includeWorkView: true,
+        includeWorkViewObservation: true,
+        includePlanTodo: true,
+        instruction: "Recommend the next bounded verification step.",
+      },
+    },
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.evidence.workViewObservationIncluded, true);
+  assert.equal(result.evidence.workViewObservationStatus, "ready");
+  assert.equal(result.evidence.semanticTargetCount, 2);
+  assert.equal(result.evidence.planTodoEvidenceIncluded, true);
+  assert.equal(result.evidence.planTodoTodoSource, "workbench_storage");
+  assert.equal(result.liveProviderExecution.contextPacket.includeWorkViewObservation, true);
+  assert.equal(result.liveProviderExecution.contextPacket.includePlanTodo, true);
+  const content = result.liveProviderExecution.requestEnvelope.messages[0].content;
+  assert.match(content, /workViewObservationIncluded.*true/);
+  assert.match(content, /workViewObservationStatus.*ready/);
+  assert.match(content, /openclaw-native-engineering-plan-todo-evidence-v0/);
+  assert.doesNotMatch(content, /https:\/\/private\.example/);
+  assert.doesNotMatch(content, /data:image/);
+  assert.doesNotMatch(content, /private page title/);
+  assert.doesNotMatch(content, /"selector"|"inputValue"|"leaseId"/);
+  assert.doesNotMatch(JSON.stringify(result.evidence), /private|secret/);
+  assert.doesNotMatch(content, /plan-secret/);
+});
+
+test("context packet handoff rejects observation without the explicit work-view request", async () => {
+  const input = contextInputs();
+  const result = await materialiseCloudLiveProviderContextPacketExecution({
+    ...input,
+    liveProviderExecution: {
+      requested: true,
+      taskId: input.task.id,
+      contextPacket: {
+        requested: true,
+        taskId: input.task.id,
+        includeWorkViewObservation: true,
+      },
+    },
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, "live_provider_context_observation_requires_work_view");
 });

@@ -55,6 +55,20 @@ function compactContextPacketEvidence(evidence) {
     truncatedOutputs: Number.isInteger(evidence.truncatedOutputs) ? evidence.truncatedOutputs : 0,
     compactedMessages: Number.isInteger(evidence.compactedMessages) ? evidence.compactedMessages : 0,
     reclaimedChars: Number.isInteger(evidence.reclaimedChars) ? evidence.reclaimedChars : 0,
+    workViewAssociationIncluded: evidence.workViewAssociationIncluded === true,
+    workViewAssociationStatus: evidence.workViewAssociationStatus ?? null,
+    workViewObservationIncluded: evidence.workViewObservationIncluded === true,
+    workViewObservationStatus: evidence.workViewObservationStatus ?? null,
+    workViewObservationFreshness: evidence.workViewObservationFreshness ?? null,
+    workViewObservationSequence: Number.isInteger(evidence.workViewObservationSequence)
+      ? evidence.workViewObservationSequence
+      : null,
+    semanticTargetCount: Number.isInteger(evidence.semanticTargetCount)
+      ? evidence.semanticTargetCount
+      : null,
+    planTodoEvidenceIncluded: evidence.planTodoEvidenceIncluded === true,
+    planTodoTodoSource: evidence.planTodoTodoSource ?? null,
+    planTodoCurrentAction: evidence.planTodoCurrentAction ?? null,
     contextContentHash: typeof evidence.contextContentHash === "string"
       ? evidence.contextContentHash
       : null,

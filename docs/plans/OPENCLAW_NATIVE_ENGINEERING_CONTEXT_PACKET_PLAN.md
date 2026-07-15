@@ -127,6 +127,25 @@ This advances the Level 1 cloud-consciousness boundary from local context
 assembly to an explicitly approved provider handoff while preserving local
 operator control.
 
+The provider handoff now also accepts the existing explicit work-view and
+plan/todo selectors:
+
+```json
+{
+  "includeWorkView": true,
+  "includeWorkViewObservation": true,
+  "includePlanTodo": true
+}
+```
+
+The materializer reuses the local association, observation, and plan/todo
+builders, includes only their bounded summaries in the transient provider
+message, and records their inclusion/status in compact task evidence. The
+resulting content hash remains part of the existing approval binding. Page
+URLs, pixels, page text, target items, selectors, input values, lease ids, and
+credentials remain excluded. The focused boundary is documented in
+`OPENCLAW_NATIVE_ENGINEERING_CONTEXT_PROVIDER_HANDOFF_BRIDGE_PLAN.md`.
+
 ## Structured Recommendation Follow-Up Complete
 
 The approved context-packet handoff now appends the bounded
@@ -232,3 +251,8 @@ with `includePlanTodo: true`. It carries bounded task-plan/workbench summaries
 and the existing guidance-only next action as protected context; it does not
 switch planning mode, write a todo file, create a task, or execute the
 suggestion.
+
+When this packet is used by the existing approved provider handoff, these
+selectors are still explicit request inputs and are covered by the same
+request-content hash. They do not enable provider calls or action execution by
+themselves.
