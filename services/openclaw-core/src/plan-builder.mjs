@@ -111,6 +111,7 @@ export function createPlanBuilder(deps) {
   // Native plugin refresh builders depend on the rule-plan serializer below;
   // expose them lazily so the common capability runtime can share the same owner.
   let nativePluginPlanBuilders = null;
+  let cloudLiveProviderRuntimeImplementation = null;
   const capabilityRuntime = createCapabilityRuntime({
     host,
     port,
@@ -134,6 +135,14 @@ export function createPlanBuilder(deps) {
           throw new Error("Native plugin runtime refresh builders are not initialized.");
         }
         return nativePluginPlanBuilders.createNativePluginRuntimeRefreshTask(...args);
+      },
+    },
+    providerRuntime: {
+      createCloudConsciousnessLiveProviderEgressExecutionTask: (...args) => {
+        if (!cloudLiveProviderRuntimeImplementation) {
+          throw new Error("Cloud live provider runtime builders are not initialized.");
+        }
+        return cloudLiveProviderRuntimeImplementation.createCloudConsciousnessLiveProviderEgressExecutionTask(...args);
       },
     },
   });
@@ -598,7 +607,7 @@ export function createPlanBuilder(deps) {
     buildCloudConsciousnessLiveProviderCallRuntimeImplementationPlan,
   } = cloudConsciousnessLiveProviderRuntimeReadinessBuilders;
 
-  const cloudLiveProviderRuntimeImplementation = createCloudLiveProviderRuntimeImplementation({
+  cloudLiveProviderRuntimeImplementation = createCloudLiveProviderRuntimeImplementation({
     buildRuntimeImplementationPlan: buildCloudConsciousnessLiveProviderCallRuntimeImplementationPlan,
     createTask,
     createApprovalRequestForTask,

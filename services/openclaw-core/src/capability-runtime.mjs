@@ -12,6 +12,7 @@ import { createEngineeringContextCapabilityHandlers } from "./capability-runtime
 import { createEngineeringPlanTodoCapabilityHandlers } from "./capability-runtime-engineering-plan-todo.mjs";
 import { createEngineeringWorkViewCapabilityHandlers } from "./capability-runtime-work-view.mjs";
 import { createPluginRuntimeRefreshCapabilityHandlers } from "./capability-runtime-plugin-refresh.mjs";
+import { createEngineeringProviderHandoffCapabilityHandlers } from "./capability-runtime-engineering-provider-handoff.mjs";
 
 export function createCapabilityRuntime(deps) {
   const {
@@ -30,6 +31,7 @@ export function createCapabilityRuntime(deps) {
     listCommandTranscriptRecords = () => [],
     listFilesystemChangeRecords = () => [],
     pluginRuntime = {},
+    providerRuntime = {},
   } = deps;
   const {
     fetchJson,
@@ -124,6 +126,7 @@ export function createCapabilityRuntime(deps) {
     publishEvent,
   });
   const pluginRuntimeRefreshHandlers = createPluginRuntimeRefreshCapabilityHandlers(pluginRuntime);
+  const engineeringProviderHandoffHandlers = createEngineeringProviderHandoffCapabilityHandlers(providerRuntime);
 
   function baseCapabilities() {
     return buildBaseCapabilities({
@@ -348,6 +351,10 @@ export function createCapabilityRuntime(deps) {
     if (pluginRuntimeRefresh.handled) {
       return pluginRuntimeRefresh.result;
     }
+    const engineeringProviderHandoff = await engineeringProviderHandoffHandlers.callBackend(capability, request);
+    if (engineeringProviderHandoff.handled) {
+      return engineeringProviderHandoff.result;
+    }
 
     if (capability.id === "sense.system.vitals") {
       return fetchJson(`${systemSenseUrl}/system/health`);
@@ -562,6 +569,10 @@ export function createCapabilityRuntime(deps) {
     const pluginRuntimeRefreshSummary = pluginRuntimeRefreshHandlers.summariseResult(capability, result);
     if (pluginRuntimeRefreshSummary) {
       return pluginRuntimeRefreshSummary;
+    }
+    const engineeringProviderHandoffSummary = engineeringProviderHandoffHandlers.summariseResult(capability, result);
+    if (engineeringProviderHandoffSummary) {
+      return engineeringProviderHandoffSummary;
     }
 
     if (capability.id === "sense.system.vitals") {
@@ -864,6 +875,13 @@ export function createCapabilityRuntime(deps) {
       return {
         statusCode: 400,
         response: { ok: false, error: pluginRuntimeRefreshValidationError },
+      };
+    }
+    const engineeringProviderHandoffValidationError = engineeringProviderHandoffHandlers.validateRequest(capability, request);
+    if (engineeringProviderHandoffValidationError) {
+      return {
+        statusCode: 400,
+        response: { ok: false, error: engineeringProviderHandoffValidationError },
       };
     }
 

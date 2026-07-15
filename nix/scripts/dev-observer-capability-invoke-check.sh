@@ -43,6 +43,8 @@ cleanup() {
     "${WORK_VIEW_FILE:-}" \
     "${WORK_VIEW_CONTROL_FILE:-}" \
     "${CONTEXT_PACKET_FILE:-}" \
+    "${PROVIDER_HANDOFF_FILE:-}" \
+    "${CAPABILITIES_FILE:-}" \
     "${BLOCKED_FILE:-}" \
     "${APPROVED_FILE:-}" \
     "${EVENTS_FILE:-}"
@@ -71,6 +73,8 @@ ENGINEERING_WRITE_PROPOSAL_FILE="$(mktemp)"
 WORK_VIEW_FILE="$(mktemp)"
 WORK_VIEW_CONTROL_FILE="$(mktemp)"
 CONTEXT_PACKET_FILE="$(mktemp)"
+PROVIDER_HANDOFF_FILE="$(mktemp)"
+CAPABILITIES_FILE="$(mktemp)"
 BLOCKED_FILE="$(mktemp)"
 APPROVED_FILE="$(mktemp)"
 EVENTS_FILE="$(mktemp)"
@@ -89,6 +93,8 @@ post_json "http://127.0.0.1:$OPENCLAW_SESSION_MANAGER_PORT/work-view/prepare" '{
 post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"act.work_view.control","operation":"work_view.reveal","params":{"entryUrl":"https://example.com/observer-capability-work-view"}}' > "$WORK_VIEW_CONTROL_FILE"
 post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"sense.openclaw.engineering_context.packet","params":{"limit":4,"thresholdChars":256,"protectRecentAssistantTurns":0}}' > "$CONTEXT_PACKET_FILE"
 post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"sense.openclaw.engineering_context.work_view_observation"}' > "$WORK_VIEW_FILE"
+curl --silent --fail "$CORE_URL/capabilities" > "$CAPABILITIES_FILE"
+post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"act.openclaw.engineering_context.provider_handoff_task","approved":true,"params":{"confirm":false}}' > "$PROVIDER_HANDOFF_FILE"
 post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"act.system.command.dry_run","intent":"system.command","params":{"command":"rm","args":["-rf","/tmp/openclaw-danger"]}}' > "$BLOCKED_FILE"
 post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"act.system.command.dry_run","intent":"system.command","approved":true,"params":{"command":"rm","args":["-rf","/tmp/openclaw-danger"]}}' > "$APPROVED_FILE"
 curl --silent --fail "$EVENT_HUB_URL/events/audit?source=openclaw-core&limit=80" > "$EVENTS_FILE"
@@ -109,7 +115,9 @@ node - <<'EOF' \
   "$ENGINEERING_WRITE_PROPOSAL_FILE" \
   "$WORK_VIEW_FILE" \
   "$WORK_VIEW_CONTROL_FILE" \
-  "$CONTEXT_PACKET_FILE"
+  "$CONTEXT_PACKET_FILE" \
+  "$PROVIDER_HANDOFF_FILE" \
+  "$CAPABILITIES_FILE"
 const fs = require("node:fs");
 const html = fs.readFileSync(process.argv[2], "utf8");
 const client = fs.readFileSync(process.argv[3], "utf8");
@@ -127,6 +135,8 @@ const engineeringWriteProposal = JSON.parse(fs.readFileSync(process.argv[14], "u
 const workView = JSON.parse(fs.readFileSync(process.argv[15], "utf8"));
 const workViewControl = JSON.parse(fs.readFileSync(process.argv[16], "utf8"));
 const contextPacket = JSON.parse(fs.readFileSync(process.argv[17], "utf8"));
+const providerHandoff = JSON.parse(fs.readFileSync(process.argv[18], "utf8"));
+const capabilities = JSON.parse(fs.readFileSync(process.argv[19], "utf8"));
 
 for (const token of [
   "invoke-vitals-button",
@@ -261,6 +271,26 @@ if (
 ) {
   throw new Error("Observer engineering context packet invoke path should remain local and summary-only");
 }
+if (!capabilities.ok || !capabilities.capabilities?.some((capability) =>
+  capability.id === "act.openclaw.engineering_context.provider_handoff_task"
+  && capability.governance === "require_approval"
+  && capability.requiresApproval === true
+  && capability.domains?.includes("cross_boundary")
+)) {
+  throw new Error("Observer capability registry should expose the governed provider handoff task boundary");
+}
+if (
+  !providerHandoff.ok
+  || providerHandoff.invoked !== true
+  || providerHandoff.result?.blocked !== true
+  || providerHandoff.result?.reason !== "operator_confirmation_required"
+  || providerHandoff.summary?.kind !== "engineering.provider_handoff_task"
+  || providerHandoff.summary?.createsTask !== false
+  || providerHandoff.summary?.createsApproval !== false
+  || providerHandoff.summary?.noProviderCall !== true
+) {
+  throw new Error("Observer provider handoff capability should stop at explicit confirmation");
+}
 if (!blocked.ok || blocked.invoked !== false || blocked.blocked !== true || blocked.reason !== "policy_requires_approval") {
   throw new Error("Observer blocked dry-run path should expose policy_requires_approval");
 }
@@ -316,6 +346,11 @@ console.log(JSON.stringify({
         messages: contextPacket.summary.messageCount,
         redactions: contextPacket.summary.redactions,
         providerEgress: !contextPacket.summary.noProviderEgress,
+      },
+      providerHandoff: {
+        blocked: providerHandoff.result.reason,
+        createsTask: providerHandoff.summary.createsTask,
+        noProviderCall: providerHandoff.summary.noProviderCall,
       },
     },
     vitalsPolicy: vitals.policy.decision,

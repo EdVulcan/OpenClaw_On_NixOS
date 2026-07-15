@@ -77,6 +77,20 @@ existing engineering task to supply the bounded context. The source task must
 exist, and both ids plus the materialized content hash are retained as compact
 provenance.
 
+The same handoff task is now exposed through the common capability runtime as:
+
+```text
+act.openclaw.engineering_context.provider_handoff_task
+```
+
+The capability requires an approved cross-boundary invocation and
+`params.confirm=true`, validates the fixed DeepSeek credential reference and
+bounded request envelope, then delegates to the existing egress task builder.
+It accepts the compact source-task/context-hash binding but never stores the
+request message, creates a second execution owner, reads credentials, or
+contacts the provider. The later `/operator/step` binding check remains the
+only path that can proceed toward execution.
+
 ## Evidence
 
 Runtime:
@@ -85,6 +99,9 @@ Runtime:
 services/openclaw-core/src/cloud-live-provider-runtime-context-packet.mjs
 services/openclaw-core/src/cloud-live-provider-runtime-live-execution.mjs
 services/openclaw-core/src/task-executor.mjs
+services/openclaw-core/src/capability-runtime-engineering-provider-handoff.mjs
+services/openclaw-core/src/capability-runtime.mjs
+services/openclaw-core/src/capability-descriptors.mjs
 ```
 
 Tests:
@@ -93,6 +110,7 @@ Tests:
 services/openclaw-core/test/cloud-live-provider-runtime-context-packet.test.mjs
 services/openclaw-core/test/cloud-live-provider-runtime-live-execution.test.mjs
 services/openclaw-core/test/task-executor.test.mjs
+services/openclaw-core/test/capability-runtime-engineering-provider-handoff.test.mjs
 ```
 
 The tests prove explicit flag handling, local work-view read assembly, plan/todo
@@ -104,6 +122,7 @@ existing hash-bound live execution path.
 ```text
 automatic provider calls
 automatic use of provider recommendations
+automatic capability approval or provider task execution
 raw page or visual payload transfer
 long-lived LSP or ACPX/Codex process execution
 new provider routes or credential sources

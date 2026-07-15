@@ -325,6 +325,16 @@ and network access remain disabled. Core and Observer refresh checks exercise
 the common evidence path and its confirmation boundary. Details are in
 `docs/plans/OPENCLAW_NATIVE_PLUGIN_RUNTIME_REFRESH_TASK_PLAN.md`.
 
+The explicitly approved Engineering Context provider handoff task is now also
+available through the common capability runtime as
+`act.openclaw.engineering_context.provider_handoff_task`. It accepts only the
+bounded DeepSeek request shape, requires both capability approval and
+`confirm:true`, and delegates task/approval creation to the existing egress
+owner. The persisted task retains only the endpoint/model/credential-reference
+and request/context hash binding; it performs no credential read, endpoint
+contact, provider call, or network egress. The existing operator step remains
+the only execution owner.
+
 The first common capability-runtime entry point for the Level 2 trusted
 work-view is now available as
 `sense.openclaw.engineering_context.work_view_observation`. It reads the

@@ -183,6 +183,10 @@ OPENCLAW_NATIVE_ENGINEERING_CONTEXT_PROVIDER_HANDOFF_BRIDGE_PLAN.md
 
 It reuses the existing approval-bound DeepSeek task and keeps the context
 transient; it does not transfer raw page payloads or create automatic actions.
+The same explicit task creation is available through
+`act.openclaw.engineering_context.provider_handoff_task`, which delegates to
+the existing egress owner and still leaves operator execution and provider
+egress separately gated.
 
 The provider handoff's explicit source-task continuity is documented in:
 

@@ -319,6 +319,23 @@ export function buildBaseCapabilities({
       description: "Assemble bounded redacted local engineering context with protected verification/recovery evidence without provider use or persisted packet content.",
     },
     {
+      id: "act.openclaw.engineering_context.provider_handoff_task",
+      name: "Native Engineering Provider Handoff Task",
+      kind: "actuator",
+      service: "openclaw-core",
+      endpoint: `http://${host}:${port}/cloud-consciousness/live-provider-egress-execution-tasks`,
+      intents: [
+        "openclaw.engineering_context.provider_handoff_task",
+        "engineering.context.provider_handoff_task",
+        "provider.handoff_task",
+      ],
+      domains: ["cross_boundary"],
+      risk: "high",
+      governance: "require_approval",
+      requiresApproval: true,
+      description: "Create an explicitly confirmed, request-bound DeepSeek handoff task through the existing approval owner without contacting the endpoint or reading credentials.",
+    },
+    {
       id: "sense.openclaw.engineering_context.plan_todo_evidence",
       name: "Native Engineering Plan/Todo Evidence",
       kind: "sensor",

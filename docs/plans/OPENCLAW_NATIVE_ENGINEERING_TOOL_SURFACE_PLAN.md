@@ -557,6 +557,13 @@ generation metadata for core restart, and keeps arbitrary plugin module import,
 plugin code execution, runtime activation, cache mutation, provider egress, and
 root work disabled.
 
+The existing explicitly approved provider handoff task is also available as
+`act.openclaw.engineering_context.provider_handoff_task`. It validates the
+fixed DeepSeek request shape, delegates to the existing approval-bound egress
+owner, and retains only compact request/context binding metadata. This is a
+task-creation bridge, not a provider call: credential reads, endpoint contact,
+network egress, automatic approval, and operator execution remain deferred.
+
 The ACPX/Codex bridge compatibility follow-up was completed as:
 
 ```text

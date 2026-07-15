@@ -45,6 +45,8 @@ cleanup() {
     "${WORK_VIEW_FILE:-}" \
     "${WORK_VIEW_CONTROL_FILE:-}" \
     "${CONTEXT_PACKET_FILE:-}" \
+    "${PROVIDER_HANDOFF_FILE:-}" \
+    "${CAPABILITIES_FILE:-}" \
     "${PROCESS_FILE:-}" \
     "${BLOCKED_COMMAND_FILE:-}" \
     "${APPROVED_COMMAND_FILE:-}" \
@@ -72,6 +74,8 @@ ENGINEERING_WRITE_PROPOSAL_FILE="$(mktemp)"
 WORK_VIEW_FILE="$(mktemp)"
 WORK_VIEW_CONTROL_FILE="$(mktemp)"
 CONTEXT_PACKET_FILE="$(mktemp)"
+PROVIDER_HANDOFF_FILE="$(mktemp)"
+CAPABILITIES_FILE="$(mktemp)"
 PROCESS_FILE="$(mktemp)"
 BLOCKED_COMMAND_FILE="$(mktemp)"
 APPROVED_COMMAND_FILE="$(mktemp)"
@@ -90,6 +94,8 @@ post_json "$SESSION_MANAGER_URL/work-view/prepare" '{"displayTarget":"workspace-
 post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"act.work_view.control","operation":"work_view.reveal","params":{"entryUrl":"https://example.com/capability-work-view"}}' > "$WORK_VIEW_CONTROL_FILE"
 post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"sense.openclaw.engineering_context.packet","params":{"limit":4,"thresholdChars":256,"protectRecentAssistantTurns":0}}' > "$CONTEXT_PACKET_FILE"
 post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"sense.openclaw.engineering_context.work_view_observation"}' > "$WORK_VIEW_FILE"
+curl --silent --fail "$CORE_URL/capabilities" > "$CAPABILITIES_FILE"
+post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"act.openclaw.engineering_context.provider_handoff_task","approved":true,"params":{"confirm":false}}' > "$PROVIDER_HANDOFF_FILE"
 post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"sense.process.list","intent":"process.list","params":{"limit":20}}' > "$PROCESS_FILE"
 post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"act.system.command.dry_run","intent":"system.command","params":{"command":"rm","args":["-rf","/tmp/openclaw-danger"]}}' > "$BLOCKED_COMMAND_FILE"
 post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"act.system.command.dry_run","intent":"system.command","approved":true,"params":{"command":"rm","args":["-rf","/tmp/openclaw-danger"]}}' > "$APPROVED_COMMAND_FILE"
@@ -112,6 +118,8 @@ node - <<'EOF' \
   "$WORK_VIEW_FILE" \
   "$WORK_VIEW_CONTROL_FILE" \
   "$CONTEXT_PACKET_FILE" \
+  "$PROVIDER_HANDOFF_FILE" \
+  "$CAPABILITIES_FILE" \
   "$FIXTURE_DIR"
 const fs = require("node:fs");
 const readJson = (index) => JSON.parse(fs.readFileSync(process.argv[index], "utf8"));
@@ -131,7 +139,9 @@ const engineeringWriteProposal = readJson(14);
 const workView = readJson(15);
 const workViewControl = readJson(16);
 const contextPacket = readJson(17);
-const fixtureDir = process.argv[18];
+const providerHandoff = readJson(18);
+const capabilities = readJson(19);
+const fixtureDir = process.argv[20];
 
 if (!vitals.ok || vitals.invoked !== true || vitals.capability?.id !== "sense.system.vitals" || vitals.policy?.decision !== "audit_only") {
   throw new Error("system vitals capability should be invoked with audit-only governance");
@@ -272,6 +282,26 @@ if (
 ) {
   throw new Error(`engineering context packet capability should remain local and summary-only in the ledger: ${JSON.stringify(contextPacket)}`);
 }
+if (!capabilities.ok || !capabilities.capabilities?.some((capability) =>
+  capability.id === "act.openclaw.engineering_context.provider_handoff_task"
+  && capability.governance === "require_approval"
+  && capability.requiresApproval === true
+  && capability.domains?.includes("cross_boundary")
+)) {
+  throw new Error("capability registry should expose the governed provider handoff task boundary");
+}
+if (
+  !providerHandoff.ok
+  || providerHandoff.invoked !== true
+  || providerHandoff.result?.blocked !== true
+  || providerHandoff.result?.reason !== "operator_confirmation_required"
+  || providerHandoff.summary?.kind !== "engineering.provider_handoff_task"
+  || providerHandoff.summary?.createsTask !== false
+  || providerHandoff.summary?.createsApproval !== false
+  || providerHandoff.summary?.noProviderCall !== true
+) {
+  throw new Error(`provider handoff capability should stop at its explicit confirmation boundary: ${JSON.stringify(providerHandoff)}`);
+}
 if (!processes.ok || processes.invoked !== true || processes.result?.count < 1 || processes.summary?.kind !== "process.list") {
   throw new Error("process list capability should route through core");
 }
@@ -337,6 +367,11 @@ console.log(JSON.stringify({
         messages: contextPacket.summary.messageCount,
         redactions: contextPacket.summary.redactions,
         providerEgress: !contextPacket.summary.noProviderEgress,
+      },
+      providerHandoff: {
+        blocked: providerHandoff.result.reason,
+        createsTask: providerHandoff.summary.createsTask,
+        noProviderCall: providerHandoff.summary.noProviderCall,
       },
       policies: [engineeringRead.policy.decision, engineeringGlob.policy.decision, engineeringGrep.policy.decision],
     },
