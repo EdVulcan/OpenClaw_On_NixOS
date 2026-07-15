@@ -63,6 +63,7 @@ test("Observer exposes the explicit pending provider handoff task control", asyn
                 provider: "deepseek",
                 model: "deepseek-chat",
                 requestContentHash: "r".repeat(64),
+                sourceTaskId: "source-task-1",
                 requestContentIncluded: false,
                 credentialValueIncluded: false,
               },
@@ -107,6 +108,7 @@ test("Observer exposes the explicit pending provider handoff task control", asyn
   assert.equal(context.engineeringProviderHandoffTask.textContent, "provider-task-1");
   assert.equal(context.engineeringProviderHandoffApproval.textContent, "provider-approval-1");
   assert.equal(context.engineeringProviderHandoffJson.textContent.includes("Review the bounded local engineering state."), false);
+  assert.match(context.engineeringProviderHandoffJson.textContent, /sourceTask=source-task-1/);
   assert.doesNotMatch(context.engineeringProviderHandoffJson.textContent, /sk-[A-Za-z0-9_-]{16,}/u);
   assert.match(calls.at(-1)[1], /Created pending DeepSeek handoff task provider-task-1/);
 });

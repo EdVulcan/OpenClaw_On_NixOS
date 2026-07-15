@@ -18,7 +18,7 @@ export const observerClientEngineeringProviderHandoffRenderersScript = `function
     \`Status: \${blocked ? (data?.reason ?? result?.reason ?? "blocked") : task ? (task.status ?? "created") : "not created"}\`,
     \`Task: \${task?.id ?? summary.taskId ?? "none"}\`,
     \`Approval: \${approval?.id ?? summary.approvalId ?? "none"} status=\${approval?.status ?? "none"}\`,
-    \`Binding: provider=\${binding.provider ?? summary.provider ?? "none"} model=\${binding.model ?? summary.model ?? "none"} requestBound=\${Boolean(binding.requestContentHash) || summary.requestBound === true}\`,
+    \`Binding: provider=\${binding.provider ?? summary.provider ?? "none"} model=\${binding.model ?? summary.model ?? "none"} sourceTask=\${binding.sourceTaskId ?? summary.sourceTaskId ?? "none"} requestBound=\${Boolean(binding.requestContentHash) || summary.requestBound === true}\`,
     \`Governance: createsTask=\${Boolean(result?.governance?.createsTask ?? summary.createsTask)} createsApproval=\${Boolean(result?.governance?.createsApproval ?? summary.createsApproval)} endpointContacted=\${Boolean(result?.governance?.endpointContacted ?? summary.endpointContacted)} networkEgress=\${Boolean(result?.governance?.networkEgress ?? summary.networkEgress)} providerCall=\${Boolean(result?.governance?.providerCall ?? false)}\`,
     "Request text and credential values are not shown or persisted in this readback.",
   ].join("\\n");
