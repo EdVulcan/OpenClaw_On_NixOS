@@ -14,6 +14,8 @@ import { createNativeEngineeringLspLifecycleStateBuilders } from "./native-engin
 import { createNativeEngineeringLspSourceTransferProposalBuilders } from "./native-engineering-lsp-source-transfer-proposal-builders.mjs";
 import { createNativeEngineeringLspSymbolRequestProposalBuilders } from "./native-engineering-lsp-symbol-request-proposal-builders.mjs";
 import { createNativeEngineeringLspSelectedTargetReadBridgeBuilders } from "./native-engineering-lsp-selected-target-read-bridge-builders.mjs";
+import { buildNativeEngineeringEditExecutionEvidence } from "./native-engineering-edit-execution-evidence-builders.mjs";
+import { buildNativeEngineeringWriteExecutionEvidence } from "./native-engineering-write-execution-evidence-builders.mjs";
 import { createNativeAcpxCodexBridgeBuilders } from "./native-acpx-codex-bridge-builders.mjs";
 import { createNativeAcpxCodexBridgeTaskBuilders } from "./native-acpx-codex-bridge-task-builders.mjs";
 import {
@@ -542,7 +544,9 @@ function buildOpenClawNativePluginAdapterStatus() {
     buildNativeEngineeringGlob,
     buildNativeEngineeringGrep,
     buildNativeEngineeringEditProposal,
+    buildNativeEngineeringEditExecutionEvidence,
     buildNativeEngineeringWriteProposal,
+    buildNativeEngineeringWriteExecutionEvidence,
     buildNativeEngineeringLspEvidence,
     buildNativeEngineeringLspLifecycleDraft,
     buildNativeEngineeringLspLifecycleState,

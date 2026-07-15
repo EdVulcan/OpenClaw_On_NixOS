@@ -110,6 +110,7 @@ const planBuilder = createPlanBuilder({
   host,
   port,
   listCommandTranscriptRecords: (options) => executor?.listCommandTranscriptRecords(options) ?? [],
+  listFilesystemChangeRecords: (options) => executor?.listFilesystemChangeRecords(options) ?? [],
 });
 
 executor = createTaskExecutor({

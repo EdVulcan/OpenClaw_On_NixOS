@@ -329,6 +329,17 @@ provider. Actual write approval and execution remain on the existing
 `workspace-text-write-tasks` path. The boundary is documented in
 `docs/plans/OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_WRITE_PROPOSAL_PLAN.md`.
 
+The existing edit/write execution evidence is now also available through the
+common `/capabilities/invoke` runtime as
+`sense.openclaw.engineering_tool.edit_execution_evidence` and
+`sense.openclaw.engineering_tool.write_execution_evidence`. The bridge reuses
+the existing task and filesystem-ledger builders and reads only completed
+approved mutation records; invocation and audit events retain compact summaries
+without file content, diff lines, replacement text, task creation, approval
+actions, or mutation. The real edit closed-loop and write execution milestones
+prove this common readback against completed tasks. It is documented in
+`docs/plans/OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_EXECUTION_EVIDENCE_PLAN.md`.
+
 The selected Level 1 consistency closures are complete. Do not reopen the LSP
 symbol chain or add another evidence/readiness shell; choose the next concrete
 identity-upgrade capability only after its Level 2 authority boundary is

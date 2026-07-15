@@ -33,6 +33,7 @@ export function createPlanBuilder(deps) {
     host,
     port,
     listCommandTranscriptRecords = () => [],
+    listFilesystemChangeRecords = () => [],
   } = deps;
   const {
     fetchJson,
@@ -116,6 +117,7 @@ export function createPlanBuilder(deps) {
     policyEvaluator,
     publishEvent,
     listCommandTranscriptRecords,
+    listFilesystemChangeRecords,
   });
   const {
     capabilityById,

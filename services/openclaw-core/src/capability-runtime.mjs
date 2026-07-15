@@ -5,6 +5,7 @@ import { buildBaseCapabilities } from "./capability-descriptors.mjs";
 import { createEngineeringReadSearchCapabilityHandlers } from "./capability-runtime-engineering-read-search.mjs";
 import { createEngineeringVerificationCapabilityHandlers } from "./capability-runtime-engineering-verification.mjs";
 import { createEngineeringProposalCapabilityHandlers } from "./capability-runtime-engineering-proposals.mjs";
+import { createEngineeringExecutionEvidenceCapabilityHandlers } from "./capability-runtime-engineering-execution-evidence.mjs";
 import { createEngineeringContextCapabilityHandlers } from "./capability-runtime-engineering-context.mjs";
 import { createEngineeringWorkViewCapabilityHandlers } from "./capability-runtime-work-view.mjs";
 
@@ -21,6 +22,7 @@ export function createCapabilityRuntime(deps) {
     createId = randomUUID,
     now = () => new Date().toISOString(),
     listCommandTranscriptRecords = () => [],
+    listFilesystemChangeRecords = () => [],
   } = deps;
   const {
     fetchJson,
@@ -68,6 +70,12 @@ export function createCapabilityRuntime(deps) {
   const engineeringProposalHandlers = createEngineeringProposalCapabilityHandlers({
     buildNativeEngineeringEditProposal: pluginReview.buildNativeEngineeringEditProposal,
     buildNativeEngineeringWriteProposal: pluginReview.buildNativeEngineeringWriteProposal,
+  });
+  const engineeringExecutionEvidenceHandlers = createEngineeringExecutionEvidenceCapabilityHandlers({
+    buildNativeEngineeringEditExecutionEvidence: pluginReview.buildNativeEngineeringEditExecutionEvidence,
+    buildNativeEngineeringWriteExecutionEvidence: pluginReview.buildNativeEngineeringWriteExecutionEvidence,
+    listFilesystemChangeRecords,
+    tasks: state.tasks ?? new Map(),
   });
   const engineeringContextHandlers = createEngineeringContextCapabilityHandlers({
     tasks: state.tasks ?? new Map(),
@@ -281,6 +289,10 @@ export function createCapabilityRuntime(deps) {
     if (engineeringProposal.handled) {
       return engineeringProposal.result;
     }
+    const engineeringExecutionEvidence = engineeringExecutionEvidenceHandlers.callBackend(capability, request);
+    if (engineeringExecutionEvidence.handled) {
+      return engineeringExecutionEvidence.result;
+    }
     const engineeringContext = await engineeringContextHandlers.callBackend(capability, request);
     if (engineeringContext.handled) {
       return engineeringContext.result;
@@ -475,6 +487,10 @@ export function createCapabilityRuntime(deps) {
     const engineeringProposalSummary = engineeringProposalHandlers.summariseResult(capability, result);
     if (engineeringProposalSummary) {
       return engineeringProposalSummary;
+    }
+    const engineeringExecutionEvidenceSummary = engineeringExecutionEvidenceHandlers.summariseResult(capability, result);
+    if (engineeringExecutionEvidenceSummary) {
+      return engineeringExecutionEvidenceSummary;
     }
     const engineeringContextSummary = engineeringContextHandlers.summariseResult(capability, result);
     if (engineeringContextSummary) {

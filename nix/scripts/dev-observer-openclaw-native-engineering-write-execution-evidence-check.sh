@@ -42,7 +42,8 @@ cleanup() {
     "${APPROVAL_ID_FILE:-}" \
     "${APPROVE_FILE:-}" \
     "${STEP_FILE:-}" \
-    "${EVIDENCE_FILE:-}"
+    "${EVIDENCE_FILE:-}" \
+    "${CAPABILITY_EVIDENCE_FILE:-}"
   "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -60,6 +61,7 @@ APPROVAL_ID_FILE="$(mktemp)"
 APPROVE_FILE="$(mktemp)"
 STEP_FILE="$(mktemp)"
 EVIDENCE_FILE="$(mktemp)"
+CAPABILITY_EVIDENCE_FILE="$(mktemp)"
 
 curl --silent --fail "$OBSERVER_URL/" > "$HTML_FILE"
 curl --silent --fail "$OBSERVER_URL/client-v5.js" > "$CLIENT_FILE"
@@ -92,8 +94,9 @@ process.stdout.write(step.task.id);
 EOF
 )"
 curl --silent --fail "$CORE_URL/plugins/native-adapter/engineering-write-execution/evidence?taskId=$TASK_ID&limit=10" > "$EVIDENCE_FILE"
+post_json "$CORE_URL/capabilities/invoke" "{\"capabilityId\":\"sense.openclaw.engineering_tool.write_execution_evidence\",\"taskId\":\"$TASK_ID\",\"params\":{\"limit\":10}}" > "$CAPABILITY_EVIDENCE_FILE"
 
-node - <<'EOF' "$HTML_FILE" "$CLIENT_FILE" "$STEP_FILE" "$EVIDENCE_FILE" "$TARGET_FILE" "$SECRET_CONTENT"
+node - <<'EOF' "$HTML_FILE" "$CLIENT_FILE" "$STEP_FILE" "$EVIDENCE_FILE" "$CAPABILITY_EVIDENCE_FILE" "$TARGET_FILE" "$SECRET_CONTENT"
 const fs = require("node:fs");
 const readText = (index) => fs.readFileSync(process.argv[index], "utf8");
 const readJson = (index) => JSON.parse(readText(index));
@@ -102,9 +105,10 @@ const html = readText(2);
 const client = readText(3);
 const step = readJson(4);
 const evidence = readJson(5);
-const targetFile = process.argv[6];
-const secret = process.argv[7];
-const raw = JSON.stringify({ step, evidence });
+const capabilityEvidence = readJson(6);
+const targetFile = process.argv[7];
+const secret = process.argv[8];
+const raw = JSON.stringify({ step, evidence, capabilityEvidence });
 
 for (const token of [
   "OpenClaw Engineering Write Execution",
@@ -145,6 +149,21 @@ if (
 ) {
   throw new Error(`Observer write execution evidence mismatch: ${JSON.stringify(evidence)}`);
 }
+if (
+  !capabilityEvidence.ok
+  || capabilityEvidence.invoked !== true
+  || capabilityEvidence.capability?.id !== "sense.openclaw.engineering_tool.write_execution_evidence"
+  || capabilityEvidence.result?.registry !== "openclaw-native-engineering-write-execution-evidence-v0"
+  || capabilityEvidence.result?.query?.taskId !== step.task?.id
+  || capabilityEvidence.result?.summary?.passed !== 1
+  || capabilityEvidence.summary?.kind !== "engineering.write_execution_evidence"
+  || capabilityEvidence.summary?.noMutation !== true
+  || capabilityEvidence.summary?.noTaskCreation !== true
+  || capabilityEvidence.summary?.noApprovalAction !== true
+  || capabilityEvidence.summary?.noProviderEgress !== true
+) {
+  throw new Error(`Observer shared write execution evidence capability mismatch: ${JSON.stringify(capabilityEvidence)}`);
+}
 if (raw.includes(secret)) {
   throw new Error("Observer write execution evidence leaked secret content");
 }
@@ -156,6 +175,7 @@ console.log(JSON.stringify({
     registry: evidence.registry,
     taskId: step.task.id,
     passed: evidence.summary.passed,
+    sharedExecutionEvidence: capabilityEvidence.summary.kind,
   },
 }, null, 2));
 EOF

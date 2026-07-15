@@ -71,6 +71,7 @@ cleanup() {
     "${EDIT_HISTORY_FILE:-}" \
     "${EDIT_LEDGER_FILE:-}" \
     "${EDIT_EVIDENCE_FILE:-}" \
+    "${EDIT_CAPABILITY_EVIDENCE_FILE:-}" \
     "${VERIFY_TASK_FILE:-}" \
     "${VERIFY_BLOCKED_FILE:-}" \
     "${VERIFY_APPROVE_FILE:-}" \
@@ -99,6 +100,7 @@ EDIT_STEP_FILE="$(mktemp)"
 EDIT_HISTORY_FILE="$(mktemp)"
 EDIT_LEDGER_FILE="$(mktemp)"
 EDIT_EVIDENCE_FILE="$(mktemp)"
+EDIT_CAPABILITY_EVIDENCE_FILE="$(mktemp)"
 VERIFY_TASK_FILE="$(mktemp)"
 VERIFY_BLOCKED_FILE="$(mktemp)"
 VERIFY_APPROVE_FILE="$(mktemp)"
@@ -186,6 +188,7 @@ post_json "$CORE_URL/operator/step" '{}' > "$EDIT_STEP_FILE"
 curl --silent --fail "$CORE_URL/capabilities/invocations?capabilityId=act.filesystem.write_text&limit=10" > "$EDIT_HISTORY_FILE"
 curl --silent --fail "$CORE_URL/filesystem/changes?limit=20" > "$EDIT_LEDGER_FILE"
 curl --silent --fail "$CORE_URL/plugins/native-adapter/engineering-edit-execution/evidence?taskId=$edit_task_id&limit=10" > "$EDIT_EVIDENCE_FILE"
+post_json "$CORE_URL/capabilities/invoke" "{\"capabilityId\":\"sense.openclaw.engineering_tool.edit_execution_evidence\",\"taskId\":\"$edit_task_id\",\"params\":{\"limit\":10}}" > "$EDIT_CAPABILITY_EVIDENCE_FILE"
 
 post_json "$CORE_URL/plugins/native-adapter/source-command-proposals/tasks" '{"proposalId":"openclaw:typecheck","query":"verify","confirm":true}' > "$VERIFY_TASK_FILE"
 post_json "$CORE_URL/operator/step" '{}' > "$VERIFY_BLOCKED_FILE"
@@ -228,7 +231,8 @@ node - <<'EOF' \
   "$PROMPT_SECRET" \
   "$TOOL_SECRET" \
   "$edit_task_id" \
-  "$verify_task_id"
+  "$verify_task_id" \
+  "$EDIT_CAPABILITY_EVIDENCE_FILE"
 const fs = require("node:fs");
 const readText = (index) => fs.readFileSync(process.argv[index], "utf8");
 const readJson = (index) => JSON.parse(readText(index));
@@ -251,6 +255,7 @@ const promptSecret = process.argv[16];
 const toolSecret = process.argv[17];
 const editTaskId = process.argv[18];
 const verifyTaskId = process.argv[19];
+const editCapabilityEvidence = readJson(20);
 const finalText = fs.readFileSync(targetFile, "utf8");
 const finalPackage = JSON.parse(finalText);
 const raw = JSON.stringify({
@@ -259,6 +264,7 @@ const raw = JSON.stringify({
   history,
   ledger,
   editEvidence,
+  editCapabilityEvidence,
   verifyApprove,
   verifyStep,
   verifyEvidence,
@@ -315,6 +321,21 @@ if (
 ) {
   throw new Error(`edit execution readback mismatch: ${JSON.stringify(editEvidence)}`);
 }
+if (
+  !editCapabilityEvidence.ok
+  || editCapabilityEvidence.invoked !== true
+  || editCapabilityEvidence.capability?.id !== "sense.openclaw.engineering_tool.edit_execution_evidence"
+  || editCapabilityEvidence.result?.registry !== "openclaw-native-engineering-edit-execution-evidence-v0"
+  || editCapabilityEvidence.result?.query?.taskId !== editTaskId
+  || editCapabilityEvidence.result?.summary?.passed !== 1
+  || editCapabilityEvidence.summary?.kind !== "engineering.edit_execution_evidence"
+  || editCapabilityEvidence.summary?.noMutation !== true
+  || editCapabilityEvidence.summary?.noTaskCreation !== true
+  || editCapabilityEvidence.summary?.noApprovalAction !== true
+  || editCapabilityEvidence.summary?.noProviderEgress !== true
+) {
+  throw new Error(`shared edit execution evidence capability mismatch: ${JSON.stringify(editCapabilityEvidence)}`);
+}
 if (verifyApprove.approval?.status !== "approved" || verifyApprove.task?.policy?.decision?.decision !== "audit_only") {
   throw new Error(`verification approval mismatch: ${JSON.stringify(verifyApprove)}`);
 }
@@ -356,6 +377,7 @@ console.log(JSON.stringify({
     editTaskId,
     verifyTaskId,
     editLedgerRecords: ledger.summary.write_text,
+    sharedExecutionEvidence: editCapabilityEvidence.summary.kind,
     verificationPassed: verifyEvidence.summary.passed,
     recoveryFailures: recovery.summary.totalFailures,
   },

@@ -77,6 +77,7 @@ function createHarness(overrides = {}) {
       events.push({ name, body });
     },
     listCommandTranscriptRecords: overrides.listCommandTranscriptRecords ?? (() => []),
+    listFilesystemChangeRecords: overrides.listFilesystemChangeRecords ?? (() => []),
     fetchImpl: overrides.fetchImpl ?? (async (url) => {
       calls.health.push(url);
       return {
@@ -856,6 +857,103 @@ test("capability runtime exposes the existing redacted write proposal without mu
   assert.equal(JSON.stringify(state.capabilityInvocationLog).includes("transient write content"), false);
   assert.equal(JSON.stringify(events).includes("transient write content"), false);
   assert.deepEqual(events.map((event) => event.name), [
+    "policy.evaluated",
+    "capability.invoked",
+  ]);
+});
+
+test("capability runtime exposes approved edit and write execution evidence through the shared ledger boundary", async () => {
+  const builderInputs = [];
+  const editTaskId = "runtime-edit-execution-task";
+  const writeTaskId = "runtime-write-execution-task";
+  const filesystemChanges = [
+    {
+      id: "edit-change-1",
+      taskId: editTaskId,
+      change: "write_text",
+      capabilityId: "act.filesystem.write_text",
+      path: "/workspace/src/app.ts",
+      contentBytes: 24,
+    },
+    {
+      id: "write-change-1",
+      taskId: writeTaskId,
+      change: "write_text",
+      capabilityId: "act.filesystem.write_text",
+      path: "/workspace/src/new.ts",
+      contentBytes: 18,
+    },
+  ];
+  const tasks = new Map([
+    [editTaskId, { id: editTaskId, status: "completed" }],
+    [writeTaskId, { id: writeTaskId, status: "completed" }],
+  ]);
+  const { runtime, state, events } = createHarness({
+    state: { tasks },
+    listFilesystemChangeRecords: ({ limit }) => {
+      builderInputs.push({ limit });
+      return filesystemChanges;
+    },
+    pluginReview: {
+      buildNativeEngineeringEditExecutionEvidence: (input) => ({
+        ok: true,
+        registry: "openclaw-native-engineering-edit-execution-evidence-v0",
+        query: { taskId: input.taskId, limit: input.limit },
+        summary: { total: 1, passed: 1, failed: 0, completedTasks: 1, withEngineeringProposal: 1 },
+        bounds: { noFilesystemWrite: true, noTaskCreation: true, noApprovalAction: true },
+        governance: { canMutate: false, canCreateTask: false, canApproveTask: false, canCallProvider: false },
+      }),
+      buildNativeEngineeringWriteExecutionEvidence: (input) => ({
+        ok: true,
+        registry: "openclaw-native-engineering-write-execution-evidence-v0",
+        query: { taskId: input.taskId, limit: input.limit },
+        summary: { total: 1, passed: 1, failed: 0, completedTasks: 1, withEngineeringProposal: 1 },
+        bounds: { noFilesystemWrite: true, noTaskCreation: true, noApprovalAction: true },
+        governance: { canMutate: false, canCreateTask: false, canApproveTask: false, canCallProvider: false },
+      }),
+    },
+  });
+
+  const registry = await runtime.buildCapabilityRegistry();
+  for (const capabilityId of [
+    "sense.openclaw.engineering_tool.edit_execution_evidence",
+    "sense.openclaw.engineering_tool.write_execution_evidence",
+  ]) {
+    const capability = registry.capabilities.find((item) => item.id === capabilityId);
+    assert.equal(capability?.kind, "sensor");
+    assert.equal(capability?.governance, "audit_only");
+    assert.equal(capability?.available, true);
+  }
+
+  const edit = await runtime.invokeCapability({
+    capabilityId: "sense.openclaw.engineering_tool.edit_execution_evidence",
+    taskId: editTaskId,
+    params: { limit: 4 },
+  });
+  const write = await runtime.invokeCapability({
+    capabilityId: "sense.openclaw.engineering_tool.write_execution_evidence",
+    params: { taskId: writeTaskId, limit: 4 },
+  });
+
+  assert.equal(edit.response.invoked, true);
+  assert.equal(edit.response.result.query.taskId, editTaskId);
+  assert.equal(edit.response.summary.kind, "engineering.edit_execution_evidence");
+  assert.equal(edit.response.summary.noMutation, true);
+  assert.equal(edit.response.summary.noTaskCreation, true);
+  assert.equal(edit.response.summary.noApprovalAction, true);
+  assert.equal(edit.response.summary.noProviderEgress, true);
+  assert.equal(write.response.invoked, true);
+  assert.equal(write.response.result.query.taskId, writeTaskId);
+  assert.equal(write.response.summary.kind, "engineering.write_execution_evidence");
+  assert.equal(write.response.summary.noMutation, true);
+  assert.equal(write.response.summary.noTaskCreation, true);
+  assert.equal(write.response.summary.noApprovalAction, true);
+  assert.equal(write.response.summary.noProviderEgress, true);
+  assert.deepEqual(builderInputs, [{ limit: 100 }, { limit: 100 }]);
+  assert.equal(JSON.stringify(state.capabilityInvocationLog).includes("/workspace/src"), false);
+  assert.deepEqual(events.map((event) => event.name), [
+    "policy.evaluated",
+    "capability.invoked",
     "policy.evaluated",
     "capability.invoked",
   ]);

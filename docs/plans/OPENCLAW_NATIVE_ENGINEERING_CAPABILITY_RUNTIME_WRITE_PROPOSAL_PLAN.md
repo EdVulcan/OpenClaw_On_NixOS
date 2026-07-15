@@ -71,6 +71,9 @@ bridge and is unchanged by this common entry point.
 
 ## Next Smallest Capability
 
-Keep `cc_edit`/`cc_write` proposal generation separate from mutation. Extend
-common runtime access only when an existing approval bridge can carry a concrete
-operator decision without persisting proposal content.
+The common runtime execution-evidence follow-up is now complete in
+`OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_EXECUTION_EVIDENCE_PLAN.md`.
+It reads only the existing completed write task and filesystem-ledger evidence;
+write content remains outside durable capability evidence. Keep proposal
+generation, approval, mutation, and execution evidence separate, then continue
+with a concrete Level 2 trusted work-view/session-helper behavior.

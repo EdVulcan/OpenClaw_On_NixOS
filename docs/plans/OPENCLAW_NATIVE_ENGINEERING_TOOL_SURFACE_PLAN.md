@@ -28,6 +28,7 @@ documented in
 `OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_CONTEXT_PACKET_PLAN.md`,
 `OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_EDIT_PROPOSAL_PLAN.md`,
 `OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_WRITE_PROPOSAL_PLAN.md`,
+`OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_EXECUTION_EVIDENCE_PLAN.md`,
 `OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_WORK_VIEW_OBSERVATION_PLAN.md`
 and
 `OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_WORK_VIEW_CONTROL_PLAN.md`.
@@ -108,6 +109,7 @@ services/openclaw-core/src/capability-descriptors.mjs
 services/openclaw-core/src/capability-runtime.mjs
 services/openclaw-core/src/capability-runtime-engineering-read-search.mjs
 services/openclaw-core/src/capability-runtime-engineering-verification.mjs
+services/openclaw-core/src/capability-runtime-engineering-execution-evidence.mjs
 services/openclaw-core/src/capability-runtime-work-view.mjs
 ```
 
@@ -138,6 +140,9 @@ capability-invoke
 observer-capability-invoke
 openclaw-native-engineering-verification-evidence
 observer-openclaw-native-engineering-verification-evidence
+openclaw-native-engineering-edit-closed-loop
+openclaw-native-engineering-write-execution-evidence
+observer-openclaw-native-engineering-write-execution-evidence
 ```
 
 ## Deferred Execution
@@ -174,6 +179,18 @@ unapproved provider calls and network egress
 ```
 
 ## Next Slice
+
+The common execution-evidence closure is now implemented as:
+
+```text
+OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_EXECUTION_EVIDENCE_PLAN.md
+```
+
+The shared capability runtime exposes read-only edit/write completion evidence
+after the existing approval-gated mutation paths have produced task and
+filesystem-ledger records. The existing edit closed-loop and write execution
+milestones prove the common invocation against real completed tasks; no new
+evidence route or readiness milestone was added.
 
 The bounded read/search capability-runtime follow-up was completed as:
 

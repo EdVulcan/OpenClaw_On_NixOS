@@ -40,6 +40,7 @@ cleanup() {
     "${APPROVE_FILE:-}" \
     "${STEP_FILE:-}" \
     "${EVIDENCE_FILE:-}" \
+    "${CAPABILITY_EVIDENCE_FILE:-}" \
     "${ADAPTER_FILE:-}"
   "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 }
@@ -56,6 +57,7 @@ APPROVAL_ID_FILE="$(mktemp)"
 APPROVE_FILE="$(mktemp)"
 STEP_FILE="$(mktemp)"
 EVIDENCE_FILE="$(mktemp)"
+CAPABILITY_EVIDENCE_FILE="$(mktemp)"
 ADAPTER_FILE="$(mktemp)"
 
 post_json "$CORE_URL/plugins/native-adapter/engineering-write-proposal-tasks" "{\"relativePath\":\"$TARGET_RELATIVE_PATH\",\"content\":\"$SECRET_CONTENT\",\"overwrite\":false,\"confirm\":true}" > "$TASK_FILE"
@@ -102,19 +104,21 @@ EOF
 )"
 
 curl --silent --fail "$CORE_URL/plugins/native-adapter/engineering-write-execution/evidence?taskId=$TASK_ID&limit=10" > "$EVIDENCE_FILE"
+post_json "$CORE_URL/capabilities/invoke" "{\"capabilityId\":\"sense.openclaw.engineering_tool.write_execution_evidence\",\"taskId\":\"$TASK_ID\",\"params\":{\"limit\":10}}" > "$CAPABILITY_EVIDENCE_FILE"
 curl --silent --fail "$CORE_URL/plugins/openclaw-native-plugin-adapter" > "$ADAPTER_FILE"
 
-node - <<'EOF' "$APPROVE_FILE" "$STEP_FILE" "$EVIDENCE_FILE" "$ADAPTER_FILE" "$TARGET_FILE" "$SECRET_CONTENT"
+node - <<'EOF' "$APPROVE_FILE" "$STEP_FILE" "$EVIDENCE_FILE" "$CAPABILITY_EVIDENCE_FILE" "$ADAPTER_FILE" "$TARGET_FILE" "$SECRET_CONTENT"
 const fs = require("node:fs");
 const readJson = (index) => JSON.parse(fs.readFileSync(process.argv[index], "utf8"));
 
 const approve = readJson(2);
 const step = readJson(3);
 const evidence = readJson(4);
-const adapter = readJson(5);
-const targetFile = process.argv[6];
-const secret = process.argv[7];
-const raw = JSON.stringify({ approve, step, evidence, adapter });
+const capabilityEvidence = readJson(5);
+const adapter = readJson(6);
+const targetFile = process.argv[7];
+const secret = process.argv[8];
+const raw = JSON.stringify({ approve, step, evidence, capabilityEvidence, adapter });
 
 if (approve.approval?.status !== "approved") {
   throw new Error(`approval mismatch: ${JSON.stringify(approve)}`);
@@ -144,6 +148,21 @@ if (
   throw new Error(`write execution evidence mismatch: ${JSON.stringify(evidence)}`);
 }
 if (
+  !capabilityEvidence.ok
+  || capabilityEvidence.invoked !== true
+  || capabilityEvidence.capability?.id !== "sense.openclaw.engineering_tool.write_execution_evidence"
+  || capabilityEvidence.result?.registry !== "openclaw-native-engineering-write-execution-evidence-v0"
+  || capabilityEvidence.result?.query?.taskId !== step.task?.id
+  || capabilityEvidence.result?.summary?.passed !== 1
+  || capabilityEvidence.summary?.kind !== "engineering.write_execution_evidence"
+  || capabilityEvidence.summary?.noMutation !== true
+  || capabilityEvidence.summary?.noTaskCreation !== true
+  || capabilityEvidence.summary?.noApprovalAction !== true
+  || capabilityEvidence.summary?.noProviderEgress !== true
+) {
+  throw new Error(`shared write execution evidence capability mismatch: ${JSON.stringify(capabilityEvidence)}`);
+}
+if (
   !adapter.implementedCapabilities?.includes("sense.openclaw.engineering_tool.write_execution_evidence")
   || adapter.summary?.canReadEngineeringWriteExecutionEvidence !== true
 ) {
@@ -158,6 +177,7 @@ console.log(JSON.stringify({
     registry: evidence.registry,
     taskId: step.task.id,
     passed: evidence.summary.passed,
+    sharedExecutionEvidence: capabilityEvidence.summary.kind,
     bytes: evidence.summary.totalContentBytes,
   },
 }, null, 2));

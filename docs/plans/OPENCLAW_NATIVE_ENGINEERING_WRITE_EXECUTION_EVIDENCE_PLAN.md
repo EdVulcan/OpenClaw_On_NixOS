@@ -113,12 +113,14 @@ approval-gated patch apply task path without approving or executing it.
 
 ## Next Slice
 
-The next recommended real capability after write closed-loop proof is:
+The common capability-runtime execution-evidence follow-up is now complete as:
 
 ```text
-Native governed engineering edit closed-loop proof
+OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_EXECUTION_EVIDENCE_PLAN.md
 ```
 
-That slice may include a thin edit execution evidence readback if needed, but
-should target the full loop: read/search -> edit proposal -> approval-gated
-workspace_patch_apply -> ledger -> Observer -> verification/recovery.
+It exposes the existing edit and write evidence builders through the shared
+`/capabilities/invoke` policy and audit boundary without creating another
+mutation or readiness route. The next product slice should be a concrete Level
+2 trusted work-view/session-helper behavior, not another standalone evidence
+surface.
