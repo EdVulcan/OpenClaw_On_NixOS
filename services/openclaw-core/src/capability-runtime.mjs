@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { createEventName } from "../../../packages/shared-events/src/event-factory.mjs";
 import { buildBaseCapabilities } from "./capability-descriptors.mjs";
 import { createEngineeringReadSearchCapabilityHandlers } from "./capability-runtime-engineering-read-search.mjs";
+import { createEngineeringVerificationCapabilityHandlers } from "./capability-runtime-engineering-verification.mjs";
 
 export function createCapabilityRuntime(deps) {
   const {
@@ -16,6 +17,7 @@ export function createCapabilityRuntime(deps) {
     fetchImpl = globalThis.fetch,
     createId = randomUUID,
     now = () => new Date().toISOString(),
+    listCommandTranscriptRecords = () => [],
   } = deps;
   const {
     fetchJson,
@@ -54,6 +56,11 @@ export function createCapabilityRuntime(deps) {
     buildNativeEngineeringReadFile: pluginReview.buildNativeEngineeringReadFile,
     buildNativeEngineeringGlob: pluginReview.buildNativeEngineeringGlob,
     buildNativeEngineeringGrep: pluginReview.buildNativeEngineeringGrep,
+  });
+  const engineeringVerificationHandlers = createEngineeringVerificationCapabilityHandlers({
+    listCommandTranscriptRecords,
+    listCapabilityInvocations: (options) => listCapabilityInvocations(options),
+    tasks: state.tasks ?? new Map(),
   });
 
   function baseCapabilities() {
@@ -230,6 +237,10 @@ export function createCapabilityRuntime(deps) {
     const engineeringReadSearch = engineeringReadSearchHandlers.callBackend(capability, request);
     if (engineeringReadSearch.handled) {
       return engineeringReadSearch.result;
+    }
+    const engineeringVerification = engineeringVerificationHandlers.callBackend(capability, request);
+    if (engineeringVerification.handled) {
+      return engineeringVerification.result;
     }
 
     if (capability.id === "sense.system.vitals") {
@@ -409,6 +420,10 @@ export function createCapabilityRuntime(deps) {
     const engineeringReadSearchSummary = engineeringReadSearchHandlers.summariseResult(capability, result);
     if (engineeringReadSearchSummary) {
       return engineeringReadSearchSummary;
+    }
+    const engineeringVerificationSummary = engineeringVerificationHandlers.summariseResult(capability, result);
+    if (engineeringVerificationSummary) {
+      return engineeringVerificationSummary;
     }
 
     if (capability.id === "sense.system.vitals") {

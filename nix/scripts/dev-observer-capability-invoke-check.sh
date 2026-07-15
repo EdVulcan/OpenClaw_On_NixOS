@@ -37,6 +37,7 @@ cleanup() {
     "${ENGINEERING_READ_FILE:-}" \
     "${ENGINEERING_GLOB_FILE:-}" \
     "${ENGINEERING_GREP_FILE:-}" \
+    "${ENGINEERING_VERIFY_FILE:-}" \
     "${BLOCKED_FILE:-}" \
     "${APPROVED_FILE:-}" \
     "${EVENTS_FILE:-}"
@@ -59,6 +60,7 @@ PROCESS_FILE="$(mktemp)"
 ENGINEERING_READ_FILE="$(mktemp)"
 ENGINEERING_GLOB_FILE="$(mktemp)"
 ENGINEERING_GREP_FILE="$(mktemp)"
+ENGINEERING_VERIFY_FILE="$(mktemp)"
 BLOCKED_FILE="$(mktemp)"
 APPROVED_FILE="$(mktemp)"
 EVENTS_FILE="$(mktemp)"
@@ -70,6 +72,7 @@ post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"sense.process.list",
 post_json "$CORE_URL/capabilities/invoke" "{\"capabilityId\":\"sense.openclaw.engineering_tool.read\",\"params\":{\"workspacePath\":\"$FIXTURE_DIR\",\"relativePath\":\"src/app.ts\",\"startLine\":1,\"endLine\":1}}" > "$ENGINEERING_READ_FILE"
 post_json "$CORE_URL/capabilities/invoke" "{\"capabilityId\":\"sense.openclaw.engineering_tool.glob\",\"params\":{\"workspacePath\":\"$FIXTURE_DIR\",\"pattern\":\"src/**/*.ts\",\"limit\":4}}" > "$ENGINEERING_GLOB_FILE"
 post_json "$CORE_URL/capabilities/invoke" "{\"capabilityId\":\"sense.openclaw.engineering_tool.grep\",\"params\":{\"workspacePath\":\"$FIXTURE_DIR\",\"query\":\"observerNeedle\",\"include\":\"src/**/*.ts\",\"literal\":true,\"limit\":4}}" > "$ENGINEERING_GREP_FILE"
+post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"sense.openclaw.engineering_tool.verify_evidence","params":{"limit":4,"maxOutputChars":500}}' > "$ENGINEERING_VERIFY_FILE"
 post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"act.system.command.dry_run","intent":"system.command","params":{"command":"rm","args":["-rf","/tmp/openclaw-danger"]}}' > "$BLOCKED_FILE"
 post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"act.system.command.dry_run","intent":"system.command","approved":true,"params":{"command":"rm","args":["-rf","/tmp/openclaw-danger"]}}' > "$APPROVED_FILE"
 curl --silent --fail "$EVENT_HUB_URL/events/audit?source=openclaw-core&limit=80" > "$EVENTS_FILE"
@@ -84,7 +87,8 @@ node - <<'EOF' \
   "$ENGINEERING_GREP_FILE" \
   "$BLOCKED_FILE" \
   "$APPROVED_FILE" \
-  "$EVENTS_FILE"
+  "$EVENTS_FILE" \
+  "$ENGINEERING_VERIFY_FILE"
 const fs = require("node:fs");
 const html = fs.readFileSync(process.argv[2], "utf8");
 const client = fs.readFileSync(process.argv[3], "utf8");
@@ -96,6 +100,7 @@ const engineeringGrep = JSON.parse(fs.readFileSync(process.argv[8], "utf8"));
 const blocked = JSON.parse(fs.readFileSync(process.argv[9], "utf8"));
 const approved = JSON.parse(fs.readFileSync(process.argv[10], "utf8"));
 const events = JSON.parse(fs.readFileSync(process.argv[11], "utf8"));
+const engineeringVerify = JSON.parse(fs.readFileSync(process.argv[12], "utf8"));
 
 for (const token of [
   "invoke-vitals-button",
@@ -139,6 +144,17 @@ if (
 ) {
   throw new Error("Observer engineering read/search invoke path should return bounded results");
 }
+if (
+  !engineeringVerify.ok
+  || engineeringVerify.invoked !== true
+  || engineeringVerify.capability?.id !== "sense.openclaw.engineering_tool.verify_evidence"
+  || engineeringVerify.result?.summary?.total !== 0
+  || engineeringVerify.summary?.kind !== "engineering.verification_evidence"
+  || engineeringVerify.summary?.noCommandExecution !== true
+  || engineeringVerify.result?.governance?.canExecuteCommand !== false
+) {
+  throw new Error("Observer verification evidence invoke path should remain read-only");
+}
 if (!blocked.ok || blocked.invoked !== false || blocked.blocked !== true || blocked.reason !== "policy_requires_approval") {
   throw new Error("Observer blocked dry-run path should expose policy_requires_approval");
 }
@@ -169,6 +185,7 @@ console.log(JSON.stringify({
       read: engineeringRead.summary.kind,
       globMatches: engineeringGlob.result.summary.matchedResults,
       grepMatches: engineeringGrep.result.summary.matchedResults,
+      verificationRecords: engineeringVerify.result.summary.total,
     },
     vitalsPolicy: vitals.policy.decision,
     processCount: processes.result.count,

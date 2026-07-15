@@ -18,8 +18,18 @@ export function createDebouncedPersist(stateFilePath, buildPayload, debounceMs =
     }
   }
 
-  return function persistState() {
+  function persistState() {
     if (timer !== null) clearTimeout(timer);
     timer = setTimeout(() => { timer = null; writeImmediate(); }, debounceMs);
+  }
+
+  persistState.flush = () => {
+    if (timer !== null) {
+      clearTimeout(timer);
+      timer = null;
+    }
+    writeImmediate();
   };
+
+  return persistState;
 }

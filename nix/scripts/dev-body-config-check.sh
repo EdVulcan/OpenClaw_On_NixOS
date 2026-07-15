@@ -591,13 +591,14 @@ EOF
     || ! -f "$core_out/share/openclaw/services/openclaw-core/src/native-engineering-work-view-association.mjs"
     || ! -f "$core_out/share/openclaw/services/openclaw-core/src/native-engineering-work-view-binding.mjs"
     || ! -f "$core_out/share/openclaw/services/openclaw-core/src/native-engineering-work-view-bind-routes.mjs"
+    || ! -f "$core_out/share/openclaw/services/openclaw-core/src/capability-runtime-engineering-verification.mjs"
     || ! -f "$core_out/share/openclaw/services/openclaw-core/src/hostd-control-client.mjs"
     || ! -f "$core_out/share/openclaw/packages/plugin-runtime/src/plugin-registry.mjs"
     || ! -f "$core_out/share/openclaw/packages/plugin-runtime/src/plugin-registry-generation-store.mjs"
     || ! -f "$core_out/share/openclaw/packages/shared-utils/src/persist.mjs"
     || -w "$core_server"
     || -e "$core_out/share/openclaw/services/openclaw-core/test"
-    || "$(find "$core_out" -type f | wc -l)" -ne 161 ]]; then
+    || "$(find "$core_out" -type f | wc -l)" -ne 164 ]]; then
     echo "core Nix closure is not exact and read-only: $core_out" >&2
     exit 1
   fi
@@ -1355,7 +1356,7 @@ EOF
     || ! -f "$observer_ui_out/share/openclaw/packages/shared-client/src/service-descriptors.mjs"
     || -w "$observer_ui_server"
     || -e "$observer_ui_out/share/openclaw/apps/observer-ui/scripts"
-    || "$(find "$observer_ui_out" -type f | wc -l)" -ne 59 ]]; then
+    || "$(find "$observer_ui_out" -type f | wc -l)" -ne 60 ]]; then
     echo "observer-ui Nix closure is not exact and read-only: $observer_ui_out" >&2
     exit 1
   fi

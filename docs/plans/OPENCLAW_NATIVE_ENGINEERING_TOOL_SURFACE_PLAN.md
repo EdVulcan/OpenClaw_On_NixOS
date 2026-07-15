@@ -8,9 +8,9 @@ The original read-only inventory and the subsequent Level 1 engineering loop
 are complete through LSP selected-target edit, verification, recovery/rerun,
 plugin refresh, ACPX/Codex boundary evidence, and local context-packet
 assembly. The Level 1 operator execution-consistency correction and the
-unified capability-runtime bridge for bounded read/search are now complete; the
-next identity-upgrade route remains the Level 2 trusted work-view/session-helper
-boundary.
+unified capability-runtime bridges for bounded read/search and verification
+evidence are now complete; the next identity-upgrade route remains the Level 2
+trusted work-view/session-helper boundary.
 
 The latest completed slices are the compact work-view association, the explicit
 operator-reviewed task bind documented in
@@ -18,8 +18,9 @@ operator-reviewed task bind documented in
 `OPENCLAW_NATIVE_ENGINEERING_WORK_VIEW_BIND_PLAN.md`, and the execution binding
 documented in
 `OPENCLAW_NATIVE_ENGINEERING_OPERATOR_EXECUTION_BINDING_PLAN.md`. The bounded
-read/search capability-runtime bridge is documented in
-`OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_READ_SEARCH_PLAN.md`.
+read/search and verification capability-runtime bridges are documented in
+`OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_READ_SEARCH_PLAN.md` and
+`OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_VERIFICATION_EVIDENCE_PLAN.md`.
 
 Do not select historical inventory or LSP variant text below as a new slice.
 
@@ -67,7 +68,7 @@ governed by the existing local policy, invocation ledger, and audit event path.
 | `cc_glob` | `sense.openclaw.engineering_tool.glob` | `read_only_path_search` | low | no approval for bounded metadata search | absorbed through bounded native route and capability-runtime invoke |
 | `cc_grep` | `sense.openclaw.engineering_tool.grep` | `read_only_content_search` | low | no approval for bounded search; snippets require budget and audit | absorbed through bounded native route and capability-runtime invoke |
 | `cc_lsp` | `sense.openclaw.engineering_tool.lsp_evidence` / `act.openclaw.engineering_tool.lsp_lifecycle_task` / `sense.openclaw.engineering_tool.lsp_lifecycle_state` / `plan.openclaw.engineering_tool.lsp_source_transfer` / `act.openclaw.engineering_tool.lsp_source_transfer_task` / `plan.openclaw.engineering_tool.lsp_symbol_request` / `act.openclaw.engineering_tool.lsp_symbol_request_task` / `sense.openclaw.engineering_tool.lsp_selected_target_read_bridge` / `plan.openclaw.engineering_tool.lsp_selected_target_edit_proposal_seed` | `language_intelligence_evidence_governed_lifecycle_source_transfer_symbol_boundary_read_bridge_edit_seed_approved_edit_verification_recovery_and_rerun_proof` | medium | no approval for evidence/state/proposal/read-bridge/edit-seed/recovery-evidence readback; approval required before lifecycle/source-transfer/symbol execution, edit mutation, verification command execution, or recovery rerun | partially absorbed as evidence, lifecycle draft, approval-gated binary gate, bounded process supervision probe, lifecycle state readback, initialize/shutdown handshake, didOpen source-transfer proposal, approval-gated didOpen task, symbol request proposal, approval-gated single symbol request task, bounded response target selection, selected-target native read bridge, selected-target edit proposal seed, selected-target approved edit closed-loop proof, selected-target verification handoff, selected-target recovery recommendation handoff, and selected-target recovered verification rerun proof |
-| `cc_verify` | `act.openclaw.engineering_tool.verify` | `verification_command_evidence` | medium | command execution requires policy or approval | partially absorbed, command execution deferred |
+| `cc_verify` | `sense.openclaw.engineering_tool.verify_evidence` / `act.openclaw.engineering_tool.verify` | `verification_command_evidence` | medium | evidence readback is audit-only; command execution remains on the existing approval-gated task path | absorbed through bounded evidence route and capability-runtime invoke; new command execution deferred |
 | `cc_plan_enter` | `plan.openclaw.engineering_tool.plan_enter` / `act.openclaw.engineering_context.plan_todo_workbench_state` | `planning_state` | low | no hidden mode switch; explicit operator confirmation for core-state workbench storage | absorbed as evidence plus governed workbench storage |
 | `cc_plan_exit` | `plan.openclaw.engineering_tool.plan_exit` / `act.openclaw.engineering_context.plan_todo_workbench_state` | `planning_state` | low | no hidden execution transition; explicit operator confirmation for stored confirmed-plan readback | absorbed as evidence plus governed workbench storage |
 | `cc_todo_write` | `plan.openclaw.engineering_tool.todo_write` / `act.openclaw.engineering_context.plan_todo_workbench_state` | `planning_state` | low | explicit operator confirmation for bounded core-state todo storage; no `.openclaw/cc-todo.md` write | absorbed as evidence plus governed workbench storage |
@@ -96,6 +97,7 @@ services/openclaw-core/src/native-engineering-tool-surface-builders.mjs
 services/openclaw-core/src/capability-descriptors.mjs
 services/openclaw-core/src/capability-runtime.mjs
 services/openclaw-core/src/capability-runtime-engineering-read-search.mjs
+services/openclaw-core/src/capability-runtime-engineering-verification.mjs
 ```
 
 Core route:
@@ -123,6 +125,8 @@ openclaw-native-engineering-tool-surface-inventory
 observer-openclaw-native-engineering-tool-surface-inventory
 capability-invoke
 observer-capability-invoke
+openclaw-native-engineering-verification-evidence
+observer-openclaw-native-engineering-verification-evidence
 ```
 
 ## Deferred Execution
@@ -170,6 +174,17 @@ The existing native builders are now available through the common capability
 registry and `/capabilities/invoke` path, with the same bounded workspace,
 output, and binary policies plus compact invocation/event evidence. This does
 not add a task or approval path.
+
+The existing `cc_verify` verification-evidence builder is now available through
+the same registry and invoke path as
+`sense.openclaw.engineering_tool.verify_evidence`. It reads only existing
+governed command transcripts and completed task outcomes, keeps output previews
+bounded, and records compact invocation/event evidence without executing a
+command or creating a task or approval. The focused bridge is documented in:
+
+```text
+OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_VERIFICATION_EVIDENCE_PLAN.md
+```
 
 The operator execution-consistency follow-up was completed as:
 

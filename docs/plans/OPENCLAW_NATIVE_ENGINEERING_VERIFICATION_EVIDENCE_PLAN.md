@@ -103,6 +103,21 @@ npm --workspace @openclaw/observer-ui run typecheck
 OPENCLAW_MILESTONE_CHECKS=openclaw-native-engineering-verification-evidence,observer-openclaw-native-engineering-verification-evidence bash nix/scripts/dev-milestone-check.sh
 ```
 
+## Capability Runtime Bridge
+
+The same read-only builder is also exposed through the common capability
+runtime as:
+
+```text
+sense.openclaw.engineering_tool.verify_evidence
+```
+
+The bridge is documented in
+`OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_VERIFICATION_EVIDENCE_PLAN.md`.
+It reuses the existing transcript/task accessors and persists only compact
+invocation summaries; it does not introduce command execution or task/approval
+creation.
+
 ## Follow-On Slice
 
 The direct follow-on slice is:

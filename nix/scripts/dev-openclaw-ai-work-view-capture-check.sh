@@ -201,9 +201,10 @@ EOF
 grounded_task="$(post_json "$CORE_URL/tasks" "{\"goal\":\"Prove autonomous visual grounding\",\"type\":\"browser_task\",\"targetUrl\":\"$GROUNDING_URL\",\"workViewStrategy\":\"ai-work-view\",\"planStrategy\":\"rule-v1\",\"actions\":[{\"kind\":\"browser.new_tab\",\"params\":{\"url\":\"$AUTONOMOUS_GROUNDING_URL\"}}]}")"
 grounded_task_id="$(node -e 'const data=JSON.parse(process.argv[1]); process.stdout.write(data.task.id);' "$grounded_task")"
 grounded_execution="$(post_json "$CORE_URL/tasks/$grounded_task_id/execute" "{\"expectedUrl\":\"$AUTONOMOUS_GROUNDING_URL\",\"hideOnComplete\":false}")"
-node - <<'EOF' "$grounded_execution" "$AUTONOMOUS_GROUNDING_URL"
-const data = JSON.parse(process.argv[2]);
-const expectedUrl = process.argv[3];
+node -e '
+const fs = require("node:fs");
+const data = JSON.parse(fs.readFileSync(0, "utf8"));
+const expectedUrl = process.argv[1];
 const evidence = data.execution?.actionEvidence;
 const action = evidence?.actions?.[0];
 const grounding = action?.mediation?.visualGrounding ?? {};
@@ -239,7 +240,7 @@ console.log(JSON.stringify({
     imageDataRetained: grounding.imageDataRetained,
   },
 }, null, 2));
-EOF
+' "$AUTONOMOUS_GROUNDING_URL" <<<"$grounded_execution"
 
 provider="$(curl --silent "$SCREEN_URL/screen/provider")"
 capture="$(curl --silent "$BROWSER_URL/browser/capture")"

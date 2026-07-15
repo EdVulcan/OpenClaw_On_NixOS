@@ -123,8 +123,8 @@ if (
   || afterCounts.queued !== 0
   || afterCounts.running !== 0
   || afterCounts.paused !== 0
-  || afterCounts.completed !== 1
-  || afterCounts.failed !== 1
+  || afterCounts.completed !== 2
+  || afterCounts.failed !== 0
 ) {
   throw new Error(`operator restart lifecycle mismatch: before=${JSON.stringify(beforeCounts)} after=${JSON.stringify(afterCounts)}`);
 }
@@ -133,13 +133,12 @@ if (!restoredOne || restoredOne.status !== "completed" || restoredOne.plan?.stat
 }
 if (
   !restoredTwo
-  || restoredTwo.status !== "failed"
-  || restoredTwo.executionPhase !== "input_reentry_required"
-  || restoredTwo.plan?.status !== "planned"
-  || restoredTwo.outcome?.details?.reason !== "write_only_input_reentry_required"
-  || restoredTwo.outcome?.details?.automaticReplay !== false
+  || restoredTwo.status !== "completed"
+  || restoredTwo.plan?.status !== "completed"
+  || restoredTwo.outcome?.details?.operatorExecutionBinding?.inputTextBound !== false
+  || JSON.stringify(restoredTwo).includes("operator two")
 ) {
-  throw new Error("operator run task did not preserve the write-only input re-entry boundary after restart");
+  throw new Error("operator run task did not persist terminal write-only evidence without input text after restart");
 }
 if (afterSummary.summary?.counts?.active !== 0 || afterSummary.summary?.currentTaskId !== null) {
   throw new Error("operator loop should leave no active tasks");
@@ -179,8 +178,7 @@ console.log(JSON.stringify({
       id: restoredTwo.id,
       status: restoredTwo.status,
       planStatus: restoredTwo.plan?.status ?? null,
-      executionPhase: restoredTwo.executionPhase ?? null,
-      reentryRequired: restoredTwo.outcome?.details?.reason === "write_only_input_reentry_required",
+      inputTextBound: restoredTwo.outcome?.details?.operatorExecutionBinding?.inputTextBound ?? null,
     },
   ],
 }, null, 2));

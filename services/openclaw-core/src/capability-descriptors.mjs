@@ -207,6 +207,22 @@ export function buildBaseCapabilities({
       description: "Search bounded workspace text with result, file-size, output, binary, and skipped-directory limits.",
     },
     {
+      id: "sense.openclaw.engineering_tool.verify_evidence",
+      name: "Native Engineering Verification Evidence",
+      kind: "sensor",
+      service: "openclaw-core",
+      endpoint: `http://${host}:${port}/plugins/native-adapter/engineering-verification/evidence`,
+      intents: [
+        "openclaw.engineering_tool.verify_evidence",
+        "engineering.tool.verify_evidence",
+        "engineering.verify_evidence",
+      ],
+      domains: ["body_internal"],
+      risk: "medium",
+      governance: "audit_only",
+      description: "Read bounded verification evidence from existing governed command transcripts without executing commands or creating tasks.",
+    },
+    {
       id: "sense.openclaw.plugin_manifest_map",
       name: "Native OpenClaw Plugin Manifest Map",
       kind: "sensor",

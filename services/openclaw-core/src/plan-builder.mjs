@@ -22,7 +22,18 @@ import { createSystemdTaskBuilders } from "./systemd-task-builders.mjs";
 
 export function createPlanBuilder(deps) {
   const profiler = createRuntimeProfiler("plan-builder");
-  const { client, state, taskManager, pluginReview, approvalEngine, policyEvaluator, publishEvent, host, port } = deps;
+  const {
+    client,
+    state,
+    taskManager,
+    pluginReview,
+    approvalEngine,
+    policyEvaluator,
+    publishEvent,
+    host,
+    port,
+    listCommandTranscriptRecords = () => [],
+  } = deps;
   const {
     fetchJson,
     postJson,
@@ -104,6 +115,7 @@ export function createPlanBuilder(deps) {
     pluginReview,
     policyEvaluator,
     publishEvent,
+    listCommandTranscriptRecords,
   });
   const {
     capabilityById,

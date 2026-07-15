@@ -76,6 +76,7 @@ function createHarness(overrides = {}) {
     publishEvent: async (name, body) => {
       events.push({ name, body });
     },
+    listCommandTranscriptRecords: overrides.listCommandTranscriptRecords ?? (() => []),
     fetchImpl: async (url) => {
       calls.health.push(url);
       return {
@@ -283,4 +284,69 @@ test("capability runtime exposes bounded engineering read/search through the gov
   assert.equal(JSON.stringify(state.capabilityInvocationLog).includes("source body"), false);
   assert.equal(state.capabilityInvocationLog.length, 3);
   assert.equal(events.filter((event) => event.name === "capability.invoked").length, 3);
+});
+
+test("capability runtime exposes read-only verification evidence through the governed invoke path", async () => {
+  const taskId = "verification-task-1";
+  const transcriptRecord = {
+    taskId,
+    taskStatus: "completed",
+    taskClosedAt: "2026-07-08T00:00:01.000Z",
+    taskOutcome: "completed",
+    index: 0,
+    state: "executed",
+    command: "npm",
+    exitCode: 0,
+    timedOut: false,
+    stdout: "verification-ok",
+    stderr: "",
+  };
+  const stateTasks = new Map([[
+    taskId,
+    {
+      id: taskId,
+      status: "completed",
+      closedAt: transcriptRecord.taskClosedAt,
+      outcome: {
+        kind: "completed",
+        details: {
+          commandTranscript: [{
+            command: "npm",
+            exitCode: 0,
+            timedOut: false,
+          }],
+        },
+      },
+    },
+  ]]);
+  const { runtime, state, events } = createHarness({
+    state: { tasks: stateTasks },
+    listCommandTranscriptRecords: ({ limit }) => {
+      assert.equal(limit, 100);
+      return [transcriptRecord];
+    },
+  });
+
+  const registry = await runtime.buildCapabilityRegistry();
+  const capability = registry.capabilities.find((item) => item.id === "sense.openclaw.engineering_tool.verify_evidence");
+  assert.equal(capability?.governance, "audit_only");
+  assert.equal(capability?.available, true);
+  assert.equal(capability?.requiresApproval, undefined);
+
+  const result = await runtime.invokeCapability({
+    capabilityId: "sense.openclaw.engineering_tool.verify_evidence",
+    taskId,
+    params: { limit: 4, maxOutputChars: 200 },
+  });
+
+  assert.equal(result.response.invoked, true);
+  assert.equal(result.response.summary.kind, "engineering.verification_evidence");
+  assert.equal(result.response.summary.passed, 1);
+  assert.equal(result.response.summary.attachedToCompletedTasks, 1);
+  assert.equal(result.response.summary.noCommandExecution, true);
+  assert.equal(result.response.result.capability.id, "sense.openclaw.engineering_tool.verify_evidence");
+  assert.equal(result.response.result.query.taskId, taskId);
+  assert.equal(result.response.result.evidence[0].result.stdout, "verification-ok");
+  assert.equal(JSON.stringify(state.capabilityInvocationLog).includes("verification-ok"), false);
+  assert.deepEqual(events.map((event) => event.name), ["policy.evaluated", "capability.invoked"]);
 });

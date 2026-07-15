@@ -38,6 +38,7 @@ cleanup() {
     "${ENGINEERING_READ_FILE:-}" \
     "${ENGINEERING_GLOB_FILE:-}" \
     "${ENGINEERING_GREP_FILE:-}" \
+    "${ENGINEERING_VERIFY_FILE:-}" \
     "${PROCESS_FILE:-}" \
     "${BLOCKED_COMMAND_FILE:-}" \
     "${APPROVED_COMMAND_FILE:-}" \
@@ -59,6 +60,7 @@ SEARCH_FILE="$(mktemp)"
 ENGINEERING_READ_FILE="$(mktemp)"
 ENGINEERING_GLOB_FILE="$(mktemp)"
 ENGINEERING_GREP_FILE="$(mktemp)"
+ENGINEERING_VERIFY_FILE="$(mktemp)"
 PROCESS_FILE="$(mktemp)"
 BLOCKED_COMMAND_FILE="$(mktemp)"
 APPROVED_COMMAND_FILE="$(mktemp)"
@@ -70,6 +72,7 @@ post_json "$CORE_URL/capabilities/invoke" "{\"capabilityId\":\"sense.filesystem.
 post_json "$CORE_URL/capabilities/invoke" "{\"capabilityId\":\"sense.openclaw.engineering_tool.read\",\"params\":{\"workspacePath\":\"$FIXTURE_DIR\",\"relativePath\":\"src/app.ts\",\"startLine\":1,\"endLine\":1}}" > "$ENGINEERING_READ_FILE"
 post_json "$CORE_URL/capabilities/invoke" "{\"capabilityId\":\"sense.openclaw.engineering_tool.glob\",\"params\":{\"workspacePath\":\"$FIXTURE_DIR\",\"pattern\":\"src/**/*.ts\",\"limit\":4}}" > "$ENGINEERING_GLOB_FILE"
 post_json "$CORE_URL/capabilities/invoke" "{\"capabilityId\":\"sense.openclaw.engineering_tool.grep\",\"params\":{\"workspacePath\":\"$FIXTURE_DIR\",\"query\":\"capabilityNeedle\",\"include\":\"src/**/*.ts\",\"literal\":true,\"limit\":4}}" > "$ENGINEERING_GREP_FILE"
+post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"sense.openclaw.engineering_tool.verify_evidence","params":{"limit":4,"maxOutputChars":500}}' > "$ENGINEERING_VERIFY_FILE"
 post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"sense.process.list","intent":"process.list","params":{"limit":20}}' > "$PROCESS_FILE"
 post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"act.system.command.dry_run","intent":"system.command","params":{"command":"rm","args":["-rf","/tmp/openclaw-danger"]}}' > "$BLOCKED_COMMAND_FILE"
 post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"act.system.command.dry_run","intent":"system.command","approved":true,"params":{"command":"rm","args":["-rf","/tmp/openclaw-danger"]}}' > "$APPROVED_COMMAND_FILE"
@@ -86,6 +89,7 @@ node - <<'EOF' \
   "$BLOCKED_COMMAND_FILE" \
   "$APPROVED_COMMAND_FILE" \
   "$EVENTS_FILE" \
+  "$ENGINEERING_VERIFY_FILE" \
   "$FIXTURE_DIR"
 const fs = require("node:fs");
 const readJson = (index) => JSON.parse(fs.readFileSync(process.argv[index], "utf8"));
@@ -99,7 +103,8 @@ const processes = readJson(8);
 const blockedCommand = readJson(9);
 const approvedCommand = readJson(10);
 const events = readJson(11);
-const fixtureDir = process.argv[12];
+const engineeringVerify = readJson(12);
+const fixtureDir = process.argv[13];
 
 if (!vitals.ok || vitals.invoked !== true || vitals.capability?.id !== "sense.system.vitals" || vitals.policy?.decision !== "audit_only") {
   throw new Error("system vitals capability should be invoked with audit-only governance");
@@ -144,6 +149,18 @@ if (
 ) {
   throw new Error(`engineering grep capability should use the bounded governed builder: ${JSON.stringify(engineeringGrep)}`);
 }
+if (
+  !engineeringVerify.ok
+  || engineeringVerify.invoked !== true
+  || engineeringVerify.capability?.id !== "sense.openclaw.engineering_tool.verify_evidence"
+  || engineeringVerify.result?.registry !== "openclaw-native-engineering-verification-evidence-v0"
+  || engineeringVerify.result?.summary?.total !== 0
+  || engineeringVerify.summary?.kind !== "engineering.verification_evidence"
+  || engineeringVerify.summary?.noCommandExecution !== true
+  || engineeringVerify.result?.governance?.canExecuteCommand !== false
+) {
+  throw new Error(`verification evidence capability should remain read-only through the governed builder: ${JSON.stringify(engineeringVerify)}`);
+}
 if (!processes.ok || processes.invoked !== true || processes.result?.count < 1 || processes.summary?.kind !== "process.list") {
   throw new Error("process list capability should route through core");
 }
@@ -184,6 +201,7 @@ console.log(JSON.stringify({
       readLines: engineeringRead.result.summary.lineCount,
       globMatches: engineeringGlob.result.summary.matchedResults,
       grepMatches: engineeringGrep.result.summary.matchedResults,
+      verificationRecords: engineeringVerify.result.summary.total,
       policies: [engineeringRead.policy.decision, engineeringGlob.policy.decision, engineeringGrep.policy.decision],
     },
     process: {

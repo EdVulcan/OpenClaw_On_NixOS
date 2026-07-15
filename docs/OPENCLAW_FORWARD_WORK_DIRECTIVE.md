@@ -275,6 +275,14 @@ documented in
 `docs/plans/OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_READ_SEARCH_PLAN.md`.
 It adds no task, approval, write, command, LSP, provider, or network authority.
 
+The existing `cc_verify` verification-evidence builder is likewise available
+through `sense.openclaw.engineering_tool.verify_evidence` in the common
+`/capabilities/invoke` runtime. It reads only the existing governed command
+transcript/task evidence, records the normal policy/invocation/audit path, and
+keeps command execution, task creation, approvals, retries, mutation, and
+provider egress disabled. This bridge is documented in
+`docs/plans/OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_VERIFICATION_EVIDENCE_PLAN.md`.
+
 The selected Level 1 consistency closures are complete. Do not reopen the LSP
 symbol chain or add another evidence/readiness shell; choose the next concrete
 identity-upgrade capability only after its Level 2 authority boundary is
@@ -611,12 +619,13 @@ proves bounded open plus fail-closed workspace restoration. The heavyweight
 real Firefox launch remains in its dedicated browser/release gate rather than
 the normal package iteration loop. Phase A is 8/9 services, not complete.
 
-The final Phase A closure is core. Package its 134 runtime modules and exact
+The final Phase A closure is core. Package its 148 runtime modules and exact
 shared imports without tests/artifacts, preserve writable control-plane state,
 and prove representative persisted behavior from the store.
 
-That final closure is now complete. Core contains exactly 149 runtime files,
-its generated system unit points into the store, and a real packaged process
+That final closure is now complete. Core contains exactly 148 runtime modules
+and 164 files across its exact store closure, its generated system unit points
+into the store, and a real packaged process
 persists and restores an unexecuted queued task. The trusted sidecar template
 also runs from the session-manager store closure. Phase A is complete at 9/9
 services with no default desktop-body process WorkingDirectory under

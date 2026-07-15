@@ -98,6 +98,7 @@ const workspaceOps = createWorkspaceOps({
   publishEvent,
 });
 
+let executor = null;
 const planBuilder = createPlanBuilder({
   client,
   state,
@@ -108,9 +109,10 @@ const planBuilder = createPlanBuilder({
   publishEvent,
   host,
   port,
+  listCommandTranscriptRecords: (options) => executor?.listCommandTranscriptRecords(options) ?? [],
 });
 
-const executor = createTaskExecutor({
+executor = createTaskExecutor({
   client,
   state,
   taskManager,
@@ -164,6 +166,21 @@ const server = http.createServer(async (req, res) => {
     }
   }
 });
+
+let shuttingDown = false;
+function shutdown() {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  state.persistState.flush?.();
+  if (!server.listening) {
+    process.exit(0);
+    return;
+  }
+  server.close(() => process.exit(0));
+}
+
+process.once("SIGTERM", shutdown);
+process.once("SIGINT", shutdown);
 
 state.loadPersistentState();
 const nativePluginRuntimeRestore = planBuilder.restoreNativePluginRuntimeState();
