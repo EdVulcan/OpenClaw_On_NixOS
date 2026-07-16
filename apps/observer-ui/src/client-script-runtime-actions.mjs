@@ -3,6 +3,7 @@ import { observerClientRuntimeEngineeringLoopControlsScript } from "./client-scr
 import { observerClientRuntimeEngineeringLspTargetSelectionScript } from "./client-script-runtime-engineering-lsp-target-selection.mjs";
 import { observerClientRuntimeEngineeringSuggestedActionScript } from "./client-script-runtime-engineering-suggested-action.mjs";
 import { observerClientRuntimeEngineeringRecommendationScript } from "./client-script-runtime-engineering-recommendation.mjs";
+import { observerClientRuntimeEngineeringPlanScript } from "./client-script-runtime-engineering-plan.mjs";
 import { observerClientRuntimeSystemBodyTasksScript } from "./client-script-runtime-system-body-tasks.mjs";
 import { observerClientRuntimeSystemHealScript } from "./client-script-runtime-system-heal.mjs";
 import { observerClientRuntimeScreenObservationScript } from "./client-script-runtime-screen-observation.mjs";
@@ -74,7 +75,7 @@ async function createPlannedTask() {
   await refreshOperatorState();
 }
 
-${observerClientRuntimeApprovalTasksScript}${observerClientRuntimeEngineeringLoopControlsScript}${observerClientRuntimeEngineeringLspTargetSelectionScript}${observerClientRuntimeEngineeringSuggestedActionScript}${observerClientRuntimeEngineeringRecommendationScript}${observerClientNativeRuntimeRefreshTasksScript}${observerClientRuntimeSystemHealScript}${observerClientRuntimeScreenObservationScript}${observerClientRuntimeWorkViewControlsScript}async function runOperatorStepFromUi() {
+${observerClientRuntimeApprovalTasksScript}${observerClientRuntimeEngineeringLoopControlsScript}${observerClientRuntimeEngineeringLspTargetSelectionScript}${observerClientRuntimeEngineeringSuggestedActionScript}${observerClientRuntimeEngineeringRecommendationScript}${observerClientRuntimeEngineeringPlanScript}${observerClientNativeRuntimeRefreshTasksScript}${observerClientRuntimeSystemHealScript}${observerClientRuntimeScreenObservationScript}${observerClientRuntimeWorkViewControlsScript}async function runOperatorStepFromUi() {
   const result = await fetchJson(\`\${observerConfig.coreUrl}/operator/step\`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -83,6 +84,7 @@ ${observerClientRuntimeApprovalTasksScript}${observerClientRuntimeEngineeringLoo
 
   renderOperatorPanel(result);
   renderEngineeringRecommendationFromOperatorResult(result);
+  renderEngineeringPlanFromOperatorResult(result);
   taskHistoryFocus = result.task?.id ? "selected-task" : taskHistoryFocus;
   selectedHistoryTaskId = result.task?.id ?? selectedHistoryTaskId;
   if (result.task?.id) {
@@ -112,6 +114,7 @@ async function runOperatorLoopFromUi() {
 
   renderOperatorPanel(result);
   renderEngineeringRecommendationFromOperatorResult(result);
+  renderEngineeringPlanFromOperatorResult(result);
   const lastTask = [...(result.steps ?? [])].reverse().find((step) => step.task?.id)?.task ?? null;
   taskHistoryFocus = lastTask?.id ? "selected-task" : taskHistoryFocus;
   selectedHistoryTaskId = lastTask?.id ?? selectedHistoryTaskId;

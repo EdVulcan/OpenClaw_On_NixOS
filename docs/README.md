@@ -34,6 +34,13 @@ Do not continue with Phase 137-style provider wrappers unless the next slice
 creates a real capability and explicitly passes the progress test in the forward
 directive.
 
+The current real capability slice is a bounded engineering-plan draft from the
+existing approved DeepSeek handoff. The provider may return an
+`engineering_plan_v0` response with at most eight redacted todo items; Observer
+shows it as transient review material, and only an explicit operator action can
+save it through the existing plan/todo workbench capability. No task, approval,
+execution, workspace mutation, or provider route is created by the draft.
+
 ## Active Architecture
 
 | Document | Role |

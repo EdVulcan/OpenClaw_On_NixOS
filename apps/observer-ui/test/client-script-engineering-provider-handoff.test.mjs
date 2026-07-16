@@ -40,6 +40,7 @@ test("Observer exposes the explicit pending provider handoff task control", asyn
   const context = {
     engineeringProviderHandoffPromptInput: element({ value: "Review the bounded local engineering state." }),
     engineeringProviderHandoffSourceTaskIdInput: element({ value: "source-task-1" }),
+    engineeringProviderHandoffResponseContract: element({ value: "engineering_recommendation_v0" }),
     engineeringProviderHandoffCreateButton: element(),
     engineeringProviderHandoffStatus: element(),
     engineeringProviderHandoffTask: element(),

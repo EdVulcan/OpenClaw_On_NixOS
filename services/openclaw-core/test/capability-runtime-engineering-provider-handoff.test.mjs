@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { createCapabilityRuntime } from "../src/capability-runtime.mjs";
+import { CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_ENGINEERING_PLAN_CONTRACT } from "../src/cloud-live-provider-runtime-engineering-plan-contract.mjs";
 
 const CAPABILITY_ID = "act.openclaw.engineering_context.provider_handoff_task";
 const CREDENTIAL_REFERENCE = "openclaw://credential/deepseek-api-key";
@@ -156,6 +157,34 @@ test("provider handoff capability remains explicitly approval-gated and request-
     "policy.evaluated",
     "capability.invoked",
   ]);
+});
+
+test("provider handoff capability accepts the bounded engineering plan response contract", async () => {
+  const { runtime, calls } = createHarness();
+  const created = await runtime.invokeCapability(request({
+    params: {
+      confirm: true,
+      liveProviderExecution: {
+        credentialReference: CREDENTIAL_REFERENCE,
+        requestEnvelope: {
+          model: "deepseek-chat",
+          messages: [{ role: "user", content: "transient plan request" }],
+        },
+        contextPacket: {
+          requested: true,
+          sourceTaskId: "source-task-1",
+          includePlanTodo: true,
+        },
+        responseContract: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_ENGINEERING_PLAN_CONTRACT,
+      },
+    },
+  }));
+
+  assert.equal(created.response.invoked, true);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].liveProviderExecution.responseContract, CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_ENGINEERING_PLAN_CONTRACT);
+  assert.equal(calls[0].liveProviderExecution.contextPacket.includePlanTodo, true);
+  assert.equal(JSON.stringify(created.response).includes("transient plan request"), false);
 });
 
 test("provider handoff capability rejects non-DeepSeek or malformed request bindings", async () => {

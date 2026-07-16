@@ -362,3 +362,30 @@ test("context packet handoff can bind a provider task to a separate source engin
   assert.equal(missing.ok, false);
   assert.equal(missing.reason, "live_provider_context_source_task_not_found");
 });
+
+test("context packet handoff selects the bounded engineering plan response contract", async () => {
+  const input = contextInputs();
+  const result = await materialiseCloudLiveProviderContextPacketExecution({
+    ...input,
+    liveProviderExecution: {
+      requested: true,
+      taskId: input.task.id,
+      contextPacket: {
+        requested: true,
+        taskId: input.task.id,
+        includePlanTodo: true,
+        responseContract: "engineering_plan_v0",
+        instruction: "Draft a bounded plan for the next reviewed engineering step.",
+      },
+    },
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.evidence.responseContract, "engineering_plan_v0");
+  assert.equal(result.liveProviderExecution.responseContract, "engineering_plan_v0");
+  assert.equal(result.liveProviderExecution.contextPacket.includePlanTodo, true);
+  const content = result.liveProviderExecution.requestEnvelope.messages[0].content;
+  assert.match(content, /planSummary/);
+  assert.match(content, /1 to 8/);
+  assert.doesNotMatch(JSON.stringify(result.evidence), /Draft a bounded plan/);
+});

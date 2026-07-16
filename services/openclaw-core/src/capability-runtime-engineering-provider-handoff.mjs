@@ -3,6 +3,7 @@ import {
   validateLiveProviderRequestEnvelope,
 } from "./cloud-live-provider-network-sender.mjs";
 import { CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_ENGINEERING_RECOMMENDATION_CONTRACT } from "./cloud-live-provider-runtime-response-contract.mjs";
+import { CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_ENGINEERING_PLAN_CONTRACT } from "./cloud-live-provider-runtime-engineering-plan-contract.mjs";
 
 const CAPABILITY_ID = "act.openclaw.engineering_context.provider_handoff_task";
 const MAX_SOURCE_TASK_ID_CHARS = 200;
@@ -43,6 +44,9 @@ function buildLiveProviderExecution(params) {
     ? input.contextPacket
     : null;
   const sourceTaskId = normaliseSourceTaskId(contextPacket?.sourceTaskId);
+  const includeWorkView = contextPacket?.includeWorkView === true;
+  const includeWorkViewObservation = contextPacket?.includeWorkViewObservation === true;
+  const includePlanTodo = contextPacket?.includePlanTodo === true;
   return {
     requested: true,
     credentialReference: input.credentialReference,
@@ -54,6 +58,9 @@ function buildLiveProviderExecution(params) {
           contextPacket: {
             requested: true,
             ...(sourceTaskId ? { sourceTaskId } : {}),
+            ...(includeWorkView ? { includeWorkView: true } : {}),
+            ...(includeWorkViewObservation ? { includeWorkViewObservation: true } : {}),
+            ...(includePlanTodo ? { includePlanTodo: true } : {}),
           },
         }
       : {}),
@@ -162,6 +169,11 @@ export function createEngineeringProviderHandoffCapabilityHandlers({
     if (contextPacket !== undefined && contextPacket.requested !== true) {
       return "Provider handoff contextPacket.requested must be true when provided.";
     }
+    for (const key of ["includeWorkView", "includeWorkViewObservation", "includePlanTodo"]) {
+      if (contextPacket?.[key] !== undefined && typeof contextPacket[key] !== "boolean") {
+        return `Provider handoff contextPacket.${key} must be a boolean.`;
+      }
+    }
     try {
       normaliseSourceTaskId(contextPacket?.sourceTaskId);
     } catch (error) {
@@ -174,7 +186,8 @@ export function createEngineeringProviderHandoffCapabilityHandlers({
     }
     if (input.responseContract !== undefined
       && input.responseContract !== null
-      && input.responseContract !== CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_ENGINEERING_RECOMMENDATION_CONTRACT) {
+      && input.responseContract !== CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_ENGINEERING_RECOMMENDATION_CONTRACT
+      && input.responseContract !== CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_ENGINEERING_PLAN_CONTRACT) {
       return "Provider handoff responseContract is not supported.";
     }
     return null;

@@ -1,11 +1,12 @@
 # OpenClaw Native Engineering Context Provider Handoff Bridge Plan
 
-Updated: 2026-07-15
+Updated: 2026-07-16
 
 ## Active Slice
 
 Explicitly approved provider consumption of the existing work-view observation
-and plan/todo context bridges.
+and plan/todo context bridges, including one bounded AI engineering-plan draft
+that an operator can explicitly save to the existing workbench.
 
 Identity alignment: Level 1 to Level 2 boundary, with provider egress still
 owned by the existing approval-gated DeepSeek task.
@@ -99,6 +100,33 @@ selected source id is forwarded into the same redacted request binding; the
 control does not infer or mutate a source task, approve the task, run
 `/operator/step`, display the request text, or contact DeepSeek.
 
+## Engineering Plan Draft Follow-Up Complete
+
+The existing handoff now accepts the bounded
+`engineering_plan_v0` response contract. Its provider instruction requires a
+JSON object containing only:
+
+```text
+planSummary: bounded text
+todos: 1-8 bounded { id, description } objects
+requiresOperatorReview: true
+```
+
+The contract rejects unknown keys, duplicate todo ids, paths, URLs,
+credential-like values, and automatic task/approval/execution flags. Valid
+results are returned only in the current operator response as `plan`; the live
+provider task retains only compact contract evidence, todo count, summary
+length, validity, and response hash. The plan and todo text are not written to
+task state or the invocation ledger.
+
+Observer adds an explicit response-mode selector and renders the transient plan
+in the Engineering Context panel. `Save Reviewed AI Plan` revalidates the
+contract and calls the existing
+`act.openclaw.engineering_context.plan_todo_workbench_state` capability with
+`confirm: true`, the existing source task id, and normalized pending todos. It
+does not approve or execute the provider task, create another task, mutate task
+status, or accept arbitrary provider instructions.
+
 ## Evidence
 
 Runtime:
@@ -106,6 +134,7 @@ Runtime:
 ```text
 services/openclaw-core/src/cloud-live-provider-runtime-context-packet.mjs
 services/openclaw-core/src/cloud-live-provider-runtime-live-execution.mjs
+services/openclaw-core/src/cloud-live-provider-runtime-engineering-plan-contract.mjs
 services/openclaw-core/src/task-executor.mjs
 services/openclaw-core/src/capability-runtime-engineering-provider-handoff.mjs
 services/openclaw-core/src/capability-runtime.mjs
@@ -113,6 +142,7 @@ services/openclaw-core/src/capability-descriptors.mjs
 apps/observer-ui/src/observer-panels-engineering-context.mjs
 apps/observer-ui/src/client-script-refreshers-engineering-provider-handoff.mjs
 apps/observer-ui/src/client-script-renderers-engineering-provider-handoff.mjs
+apps/observer-ui/src/client-script-runtime-engineering-plan.mjs
 ```
 
 Tests:
@@ -122,23 +152,29 @@ services/openclaw-core/test/cloud-live-provider-runtime-context-packet.test.mjs
 services/openclaw-core/test/cloud-live-provider-runtime-live-execution.test.mjs
 services/openclaw-core/test/task-executor.test.mjs
 services/openclaw-core/test/capability-runtime-engineering-provider-handoff.test.mjs
+services/openclaw-core/test/cloud-live-provider-runtime-engineering-plan-contract.test.mjs
 apps/observer-ui/test/client-script-engineering-provider-handoff.test.mjs
+apps/observer-ui/test/client-script-engineering-plan.test.mjs
 nix/scripts/dev-openclaw-cloud-consciousness-live-provider-egress-execution-task-shell-common-check.sh
 ```
 
 The tests prove explicit flag handling, local work-view read assembly, plan/todo
-assembly, sensitive payload exclusion, compact durable evidence, the Observer
-pending-task control, and the existing hash-bound live execution path. The real
-Phase 63 Core check also proves the positive `approved:true` plus `confirm:true`
-common-capability path creates the same pending egress task without exposing the
-request text or contacting a provider. The Observer test also proves the
-explicit source-task input reaches the capability request.
+assembly, sensitive payload exclusion, compact durable evidence, the bounded
+plan response parser, transient live plan projection, the explicit Observer
+workbench save, the pending-task control, and the existing hash-bound live
+execution path. The real Phase 63 Core check now also binds
+`engineering_plan_v0` through the positive `approved:true` plus `confirm:true`
+common-capability path without exposing the request text or contacting a
+provider. The Observer test proves the explicit source-task input reaches the
+capability request and the plan test proves reviewed save uses the existing
+workbench capability.
 
 ## Deferred
 
 ```text
 automatic provider calls
 automatic use of provider recommendations
+automatic persistence or execution of AI-generated plans
 automatic capability approval or provider task execution
 raw page or visual payload transfer
 long-lived LSP or ACPX/Codex process execution
@@ -148,6 +184,7 @@ desktop-wide capture, root work, and arbitrary endpoint execution
 
 ## Next Smallest Capability
 
-Keep this bridge transient and review-only. Select a further Level 2 action only
-after a concrete operator decision cannot be made from the current bounded
-observation and plan/todo summaries.
+Keep the plan draft transient until the operator explicitly saves it through the
+existing workbench capability. The next product capability remains the smallest
+Level 2 action only after a concrete operator decision cannot be made from the
+current bounded observation and plan/todo summaries.

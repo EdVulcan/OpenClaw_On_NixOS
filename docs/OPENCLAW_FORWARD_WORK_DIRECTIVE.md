@@ -281,6 +281,23 @@ the egress task remains the approval and execution owner. This continuity
 boundary is documented in
 `docs/plans/OPENCLAW_NATIVE_ENGINEERING_CONTEXT_PROVIDER_SOURCE_TASK_PLAN.md`.
 
+The next concrete provider-facing product slice is now the bounded
+`engineering_plan_v0` response contract on that same approved handoff. DeepSeek
+may return only a short plan summary and up to eight todo items with no paths,
+URLs, credentials, or automatic-control fields. The plan is transient in the
+operator result; Observer validates it and can save a reviewed copy through the
+existing `act.openclaw.engineering_context.plan_todo_workbench_state` capability
+only after explicit confirmation. Durable provider evidence keeps only the
+contract, counts, lengths, validity, and response hash. This advances the
+Level 1 cloud-consciousness/workbench loop without reopening the historical
+provider phase ladder.
+
+Evidence for this slice is in the engineering-plan contract and live-execution
+tests, the provider handoff capability test, the Observer plan test, and the
+existing Phase 63 egress task-shell check. Provider egress remains explicitly
+operator-approved; the draft cannot create tasks or approvals, execute controls,
+write files, or change the workspace by itself.
+
 The current Level 1 follow-up closes a separate operator execution-consistency
 gap in the existing browser task path. It is documented in
 `docs/plans/OPENCLAW_NATIVE_ENGINEERING_OPERATOR_EXECUTION_BINDING_PLAN.md`.

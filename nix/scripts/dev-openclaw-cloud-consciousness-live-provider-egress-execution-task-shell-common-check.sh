@@ -113,7 +113,7 @@ post_json "$CORE_URL/cloud-consciousness/live-provider-credential-value-access-g
 post_json "$CORE_URL/cloud-consciousness/live-provider-endpoint-network-egress-gate" '{"confirm":true}' > "$ENDPOINT_GATE_FILE"
 post_json "$CORE_URL/cloud-consciousness/live-provider-egress-execution-route-task-preflight" '{"confirm":true}' > "$ROUTE_PREFLIGHT_FILE"
 context_source_task_id="$(node -e 'const fs=require("node:fs"); const data=JSON.parse(fs.readFileSync(process.argv[1], "utf8")); if(!data.task?.id) throw new Error("missing context source task id"); console.log(data.task.id)' "$ROUTE_PREFLIGHT_FILE")"
-egress_task_request="$(node -e 'const sourceTaskId=process.argv[1]; console.log(JSON.stringify({confirm:true,liveProviderExecution:{requested:true,credentialReference:"openclaw://credential/deepseek-api-key",requestEnvelope:{model:"deepseek-chat",messages:[{role:"user",content:"Phase 63 bounded provider binding fixture."}]},contextPacket:{requested:true,sourceTaskId},responseContract:null}}))' "$context_source_task_id")"
+egress_task_request="$(node -e 'const sourceTaskId=process.argv[1]; console.log(JSON.stringify({confirm:true,liveProviderExecution:{requested:true,credentialReference:"openclaw://credential/deepseek-api-key",requestEnvelope:{model:"deepseek-chat",messages:[{role:"user",content:"Phase 63 bounded provider binding fixture."}]},contextPacket:{requested:true,sourceTaskId},responseContract:"engineering_plan_v0"}}))' "$context_source_task_id")"
 post_json "$CORE_URL/cloud-consciousness/live-provider-egress-execution-tasks" "$egress_task_request" > "$ROUTE_TASK_FILE"
 capability_request="$(node -e 'const params=JSON.parse(process.argv[1]); console.log(JSON.stringify({capabilityId:"act.openclaw.engineering_context.provider_handoff_task",approved:true,params}))' "$egress_task_request")"
 post_json "$CORE_URL/capabilities/invoke" "$capability_request" > "$CAPABILITY_FILE"
@@ -168,6 +168,7 @@ if (
   || routeTaskRecord.registry !== egressTaskRegistry
   || routeTaskRecord.approval?.status !== "pending"
   || routeTaskRecord.task?.cloudConsciousnessLiveProviderEgressExecution?.requestBinding?.sourceTaskId !== contextSourceTaskId
+  || routeTaskRecord.task?.cloudConsciousnessLiveProviderEgressExecution?.requestBinding?.responseContract !== "engineering_plan_v0"
   || routeTaskRecord.task?.cloudConsciousnessLiveProviderEgressExecution?.egressExecutionTaskCreated !== true
 ) {
   throw new Error(`Phase 63 dedicated egress task route should retain its pending request-bound shell contract: ${JSON.stringify(routeTaskRecord)}`);
@@ -194,6 +195,7 @@ if (
   || taskShell?.sourceRegistry !== routePreflightRegistry
   || taskShell?.implementationStatus !== "task_shell_only"
   || taskShell?.requestBinding?.sourceTaskId !== contextSourceTaskId
+  || taskShell?.requestBinding?.responseContract !== "engineering_plan_v0"
   || taskShell?.egressExecutionTaskCreated !== true
   || taskShell?.egressExecutionTaskApproved !== false
   || !egressStepRecord.ok
@@ -204,6 +206,7 @@ if (
   || completedShell?.egressExecutionTaskCreated !== true
   || completedShell?.egressExecutionTaskApproved !== true
   || completedShell?.egressExecutionDeferred !== true
+  || completedShell?.requestBinding?.responseContract !== "engineering_plan_v0"
 ) {
   throw new Error(`Phase 63 should create and approve deferred egress execution task shell evidence: ${JSON.stringify({ egressTaskRecord, egressStepRecord })}`);
 }

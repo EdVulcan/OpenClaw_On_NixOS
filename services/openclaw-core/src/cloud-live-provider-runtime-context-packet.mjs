@@ -11,6 +11,10 @@ import {
   CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_ENGINEERING_RECOMMENDATION_CONTRACT,
   buildCloudLiveProviderEngineeringRecommendationInstruction,
 } from "./cloud-live-provider-runtime-response-contract.mjs";
+import {
+  CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_ENGINEERING_PLAN_CONTRACT,
+  buildCloudLiveProviderEngineeringPlanInstruction,
+} from "./cloud-live-provider-runtime-engineering-plan-contract.mjs";
 
 export const CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CONTEXT_PACKET_REGISTRY =
   "openclaw-cloud-consciousness-live-provider-context-packet-v0";
@@ -186,7 +190,8 @@ export async function materialiseCloudLiveProviderContextPacketExecution({
   const responseContract = contextRequest.responseContract === undefined
     ? CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_ENGINEERING_RECOMMENDATION_CONTRACT
     : contextRequest.responseContract;
-  if (responseContract !== CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_ENGINEERING_RECOMMENDATION_CONTRACT) {
+  if (responseContract !== CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_ENGINEERING_RECOMMENDATION_CONTRACT
+    && responseContract !== CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_ENGINEERING_PLAN_CONTRACT) {
     return {
       ok: false,
       reason: "live_provider_context_response_contract_not_supported",
@@ -256,7 +261,10 @@ export async function materialiseCloudLiveProviderContextPacketExecution({
     contextRequest.instruction,
     MAX_INSTRUCTION_CHARS,
   ) || "Review this bounded local engineering context and provide a concise next-step recommendation. Do not propose uncontrolled execution.";
-  const responseContractInstruction = buildCloudLiveProviderEngineeringRecommendationInstruction();
+  const responseContractInstruction = responseContract
+    === CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_ENGINEERING_PLAN_CONTRACT
+    ? buildCloudLiveProviderEngineeringPlanInstruction()
+    : buildCloudLiveProviderEngineeringRecommendationInstruction();
   const instruction = [
     boundedText(
       requestedInstruction,

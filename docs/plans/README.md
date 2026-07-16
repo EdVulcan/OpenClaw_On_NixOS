@@ -44,6 +44,7 @@ OPENCLAW_NATIVE_ENGINEERING_RECOVERY_WORK_STANDARDS_COVERAGE_PLAN.md
 OPENCLAW_NATIVE_ENGINEERING_MICROCOMPACT_EVIDENCE_PLAN.md
 OPENCLAW_NATIVE_ENGINEERING_MICROCOMPACT_PROJECTION_PLAN.md
 OPENCLAW_NATIVE_ENGINEERING_CONTEXT_PACKET_PLAN.md
+OPENCLAW_NATIVE_ENGINEERING_CONTEXT_PROVIDER_HANDOFF_BRIDGE_PLAN.md
 OPENCLAW_NATIVE_ENGINEERING_CONTEXT_PROVIDER_SOURCE_TASK_PLAN.md
 OPENCLAW_NATIVE_ENGINEERING_OPERATOR_EXECUTION_BINDING_PLAN.md
 OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_READ_SEARCH_PLAN.md
@@ -180,6 +181,14 @@ compatibility/preflight and its common capability-runtime bridge, and local
 context packet are already completed evidence; do not reopen their historical
 next-step wording. ACPX live process execution and provider/model use remain
 explicit authorization boundaries.
+
+The current provider follow-up is the bounded `engineering_plan_v0` response
+contract in `OPENCLAW_NATIVE_ENGINEERING_CONTEXT_PROVIDER_HANDOFF_BRIDGE_PLAN.md`.
+It turns one already-approved DeepSeek response into a transient plan draft;
+Observer can save it only after operator review through the existing
+`act.openclaw.engineering_context.plan_todo_workbench_state` capability. The
+provider response remains request-bound and no automatic task, approval,
+execution, or mutation is added.
 
 The active Level 2 bridge is documented in:
 

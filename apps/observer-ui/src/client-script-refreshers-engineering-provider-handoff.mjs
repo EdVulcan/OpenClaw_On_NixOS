@@ -5,6 +5,9 @@ export const observerClientEngineeringProviderHandoffRefreshersScript = `async f
 
   const prompt = engineeringProviderHandoffPromptInput.value.trim();
   const sourceTaskId = engineeringProviderHandoffSourceTaskIdInput?.value.trim() ?? "";
+  const responseContract = engineeringProviderHandoffResponseContract?.value === "engineering_plan_v0"
+    ? "engineering_plan_v0"
+    : "engineering_recommendation_v0";
   if (!prompt) {
     setControlMessage("Enter a bounded provider request before creating the handoff task.");
     engineeringProviderHandoffPromptInput.focus();
@@ -27,9 +30,15 @@ export const observerClientEngineeringProviderHandoffRefreshersScript = `async f
               model: "deepseek-chat",
               messages: [{ role: "user", content: prompt }],
             },
-            responseContract: "engineering_recommendation_v0",
-            ...(sourceTaskId
-              ? { contextPacket: { requested: true, sourceTaskId } }
+            responseContract,
+            ...((sourceTaskId || responseContract === "engineering_plan_v0")
+              ? {
+                  contextPacket: {
+                    requested: true,
+                    ...(sourceTaskId ? { sourceTaskId } : {}),
+                    ...(responseContract === "engineering_plan_v0" ? { includePlanTodo: true } : {}),
+                  },
+                }
               : {}),
           },
         },

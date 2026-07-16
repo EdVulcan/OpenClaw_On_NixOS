@@ -27,6 +27,13 @@ export function observerEngineeringContextPanels() {
               <label for="engineering-provider-handoff-prompt-input">DeepSeek Handoff Request</label>
               <textarea id="engineering-provider-handoff-prompt-input" rows="3" maxlength="8000" placeholder="Bounded request for the next approved provider review"></textarea>
             </div>
+            <div class="field">
+              <label for="engineering-provider-handoff-response-contract">AI response mode</label>
+              <select id="engineering-provider-handoff-response-contract">
+                <option value="engineering_recommendation_v0">Action recommendation</option>
+                <option value="engineering_plan_v0">Engineering plan draft</option>
+              </select>
+            </div>
           </div>
           <div class="actions tight">
             <button id="engineering-context-packet-build-button" class="secondary" type="button">Build Context Packet</button>
@@ -39,6 +46,9 @@ export function observerEngineeringContextPanels() {
           <div class="metric"><span>Handoff Task</span><span id="engineering-provider-handoff-task">none</span></div>
           <div class="metric"><span>Handoff Approval</span><span id="engineering-provider-handoff-approval">none</span></div>
           <pre id="engineering-provider-handoff-json">No provider handoff task created yet.</pre>
+          <div class="metric"><span>AI Plan Draft</span><span id="engineering-provider-plan-status">none</span></div>
+          <button id="engineering-provider-plan-apply-button" class="secondary" type="button" disabled>Save Reviewed AI Plan</button>
+          <pre id="engineering-provider-plan-json">No transient AI plan draft available.</pre>
           <pre id="engineering-context-packet-json">No local engineering context packet built yet.</pre>
         </section>
 `;

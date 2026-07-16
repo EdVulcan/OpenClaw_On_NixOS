@@ -595,6 +595,7 @@ function selectSourceHeuristics(file) {
     ["services/openclaw-core/test/capability-runtime-browser-actions.test.mjs", ["openclaw-core-service-unit-tests", "capability-invoke", "observer-capability-invoke"]],
     ["services/openclaw-core/test/capability-runtime-screen-actions.test.mjs", ["openclaw-core-service-unit-tests", "capability-invoke", "observer-capability-invoke"]],
     ["services/openclaw-core/test/cloud-live-provider-runtime-response-contract.test.mjs", ["openclaw-core-service-unit-tests"]],
+    ["services/openclaw-core/test/cloud-live-provider-runtime-engineering-plan-contract.test.mjs", ["openclaw-core-service-unit-tests", "openclaw-cloud-consciousness-live-provider-egress-execution-task-shell"]],
     ["services/openclaw-core/test/native-engineering-plan-todo-evidence-builders.test.mjs", ["openclaw-core-service-unit-tests", "openclaw-native-engineering-plan-todo-evidence", "observer-openclaw-native-engineering-plan-todo-evidence"]],
     ["services/openclaw-core/test/native-engineering-tool-surface-builders.test.mjs", ["openclaw-core-service-unit-tests", "openclaw-native-engineering-tool-surface-inventory", "observer-openclaw-native-engineering-tool-surface-inventory"]],
     ["services/openclaw-core/test/browser-task-execution-binding.test.mjs", ["openclaw-core-service-unit-tests", "task-executor", "operator-loop"]],
@@ -605,7 +606,8 @@ function selectSourceHeuristics(file) {
     ["services/openclaw-core/src/route-handlers.mjs", ["task-workbench", "operator-loop", "observer-operator", nativeEngineeringContextPacketPairBatchCheck]],
     ["services/openclaw-core/src/cloud-live-provider-result-envelope-routes.mjs", ["openclaw-live-provider-result-envelope-batch-reuse"]],
     ["services/openclaw-core/src/cloud-live-provider-runtime-context-packet.mjs", [nativeEngineeringContextPacketPairBatchCheck, "openclaw-core-service-unit-tests"]],
-    ["services/openclaw-core/src/cloud-live-provider-runtime-live-execution.mjs", ["openclaw-core-service-unit-tests"]],
+    ["services/openclaw-core/src/cloud-live-provider-runtime-engineering-plan-contract.mjs", ["openclaw-core-service-unit-tests", "openclaw-cloud-consciousness-live-provider-egress-execution-task-shell"]],
+    ["services/openclaw-core/src/cloud-live-provider-runtime-live-execution.mjs", ["openclaw-core-service-unit-tests", "openclaw-cloud-consciousness-live-provider-egress-execution-task-shell"]],
     ["services/openclaw-core/src/native-engineering-context-packet.mjs", [nativeEngineeringContextPacketPairBatchCheck]],
     ["services/openclaw-core/src/native-engineering-context-packet-assembly.mjs", [nativeEngineeringContextPacketPairBatchCheck, "openclaw-core-service-unit-tests", "capability-invoke", "observer-capability-invoke"]],
     ["services/openclaw-core/src/native-engineering-context-routes.mjs", [nativeEngineeringContextPacketPairBatchCheck]],
@@ -640,9 +642,11 @@ function selectSourceHeuristics(file) {
     ["apps/observer-ui/src/client-script-runtime-engineering-lsp-target-selection.mjs", [nativeEngineeringLspObserverCheck]],
     ["apps/observer-ui/src/client-script-runtime-engineering-suggested-action.mjs", ["observer-capability-invoke"]],
     ["apps/observer-ui/src/client-script-runtime-engineering-recommendation.mjs", ["observer-capability-invoke"]],
+    ["apps/observer-ui/src/client-script-runtime-engineering-plan.mjs", ["observer-capability-invoke"]],
     ["apps/observer-ui/src/client-script-runtime-system-heal.mjs", ["observer-capability-invoke"]],
     ["apps/observer-ui/src/client-script-runtime-work-view-controls.mjs", ["observer-capability-invoke"]],
     ["apps/observer-ui/test/client-script-runtime-engineering-recommendation.test.mjs", ["observer-capability-invoke"]],
+    ["apps/observer-ui/test/client-script-engineering-plan.test.mjs", ["observer-capability-invoke"]],
     ["apps/observer-ui/test/client-script-runtime-system-heal.test.mjs", ["observer-capability-invoke"]],
     ["apps/observer-ui/test/client-script-runtime-work-view-controls.test.mjs", ["observer-capability-invoke"]],
     ["apps/observer-ui/test/client-script-engineering-lsp-target-selection.test.mjs", [nativeEngineeringLspObserverCheck, "observer-capability-invoke"]],
@@ -682,7 +686,8 @@ function selectSourceHeuristics(file) {
   }
 
   if (file === "services/openclaw-core/src/cloud-live-provider-runtime-context-packet.mjs"
-    || file === "services/openclaw-core/src/cloud-live-provider-runtime-live-execution.mjs") {
+    || file === "services/openclaw-core/src/cloud-live-provider-runtime-live-execution.mjs"
+    || file === "services/openclaw-core/src/cloud-live-provider-runtime-engineering-plan-contract.mjs") {
     return;
   }
 

@@ -352,6 +352,27 @@ selectors are still explicit request inputs and are covered by the same
 request-content hash. They do not enable provider calls or action execution by
 themselves.
 
+## Engineering Plan Draft Follow-Up Complete
+
+The existing approved provider handoff can now select
+`engineering_plan_v0` after the packet has included the bounded plan/todo
+context. The provider instruction and parser accept only a short summary, one
+to eight `{ id, description }` todo items, and `requiresOperatorReview: true`.
+Unknown keys, paths, URLs, credential-like values, duplicate ids, and automatic
+control flags fail closed.
+
+The valid plan is transient in the live execution response. Durable task and
+capability evidence retains only the contract, validity, summary length, todo
+count, response hash, and the existing request/context binding. Observer can
+show the draft and save a normalized pending copy only after explicit operator
+review through the existing plan/todo workbench capability. No task, approval,
+execution, provider route, file write, or task-status transition is automatic.
+
+The boundary is documented in
+`OPENCLAW_NATIVE_ENGINEERING_CONTEXT_PROVIDER_HANDOFF_BRIDGE_PLAN.md` and is
+covered by the provider contract, context-packet, live-execution, capability,
+Observer, and Phase 63 task-shell evidence.
+
 The next Level 2 slice is to use this reviewed readiness decision at the
 existing browser semantic-action handoff for one bounded operator-approved
 click. The handoff must revalidate the current lease, target inventory digest,

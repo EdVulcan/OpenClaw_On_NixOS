@@ -12,6 +12,7 @@ import {
   DEEPSEEK_CREDENTIAL_REFERENCE,
 } from "../src/cloud-live-provider-network-sender.mjs";
 import { CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_ENGINEERING_RECOMMENDATION_CONTRACT } from "../src/cloud-live-provider-runtime-response-contract.mjs";
+import { CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_ENGINEERING_PLAN_CONTRACT } from "../src/cloud-live-provider-runtime-engineering-plan-contract.mjs";
 
 const LIVE_PROVIDER_TEST_ENV = {
   OPENCLAW_CLOUD_PROVIDER_ENDPOINT: "https://api.deepseek.com",
@@ -405,6 +406,64 @@ test("valid structured recommendation is transient while task state keeps compac
   assert.equal(result.task.cloudConsciousnessLiveProviderEgressExecution.recommendation.reasonIncluded, false);
   assert.doesNotMatch(JSON.stringify(result.task), /bounded todo evidence supports/);
   assert.equal(result.summary.recommendation.actionId, "create_verification_task");
+});
+
+test("valid engineering plan is transient while task state keeps compact plan evidence", async () => {
+  const harness = createHarness();
+  const summary = "Review bounded evidence before selecting the next governed step.";
+  const description = "Review the latest bounded verification evidence.";
+  const options = liveOptions({
+    responseContract: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_ENGINEERING_PLAN_CONTRACT,
+  });
+  const task = createBoundTask(options);
+  const result = await executeCloudConsciousnessLiveProviderRequest({
+    ...harness.deps,
+    task,
+    options,
+    env: LIVE_PROVIDER_TEST_ENV,
+    sendLiveProviderRequestImpl: async () => ({
+      ok: true,
+      audit: {
+        responseContentHash: "plan-response-hash",
+        providerResponseCreated: true,
+        endpointContacted: true,
+        networkEgress: true,
+        transmitsExternally: true,
+      },
+      governance: {
+        providerCredentialRead: true,
+        credentialValueRead: true,
+        providerResponseCreated: true,
+        endpointContacted: true,
+        networkEgress: true,
+        transmitsExternally: true,
+        liveProviderCallEnabled: true,
+      },
+      response: {
+        id: "plan-response-1",
+        model: "deepseek-chat",
+        assistantContent: JSON.stringify({
+          planSummary: summary,
+          todos: [{ id: "review-evidence", description }],
+          requiresOperatorReview: true,
+        }),
+        responseContentHash: "plan-response-hash",
+        usage: { total_tokens: 14 },
+      },
+    }),
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.status, "live_provider_call_completed");
+  assert.equal(result.plan.planSummary, summary);
+  assert.equal(result.plan.todos[0].description, description);
+  assert.equal(result.plan.todos[0].status, "pending");
+  assert.equal(result.task.cloudConsciousnessLiveProviderEgressExecution.responseContract, CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_ENGINEERING_PLAN_CONTRACT);
+  assert.equal(result.task.cloudConsciousnessLiveProviderEgressExecution.plan.planTodoCount, 1);
+  assert.equal(result.task.cloudConsciousnessLiveProviderEgressExecution.plan.contentIncluded, false);
+  assert.equal(result.task.cloudConsciousnessLiveProviderEgressExecution.plan.responseContentHash, "plan-response-hash");
+  assert.doesNotMatch(JSON.stringify(result.task), /Review the latest bounded verification evidence/);
+  assert.doesNotMatch(JSON.stringify(result.task), /Review bounded evidence before selecting/);
 });
 
 test("live execution retains only compact work-view and plan/todo context evidence", async () => {

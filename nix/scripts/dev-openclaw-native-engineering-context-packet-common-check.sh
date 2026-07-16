@@ -388,7 +388,7 @@ if (observerCheck) {
     if (!html.includes(token)) throw new Error(`Observer HTML missing context packet token: ${token}`);
   }
   for (const token of [
-    "/plugins/native-adapter/engineering-context/packet",
+    "/capabilities/invoke",
     "refreshEngineeringContextPacket",
     "renderEngineeringContextPacket",
     "Local governed engineering context packet",
@@ -409,7 +409,7 @@ if (observerCheck) {
     "engineeringContextPacketRecoveryButton",
     "Reveal Trusted Work View",
     "Rebind Task to Work View",
-    "/plugins/native-adapter/engineering-context/work-view/bind",
+    "act.openclaw.engineering_context.work_view_bind",
     "bindEngineeringContextTaskToWorkView",
     "prepareEngineeringContextWorkView",
     "runRecommendedWorkViewAction",
