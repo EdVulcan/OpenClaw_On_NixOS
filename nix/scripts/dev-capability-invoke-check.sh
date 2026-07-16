@@ -4,6 +4,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 FIXTURE_DIR="$REPO_ROOT/.artifacts/capability-invoke-fixture"
+TOOL_SURFACE_FIXTURE_DIR="$REPO_ROOT/.artifacts/capability-invoke-tool-surface-fixture"
+TOOL_SURFACE_WORKSPACE_DIR="$TOOL_SURFACE_FIXTURE_DIR/openclaw"
+
+source "$SCRIPT_DIR/openclaw-engineering-tool-surface-fixture.sh"
 
 export OPENCLAW_CORE_PORT="${OPENCLAW_CORE_PORT:-6900}"
 export OPENCLAW_EVENT_HUB_PORT="${OPENCLAW_EVENT_HUB_PORT:-6901}"
@@ -17,7 +21,7 @@ export OBSERVER_UI_PORT="${OBSERVER_UI_PORT:-6970}"
 export OPENCLAW_CORE_STATE_FILE="${OPENCLAW_CORE_STATE_FILE:-$REPO_ROOT/.artifacts/openclaw-core-capability-invoke-check.json}"
 export OPENCLAW_EVENT_LOG_FILE="${OPENCLAW_EVENT_LOG_FILE:-$REPO_ROOT/.artifacts/openclaw-capability-invoke-check-events.jsonl}"
 export OPENCLAW_SYSTEM_ALLOWED_ROOTS="$FIXTURE_DIR"
-export OPENCLAW_WORKSPACE_ROOTS="$FIXTURE_DIR"
+export OPENCLAW_WORKSPACE_ROOTS="$FIXTURE_DIR:$TOOL_SURFACE_WORKSPACE_DIR"
 
 CORE_URL="http://127.0.0.1:$OPENCLAW_CORE_PORT"
 EVENT_HUB_URL="http://127.0.0.1:$OPENCLAW_EVENT_HUB_PORT"
@@ -26,7 +30,10 @@ SESSION_MANAGER_URL="http://127.0.0.1:$OPENCLAW_SESSION_MANAGER_PORT"
 "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 rm -f "$OPENCLAW_CORE_STATE_FILE" "$OPENCLAW_CORE_STATE_FILE.tmp" "$OPENCLAW_EVENT_LOG_FILE"
 rm -rf "$FIXTURE_DIR"
+rm -rf "$TOOL_SURFACE_FIXTURE_DIR"
 mkdir -p "$FIXTURE_DIR/nested" "$FIXTURE_DIR/src" "$FIXTURE_DIR/scratch" "$FIXTURE_DIR/.openclaw"
+mkdir -p "$TOOL_SURFACE_FIXTURE_DIR"
+prepare_engineering_tool_surface_fixture "$TOOL_SURFACE_WORKSPACE_DIR" "CAPABILITY_INVOKE_TOOL_SURFACE"
 printf 'OpenClaw capability invoke fixture\n' > "$FIXTURE_DIR/openclaw-capability-invoke.txt"
 printf 'Nested invoke search fixture\n' > "$FIXTURE_DIR/nested/search-note.md"
 printf 'export const capabilityNeedle = "OpenClaw capability invoke";\n' > "$FIXTURE_DIR/src/app.ts"
@@ -47,6 +54,7 @@ cleanup() {
     "${ENGINEERING_READ_FILE:-}" \
     "${ENGINEERING_GLOB_FILE:-}" \
     "${ENGINEERING_GREP_FILE:-}" \
+    "${ENGINEERING_TOOL_SURFACE_FILE:-}" \
     "${ENGINEERING_VERIFY_FILE:-}" \
     "${ENGINEERING_EDIT_PROPOSAL_FILE:-}" \
     "${ENGINEERING_WRITE_PROPOSAL_FILE:-}" \
@@ -68,6 +76,7 @@ cleanup() {
     "${APPROVED_COMMAND_FILE:-}" \
     "${EVENTS_FILE:-}"
   "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
+  rm -rf "$TOOL_SURFACE_FIXTURE_DIR"
 }
 trap cleanup EXIT
 
@@ -85,6 +94,7 @@ SEARCH_FILE="$(mktemp)"
 ENGINEERING_READ_FILE="$(mktemp)"
 ENGINEERING_GLOB_FILE="$(mktemp)"
 ENGINEERING_GREP_FILE="$(mktemp)"
+ENGINEERING_TOOL_SURFACE_FILE="$(mktemp)"
 ENGINEERING_VERIFY_FILE="$(mktemp)"
 ENGINEERING_EDIT_PROPOSAL_FILE="$(mktemp)"
 ENGINEERING_WRITE_PROPOSAL_FILE="$(mktemp)"
@@ -113,6 +123,7 @@ post_json "$CORE_URL/capabilities/invoke" "{\"capabilityId\":\"sense.filesystem.
 post_json "$CORE_URL/capabilities/invoke" "{\"capabilityId\":\"sense.openclaw.engineering_tool.read\",\"params\":{\"workspacePath\":\"$FIXTURE_DIR\",\"relativePath\":\"src/app.ts\",\"startLine\":1,\"endLine\":1}}" > "$ENGINEERING_READ_FILE"
 post_json "$CORE_URL/capabilities/invoke" "{\"capabilityId\":\"sense.openclaw.engineering_tool.glob\",\"params\":{\"workspacePath\":\"$FIXTURE_DIR\",\"pattern\":\"src/**/*.ts\",\"limit\":4}}" > "$ENGINEERING_GLOB_FILE"
 post_json "$CORE_URL/capabilities/invoke" "{\"capabilityId\":\"sense.openclaw.engineering_tool.grep\",\"params\":{\"workspacePath\":\"$FIXTURE_DIR\",\"query\":\"capabilityNeedle\",\"include\":\"src/**/*.ts\",\"literal\":true,\"limit\":4}}" > "$ENGINEERING_GREP_FILE"
+post_json "$CORE_URL/capabilities/invoke" "{\"capabilityId\":\"sense.openclaw.engineering_tool_surface_inventory\",\"intent\":\"engineering.tool_surface_inventory\",\"params\":{\"workspacePath\":\"$TOOL_SURFACE_WORKSPACE_DIR\"}}" > "$ENGINEERING_TOOL_SURFACE_FILE"
 post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"sense.openclaw.engineering_tool.verify_evidence","params":{"limit":4,"maxOutputChars":500}}' > "$ENGINEERING_VERIFY_FILE"
 post_json "$CORE_URL/capabilities/invoke" "{\"capabilityId\":\"act.openclaw.engineering_tool.edit_proposal\",\"params\":{\"workspacePath\":\"$FIXTURE_DIR\",\"relativePath\":\"src/app.ts\",\"oldString\":\"capabilityNeedle\",\"newString\":\"governedNeedle\",\"contextLines\":1}}" > "$ENGINEERING_EDIT_PROPOSAL_FILE"
 post_json "$CORE_URL/capabilities/invoke" "{\"capabilityId\":\"act.openclaw.engineering_tool.write_proposal\",\"params\":{\"workspacePath\":\"$FIXTURE_DIR\",\"relativePath\":\"scratch/new-file.txt\",\"content\":\"transient write content\",\"overwrite\":false,\"contextLines\":1}}" > "$ENGINEERING_WRITE_PROPOSAL_FILE"
@@ -163,7 +174,8 @@ node - <<'EOF' \
   "$SCREEN_FILE" \
   "$BROWSER_OPEN_FILE" \
   "$SCREEN_KEYBOARD_FILE" \
-  "$SCREEN_POINTER_FILE"
+  "$SCREEN_POINTER_FILE" \
+  "$ENGINEERING_TOOL_SURFACE_FILE"
 const fs = require("node:fs");
 const readJson = (index) => JSON.parse(fs.readFileSync(process.argv[index], "utf8"));
 const vitals = readJson(2);
@@ -194,6 +206,7 @@ const screen = readJson(26);
 const browserOpen = readJson(27);
 const screenKeyboard = readJson(28);
 const screenPointer = readJson(29);
+const engineeringToolSurface = readJson(30);
 
 if (!vitals.ok || vitals.invoked !== true || vitals.capability?.id !== "sense.system.vitals" || vitals.policy?.decision !== "audit_only") {
   throw new Error("system vitals capability should be invoked with audit-only governance");
@@ -250,6 +263,30 @@ if (
   || engineeringGrep.policy?.decision !== "audit_only"
 ) {
   throw new Error(`engineering grep capability should use the bounded governed builder: ${JSON.stringify(engineeringGrep)}`);
+}
+if (
+  !engineeringToolSurface.ok
+  || engineeringToolSurface.invoked !== true
+  || engineeringToolSurface.capability?.id !== "sense.openclaw.engineering_tool_surface_inventory"
+  || engineeringToolSurface.result?.registry !== "openclaw-native-engineering-tool-surface-inventory-v0"
+  || engineeringToolSurface.result?.summary?.totalTools !== 10
+  || engineeringToolSurface.result?.summary?.coveredTools !== 10
+  || engineeringToolSurface.summary?.kind !== "engineering.tool_surface_inventory"
+  || engineeringToolSurface.summary?.noSourceContentExposure !== true
+  || engineeringToolSurface.summary?.noToolExecution !== true
+  || engineeringToolSurface.summary?.noLspStart !== true
+  || engineeringToolSurface.summary?.noMutation !== true
+  || engineeringToolSurface.summary?.noTaskCreation !== true
+  || engineeringToolSurface.summary?.noApprovalCreation !== true
+  || engineeringToolSurface.summary?.noProviderEgress !== true
+  || engineeringToolSurface.result?.governance?.canExecuteToolCode !== false
+  || engineeringToolSurface.result?.governance?.canCallProvider !== false
+  || engineeringToolSurface.result?.governance?.canUseNetwork !== false
+) {
+  throw new Error(`engineering tool surface inventory capability should remain metadata-only: ${JSON.stringify(engineeringToolSurface)}`);
+}
+if (JSON.stringify(events).includes("CAPABILITY_INVOKE_TOOL_SURFACE_INDEX_SECRET_SOURCE")) {
+  throw new Error("engineering tool surface inventory source metadata must not enter audit events");
 }
 if (
   !engineeringVerify.ok
@@ -364,6 +401,13 @@ for (const capabilityId of ["act.openclaw.workspace_text_write", "act.openclaw.w
   )) {
     throw new Error(`capability registry should expose the approval-gated workspace mutation ${capabilityId}`);
   }
+}
+if (!capabilities.capabilities?.some((capability) =>
+  capability.id === "sense.openclaw.engineering_tool_surface_inventory"
+  && capability.governance === "audit_only"
+  && capability.intents?.includes("engineering.tool_surface_inventory")
+)) {
+  throw new Error("capability registry should expose the engineering tool surface inventory contract");
 }
 if (
   !workView.ok
@@ -625,6 +669,13 @@ console.log(JSON.stringify({
         workStandards: promptPack.summary.workStandardsStatus,
         noPromptContentExposure: promptPack.summary.noPromptContentExposure,
         noProviderEgress: promptPack.summary.noProviderEgress,
+      },
+      toolSurfaceInventory: {
+        tools: engineeringToolSurface.summary.totalTools,
+        covered: engineeringToolSurface.summary.coveredTools,
+        sourceContentExposed: engineeringToolSurface.summary.noSourceContentExposure === false,
+        toolExecution: engineeringToolSurface.summary.noToolExecution === false,
+        noProviderEgress: engineeringToolSurface.summary.noProviderEgress,
       },
       policies: [engineeringRead.policy.decision, engineeringGlob.policy.decision, engineeringGrep.policy.decision],
     },

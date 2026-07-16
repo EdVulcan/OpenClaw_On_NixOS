@@ -287,7 +287,9 @@ export function createNativeEngineeringToolSurfaceBuilders({
         canMutate: false,
         createsTask: false,
         createsApproval: false,
-        nextRecommendedSlice: "level-2-trusted-work-view-session-helper",
+        canCallProvider: false,
+        canUseNetwork: false,
+        nextRecommendedSlice: "select-next-concrete-local-capability-from-forward-directive",
       },
       governance: {
         mode: "native_governed_engineering_tool_surface_inventory",
@@ -303,6 +305,8 @@ export function createNativeEngineeringToolSurfaceBuilders({
         canMutate: false,
         createsTask: false,
         createsApproval: false,
+        canCallProvider: false,
+        canUseNetwork: false,
         observerVisible: true,
       },
       deferredExecutionBoundaries: [
@@ -314,6 +318,7 @@ export function createNativeEngineeringToolSurfaceBuilders({
         "no LSP server startup or process lifecycle",
         "no plan/todo state mutation",
         "no task or approval creation",
+        "no provider call or network egress",
       ],
     };
   }

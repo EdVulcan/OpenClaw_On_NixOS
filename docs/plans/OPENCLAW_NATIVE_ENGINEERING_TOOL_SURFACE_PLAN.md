@@ -26,6 +26,14 @@ bridge is documented in
 keeps prompt bodies, execution authority, task/approval creation, provider
 calls, and network use outside the capability summary and audit path.
 
+The existing read-only tool contract inventory is now also available through
+the common capability runtime as
+`sense.openclaw.engineering_tool_surface_inventory`. It reuses the dedicated
+inventory builder and keeps source metadata, contract counts, and negative
+authority flags in the common invocation summary without exposing source
+content or enabling tool execution. The focused boundary is documented in
+`OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_TOOL_SURFACE_INVENTORY_PLAN.md`.
+
 The source-derived workspace edit target selection is now also declared in the
 common capability registry as `sense.openclaw.workspace_edit_target_select`.
 Its runtime bridge reuses the existing direct builder and emits only bounded
@@ -144,6 +152,7 @@ Core builder:
 services/openclaw-core/src/native-engineering-tool-surface-builders.mjs
 services/openclaw-core/src/capability-descriptors.mjs
 services/openclaw-core/src/capability-runtime.mjs
+services/openclaw-core/src/capability-runtime-engineering-tool-surface.mjs
 services/openclaw-core/src/capability-runtime-engineering-read-search.mjs
 services/openclaw-core/src/capability-runtime-engineering-verification.mjs
 services/openclaw-core/src/capability-runtime-engineering-recovery.mjs
@@ -538,6 +547,16 @@ parameters through `sense.openclaw.engineering_tool.lsp_selected_target_read_bri
 Core reuses the existing builder and records only compact policy/invocation
 metadata. The transient read preview remains response-only. This is a runtime
 boundary closure, not a new LSP request variant or readiness shell.
+
+The existing engineering tool surface inventory is now also aligned with the
+common capability runtime as
+`sense.openclaw.engineering_tool_surface_inventory`. The common entry point
+delegates to the dedicated metadata builder and records only contract counts,
+source-index status, and negative authority flags in invocation/audit evidence;
+the detailed inventory response remains transient. This closes a declared
+versus runtime contract gap without creating a dispatcher for enhanced-source
+tools, LSP processes, tasks, approvals, writes, provider calls, or network
+egress.
 
 The selected-target edit proposal seed follow-up was completed as:
 

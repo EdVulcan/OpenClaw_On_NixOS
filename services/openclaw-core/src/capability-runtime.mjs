@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { createEventName } from "../../../packages/shared-events/src/event-factory.mjs";
 import { buildBaseCapabilities } from "./capability-descriptors.mjs";
+import { createEngineeringToolSurfaceCapabilityHandlers } from "./capability-runtime-engineering-tool-surface.mjs";
 import { createEngineeringReadSearchCapabilityHandlers } from "./capability-runtime-engineering-read-search.mjs";
 import { createEngineeringLspCapabilityHandlers } from "./capability-runtime-engineering-lsp.mjs";
 import { createEngineeringVerificationCapabilityHandlers } from "./capability-runtime-engineering-verification.mjs";
@@ -74,6 +75,7 @@ export function createCapabilityRuntime(deps) {
     buildNativeOpenClawWorkspaceSemanticIndex,
     buildNativeOpenClawWorkspaceSymbolLookup,
     buildNativeOpenClawWorkspaceEditTargetSelection,
+    buildNativeEngineeringToolSurfaceInventory,
     buildOpenClawPluginManifestMap,
     buildOpenClawPluginCapabilityPlan,
   } = pluginReview;
@@ -81,6 +83,9 @@ export function createCapabilityRuntime(deps) {
     buildNativeEngineeringReadFile: pluginReview.buildNativeEngineeringReadFile,
     buildNativeEngineeringGlob: pluginReview.buildNativeEngineeringGlob,
     buildNativeEngineeringGrep: pluginReview.buildNativeEngineeringGrep,
+  });
+  const engineeringToolSurfaceHandlers = createEngineeringToolSurfaceCapabilityHandlers({
+    buildNativeEngineeringToolSurfaceInventory,
   });
   const engineeringLspHandlers = createEngineeringLspCapabilityHandlers({
     buildNativeEngineeringLspSelectedTargetReadBridge: pluginReview.buildNativeEngineeringLspSelectedTargetReadBridge,
@@ -373,6 +378,10 @@ export function createCapabilityRuntime(deps) {
   }
 
   async function callCapabilityBackend(capability, request) {
+    const engineeringToolSurface = engineeringToolSurfaceHandlers.callBackend(capability, request);
+    if (engineeringToolSurface.handled) {
+      return engineeringToolSurface.result;
+    }
     const engineeringReadSearch = engineeringReadSearchHandlers.callBackend(capability, request);
     if (engineeringReadSearch.handled) {
       return engineeringReadSearch.result;
@@ -607,6 +616,10 @@ export function createCapabilityRuntime(deps) {
   }
 
   function summariseCapabilityInvocationResult(capability, result) {
+    const engineeringToolSurfaceSummary = engineeringToolSurfaceHandlers.summariseResult(capability, result);
+    if (engineeringToolSurfaceSummary) {
+      return engineeringToolSurfaceSummary;
+    }
     const engineeringReadSearchSummary = engineeringReadSearchHandlers.summariseResult(capability, result);
     if (engineeringReadSearchSummary) {
       return engineeringReadSearchSummary;

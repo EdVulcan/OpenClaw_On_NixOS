@@ -94,6 +94,10 @@ test("native engineering tool surface maps cc-tools contracts without execution"
   assert.equal(inventory.summary.canMutate, false);
   assert.equal(inventory.summary.createsTask, false);
   assert.equal(inventory.summary.createsApproval, false);
+  assert.equal(inventory.summary.canCallProvider, false);
+  assert.equal(inventory.summary.canUseNetwork, false);
+  assert.equal(inventory.governance.canCallProvider, false);
+  assert.equal(inventory.governance.canUseNetwork, false);
   assert.equal(inventory.governance.observerVisible, true);
   assert.equal(inventory.sourceEvidence.indexFile.contentRead, true);
   assert.equal(inventory.sourceEvidence.indexFile.contentExposed, false);

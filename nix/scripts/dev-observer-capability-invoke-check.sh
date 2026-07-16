@@ -4,6 +4,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 FIXTURE_DIR="$REPO_ROOT/.artifacts/observer-capability-invoke-fixture"
+TOOL_SURFACE_FIXTURE_DIR="$REPO_ROOT/.artifacts/observer-capability-invoke-tool-surface-fixture"
+TOOL_SURFACE_WORKSPACE_DIR="$TOOL_SURFACE_FIXTURE_DIR/openclaw"
+
+source "$SCRIPT_DIR/openclaw-engineering-tool-surface-fixture.sh"
 
 export OPENCLAW_CORE_PORT="${OPENCLAW_CORE_PORT:-7000}"
 export OPENCLAW_EVENT_HUB_PORT="${OPENCLAW_EVENT_HUB_PORT:-7001}"
@@ -16,7 +20,7 @@ export OPENCLAW_SYSTEM_HEAL_PORT="${OPENCLAW_SYSTEM_HEAL_PORT:-7007}"
 export OBSERVER_UI_PORT="${OBSERVER_UI_PORT:-7070}"
 export OPENCLAW_CORE_STATE_FILE="${OPENCLAW_CORE_STATE_FILE:-$REPO_ROOT/.artifacts/openclaw-core-observer-capability-invoke-check.json}"
 export OPENCLAW_EVENT_LOG_FILE="${OPENCLAW_EVENT_LOG_FILE:-$REPO_ROOT/.artifacts/openclaw-observer-capability-invoke-check-events.jsonl}"
-export OPENCLAW_WORKSPACE_ROOTS="$FIXTURE_DIR"
+export OPENCLAW_WORKSPACE_ROOTS="$FIXTURE_DIR:$TOOL_SURFACE_WORKSPACE_DIR"
 
 CORE_URL="http://127.0.0.1:$OPENCLAW_CORE_PORT"
 EVENT_HUB_URL="http://127.0.0.1:$OPENCLAW_EVENT_HUB_PORT"
@@ -25,7 +29,10 @@ OBSERVER_URL="http://127.0.0.1:$OBSERVER_UI_PORT"
 "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 rm -f "$OPENCLAW_CORE_STATE_FILE" "$OPENCLAW_CORE_STATE_FILE.tmp" "$OPENCLAW_EVENT_LOG_FILE"
 rm -rf "$FIXTURE_DIR"
+rm -rf "$TOOL_SURFACE_FIXTURE_DIR"
 mkdir -p "$FIXTURE_DIR/src" "$FIXTURE_DIR/scratch" "$FIXTURE_DIR/.openclaw"
+mkdir -p "$TOOL_SURFACE_FIXTURE_DIR"
+prepare_engineering_tool_surface_fixture "$TOOL_SURFACE_WORKSPACE_DIR" "OBSERVER_CAPABILITY_INVOKE_TOOL_SURFACE"
 printf 'export const observerNeedle = "observer capability invoke";\n' > "$FIXTURE_DIR/src/app.ts"
 printf '%s\n' \
   '# Observer prompt semantics fixture' \
@@ -45,6 +52,7 @@ cleanup() {
     "${ENGINEERING_READ_FILE:-}" \
     "${ENGINEERING_GLOB_FILE:-}" \
     "${ENGINEERING_GREP_FILE:-}" \
+    "${ENGINEERING_TOOL_SURFACE_FILE:-}" \
     "${ENGINEERING_VERIFY_FILE:-}" \
     "${ENGINEERING_EDIT_PROPOSAL_FILE:-}" \
     "${ENGINEERING_WRITE_PROPOSAL_FILE:-}" \
@@ -69,6 +77,7 @@ cleanup() {
     "${EVENTS_FILE:-}"
   "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
   rm -rf "$FIXTURE_DIR"
+  rm -rf "$TOOL_SURFACE_FIXTURE_DIR"
 }
 trap cleanup EXIT
 
@@ -87,6 +96,7 @@ PROCESS_FILE="$(mktemp)"
 ENGINEERING_READ_FILE="$(mktemp)"
 ENGINEERING_GLOB_FILE="$(mktemp)"
 ENGINEERING_GREP_FILE="$(mktemp)"
+ENGINEERING_TOOL_SURFACE_FILE="$(mktemp)"
 ENGINEERING_VERIFY_FILE="$(mktemp)"
 ENGINEERING_EDIT_PROPOSAL_FILE="$(mktemp)"
 ENGINEERING_WRITE_PROPOSAL_FILE="$(mktemp)"
@@ -118,6 +128,7 @@ post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"sense.process.list",
 post_json "$CORE_URL/capabilities/invoke" "{\"capabilityId\":\"sense.openclaw.engineering_tool.read\",\"params\":{\"workspacePath\":\"$FIXTURE_DIR\",\"relativePath\":\"src/app.ts\",\"startLine\":1,\"endLine\":1}}" > "$ENGINEERING_READ_FILE"
 post_json "$CORE_URL/capabilities/invoke" "{\"capabilityId\":\"sense.openclaw.engineering_tool.glob\",\"params\":{\"workspacePath\":\"$FIXTURE_DIR\",\"pattern\":\"src/**/*.ts\",\"limit\":4}}" > "$ENGINEERING_GLOB_FILE"
 post_json "$CORE_URL/capabilities/invoke" "{\"capabilityId\":\"sense.openclaw.engineering_tool.grep\",\"params\":{\"workspacePath\":\"$FIXTURE_DIR\",\"query\":\"observerNeedle\",\"include\":\"src/**/*.ts\",\"literal\":true,\"limit\":4}}" > "$ENGINEERING_GREP_FILE"
+post_json "$CORE_URL/capabilities/invoke" "{\"capabilityId\":\"sense.openclaw.engineering_tool_surface_inventory\",\"intent\":\"engineering.tool_surface_inventory\",\"params\":{\"workspacePath\":\"$TOOL_SURFACE_WORKSPACE_DIR\"}}" > "$ENGINEERING_TOOL_SURFACE_FILE"
 post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"sense.openclaw.engineering_tool.lsp_selected_target_read_bridge","intent":"engineering.lsp.selected_target_read_bridge","taskId":"observer-missing-lsp-target-task","params":{"taskId":"observer-missing-lsp-target-task","language":"typescript","targetIndex":0,"contextLines":2,"includeRead":true}}' > "$LSP_SELECTED_TARGET_READ_FILE"
 post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"sense.openclaw.engineering_tool.verify_evidence","params":{"limit":4,"maxOutputChars":500}}' > "$ENGINEERING_VERIFY_FILE"
 post_json "$CORE_URL/capabilities/invoke" "{\"capabilityId\":\"act.openclaw.engineering_tool.edit_proposal\",\"params\":{\"workspacePath\":\"$FIXTURE_DIR\",\"relativePath\":\"src/app.ts\",\"oldString\":\"observerNeedle\",\"newString\":\"governedObserverNeedle\",\"contextLines\":1}}" > "$ENGINEERING_EDIT_PROPOSAL_FILE"
@@ -172,7 +183,8 @@ node - <<'EOF' \
   "$SCREEN_POINTER_FILE" \
   "$SYSTEM_HEAL_FILE" \
   "$MAINTENANCE_FILE" \
-  "$LSP_SELECTED_TARGET_READ_FILE"
+  "$LSP_SELECTED_TARGET_READ_FILE" \
+  "$ENGINEERING_TOOL_SURFACE_FILE"
 const fs = require("node:fs");
 const html = fs.readFileSync(process.argv[2], "utf8");
 const client = fs.readFileSync(process.argv[3], "utf8");
@@ -204,6 +216,7 @@ const screenPointer = JSON.parse(fs.readFileSync(process.argv[28], "utf8"));
 const systemHeal = JSON.parse(fs.readFileSync(process.argv[29], "utf8"));
 const maintenance = JSON.parse(fs.readFileSync(process.argv[30], "utf8"));
 const lspSelectedTargetRead = JSON.parse(fs.readFileSync(process.argv[31], "utf8"));
+const engineeringToolSurface = JSON.parse(fs.readFileSync(process.argv[32], "utf8"));
 
 for (const token of [
   "invoke-vitals-button",
@@ -317,6 +330,27 @@ if (
   || lspSelectedTargetRead.result?.reason !== "no_completed_symbol_request_target_state"
 ) {
   throw new Error("Observer LSP selected-target read capability should fail closed without completed symbol state");
+}
+if (
+  !engineeringToolSurface.ok
+  || engineeringToolSurface.invoked !== true
+  || engineeringToolSurface.capability?.id !== "sense.openclaw.engineering_tool_surface_inventory"
+  || engineeringToolSurface.result?.registry !== "openclaw-native-engineering-tool-surface-inventory-v0"
+  || engineeringToolSurface.result?.summary?.totalTools !== 10
+  || engineeringToolSurface.result?.summary?.coveredTools !== 10
+  || engineeringToolSurface.summary?.kind !== "engineering.tool_surface_inventory"
+  || engineeringToolSurface.summary?.noSourceContentExposure !== true
+  || engineeringToolSurface.summary?.noToolExecution !== true
+  || engineeringToolSurface.summary?.noLspStart !== true
+  || engineeringToolSurface.summary?.noMutation !== true
+  || engineeringToolSurface.summary?.noTaskCreation !== true
+  || engineeringToolSurface.summary?.noApprovalCreation !== true
+  || engineeringToolSurface.summary?.noProviderEgress !== true
+  || engineeringToolSurface.result?.governance?.canExecuteToolCode !== false
+  || engineeringToolSurface.result?.governance?.canCallProvider !== false
+  || engineeringToolSurface.result?.governance?.canUseNetwork !== false
+) {
+  throw new Error("Observer engineering tool surface inventory capability should remain metadata-only");
 }
 if (
   !engineeringVerify.ok
@@ -582,6 +616,13 @@ if (!capabilities.capabilities?.some((capability) =>
   && capability.intents?.includes("engineering.lsp.selected_target_read_bridge")
 )) {
   throw new Error("Observer capability registry should expose the bounded LSP selected-target read contract");
+}
+if (!capabilities.capabilities?.some((capability) =>
+  capability.id === "sense.openclaw.engineering_tool_surface_inventory"
+  && capability.governance === "audit_only"
+  && capability.intents?.includes("engineering.tool_surface_inventory")
+)) {
+  throw new Error("Observer capability registry should expose the engineering tool surface inventory contract");
 }
 if (
   !contextPacket.ok

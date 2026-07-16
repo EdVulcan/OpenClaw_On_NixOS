@@ -1037,6 +1037,14 @@ and negative authority flags. This closes a declared/runtime boundary without
 reopening symbol requests, starting another LSP process, creating tasks or
 approvals, mutating the workspace, or enabling provider/network egress.
 
+The existing native engineering tool surface inventory is now also available
+through the common capability runtime as
+`sense.openclaw.engineering_tool_surface_inventory`. It reuses the dedicated
+metadata builder and records only bounded contract counts, source-index status,
+and negative authority flags in the common invocation/audit path. Source bodies,
+enhanced-source execution, LSP startup, tasks, approvals, writes, provider
+calls, and network egress remain outside the capability.
+
 The existing ACPX/Codex compatibility and session-metadata read model is now
 also available through the common capability runtime as
 `sense.openclaw.acpx_codex_bridge.compatibility`. It reuses the native builder,

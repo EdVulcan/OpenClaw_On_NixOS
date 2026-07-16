@@ -123,6 +123,22 @@ export function buildBaseCapabilities({
       description: "Query absorbed enhanced OpenClaw tool metadata through the native adapter shell without importing or executing legacy tool code.",
     },
     {
+      id: "sense.openclaw.engineering_tool_surface_inventory",
+      name: "Native Engineering Tool Surface Inventory",
+      kind: "sensor",
+      service: "openclaw-core",
+      endpoint: `http://${host}:${port}/plugins/native-adapter/engineering-tool-surface`,
+      intents: [
+        "openclaw.engineering_tool_surface_inventory",
+        "engineering.tool_surface_inventory",
+        "engineering.tool_surface",
+      ],
+      domains: ["body_internal"],
+      risk: "low",
+      governance: "audit_only",
+      description: "Read bounded enhanced-source engineering tool contract metadata through the native inventory owner without exposing source content or enabling execution.",
+    },
+    {
       id: "sense.openclaw.workspace_semantic_index",
       name: "Native OpenClaw Workspace Semantic Index",
       kind: "sensor",

@@ -115,6 +115,85 @@ test("capability runtime builds the local body registry with service health", as
   assert.ok(calls.health.some((url) => url === "http://127.0.0.1:4106/health"));
 });
 
+test("capability runtime exposes the native engineering tool surface inventory without execution authority", async () => {
+  const { runtime, state, events } = createHarness({
+    pluginReview: {
+      buildNativeEngineeringToolSurfaceInventory: (params) => {
+        assert.equal(params.workspacePath, "/tmp/engineering-tool-surface");
+        return {
+          ok: true,
+          registry: "openclaw-native-engineering-tool-surface-inventory-v0",
+          workspace: { id: "fixture-workspace", path: "/private/workspace" },
+          summary: {
+            totalTools: 10,
+            coveredTools: 10,
+            sourceFilesPresent: 11,
+            sourceFilesExpected: 11,
+            readOnlyContracts: 4,
+            mutationProposalContracts: 2,
+            planningStateContracts: 3,
+            verificationContracts: 1,
+            lspContracts: 1,
+            canReadSourceIndex: true,
+            canReadSourceFileContent: false,
+            exposesSourceFileContent: false,
+            canImportModule: false,
+            canExecuteToolCode: false,
+            canRunVerification: false,
+            canStartLsp: false,
+            canMutate: false,
+            createsTask: false,
+            createsApproval: false,
+            canCallProvider: false,
+            canUseNetwork: false,
+            nextRecommendedSlice: "select-next-concrete-local-capability-from-forward-directive",
+          },
+          governance: {
+            canReadMetadata: true,
+            canReadSourceIndex: true,
+            canReadSourceFileContent: false,
+            exposesSourceFileContent: false,
+            canImportModule: false,
+            canExecuteToolCode: false,
+            canRunVerification: false,
+            canStartLsp: false,
+            canMutate: false,
+            createsTask: false,
+            createsApproval: false,
+            canCallProvider: false,
+            canUseNetwork: false,
+            observerVisible: true,
+          },
+          sourceEvidence: { secretSourceBody: "must-not-persist" },
+        };
+      },
+    },
+  });
+
+  const result = await runtime.invokeCapability({
+    capabilityId: "sense.openclaw.engineering_tool_surface_inventory",
+    intent: "engineering.tool_surface_inventory",
+    params: { workspacePath: "/tmp/engineering-tool-surface" },
+  });
+
+  assert.equal(result.statusCode, 200);
+  assert.equal(result.response.invoked, true);
+  assert.equal(result.response.capability.id, "sense.openclaw.engineering_tool_surface_inventory");
+  assert.equal(result.response.summary.kind, "engineering.tool_surface_inventory");
+  assert.equal(result.response.summary.totalTools, 10);
+  assert.equal(result.response.summary.coveredTools, 10);
+  assert.equal(result.response.summary.noSourceContentExposure, true);
+  assert.equal(result.response.summary.noToolExecution, true);
+  assert.equal(result.response.summary.noLspStart, true);
+  assert.equal(result.response.summary.noMutation, true);
+  assert.equal(result.response.summary.noTaskCreation, true);
+  assert.equal(result.response.summary.noApprovalCreation, true);
+  assert.equal(result.response.summary.noProviderEgress, true);
+  assert.equal(result.response.summary.nextRecommendedSlice, "select-next-concrete-local-capability-from-forward-directive");
+  assert.equal(JSON.stringify(state.capabilityInvocationLog).includes("must-not-persist"), false);
+  assert.deepEqual(events.map((event) => event.name), ["policy.evaluated", "capability.invoked"]);
+});
+
 test("capability runtime invokes bounded screen observation through the screen-sense owner", async () => {
   const { runtime, state, events, calls } = createHarness({
     fetchJsonResult: {
