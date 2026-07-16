@@ -805,3 +805,9 @@ The existing Observer Edit Proposal panel now also uses
 It reuses the existing transient diff renderer and leaves proposal application
 on the explicit approval-gated task path; no write, task, approval, command,
 provider, or network authority is added by the panel refresh.
+
+The existing Observer Write Proposal panel now likewise uses
+`act.openclaw.engineering_tool.write_proposal` through `/capabilities/invoke`.
+It preserves redacted transient proposal metadata and leaves actual writing on
+the explicit approval-gated workspace text-write path; no file, task, approval,
+command, provider, or network authority is added by the panel refresh.

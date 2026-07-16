@@ -414,6 +414,10 @@ It does not write, create a task or approval, execute commands, or call a
 provider. Actual write approval and execution remain on the existing
 `workspace-text-write-tasks` path. The boundary is documented in
 `docs/plans/OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_WRITE_PROPOSAL_PLAN.md`.
+The existing Observer Write Proposal panel now also requests that redacted
+proposal through the common capability runtime and keeps proposed content out
+of durable evidence; the approval-gated write task remains a separate explicit
+operator action.
 
 The existing edit/write execution evidence is now also available through the
 common `/capabilities/invoke` runtime as

@@ -1,6 +1,6 @@
 # OpenClaw Native Engineering Capability Runtime Write Proposal Plan
 
-Updated: 2026-07-15
+Updated: 2026-07-16
 
 ## Active Slice
 
@@ -58,6 +58,15 @@ The real core and Observer checks invoke a new-file proposal against a fixture,
 verify redacted metadata, and prove the requested content is absent from the
 response and audit event ledger.
 
+## Observer Common-Path Closure
+
+The existing Observer Write Proposal panel now requests its bounded redacted
+proposal through `POST /capabilities/invoke` using
+`act.openclaw.engineering_tool.write_proposal`. It unwraps only the transient
+builder result for the existing renderer; the dedicated draft route remains a
+direct read-model proof. Proposed content is excluded from the capability
+summary, event evidence, and response projection.
+
 ## Deferred
 
 ```text
@@ -71,7 +80,8 @@ bridge and is unchanged by this common entry point.
 
 ## Next Smallest Capability
 
-The common runtime execution-evidence follow-up is now complete in
+The common runtime execution-evidence follow-up and Observer proposal
+common-path closure are now complete in
 `OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_EXECUTION_EVIDENCE_PLAN.md`.
 It reads only the existing completed write task and filesystem-ledger evidence;
 write content remains outside durable capability evidence. Keep proposal

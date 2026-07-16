@@ -399,9 +399,24 @@ async function refreshEngineeringEditProposal() {
 
 async function refreshEngineeringWriteProposal() {
   try {
-    const content = encodeURIComponent("OpenClaw engineering write proposal preview\\n");
-    const data = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/engineering-write-proposal/draft?relativePath=scratch/engineering-write-proposal.txt&content=\${content}&overwrite=false&contextLines=1\`);
-    renderEngineeringWriteProposal(data);
+    const response = await fetchJson(\`\${observerConfig.coreUrl}/capabilities/invoke\`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        capabilityId: "act.openclaw.engineering_tool.write_proposal",
+        intent: "engineering.write_proposal",
+        params: {
+          relativePath: "scratch/engineering-write-proposal.txt",
+          content: "OpenClaw engineering write proposal preview\\n",
+          overwrite: false,
+          contextLines: 1,
+        },
+      }),
+    });
+    if (response.invoked !== true) {
+      throw new Error("Engineering write proposal capability was not invoked.");
+    }
+    renderEngineeringWriteProposal(response.result ?? {});
   } catch {
     engineeringWriteProposalRegistry.textContent = "offline";
     engineeringWriteProposalKind.textContent = "unknown";

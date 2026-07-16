@@ -35,7 +35,8 @@ cleanup() {
   rm -f \
     "${HTML_FILE:-}" \
     "${CLIENT_FILE:-}" \
-    "${EVIDENCE_FILE:-}"
+    "${EVIDENCE_FILE:-}" \
+    "${CAPABILITY_FILE:-}"
   "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -45,6 +46,7 @@ trap cleanup EXIT
 HTML_FILE="$(mktemp)"
 CLIENT_FILE="$(mktemp)"
 EVIDENCE_FILE="$(mktemp)"
+CAPABILITY_FILE="$(mktemp)"
 
 content="$(node - <<'EOF' "$NEW_SECRET"
 const secret = process.argv[2];
@@ -55,8 +57,26 @@ EOF
 curl --silent --fail "$OBSERVER_URL/" > "$HTML_FILE"
 curl --silent --fail "$OBSERVER_URL/client-v5.js" > "$CLIENT_FILE"
 curl --silent --fail "$CORE_URL/plugins/native-adapter/engineering-write-proposal/draft?relativePath=src/observer-write.txt&content=$content&overwrite=false&contextLines=1" > "$EVIDENCE_FILE"
+capability_payload="$(node - <<'EOF' "$NEW_SECRET"
+const secret = process.argv[2];
+process.stdout.write(JSON.stringify({
+  capabilityId: "act.openclaw.engineering_tool.write_proposal",
+  intent: "engineering.write_proposal",
+  params: {
+    relativePath: "src/observer-write.txt",
+    content: `observer write proposal line\n${secret}\n`,
+    overwrite: false,
+    contextLines: 1,
+  },
+}));
+EOF
+)"
+curl --silent --fail -X POST "$CORE_URL/capabilities/invoke" \
+  -H 'content-type: application/json' \
+  --data "$capability_payload" \
+  > "$CAPABILITY_FILE"
 
-node - <<'EOF' "$HTML_FILE" "$CLIENT_FILE" "$EVIDENCE_FILE" "$WORKSPACE_DIR" "$NEW_SECRET"
+node - <<'EOF' "$HTML_FILE" "$CLIENT_FILE" "$EVIDENCE_FILE" "$WORKSPACE_DIR" "$NEW_SECRET" "$CAPABILITY_FILE"
 const fs = require("node:fs");
 const path = require("node:path");
 const readText = (index) => fs.readFileSync(process.argv[index], "utf8");
@@ -67,7 +87,9 @@ const client = readText(3);
 const evidence = readJson(4);
 const workspaceDir = process.argv[5];
 const newSecret = process.argv[6];
+const capability = readJson(7);
 const raw = JSON.stringify({ evidence });
+const capabilityRaw = JSON.stringify(capability);
 const newPath = path.join(workspaceDir, "src", "observer-write.txt");
 
 for (const token of [
@@ -85,7 +107,9 @@ for (const token of [
   }
 }
 for (const token of [
-  "/plugins/native-adapter/engineering-write-proposal/draft",
+  "/capabilities/invoke",
+  "act.openclaw.engineering_tool.write_proposal",
+  "engineering.write_proposal",
   "refreshEngineeringWriteProposal",
   "renderEngineeringWriteProposal",
   "Native engineering write proposal",
@@ -96,6 +120,20 @@ for (const token of [
   if (!client.includes(token)) {
     throw new Error(`Observer client missing engineering write proposal token: ${token}`);
   }
+}
+if (
+  !capability.ok
+  || capability.invoked !== true
+  || capability.capability?.id !== "act.openclaw.engineering_tool.write_proposal"
+  || capability.result?.registry !== "openclaw-native-engineering-write-proposal-v0"
+  || capability.result?.summary?.proposalKind !== "create_file_proposal"
+  || capability.summary?.kind !== "engineering.write_proposal"
+  || capability.summary?.noMutation !== true
+  || capability.summary?.noTaskCreation !== true
+  || capability.summary?.noProviderEgress !== true
+  || capability.result?.target?.contentExposed !== false
+) {
+  throw new Error(`Observer common write proposal capability mismatch: ${JSON.stringify(capability)}`);
 }
 if (fs.existsSync(newPath)) {
   throw new Error(`Observer write proposal must not create ${newPath}`);
@@ -115,7 +153,7 @@ if (
 ) {
   throw new Error(`Observer write proposal evidence mismatch: ${JSON.stringify(evidence)}`);
 }
-if (raw.includes(newSecret)) {
+if (raw.includes(newSecret) || capabilityRaw.includes(newSecret)) {
   throw new Error("Observer write proposal response leaked proposed content secret");
 }
 
