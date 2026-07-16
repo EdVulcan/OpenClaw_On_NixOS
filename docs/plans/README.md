@@ -200,7 +200,11 @@ capability-runtime family.
 
 The next route is not another provider response schema or capability-runtime
 mirror. Select a concrete Level 2 trusted work-view/session-helper operator gap
-from current evidence, then reuse the existing owner and recovery contracts.
+from current evidence, then reuse the existing owner and recovery contracts. The
+first selected gap is now closed: Observer can select one current enabled named
+semantic target and create a queued `browser.semantic_click` task through the
+existing rule-v1 planner, while Operator Step/Run and the existing Core/sidecar
+handoff remain the only execution path.
 
 The active Level 2 bridge is documented in:
 

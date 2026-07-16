@@ -134,10 +134,35 @@ second action is dispatched. The handoff exposes no page payload, selector,
 input value, or target item. No new endpoint, capture route, action family, or
 semantic typing path was added.
 
+## Operator-Reviewed Semantic Click Task Entry Complete
+
+The existing Observer Snapshot Preview now exposes a bounded target selector
+from the current screen inventory. It includes only visible, enabled targets
+with a non-empty bounded accessible name, and creates a queued rule-v1 task
+through the existing `POST /tasks/plan` route after explicit operator action.
+The plan stores only exact name/optional-role intent for
+`browser.semantic_click`; execution remains on the existing Operator Step or
+Operator Run path.
+
+The current target id, bounds, inventory digest, frame bytes, selectors, and
+page scripts are not sent as task input. At dispatch, Core re-materialises the
+intent against a fresh screen observation, and the existing semantic handoff
+and sidecar revalidate the current lease, inventory, frame, target presence, and
+visual grounding. Task creation is therefore an explicit operator review
+boundary, not an automatic action or a new capability owner.
+
+Evidence:
+
+```text
+apps/observer-ui/src/client-script-runtime-semantic-target-task.mjs
+apps/observer-ui/test/client-script-runtime-semantic-target-task.test.mjs
+services/openclaw-core/test/rule-plan-builders.test.mjs
+```
+
 ## Next Smallest Capability
 
-The existing real task/Firefox validation lane now proves this handoff: current
-semantic click, stale reference rejection, Core task evidence, post-frame
-grounding, and Observer/capture contracts all pass. The bounded Level 2 browser
-eye-hand route is closed for this slice. Select the next identity-level
-capability from the forward directive, not another readiness-only chain.
+The existing real task/Firefox validation lane proves the semantic handoff and
+the new Observer pair proves explicit queued-task creation without dispatch.
+The bounded Level 2 browser eye-hand route is closed for this operator-entry
+slice. Select the next identity-level capability from the forward directive,
+not another readiness-only chain or horizontal browser action variant.

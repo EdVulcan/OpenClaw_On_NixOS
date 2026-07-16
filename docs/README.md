@@ -50,11 +50,12 @@ through `act.work_view.control`, action-authority resume through `/control/resum
 and approved sidecar restart through the existing lifecycle `start-probe` route.
 The button remains operator initiated and unknown recommendations stay hidden.
 
-The current route is now a concrete operator-gap selection in the Level 2
-trusted work-view/session-helper boundary. Do not reopen the completed LSP,
-browser eye-hand, plan/todo, or provider-schema variants; choose a new action
-only when bounded work-view evidence demonstrates a decision that the existing
-controls cannot make.
+The current route is now a completed Level 2 operator entry in the trusted
+work-view/session-helper boundary: the Snapshot Preview can turn one current
+semantic target into a queued reviewed click task through the existing planner.
+Do not reopen the completed LSP, browser eye-hand, plan/todo, or provider-schema
+variants; choose the next action only when bounded work-view evidence
+demonstrates a decision that the existing controls cannot make.
 
 ## Active Architecture
 

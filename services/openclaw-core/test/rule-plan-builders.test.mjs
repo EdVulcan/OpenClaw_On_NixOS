@@ -146,6 +146,28 @@ test("rule plan builders map browser new-tab to the existing browser capability"
   assert.equal(plan.capabilitySummary.ids.includes("act.browser.open"), true);
 });
 
+test("rule plan builders preserve bounded operator semantic click intent", () => {
+  const builders = createRulePlanHarness();
+  const plan = builders.buildRulePlan({
+    goal: "Create a reviewed semantic click task",
+    targetUrl: "https://example.com/work",
+    intent: "browser.semantic_click",
+    actions: [{
+      kind: "browser.semantic_click",
+      params: { target: { name: "Inspect target", role: "link" } },
+    }],
+  });
+  const publicPlan = builders.serialisePlanForPublic(plan);
+  const actionStep = publicPlan.steps.find((step) => step.kind === "browser.semantic_click");
+
+  assert.deepEqual(actionStep.params, { target: { name: "Inspect target", role: "link" } });
+  assert.equal(actionStep.capabilityId, "act.screen.pointer_keyboard");
+  assert.equal(actionStep.requiresApproval, true);
+  assert.equal("x" in actionStep.params, false);
+  assert.equal("selector" in actionStep.params, false);
+  assert.equal(plan.capabilitySummary.ids.includes("act.screen.pointer_keyboard"), true);
+});
+
 test("rule plan builders update phase status without task lifecycle coupling", () => {
   const builders = createRulePlanHarness();
   const task = {

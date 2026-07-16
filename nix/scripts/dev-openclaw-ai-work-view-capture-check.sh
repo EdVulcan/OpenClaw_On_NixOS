@@ -621,3 +621,30 @@ fi
 
 post_json "$CORE_URL/work-view/trusted-sidecar/lifecycle-tasks/$SIDECAR_TASK_ID/stop" '{}' >/dev/null
 SIDECAR_STOPPED=true
+
+reviewed_semantic_task="$(post_json "$CORE_URL/tasks/plan" "$(node -e 'process.stdout.write(JSON.stringify({goal:"Create an operator-reviewed semantic click task",type:"browser_task",targetUrl:process.argv[1],workViewStrategy:"ai-work-view",planStrategy:"rule-v1",intent:"browser.semantic_click",actions:[{kind:"browser.semantic_click",params:{target:{name:"Inspect target",role:"link"}}}]}));' "$SEMANTIC_CLICK_URL")")"
+node - <<'EOF' "$reviewed_semantic_task"
+const data = JSON.parse(process.argv[2]);
+const action = data.task?.plan?.steps?.find((step) => step.kind === "browser.semantic_click");
+const binding = data.task?.operatorExecutionBinding;
+if (data.ok !== true
+  || data.task?.status !== "queued"
+  || data.task?.executionPhase !== "queued"
+  || data.task?.outcome !== null
+  || data.task?.workView !== null
+  || action?.params?.target?.name !== "Inspect target"
+  || action?.params?.target?.role !== "link"
+  || action?.params?.target?.targetId !== undefined
+  || action?.params?.target?.bounds !== undefined
+  || binding?.registry !== "openclaw-browser-task-execution-binding-v0") {
+  throw new Error(`reviewed semantic click task should remain queued and bounded: ${JSON.stringify(data)}`);
+}
+console.log(JSON.stringify({
+  operatorReviewedSemanticClickTask: {
+    taskId: data.task.id,
+    status: data.task.status,
+    executionStarted: false,
+    targetIntent: action.params.target,
+  },
+}, null, 2));
+EOF

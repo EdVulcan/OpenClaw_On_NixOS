@@ -314,6 +314,16 @@ sidecar `start-probe` path. The action remains explicit and operator initiated;
 an unknown recommendation cannot choose an endpoint, replay a task, or bypass
 the sidecar approval gate.
 
+The next concrete Level 2 operator gap is now closed through the existing
+Snapshot Preview and task planner. Observer filters the current screen
+inventory to visible enabled named targets, lets the operator choose one, and
+creates a queued rule-v1 `browser.semantic_click` task through `POST /tasks/plan`.
+Only exact name/optional-role intent enters the plan; execution remains an
+explicit Operator Step or Operator Run. Core re-materialises the target at
+dispatch and the existing semantic handoff/sidecar revalidate lease,
+inventory, frame, target presence, and visual grounding. No coordinate,
+selector, page script, automatic dispatch, or new capability owner is added.
+
 The current Level 1 follow-up closes a separate operator execution-consistency
 gap in the existing browser task path. It is documented in
 `docs/plans/OPENCLAW_NATIVE_ENGINEERING_OPERATOR_EXECUTION_BINDING_PLAN.md`.

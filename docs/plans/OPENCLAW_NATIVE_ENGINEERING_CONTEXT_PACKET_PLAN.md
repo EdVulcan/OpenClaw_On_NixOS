@@ -373,9 +373,12 @@ The boundary is documented in
 covered by the provider contract, context-packet, live-execution, capability,
 Observer, and Phase 63 task-shell evidence.
 
-The next Level 2 slice is to use this reviewed readiness decision at the
-existing browser semantic-action handoff for one bounded operator-approved
-click. The handoff must revalidate the current lease, target inventory digest,
-frame sequence, and visual grounding at the runtime owner before dispatch;
-arbitrary selectors, page scripts, automatic action dispatch, semantic type,
-and desktop-wide capture remain deferred.
+The browser semantic-action handoff and its real Firefox evidence are complete.
+The current Observer follow-up uses the existing screen inventory to let an
+operator select one visible enabled named target and create a queued
+`browser.semantic_click` rule-v1 task. The task stores only bounded name/role
+intent; the existing task binding, Core handoff, sidecar, current inventory,
+frame, lease, and visual-grounding checks remain the execution authorities.
+The button does not execute the task, accept coordinates/selectors, expose page
+scripts, or create a provider/network path. See
+`OPENCLAW_NATIVE_ENGINEERING_WORK_VIEW_OBSERVATION_BRIDGE_PLAN.md`.

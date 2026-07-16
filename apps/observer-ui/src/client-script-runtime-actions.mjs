@@ -7,6 +7,7 @@ import { observerClientRuntimeEngineeringPlanScript } from "./client-script-runt
 import { observerClientRuntimeSystemBodyTasksScript } from "./client-script-runtime-system-body-tasks.mjs";
 import { observerClientRuntimeSystemHealScript } from "./client-script-runtime-system-heal.mjs";
 import { observerClientRuntimeScreenObservationScript } from "./client-script-runtime-screen-observation.mjs";
+import { observerClientRuntimeSemanticTargetTaskScript } from "./client-script-runtime-semantic-target-task.mjs";
 import { observerClientRuntimeWorkViewControlsScript } from "./client-script-runtime-work-view-controls.mjs";
 import { observerClientRuntimeBindingsScript } from "./client-script-runtime-bindings.mjs";
 import { observerClientNativeRuntimeRefreshTasksScript } from "./client-script-runtime-native-runtime-refresh.mjs";
@@ -75,7 +76,7 @@ async function createPlannedTask() {
   await refreshOperatorState();
 }
 
-${observerClientRuntimeApprovalTasksScript}${observerClientRuntimeEngineeringLoopControlsScript}${observerClientRuntimeEngineeringLspTargetSelectionScript}${observerClientRuntimeEngineeringSuggestedActionScript}${observerClientRuntimeEngineeringRecommendationScript}${observerClientRuntimeEngineeringPlanScript}${observerClientNativeRuntimeRefreshTasksScript}${observerClientRuntimeSystemHealScript}${observerClientRuntimeScreenObservationScript}${observerClientRuntimeWorkViewControlsScript}async function runOperatorStepFromUi() {
+${observerClientRuntimeApprovalTasksScript}${observerClientRuntimeEngineeringLoopControlsScript}${observerClientRuntimeEngineeringLspTargetSelectionScript}${observerClientRuntimeEngineeringSuggestedActionScript}${observerClientRuntimeEngineeringRecommendationScript}${observerClientRuntimeEngineeringPlanScript}${observerClientNativeRuntimeRefreshTasksScript}${observerClientRuntimeSystemHealScript}${observerClientRuntimeScreenObservationScript}${observerClientRuntimeSemanticTargetTaskScript}${observerClientRuntimeWorkViewControlsScript}async function runOperatorStepFromUi() {
   const result = await fetchJson(\`\${observerConfig.coreUrl}/operator/step\`, {
     method: "POST",
     headers: { "content-type": "application/json" },

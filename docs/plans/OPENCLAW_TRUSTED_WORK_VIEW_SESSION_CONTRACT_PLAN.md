@@ -918,3 +918,18 @@ arbitrary endpoint, create approval, restart a task automatically, or bypass
 the sidecar lifecycle gate. Focused Observer tests cover all three newly
 supported recommendations and preserve the existing common capability path for
 prepare/reveal/hide.
+
+## Operator-Reviewed Semantic Click Task Entry
+
+The Observer Snapshot Preview now lets the operator select one visible enabled
+named target from the current AI-owned page inventory and create a queued
+`browser.semantic_click` rule-v1 task through the existing task planner. The
+task stores only bounded exact-name/optional-role intent and remains queued until
+an explicit Operator Step or Operator Run.
+
+The existing Core semantic handoff remains the authority at dispatch: it
+re-materialises the target from a fresh observation and the sidecar validates
+lease, inventory/frame identity, target presence, and visual grounding. The
+Observer entry does not add direct semantic capability invocation, coordinate
+dispatch, selectors, page scripts, automatic execution, provider egress, or
+network authority.
