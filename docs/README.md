@@ -27,19 +27,34 @@ preserve enhanced openclaw source on GitHub
 -> audit which enhanced capabilities are already absorbed
 -> migrate Claude Code-grade engineering capabilities as governed body tools
 -> close Level 1 operator execution-consistency and declared/runtime capability boundaries
--> return to identity-upgrade work: work-view/session helper, then hostd
+-> complete the bounded AI plan review/save bridge on the approved provider handoff
+-> select the next concrete Level 2 work-view/session-helper operator gap, then hostd
 ```
 
 Do not continue with Phase 137-style provider wrappers unless the next slice
 creates a real capability and explicitly passes the progress test in the forward
 directive.
 
-The current real capability slice is a bounded engineering-plan draft from the
-existing approved DeepSeek handoff. The provider may return an
-`engineering_plan_v0` response with at most eight redacted todo items; Observer
-shows it as transient review material, and only an explicit operator action can
-save it through the existing plan/todo workbench capability. No task, approval,
-execution, workspace mutation, or provider route is created by the draft.
+The latest completed capability slice is the bounded AI engineering-plan review
+and save bridge on the existing approved DeepSeek handoff. The provider may
+return an `engineering_plan_v0` response with at most eight redacted todo items;
+Observer shows it as transient review material, and only an explicit operator
+action can save it through the existing plan/todo workbench capability. Durable
+evidence keeps only the contract, counts, lengths, validity, and response hash.
+The draft creates no task, approval, execution, workspace mutation, or provider
+route. Live provider egress remains separately approved and request-bound.
+
+The subsequent Level 2 recovery-decision closure now maps every public trusted
+work-view recommendation to an existing explicit owner: prepare/reveal/hide
+through `act.work_view.control`, action-authority resume through `/control/resume`,
+and approved sidecar restart through the existing lifecycle `start-probe` route.
+The button remains operator initiated and unknown recommendations stay hidden.
+
+The current route is now a concrete operator-gap selection in the Level 2
+trusted work-view/session-helper boundary. Do not reopen the completed LSP,
+browser eye-hand, plan/todo, or provider-schema variants; choose a new action
+only when bounded work-view evidence demonstrates a decision that the existing
+controls cannot make.
 
 ## Active Architecture
 

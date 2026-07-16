@@ -182,13 +182,25 @@ context packet are already completed evidence; do not reopen their historical
 next-step wording. ACPX live process execution and provider/model use remain
 explicit authorization boundaries.
 
-The current provider follow-up is the bounded `engineering_plan_v0` response
-contract in `OPENCLAW_NATIVE_ENGINEERING_CONTEXT_PROVIDER_HANDOFF_BRIDGE_PLAN.md`.
-It turns one already-approved DeepSeek response into a transient plan draft;
-Observer can save it only after operator review through the existing
-`act.openclaw.engineering_context.plan_todo_workbench_state` capability. The
-provider response remains request-bound and no automatic task, approval,
-execution, or mutation is added.
+The latest provider follow-up is complete. The bounded
+`engineering_plan_v0` response contract in
+`OPENCLAW_NATIVE_ENGINEERING_CONTEXT_PROVIDER_HANDOFF_BRIDGE_PLAN.md` turns one
+already-approved DeepSeek response into a transient plan draft; Observer can
+save it only after operator review through the existing
+`act.openclaw.engineering_context.plan_todo_workbench_state` capability. Durable
+provider evidence is compact and request-bound, and no automatic task,
+approval, execution, or mutation is added.
+
+The subsequent Level 2 recovery-decision closure is recorded in
+`OPENCLAW_TRUSTED_WORK_VIEW_SESSION_CONTRACT_PLAN.md`: Observer now maps the
+public `prepare`, `reveal`, `hide`, `resume_ai_action_authority`, and
+`restart_approved_trusted_sidecar` recommendations to existing explicit owners.
+It does not add an endpoint, automatic recovery, task replay, or a new
+capability-runtime family.
+
+The next route is not another provider response schema or capability-runtime
+mirror. Select a concrete Level 2 trusted work-view/session-helper operator gap
+from current evidence, then reuse the existing owner and recovery contracts.
 
 The active Level 2 bridge is documented in:
 

@@ -134,6 +134,26 @@ test("Observer exposes only the allowlisted trusted work-view recovery actions",
   context.renderEngineeringContextPacket({
     summary: { workViewAssociationIncluded: true, messageCount: 1 },
     governance: { callsProvider: false },
+    workViewAssociation: { summary: { recoveryAction: "restart_approved_trusted_sidecar" } },
+    messages: [],
+  });
+  assert.equal(context.engineeringContextPacketRecoveryButton.textContent, "Restart Approved Trusted Sidecar");
+  assert.equal(context.engineeringContextPacketRecoveryButton.hidden, false);
+  assert.equal(context.engineeringContextPacketRecoveryButton.disabled, false);
+
+  context.renderEngineeringContextPacket({
+    summary: { workViewAssociationIncluded: true, messageCount: 1 },
+    governance: { callsProvider: false },
+    workViewAssociation: { summary: { recoveryAction: "resume_ai_action_authority" } },
+    messages: [],
+  });
+  assert.equal(context.engineeringContextPacketRecoveryButton.textContent, "Resume AI Action Authority");
+  assert.equal(context.engineeringContextPacketRecoveryButton.hidden, false);
+  assert.equal(context.engineeringContextPacketRecoveryButton.disabled, false);
+
+  context.renderEngineeringContextPacket({
+    summary: { workViewAssociationIncluded: true, messageCount: 1 },
+    governance: { callsProvider: false },
     workViewAssociation: { summary: { bindingStatus: "stale_session_binding", recoveryAction: "none" } },
     messages: [],
   });

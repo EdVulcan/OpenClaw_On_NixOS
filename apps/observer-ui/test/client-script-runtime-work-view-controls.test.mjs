@@ -4,8 +4,10 @@ import vm from "node:vm";
 
 import { observerClientRuntimeWorkViewControlsScript } from "../src/client-script-runtime-work-view-controls.mjs";
 
-function createContext() {
+function createContext(recommendedAction = "none") {
   const fetchCalls = [];
+  const controlCalls = [];
+  const sidecarProbeCalls = [];
   const messages = [];
   const refreshes = [];
   const context = {
@@ -19,7 +21,7 @@ function createContext() {
     fetchJson: async (url, options) => {
       fetchCalls.push({ url, options });
       if (url === "http://session.invalid/work-view/state") {
-        return { workView: { trustedSession: { recoveryRecommendation: { action: "none" } } } };
+        return { workView: { trustedSession: { recoveryRecommendation: { action: recommendedAction } } } };
       }
       return {
         invoked: true,
@@ -33,6 +35,8 @@ function createContext() {
         },
       };
     },
+    postControl: async (path) => controlCalls.push(path),
+    startTrustedSidecarLifecycleProbe: async () => sidecarProbeCalls.push("start-probe"),
     setControlMessage: (message) => messages.push(message),
     updateTaskPhase: async () => {},
     refreshRuntime: async () => refreshes.push("runtime"),
@@ -42,7 +46,7 @@ function createContext() {
     refreshScreen: async () => refreshes.push("screen"),
   };
   vm.runInNewContext(observerClientRuntimeWorkViewControlsScript, context);
-  return { context, fetchCalls, messages, refreshes };
+  return { context, fetchCalls, controlCalls, sidecarProbeCalls, messages, refreshes };
 }
 
 test("Observer routes work-view prepare, reveal, and hide through the common capability owner", async () => {
@@ -90,4 +94,23 @@ test("Observer routes work-view prepare, reveal, and hide through the common cap
   assert.equal(fixture.messages.length, 3);
   assert.deepEqual(fixture.refreshes, []);
   assert.doesNotMatch(observerClientRuntimeWorkViewControlsScript, /observerConfig\.sessionManagerUrl.*work-view\/(?:prepare|reveal|hide)/);
+});
+
+test("Observer maps explicit recovery recommendations to existing owner controls", async () => {
+  const resume = createContext("resume_ai_action_authority");
+  await resume.context.runRecommendedWorkViewAction();
+  assert.deepEqual(resume.controlCalls, ["/control/resume"]);
+  assert.deepEqual(resume.sidecarProbeCalls, []);
+  assert.deepEqual(resume.refreshes, ["work-view", "screen"]);
+
+  const restart = createContext("restart_approved_trusted_sidecar");
+  await restart.context.runRecommendedWorkViewAction();
+  assert.deepEqual(restart.controlCalls, []);
+  assert.deepEqual(restart.sidecarProbeCalls, ["start-probe"]);
+  assert.deepEqual(restart.refreshes, ["work-view", "screen"]);
+
+  const hide = createContext("hide_work_view");
+  await hide.context.runRecommendedWorkViewAction();
+  assert.equal(hide.fetchCalls[1].url, "http://core.invalid/capabilities/invoke");
+  assert.equal(JSON.parse(hide.fetchCalls[1].options.body).operation, "work_view.hide");
 });

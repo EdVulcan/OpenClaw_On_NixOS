@@ -53,6 +53,9 @@ export const observerClientEngineeringContextRenderersScript = `function renderE
   const recoveryButtonLabels = {
     prepare_work_view: "Prepare Trusted Work View",
     reveal_work_view: "Reveal Trusted Work View",
+    hide_work_view: "Hide Trusted Work View",
+    resume_ai_action_authority: "Resume AI Action Authority",
+    restart_approved_trusted_sidecar: "Restart Approved Trusted Sidecar",
   };
   const recoveryButtonLabel = recoveryButtonLabels[recoveryAction] ?? null;
   const rebindStatuses = new Set(["stale_session_binding", "stale_work_view_binding"]);

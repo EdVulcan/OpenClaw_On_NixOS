@@ -185,6 +185,8 @@ desktop-wide capture, root work, and arbitrary endpoint execution
 ## Next Smallest Capability
 
 Keep the plan draft transient until the operator explicitly saves it through the
-existing workbench capability. The next product capability remains the smallest
-Level 2 action only after a concrete operator decision cannot be made from the
-current bounded observation and plan/todo summaries.
+existing workbench capability. The provider-plan slice is complete; the next
+product route is the smallest Level 2 operator decision exposed by bounded
+trusted-work-view evidence. Existing recovery owners must be reused, and no
+provider schema, readiness marker, or automatic action should be added without
+a new demonstrated gap.

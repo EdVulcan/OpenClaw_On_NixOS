@@ -281,22 +281,38 @@ the egress task remains the approval and execution owner. This continuity
 boundary is documented in
 `docs/plans/OPENCLAW_NATIVE_ENGINEERING_CONTEXT_PROVIDER_SOURCE_TASK_PLAN.md`.
 
-The next concrete provider-facing product slice is now the bounded
-`engineering_plan_v0` response contract on that same approved handoff. DeepSeek
-may return only a short plan summary and up to eight todo items with no paths,
-URLs, credentials, or automatic-control fields. The plan is transient in the
-operator result; Observer validates it and can save a reviewed copy through the
-existing `act.openclaw.engineering_context.plan_todo_workbench_state` capability
-only after explicit confirmation. Durable provider evidence keeps only the
-contract, counts, lengths, validity, and response hash. This advances the
-Level 1 cloud-consciousness/workbench loop without reopening the historical
-provider phase ladder.
+The bounded provider-facing `engineering_plan_v0` product slice is now complete
+on that same approved handoff. DeepSeek may return only a short plan summary and
+up to eight todo items with no paths, URLs, credentials, or automatic-control
+fields. The plan is transient in the operator result; Observer validates it and
+can save a reviewed copy through the existing
+`act.openclaw.engineering_context.plan_todo_workbench_state` capability only
+after explicit confirmation. Durable provider evidence keeps only the contract,
+counts, lengths, validity, and response hash. This advances the Level 1
+cloud-consciousness/workbench loop without reopening the historical provider
+phase ladder.
 
 Evidence for this slice is in the engineering-plan contract and live-execution
 tests, the provider handoff capability test, the Observer plan test, and the
 existing Phase 63 egress task-shell check. Provider egress remains explicitly
 operator-approved; the draft cannot create tasks or approvals, execute controls,
 write files, or change the workspace by itself.
+
+The next route is a concrete Level 2 trusted work-view/session-helper operator
+gap selected from current bounded observation. Do not add another provider
+response schema, readiness marker, LSP variant, or browser action family unless
+the evidence demonstrates a decision that the existing owner and recovery
+controls cannot make.
+
+The first concrete Level 2 gap selected from that route was the recovery
+decision exposed by trusted work-view observation. It is now closed without a
+new route: Observer maps `prepare_work_view`, `reveal_work_view`, and
+`hide_work_view` through the existing `act.work_view.control` owner, maps
+`resume_ai_action_authority` to the existing `/control/resume` task-control
+path, and maps `restart_approved_trusted_sidecar` to the existing approved
+sidecar `start-probe` path. The action remains explicit and operator initiated;
+an unknown recommendation cannot choose an endpoint, replay a task, or bypass
+the sidecar approval gate.
 
 The current Level 1 follow-up closes a separate operator execution-consistency
 gap in the existing browser task path. It is documented in

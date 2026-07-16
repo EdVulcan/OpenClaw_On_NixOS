@@ -92,6 +92,20 @@ async function runRecommendedWorkViewAction() {
     return;
   }
 
+  if (action === "resume_ai_action_authority") {
+    await postControl("/control/resume");
+    await refreshWorkView();
+    await refreshScreen();
+    return;
+  }
+
+  if (action === "restart_approved_trusted_sidecar") {
+    await startTrustedSidecarLifecycleProbe();
+    await refreshWorkView();
+    await refreshScreen();
+    return;
+  }
+
   setControlMessage(\`Unsupported work view recommendation: \${action}\`);
 }
 `;

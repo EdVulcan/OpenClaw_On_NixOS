@@ -100,10 +100,18 @@ and maps only whitelisted actions to existing user-space endpoints:
 prepare_work_view -> POST /work-view/prepare
 reveal_work_view -> POST /work-view/reveal
 hide_work_view -> POST /work-view/hide
+resume_ai_action_authority -> POST /control/resume
+restart_approved_trusted_sidecar -> POST /work-view/trusted-sidecar/lifecycle-tasks/:taskId/start-probe
 none -> no mutation
 ```
 
 It does not call arbitrary endpoints returned by the service contract.
+The resume operation remains the existing explicit operator task-control path
+and only resumes a paused operator-controlled task after the trusted authority
+owner accepts the transition. The sidecar operation resolves the existing
+approved lifecycle task and uses its start-probe route; pre-approval still
+returns the existing blocked readback and never starts a process. Unknown or
+unsupported recommendations remain hidden from the recovery button.
 
 Observer also exposes the trusted sidecar lifecycle probe through the same
 Controls surface:
@@ -892,3 +900,21 @@ evidence into the recovered task while omitting the session lease id; recovery
 remains explicit and does not automatically restart or replay browser work.
 The task-workbench and Observer recovery checks cover the stop, recovery, and
 post-refresh readback path.
+
+## Recovery Recommendation Decision Closure
+
+The Observer recovery button now executes every public trusted-session recovery
+recommendation through an existing explicit owner:
+
+```text
+prepare/reveal/hide -> act.work_view.control -> session-manager owner
+resume_ai_action_authority -> core /control/resume
+restart_approved_trusted_sidecar -> existing approved sidecar start-probe
+```
+
+The action is still operator initiated. The UI refreshes work-view and screen
+readback after the owner returns, while no recommendation payload can select an
+arbitrary endpoint, create approval, restart a task automatically, or bypass
+the sidecar lifecycle gate. Focused Observer tests cover all three newly
+supported recommendations and preserve the existing common capability path for
+prepare/reveal/hide.
