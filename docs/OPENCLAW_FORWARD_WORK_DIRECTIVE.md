@@ -1088,6 +1088,15 @@ semantic targets, page scripts, automatic dispatch, and generic keyboard/mouse
 proxies remain deferred. The boundary is documented in
 `docs/plans/OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_SCREEN_ACTION_PLAN.md`.
 
+The existing Observer system-heal controls now also use the common capability
+runtime. `act.system.heal` receives only the explicit simulated
+`heal.restart-service` and `heal.maintenance.tick` operations from the UI, so
+Core policy evaluation, invocation history, and capability events cover the
+actions without adding a new owner. The service continues to record simulated
+outcomes only; real systemd restart/autofix remains on the separate approved
+hostd/D-Bus path. The boundary is documented in
+`docs/plans/OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_SYSTEM_HEAL_PLAN.md`.
+
 ## Identity-Upgrade Alignment
 
 Every new capability must state which identity level it serves:

@@ -211,6 +211,13 @@ export function createCapabilityRuntime(deps) {
         ?? capability.intents?.[0]
         ?? "capability.invoke";
     }
+    if (capability.id === "act.system.heal") {
+      return request.operation
+        ?? request.params?.operation
+        ?? request.intent
+        ?? capability.intents?.[0]
+        ?? "capability.invoke";
+    }
     return request.intent ?? capability.intents?.[0] ?? "capability.invoke";
   }
 
@@ -809,6 +816,11 @@ export function createCapabilityRuntime(deps) {
       const diagnosis = run?.diagnosis ?? result?.diagnosis ?? null;
       const executed = run?.executed ?? result?.executed ?? [];
       const skipped = run?.skipped ?? result?.skipped ?? [];
+      const healEntries = [
+        ...(Array.isArray(executed) ? executed : []),
+        ...(Array.isArray(skipped) ? skipped : []),
+        ...(result?.entry ? [result.entry] : []),
+      ];
       return {
         kind: run ? "maintenance.run" : "system.heal",
         ok: result?.ok === true,
@@ -820,6 +832,8 @@ export function createCapabilityRuntime(deps) {
         maintenanceRunId: run?.id ?? null,
         tickReason: result?.tick?.reason ?? null,
         nextDueAt: result?.policy?.nextDueAt ?? null,
+        noHostMutation: healEntries.every((entry) => entry?.mode === "simulated" || entry?.mode === "audit_only"),
+        noProviderEgress: true,
       };
     }
     return {

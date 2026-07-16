@@ -222,6 +222,14 @@ Only explicit `keyboard.type` and bounded left-button `mouse.click` requests
 reach the existing screen-act owner; write-only input and click coordinates
 remain transient and are excluded from invocation evidence.
 
+The existing system-heal Observer controls now also use the common capability
+runtime, documented in
+`OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_SYSTEM_HEAL_PLAN.md`.
+Only the explicit simulated `heal.restart-service` and
+`heal.maintenance.tick` operations reach the existing system-heal owner;
+Core policy, invocation history, and capability events cover the controls.
+Real systemd mutation remains on the separate approved hostd/D-Bus path.
+
 The provider handoff's explicit source-task continuity is documented in:
 
 ```text

@@ -56,6 +56,8 @@ cleanup() {
     "${BROWSER_OPEN_FILE:-}" \
     "${SCREEN_KEYBOARD_FILE:-}" \
     "${SCREEN_POINTER_FILE:-}" \
+    "${SYSTEM_HEAL_FILE:-}" \
+    "${MAINTENANCE_FILE:-}" \
     "${CONTEXT_PACKET_FILE:-}" \
     "${PROVIDER_HANDOFF_FILE:-}" \
     "${ACPX_COMPATIBILITY_FILE:-}" \
@@ -95,6 +97,8 @@ WORK_VIEW_CONTROL_FILE="$(mktemp)"
 BROWSER_OPEN_FILE="$(mktemp)"
 SCREEN_KEYBOARD_FILE="$(mktemp)"
 SCREEN_POINTER_FILE="$(mktemp)"
+SYSTEM_HEAL_FILE="$(mktemp)"
+MAINTENANCE_FILE="$(mktemp)"
 CONTEXT_PACKET_FILE="$(mktemp)"
 PROVIDER_HANDOFF_FILE="$(mktemp)"
 ACPX_COMPATIBILITY_FILE="$(mktemp)"
@@ -123,6 +127,8 @@ post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"act.work_view.contro
 post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"act.browser.open","operation":"browser.new_tab","params":{"url":"https://example.com/observer-capability-browser-action"}}' > "$BROWSER_OPEN_FILE"
 post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"act.screen.pointer_keyboard","operation":"keyboard.type","params":{"text":"transient observer capability input"}}' > "$SCREEN_KEYBOARD_FILE"
 post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"act.screen.pointer_keyboard","operation":"mouse.click","params":{"x":640,"y":360,"button":"left"}}' > "$SCREEN_POINTER_FILE"
+post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"act.system.heal","operation":"heal.restart-service","params":{"service":"openclaw-browser-runtime","mode":"simulated"}}' > "$SYSTEM_HEAL_FILE"
+post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"act.system.heal","operation":"heal.maintenance.tick","params":{"force":true,"autofix":true,"mode":"simulated"}}' > "$MAINTENANCE_FILE"
 post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"sense.openclaw.engineering_context.packet","params":{"limit":4,"thresholdChars":256,"protectRecentAssistantTurns":0}}' > "$CONTEXT_PACKET_FILE"
 post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"sense.openclaw.engineering_context.work_view_observation"}' > "$WORK_VIEW_FILE"
 curl --silent --fail "$CORE_URL/capabilities" > "$CAPABILITIES_FILE"
@@ -160,7 +166,9 @@ node - <<'EOF' \
   "$SCREEN_FILE" \
   "$BROWSER_OPEN_FILE" \
   "$SCREEN_KEYBOARD_FILE" \
-  "$SCREEN_POINTER_FILE"
+  "$SCREEN_POINTER_FILE" \
+  "$SYSTEM_HEAL_FILE" \
+  "$MAINTENANCE_FILE"
 const fs = require("node:fs");
 const html = fs.readFileSync(process.argv[2], "utf8");
 const client = fs.readFileSync(process.argv[3], "utf8");
@@ -189,6 +197,8 @@ const screen = JSON.parse(fs.readFileSync(process.argv[25], "utf8"));
 const browserOpen = JSON.parse(fs.readFileSync(process.argv[26], "utf8"));
 const screenKeyboard = JSON.parse(fs.readFileSync(process.argv[27], "utf8"));
 const screenPointer = JSON.parse(fs.readFileSync(process.argv[28], "utf8"));
+const systemHeal = JSON.parse(fs.readFileSync(process.argv[29], "utf8"));
+const maintenance = JSON.parse(fs.readFileSync(process.argv[30], "utf8"));
 
 for (const token of [
   "invoke-vitals-button",
@@ -239,6 +249,12 @@ for (const token of [
   "keyboard.type",
   "runMouseClickCapability",
   "mouse.click",
+  "runHeal",
+  "runMaintenanceTickFromUi",
+  "act.system.heal",
+  "heal.restart-service",
+  "heal.maintenance.tick",
+  "mode: \"simulated\"",
 ]) {
   if (!client.includes(token)) {
     throw new Error(`Observer client missing ${token}`);
@@ -478,6 +494,48 @@ if (
   throw new Error("Observer mouse click capability should use a bounded left-click owner path without coordinate evidence");
 }
 if (
+  !systemHeal.ok
+  || systemHeal.invoked !== true
+  || systemHeal.capability?.id !== "act.system.heal"
+  || systemHeal.policy?.subject?.intent !== "heal.restart-service"
+  || systemHeal.invocation?.request?.intent !== "heal.restart-service"
+  || systemHeal.result?.entry?.mode !== "simulated"
+  || systemHeal.result?.entry?.status !== "completed"
+  || systemHeal.summary?.kind !== "system.heal"
+  || systemHeal.summary?.noProviderEgress !== true
+  || JSON.stringify(systemHeal.invocation ?? {}).includes("openclaw-browser-runtime")
+) {
+  throw new Error("Observer system-heal capability should use the common audited simulated restart owner");
+}
+if (
+  !maintenance.ok
+  || maintenance.invoked !== true
+  || maintenance.capability?.id !== "act.system.heal"
+  || maintenance.policy?.subject?.intent !== "heal.maintenance.tick"
+  || maintenance.invocation?.request?.intent !== "heal.maintenance.tick"
+  || maintenance.result?.tick?.status !== "ran"
+  || maintenance.result?.run?.autonomy?.governance !== "audit_only"
+  || maintenance.result?.run?.autonomy?.mode !== "conservative"
+  || maintenance.result?.run?.diagnosis?.plan?.mode !== "simulated"
+  || maintenance.summary?.kind !== "maintenance.run"
+  || maintenance.summary?.noProviderEgress !== true
+  || JSON.stringify(maintenance.invocation ?? {}).includes("openclaw-browser-runtime")
+) {
+  throw new Error("Observer maintenance capability should use the common audited simulated tick owner");
+}
+if (client.includes("observerConfig.systemHealUrl}/heal/restart-service")
+  || client.includes("observerConfig.systemHealUrl}/maintenance/tick")) {
+  throw new Error("Observer system-heal controls must not call the service directly");
+}
+if (!capabilities.capabilities?.some((capability) =>
+  capability.id === "act.system.heal"
+  && capability.governance === "audit_only"
+  && capability.intents?.includes("heal.restart-service")
+  && capability.intents?.includes("heal.maintenance.tick")
+)) {
+  throw new Error("Observer capability registry should expose the audited simulated system-heal contract");
+}
+if (
   !contextPacket.ok
   || contextPacket.invoked !== true
   || contextPacket.capability?.id !== "sense.openclaw.engineering_context.packet"
@@ -598,6 +656,13 @@ console.log(JSON.stringify({
         action: workViewControl.summary.action,
         visibility: workViewControl.summary.visibility,
         payloadExposed: !workViewControl.summary.noPayloadExposure,
+      },
+      systemHeal: {
+        restart: systemHeal.summary.kind,
+        restartMode: systemHeal.result.entry.mode,
+        maintenance: maintenance.summary.kind,
+        maintenanceMode: maintenance.result.run.diagnosis.plan.mode,
+        noProviderEgress: maintenance.summary.noProviderEgress,
       },
       contextPacket: {
         messages: contextPacket.summary.messageCount,

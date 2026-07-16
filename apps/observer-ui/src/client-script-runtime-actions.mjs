@@ -4,6 +4,7 @@ import { observerClientRuntimeEngineeringLspTargetSelectionScript } from "./clie
 import { observerClientRuntimeEngineeringSuggestedActionScript } from "./client-script-runtime-engineering-suggested-action.mjs";
 import { observerClientRuntimeEngineeringRecommendationScript } from "./client-script-runtime-engineering-recommendation.mjs";
 import { observerClientRuntimeSystemBodyTasksScript } from "./client-script-runtime-system-body-tasks.mjs";
+import { observerClientRuntimeSystemHealScript } from "./client-script-runtime-system-heal.mjs";
 import { observerClientRuntimeBindingsScript } from "./client-script-runtime-bindings.mjs";
 import { observerClientNativeRuntimeRefreshTasksScript } from "./client-script-runtime-native-runtime-refresh.mjs";
 
@@ -71,7 +72,7 @@ async function createPlannedTask() {
   await refreshOperatorState();
 }
 
-${observerClientRuntimeApprovalTasksScript}${observerClientRuntimeEngineeringLoopControlsScript}${observerClientRuntimeEngineeringLspTargetSelectionScript}${observerClientRuntimeEngineeringSuggestedActionScript}${observerClientRuntimeEngineeringRecommendationScript}${observerClientNativeRuntimeRefreshTasksScript}async function runOperatorStepFromUi() {
+${observerClientRuntimeApprovalTasksScript}${observerClientRuntimeEngineeringLoopControlsScript}${observerClientRuntimeEngineeringLspTargetSelectionScript}${observerClientRuntimeEngineeringSuggestedActionScript}${observerClientRuntimeEngineeringRecommendationScript}${observerClientNativeRuntimeRefreshTasksScript}${observerClientRuntimeSystemHealScript}async function runOperatorStepFromUi() {
   const result = await fetchJson(\`\${observerConfig.coreUrl}/operator/step\`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -607,34 +608,6 @@ async function runKeyboardTypeCapability(text) {
   await refreshActionState();
   await refreshScreen();
   await refreshWorkView();
-}
-
-async function runHeal(service) {
-  const result = await fetchJson(\`\${observerConfig.systemHealUrl}/heal/restart-service\`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ service }),
-  });
-  setControlMessage(\`Heal completed for \${result.entry?.service ?? service}\`);
-  await refreshHealState();
-}
-
-async function runMaintenanceTickFromUi() {
-  const result = await fetchJson(\`\${observerConfig.systemHealUrl}/maintenance/tick\`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      force: true,
-      autofix: true,
-      mode: "simulated",
-    }),
-  });
-  const runStatus = result.run?.status ?? "no-run";
-  setControlMessage(\`Maintenance tick \${result.tick?.status ?? "unknown"}: \${result.tick?.reason ?? "unknown"} / \${runStatus}\`);
-  await refreshMaintenanceState();
-  await refreshHealState();
-  await refreshSystemState();
-  await refreshAuditState();
 }
 
 ${observerClientRuntimeSystemBodyTasksScript}async function completeCurrentTask() {

@@ -333,6 +333,47 @@ test("capability runtime dispatches bounded left click through screen-act", asyn
   assert.equal(events.at(-1)?.name, "capability.invoked");
 });
 
+test("capability runtime dispatches simulated system maintenance through system-heal", async () => {
+  const { runtime, state, events, calls } = createHarness({
+    postJsonResult: {
+      ok: true,
+      tick: { status: "ran", reason: "forced" },
+      run: {
+        id: "maintenance-1",
+        status: "healthy",
+        autonomy: {
+          governance: "audit_only",
+          approvalRequired: false,
+          mode: "conservative",
+        },
+        diagnosis: { plan: { mode: "simulated", stepCount: 0 } },
+      },
+    },
+  });
+
+  const result = await runtime.invokeCapability({
+    capabilityId: "act.system.heal",
+    operation: "heal.maintenance.tick",
+    params: { force: true, autofix: true, mode: "simulated" },
+  });
+
+  assert.equal(result.statusCode, 200);
+  assert.equal(result.response.invoked, true);
+  assert.equal(result.response.policy.input.intent, "heal.maintenance.tick");
+  assert.equal(result.response.invocation.request.intent, "heal.maintenance.tick");
+  assert.equal(result.response.summary.kind, "maintenance.run");
+  assert.equal(result.response.summary.noHostMutation, true);
+  assert.equal(result.response.summary.noProviderEgress, true);
+  assert.equal(result.response.summary.maintenanceRunId, "maintenance-1");
+  assert.deepEqual(calls.postJson, [{
+    url: "http://127.0.0.1:4107/maintenance/tick",
+    body: { force: true, autofix: true, mode: "simulated" },
+  }]);
+  assert.equal(JSON.stringify(result.response.invocation).includes("simulated"), false);
+  assert.equal(state.capabilityInvocationLog.at(-1)?.request.intent, "heal.maintenance.tick");
+  assert.equal(events.at(-1)?.name, "capability.invoked");
+});
+
 test("capability runtime exposes workspace edit target selection through the governed invoke path", async () => {
   const builderInputs = [];
   const { runtime, state, events } = createHarness({
