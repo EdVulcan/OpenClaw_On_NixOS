@@ -89,6 +89,19 @@ shared capability after approved mutation and assert the same task-specific
 ledger result, compact summary, and no-content/no-mutation boundary. No new
 milestone or duplicate evidence route is introduced.
 
+## Observer Common-Path Closure
+
+The existing Observer Write Execution Evidence refresh now invokes
+`sense.openclaw.engineering_tool.write_execution_evidence` through
+`POST /capabilities/invoke` and unwraps only the transient builder result for
+the existing renderer. The dedicated execution-evidence route remains the
+authoritative detailed read model; task creation, approval, operator execution,
+and filesystem mutation remain on their existing explicit owners.
+
+The real Observer execution-evidence check proves the served client no longer
+refreshes through the dedicated route and that the capability invocation keeps
+the completed-task ledger summary and all negative authority flags.
+
 ## Deferred
 
 ```text

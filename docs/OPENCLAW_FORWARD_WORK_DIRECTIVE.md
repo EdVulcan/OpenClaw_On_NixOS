@@ -1157,6 +1157,13 @@ short-lived process requests remain on their existing explicit governed paths.
 The boundary is documented in
 `OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_LSP_READ_PROPOSALS_PLAN.md`.
 
+The existing Observer Write Execution Evidence panel now also requests
+`sense.openclaw.engineering_tool.write_execution_evidence` through the common
+capability runtime. It unwraps only the transient completed-task/ledger result;
+the dedicated route remains the detailed read-model owner, while task creation,
+approval, operator execution, and filesystem mutation remain explicit and
+approval-gated.
+
 ## Identity-Upgrade Alignment
 
 Every new capability must state which identity level it serves:

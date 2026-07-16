@@ -124,7 +124,7 @@ for (const token of [
   }
 }
 for (const token of [
-  "/plugins/native-adapter/engineering-write-execution/evidence",
+  "/capabilities/invoke",
   "refreshEngineeringWriteExecutionEvidence",
   "renderEngineeringWriteExecutionEvidence",
   "Native engineering write execution evidence",
@@ -134,6 +134,9 @@ for (const token of [
   if (!client.includes(token)) {
     throw new Error(`Observer client missing engineering write execution token: ${token}`);
   }
+}
+if (client.includes("observerConfig.coreUrl}/plugins/native-adapter/engineering-write-execution/evidence")) {
+  throw new Error("Observer write execution evidence refresh must use the common capability runtime");
 }
 if (!fs.existsSync(targetFile) || fs.readFileSync(targetFile, "utf8") !== secret) {
   throw new Error("observer approved engineering write did not create the expected file content");

@@ -823,3 +823,11 @@ capability summaries or events. Task creation, approval, process execution,
 selected-target reads/edits, and verification remain on their existing explicit
 governed paths. The focused boundary is documented in
 `OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_LSP_READ_PROPOSALS_PLAN.md`.
+
+The existing Observer Write Execution Evidence refresh now uses
+`sense.openclaw.engineering_tool.write_execution_evidence` through
+`/capabilities/invoke`. It keeps the completed-task and filesystem-ledger
+result transient for the existing renderer and leaves task creation, approval,
+operator execution, and mutation on their existing explicit owners. Its
+common-path closure is recorded in
+`OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_EXECUTION_EVIDENCE_PLAN.md`.

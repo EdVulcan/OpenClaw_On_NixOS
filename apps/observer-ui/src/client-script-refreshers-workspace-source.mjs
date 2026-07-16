@@ -459,8 +459,19 @@ async function refreshEngineeringWriteProposal() {
 
 async function refreshEngineeringWriteExecutionEvidence() {
   try {
-    const data = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/engineering-write-execution/evidence?limit=10\`);
-    renderEngineeringWriteExecutionEvidence(data);
+    const response = await fetchJson(\`\${observerConfig.coreUrl}/capabilities/invoke\`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        capabilityId: "sense.openclaw.engineering_tool.write_execution_evidence",
+        intent: "engineering.write_execution_evidence",
+        params: { limit: 10 },
+      }),
+    });
+    if (response.invoked !== true) {
+      throw new Error("Engineering write execution evidence capability was not invoked.");
+    }
+    renderEngineeringWriteExecutionEvidence(response.result ?? {});
   } catch {
     engineeringWriteExecutionRegistry.textContent = "offline";
     engineeringWriteExecutionTotal.textContent = "0";
