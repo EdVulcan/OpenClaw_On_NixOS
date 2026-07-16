@@ -12,7 +12,6 @@ import {
   browserTaskActionsFromPlan,
   compactBrowserTaskVisualGrounding,
   executeBrowserTaskActionWithCaptureRecovery,
-  materialiseBrowserTaskAction,
   normaliseBrowserTaskVerificationUrl,
   observedBrowserTaskUrl,
 } from "./browser-task-action-contract.mjs";
@@ -22,6 +21,10 @@ import {
   isWorkViewAuthorityInterruption,
   serialiseWorkViewAuthorityInterruption,
 } from "./work-view-authority-continuity.mjs";
+import {
+  NativeEngineeringSemanticActionHandoffBlockedError,
+  prepareNativeEngineeringWorkViewSemanticAction,
+} from "./native-engineering-work-view-semantic-action-handoff.mjs";
 import {
   CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CONTEXT_PACKET_EVIDENCE,
   materialiseCloudLiveProviderContextPacketExecution,
@@ -676,6 +679,19 @@ async function executeTask(task, options = {}) {
   let initialScreen = null;
   let verifiedScreen = null;
   let preCompletionWorkViewState = null;
+  let semanticActionHandoff = null;
+
+  async function prepareAction(action, screenResponse) {
+    const preparedAction = await prepareNativeEngineeringWorkViewSemanticAction({
+      action,
+      task,
+      screenResponse,
+      readWorkViewState,
+      sessionManagerUrl,
+    });
+    semanticActionHandoff = preparedAction.handoff;
+    return preparedAction;
+  }
 
   try {
     await setTaskPhase(task, "preparing_work_view", {
@@ -709,9 +725,9 @@ async function executeTask(task, options = {}) {
     initialScreen = await fetchJson(`${screenSenseUrl}/screen/current`);
 
     for (const action of actions) {
-      const dispatchedAction = materialiseBrowserTaskAction(action, initialScreen);
+      const preparedAction = await prepareAction(action, initialScreen);
       const actionData = await executeBrowserTaskActionWithCaptureRecovery({
-        action: dispatchedAction,
+        action: preparedAction.action,
         recoveryEnabled: options.recoverCaptureInterruptions !== false,
         postAction: (endpoint, params) => postJson(`${screenActUrl}${endpoint}`, params),
         prepareWorkView: () => invokeWorkViewAuthority("capture_recovery_prepare", () => postJson(`${sessionManagerUrl}/work-view/prepare`, {
@@ -721,10 +737,10 @@ async function executeTask(task, options = {}) {
           recommendedAction: "prepare_work_view",
         })),
         refreshAction: ["browser.semantic_click", "browser.semantic_type"].includes(action.kind)
-          ? async () => materialiseBrowserTaskAction(
+          ? async () => (await prepareAction(
             action,
             await fetchJson(`${screenSenseUrl}/screen/current`),
-          )
+          )).action
           : null,
       });
       actionResults.push(actionData.action);
@@ -806,6 +822,7 @@ async function executeTask(task, options = {}) {
       verification,
       workViewSummary: verification.workViewSummary ?? null,
       actionEvidence: verification.actionEvidence ?? null,
+      semanticActionHandoff,
       initialScreen: {
         readiness: initialScreen.screen?.readiness ?? null,
         focusedWindow: initialScreen.screen?.focusedWindow ?? null,
@@ -850,9 +867,36 @@ async function executeTask(task, options = {}) {
       actions: actionResults,
       finalWorkViewState,
       verification,
+      semanticActionHandoff,
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Task execution failed.";
+    if (error instanceof NativeEngineeringSemanticActionHandoffBlockedError) {
+      const failedTask = failTask(task, "Trusted semantic action handoff blocked.", {
+        targetUrl,
+        executor: "core-v3",
+        operatorExecutionBinding: options.operatorExecutionBinding ?? null,
+        actionCount: actionResults.length,
+        semanticActionHandoff: error.handoff,
+      });
+      await publishEvent(createEventName("task.failed"), {
+        task: serialiseTask(failedTask),
+        reason: "Trusted semantic action handoff blocked.",
+        semanticActionHandoff: error.handoff,
+        executor: "core-v3",
+      });
+      return {
+        task: failedTask,
+        prepare,
+        reveal,
+        initialScreen,
+        verifiedScreen,
+        actions: actionResults,
+        finalWorkViewState: preCompletionWorkViewState,
+        verification: null,
+        semanticActionHandoff: error.handoff,
+      };
+    }
     const authorityInterruption = serialiseWorkViewAuthorityInterruption(error);
     const failedTask = failTask(task, message, {
       targetUrl,
@@ -1205,14 +1249,22 @@ async function executeTaskWithRecovery(task, options = {}) {
       : Number.isInteger(options.retryBudget) && options.retryBudget > 0
         ? options.retryBudget
         : 0;
+  const semanticActionHandoffBlocked = firstExecution.semanticActionHandoff?.ok === false;
 
-  if (firstExecution.task.status !== "failed" || options.autoRecover !== true || maxRecoveryAttempts < 1) {
+  if (firstExecution.task.status !== "failed"
+    || options.autoRecover !== true
+    || maxRecoveryAttempts < 1
+    || semanticActionHandoffBlocked) {
     return {
       finalExecution: firstExecution,
       attempts: [firstExecution],
       recovery: {
         attempted: false,
         maxAttempts: maxRecoveryAttempts,
+        suppressed: semanticActionHandoffBlocked,
+        suppressionReason: semanticActionHandoffBlocked
+          ? "semantic_action_handoff_blocked"
+          : null,
       },
     };
   }

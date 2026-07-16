@@ -282,6 +282,171 @@ function createExecutorHarness(overrides = {}) {
   return { executor, state, events, persistCalls: () => persistCalls };
 }
 
+function buildSemanticClickExecutionFixture({
+  captureFreshness = "fresh",
+  stateInventorySha256 = "b".repeat(64),
+} = {}) {
+  const targetUrl = "https://example.com/semantic-click";
+  const frameSha256 = "a".repeat(64);
+  const frameSequence = 7;
+  const workViewResponse = {
+    ok: true,
+    session: { sessionId: "session-1", status: "ready" },
+    workView: {
+      workViewId: "work-view-primary",
+      status: "ready",
+      visibility: "visible",
+      mode: "foreground-observable",
+      helperStatus: "active",
+      browserStatus: "running",
+      activeUrl: targetUrl,
+      displayTarget: "workspace-2",
+    },
+  };
+  const stateData = {
+    ...workViewResponse,
+    trustedSession: {
+      sessionIdentity: { status: "authoritative" },
+      helperRuntime: {
+        status: "active",
+        actionAuthority: "active",
+        leaseMatched: true,
+        sidecar: {
+          captureSourceStatus: "ready",
+          captureFreshness,
+          captureObservation: {
+            sequence: 12,
+            visualFrame: {
+              available: true,
+              fresh: captureFreshness === "fresh",
+              sha256: frameSha256,
+              sequence: frameSequence,
+            },
+            semanticTargets: {
+              available: true,
+              itemCount: 1,
+              truncated: false,
+              inventorySha256: stateInventorySha256,
+              frameSequence,
+              frameSha256,
+            },
+          },
+        },
+      },
+    },
+  };
+  const screenResponse = {
+    ok: true,
+    screen: {
+      readiness: "ready",
+      focusedWindow: { title: "AI work view", pid: 4103 },
+      visualFrame: {
+        available: true,
+        fresh: true,
+        sha256: frameSha256,
+        sequence: frameSequence,
+      },
+      semanticTargets: {
+        available: true,
+        truncated: false,
+        inventorySha256: "b".repeat(64),
+        frame: { sha256: frameSha256, sequence: frameSequence },
+        items: [{
+          targetId: `frame-${frameSequence}-target-1`,
+          role: "button",
+          name: "Inspect",
+          visible: true,
+          disabled: false,
+        }],
+      },
+      workViewSummary: {
+        url: targetUrl,
+        visibleTextBlocks: [targetUrl],
+        summaryText: targetUrl,
+      },
+    },
+  };
+  const postCalls = [];
+  let screenActCalls = 0;
+  const client = {
+    sessionManagerUrl: "http://session-manager",
+    screenSenseUrl: "http://screen-sense",
+    screenActUrl: "http://screen-act",
+    systemSenseUrl: "http://system-sense",
+    fetchJson: async (url) => {
+      if (url === "http://screen-sense/screen/current") return screenResponse;
+      if (url === "http://session-manager/work-view/state") return stateData;
+      return { ok: true };
+    },
+    postJson: async (url, body) => {
+      postCalls.push({ url, body });
+      if (url === "http://screen-act/act/mouse/click") {
+        screenActCalls += 1;
+        return {
+          ok: true,
+          action: {
+            id: "semantic-click-action",
+            kind: "mouse.click",
+            params: body,
+            degraded: false,
+            result: "executed-browser-runtime",
+            mediation: {
+              accepted: true,
+              transport: "trusted-sidecar-ipc",
+              effect: { url: targetUrl },
+              visualGrounding: {
+                registry: "openclaw-trusted-work-view-visual-action-grounding-v0",
+                required: true,
+                status: "grounded",
+                before: {
+                  registry: "openclaw-browser-visual-frame-v0",
+                  sha256: frameSha256,
+                  sequence: frameSequence,
+                  fresh: true,
+                },
+                after: {
+                  registry: "openclaw-browser-visual-frame-v0",
+                  sha256: "c".repeat(64),
+                  sequence: frameSequence + 1,
+                  fresh: true,
+                },
+                sequenceAdvanced: true,
+              },
+            },
+          },
+        };
+      }
+      return workViewResponse;
+    },
+  };
+  return {
+    targetUrl,
+    stateData,
+    client,
+    postCalls,
+    get screenActCalls() {
+      return screenActCalls;
+    },
+    readWorkViewState: async () => ({ ok: true, data: stateData }),
+    taskManager: {
+      buildWorkViewAttachPayload: () => ({
+        workViewId: "work-view-primary",
+        sessionId: "session-1",
+        status: "ready",
+        visibility: "visible",
+        mode: "foreground-observable",
+        helperStatus: "active",
+        displayTarget: "workspace-2",
+        activeUrl: targetUrl,
+      }),
+      attachTaskToWorkView: (task, workView) => {
+        task.workView = workView;
+        return task;
+      },
+    },
+  };
+}
+
 test("command transcript read model sorts, classifies, and summarises task outcomes", () => {
   const { executor, state } = createExecutorHarness();
   state.tasks.set("task-old", {
@@ -1943,6 +2108,102 @@ test("browser task executor prepares once and retries an in-flight capture inter
   assert.equal(evidenceAction.mediation.visualGrounding.imageDataRetained, false);
   assert.equal(JSON.stringify(evidenceAction).includes("data:image/"), false);
   assert.equal(result.finalExecution.verification.activeUrl, recoveredUrl);
+});
+
+test("browser task executor dispatches one semantic click after trusted handoff revalidation", async () => {
+  const fixture = buildSemanticClickExecutionFixture();
+  const { executor } = createExecutorHarness({
+    taskManager: fixture.taskManager,
+    deps: {
+      client: fixture.client,
+      readWorkViewState: fixture.readWorkViewState,
+    },
+  });
+  const task = {
+    id: "semantic-click-executor-task",
+    type: "browser_task",
+    goal: "Dispatch one reviewed semantic click",
+    status: "queued",
+    targetUrl: fixture.targetUrl,
+  };
+
+  const result = await executor.executeTaskWithRecovery(task, {
+    actions: [{ kind: "browser.semantic_click", params: { target: { name: "Inspect", role: "button" } } }],
+    expectedUrl: fixture.targetUrl,
+    hideOnComplete: false,
+    autoRecover: true,
+    maxRecoveryAttempts: 1,
+  });
+
+  const actionCall = fixture.postCalls.find((call) => call.url === "http://screen-act/act/mouse/click");
+  assert.equal(result.finalExecution.task.status, "completed");
+  assert.equal(result.finalExecution.semanticActionHandoff.status, "ready_for_dispatch");
+  assert.equal(result.finalExecution.task.outcome.details.semanticActionHandoff.ok, true);
+  assert.equal(fixture.screenActCalls, 1);
+  assert.equal(actionCall.body.semanticTarget.targetId, "frame-7-target-1");
+  assert.equal(actionCall.body.semanticTarget.inventorySha256, "b".repeat(64));
+  assert.equal(actionCall.body.semanticTarget.frame.sequence, 7);
+});
+
+test("browser task executor blocks stale semantic click handoff without automatic redispatch", async () => {
+  const fixture = buildSemanticClickExecutionFixture({ captureFreshness: "stale" });
+  const { executor } = createExecutorHarness({
+    taskManager: fixture.taskManager,
+    deps: {
+      client: fixture.client,
+      readWorkViewState: fixture.readWorkViewState,
+    },
+  });
+  const task = {
+    id: "semantic-click-stale-task",
+    type: "browser_task",
+    goal: "Block a stale semantic click",
+    status: "queued",
+    targetUrl: fixture.targetUrl,
+  };
+
+  const result = await executor.executeTaskWithRecovery(task, {
+    actions: [{ kind: "browser.semantic_click", params: { target: { name: "Inspect", role: "button" } } }],
+    expectedUrl: fixture.targetUrl,
+    hideOnComplete: false,
+    autoRecover: true,
+    maxRecoveryAttempts: 1,
+  });
+
+  assert.equal(result.finalExecution.task.status, "failed");
+  assert.equal(result.finalExecution.semanticActionHandoff.reason, "observation_not_fresh");
+  assert.equal(result.recovery.attempted, false);
+  assert.equal(result.recovery.suppressed, true);
+  assert.equal(fixture.screenActCalls, 0);
+});
+
+test("browser task executor blocks semantic click when current inventory digest mismatches", async () => {
+  const fixture = buildSemanticClickExecutionFixture({ stateInventorySha256: "c".repeat(64) });
+  const { executor } = createExecutorHarness({
+    taskManager: fixture.taskManager,
+    deps: {
+      client: fixture.client,
+      readWorkViewState: fixture.readWorkViewState,
+    },
+  });
+  const task = {
+    id: "semantic-click-mismatch-task",
+    type: "browser_task",
+    goal: "Block a mismatched semantic click",
+    status: "queued",
+    targetUrl: fixture.targetUrl,
+  };
+
+  const result = await executor.executeTaskWithRecovery(task, {
+    actions: [{ kind: "browser.semantic_click", params: { target: { name: "Inspect", role: "button" } } }],
+    expectedUrl: fixture.targetUrl,
+    hideOnComplete: false,
+  });
+
+  assert.equal(result.finalExecution.task.status, "failed");
+  assert.equal(result.finalExecution.semanticActionHandoff.reason, "semantic_target_capture_mismatch");
+  assert.equal(result.finalExecution.task.outcome.details.semanticActionHandoff.revalidation.stateInventoryMatchesScreen, false);
+  assert.equal(fixture.screenActCalls, 0);
 });
 
 test("browser task executor returns recoverable evidence when session authority is unavailable", async () => {

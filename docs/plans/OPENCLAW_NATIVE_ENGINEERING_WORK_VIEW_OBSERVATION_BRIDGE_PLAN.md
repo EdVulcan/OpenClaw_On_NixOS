@@ -96,7 +96,7 @@ openclaw-native-engineering-context-packet-pair-batch-reuse
 ```text
 raw visual frame or data URL in engineering context
 page URL, page text, or semantic target item transfer
-automatic action selection or dispatch from observation metadata
+unreviewed automatic target selection or dispatch from observation metadata
 long-lived LSP pools and ACPX/Codex live process execution
 provider egress, credentials, root/system daemon work, and desktop-wide capture
 ```
@@ -111,10 +111,25 @@ inventory/frame consistency. The decision never selects a target or dispatches
 an action, and it exposes no target items, selectors, URLs, pixels, lease
 values, or input data.
 
+## Semantic Click Handoff Complete
+
+The existing browser semantic-action handoff now consumes this decision for one
+operator-reviewed `browser.semantic_click`. Core materialises the target from
+the existing screen observation, re-reads the existing session-manager state,
+and requires the task binding, active lease, fresh capture, inventory digest,
+frame sequence/digest, current target presence, and visual frame to agree
+before calling the existing `screen-act` route. The sidecar remains the final
+runtime owner and performs its own immediate capture and post-action visual
+grounding checks.
+
+Stale or cross-source-mismatched evidence returns a failed task with compact
+`semanticActionHandoff` evidence and suppresses automatic task recovery, so no
+second action is dispatched. The handoff exposes no page payload, selector,
+input value, or target item. No new endpoint, capture route, action family, or
+semantic typing path was added.
+
 ## Next Smallest Capability
 
-Use this decision at the existing browser semantic-action handoff for one
-operator-approved semantic click. The runtime owner must revalidate the
-frame-scoped target reference and visual grounding immediately before dispatch;
-do not add a second capture route or use the decision for automatic action
-dispatch.
+Carry this proof through the existing real task/Firefox validation lane, then
+select the next identity-level capability. Do not add another readiness-only
+chain.
