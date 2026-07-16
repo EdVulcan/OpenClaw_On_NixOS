@@ -5,6 +5,7 @@ import { observerClientRuntimeEngineeringSuggestedActionScript } from "./client-
 import { observerClientRuntimeEngineeringRecommendationScript } from "./client-script-runtime-engineering-recommendation.mjs";
 import { observerClientRuntimeSystemBodyTasksScript } from "./client-script-runtime-system-body-tasks.mjs";
 import { observerClientRuntimeSystemHealScript } from "./client-script-runtime-system-heal.mjs";
+import { observerClientRuntimeScreenObservationScript } from "./client-script-runtime-screen-observation.mjs";
 import { observerClientRuntimeWorkViewControlsScript } from "./client-script-runtime-work-view-controls.mjs";
 import { observerClientRuntimeBindingsScript } from "./client-script-runtime-bindings.mjs";
 import { observerClientNativeRuntimeRefreshTasksScript } from "./client-script-runtime-native-runtime-refresh.mjs";
@@ -73,7 +74,7 @@ async function createPlannedTask() {
   await refreshOperatorState();
 }
 
-${observerClientRuntimeApprovalTasksScript}${observerClientRuntimeEngineeringLoopControlsScript}${observerClientRuntimeEngineeringLspTargetSelectionScript}${observerClientRuntimeEngineeringSuggestedActionScript}${observerClientRuntimeEngineeringRecommendationScript}${observerClientNativeRuntimeRefreshTasksScript}${observerClientRuntimeSystemHealScript}${observerClientRuntimeWorkViewControlsScript}async function runOperatorStepFromUi() {
+${observerClientRuntimeApprovalTasksScript}${observerClientRuntimeEngineeringLoopControlsScript}${observerClientRuntimeEngineeringLspTargetSelectionScript}${observerClientRuntimeEngineeringSuggestedActionScript}${observerClientRuntimeEngineeringRecommendationScript}${observerClientNativeRuntimeRefreshTasksScript}${observerClientRuntimeSystemHealScript}${observerClientRuntimeScreenObservationScript}${observerClientRuntimeWorkViewControlsScript}async function runOperatorStepFromUi() {
   const result = await fetchJson(\`\${observerConfig.coreUrl}/operator/step\`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -427,14 +428,6 @@ async function postControl(path) {
   await refreshTaskList();
   await refreshTaskHistoryDetail();
   await refreshOperatorState();
-}
-
-async function refreshScreenNow() {
-  const result = await fetchJson(\`\${observerConfig.screenSenseUrl}/screen/refresh\`, {
-    method: "POST",
-  });
-  setControlMessage(\`Screen refreshed: \${result.screen?.readiness ?? "unknown"}\`);
-  await refreshScreen();
 }
 
 async function runBrowserOpenCapability(url) {

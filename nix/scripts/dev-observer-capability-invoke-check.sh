@@ -262,6 +262,7 @@ for (const token of [
   "work_view.hide",
   "sense.openclaw.engineering_context.packet",
   "act.openclaw.engineering_context.work_view_bind",
+  "refreshScreenNow",
 ]) {
   if (!client.includes(token)) {
     throw new Error(`Observer client missing ${token}`);
@@ -542,6 +543,9 @@ if (client.includes("observerConfig.sessionManagerUrl}/work-view/prepare")
 if (client.includes("observerConfig.coreUrl}/plugins/native-adapter/engineering-context/packet")
   || client.includes("observerConfig.coreUrl}/plugins/native-adapter/engineering-context/work-view/bind")) {
   throw new Error("Observer engineering context controls must use the common capability runtime");
+}
+if (client.includes("observerConfig.screenSenseUrl}/screen/refresh")) {
+  throw new Error("Observer screen refresh control must use the common capability runtime");
 }
 if (!capabilities.capabilities?.some((capability) =>
   capability.id === "act.system.heal"

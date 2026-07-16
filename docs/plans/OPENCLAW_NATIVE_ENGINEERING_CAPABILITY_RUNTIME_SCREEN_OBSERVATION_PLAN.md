@@ -81,6 +81,13 @@ the control does not add a second screen route or expose raw screen payloads.
 The real Observer check asserts the HTML control, client request mapping,
 event binding, and bounded service response together.
 
+The existing `Refresh Screen State` control also sends the fixed observation
+request through the common capability runtime before re-reading the existing
+read-only `/screen/current` panel state. This keeps the detailed panel refresh
+available without a direct Observer POST to `/screen/refresh`; the capability
+response remains the bounded structural observation and adds no screen action,
+payload exposure, or provider egress.
+
 ## Deferred
 
 ```text

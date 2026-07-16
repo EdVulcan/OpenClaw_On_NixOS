@@ -447,6 +447,11 @@ The existing Observer Body Capabilities panel now provides an explicit
 the common invocation readback and does not add a second screen owner, expose
 raw screen payloads, or grant screen-action authority.
 
+The existing Observer `Refresh Screen State` control now also invokes the
+fixed `sense.screen.observe` capability before performing its existing
+read-only `/screen/current` panel read. No direct `/screen/refresh` POST,
+screen payload exposure, action dispatch, or provider egress is added.
+
 The structured provider recommendation bridge now includes one Level 2
 observation action, `observe_current_screen`, bound to that exact Observer
 control and `sense.screen.observe`. A reviewed recommendation can therefore
