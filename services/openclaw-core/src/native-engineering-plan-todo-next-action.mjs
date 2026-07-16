@@ -37,6 +37,13 @@ const ACTIONS = {
     existingCapabilityId: "act.openclaw.engineering_tool.verify",
     requiresApproval: true,
   },
+  observe: {
+    actionId: "observe_current_screen",
+    label: "Observe the current trusted AI work view",
+    existingObserverControlId: "invoke-screen-observation-button",
+    existingCapabilityId: "sense.screen.observe",
+    requiresApproval: false,
+  },
 };
 
 export function getNativeEngineeringPlanTodoActionById(actionId) {
@@ -59,6 +66,9 @@ function classifyTodo(todo) {
   const text = `${todo?.id ?? ""} ${todo?.description ?? ""}`.toLowerCase();
   if (/(verify|test|check|validate|milestone|typecheck)/.test(text)) {
     return ACTIONS.verify;
+  }
+  if (/(observe|screen|capture|visual|work.?view)/.test(text)) {
+    return ACTIONS.observe;
   }
   if (/(save|store|persist)/.test(text)) {
     return ACTIONS.save;

@@ -427,6 +427,16 @@ The existing Observer Body Capabilities panel now provides an explicit
 the common invocation readback and does not add a second screen owner, expose
 raw screen payloads, or grant screen-action authority.
 
+The structured provider recommendation bridge now includes one Level 2
+observation action, `observe_current_screen`, bound to that exact Observer
+control and `sense.screen.observe`. A reviewed recommendation can therefore
+refresh the bounded current work-view summary through an existing operator
+control. The client revalidates the control id, capability id, and approval
+contract; operator selection remains required, while raw screen payloads,
+automatic action dispatch, arbitrary selectors, and provider-driven execution
+remain deferred. Evidence stays on the existing recommendation and capability
+invoke checks.
+
 The selected Level 1 consistency closures are complete. Do not reopen the LSP
 symbol chain or add another evidence/readiness shell; choose the next concrete
 identity-upgrade capability only after its Level 2 authority boundary is

@@ -36,6 +36,12 @@ function validateEngineeringRecommendation(recommendation) {
   if (recommendation.existingObserverControlId !== control.controlId) {
     throw new Error("AI engineering recommendation Observer control does not match the allowlist.");
   }
+  if (recommendation.existingCapabilityId !== control.capabilityId) {
+    throw new Error("AI engineering recommendation capability does not match the allowlist.");
+  }
+  if (recommendation.requiresApproval !== control.requiresApproval) {
+    throw new Error("AI engineering recommendation approval contract does not match the allowlist.");
+  }
   if (typeof recommendation.reason !== "string" || !recommendation.reason.trim()) {
     throw new Error("AI engineering recommendation reason is missing.");
   }
@@ -116,7 +122,7 @@ async function useEngineeringRecommendation() {
   setControlMessage(
     "Used the AI recommendation through the existing "
       + control.controlId
-      + " control; approval and operator execution remain required.",
+      + " control; operator selection remains required and any control-specific approval or execution gate remains in place.",
   );
 }
 

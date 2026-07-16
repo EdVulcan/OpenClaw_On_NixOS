@@ -193,6 +193,27 @@ accept an endpoint, command, path, or provider payload from the model.
 Evidence is served through the existing `/operator/step` and `/operator/run`
 response serialization paths. No new provider route or task type was added.
 
+## Screen Observation Recommendation Follow-Up Complete
+
+The structured recommendation allowlist now also contains
+`observe_current_screen`. Its binding is fixed to the existing Observer
+`invoke-screen-observation-button` and the common `sense.screen.observe`
+capability. The operator can review a transient provider recommendation and
+select `Use AI Recommendation`; that selection invokes the same bounded screen
+summary path and never exposes pixels, OCR text, URLs, session/lease ids, or
+semantic target items.
+
+This action is read-only and does not require a second approval task, but the
+operator selection remains mandatory. The client validates the action's
+Observer control, capability id, approval contract, review flag, confidence,
+and automatic-control flags before invoking it. Plan/todo guidance can point
+to the same control without creating a task or suggestion-link mutation.
+
+Evidence is covered by the existing core recommendation tests, plan/todo
+evidence test, Observer recommendation test, and capability-invoke/Observer
+real checks. The provider response remains transient and durable evidence
+retains only compact action and hash metadata.
+
 ## Trusted Work-View Association Follow-Up Complete
 
 The existing explicit Observer packet action can now request a compact
@@ -272,3 +293,10 @@ When this packet is used by the existing approved provider handoff, these
 selectors are still explicit request inputs and are covered by the same
 request-content hash. They do not enable provider calls or action execution by
 themselves.
+
+The next Level 2 slice is to use this reviewed observation result in one
+existing operator decision, such as choosing whether the trusted work view is
+ready for a bounded semantic action. That decision must consume only the
+bounded observation summary and remain on the existing screen-action lane;
+arbitrary selectors, page scripts, automatic action dispatch, and desktop-wide
+capture remain deferred.

@@ -25,6 +25,7 @@ test("recommendation instruction derives the existing allowlisted action ids", (
   assert.match(instruction, /create_edit_proposal_task/);
   assert.match(instruction, /create_write_proposal_task/);
   assert.match(instruction, /create_verification_task/);
+  assert.match(instruction, /observe_current_screen/);
   assert.match(instruction, /requiresOperatorReview must be true/);
   assert.match(instruction, /Do not include commands, file paths, URLs, credentials/);
 });
@@ -45,6 +46,25 @@ test("valid JSON recommendation resolves to an existing governed action", () => 
   assert.equal(result.evidence.reason, null);
   assert.equal(result.evidence.reasonIncluded, false);
   assert.equal(result.evidence.responseContentHash, "response-hash");
+});
+
+test("screen observation recommendation resolves to the existing read-only Observer control", () => {
+  const result = parseCloudLiveProviderEngineeringRecommendation({
+    contract: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_ENGINEERING_RECOMMENDATION_CONTRACT,
+    assistantContent: JSON.stringify(recommendationPayload({
+      actionId: "observe_current_screen",
+      reason: "Refresh the bounded current work-view observation before deciding on the next step.",
+      confidence: 0.84,
+    })),
+    responseContentHash: "screen-observation-response-hash",
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.recommendation.actionId, "observe_current_screen");
+  assert.equal(result.recommendation.existingObserverControlId, "invoke-screen-observation-button");
+  assert.equal(result.recommendation.existingCapabilityId, "sense.screen.observe");
+  assert.equal(result.recommendation.requiresApproval, false);
+  assert.equal(result.recommendation.requiresOperatorReview, true);
 });
 
 test("fenced JSON recommendation is accepted without persisting its reason", () => {

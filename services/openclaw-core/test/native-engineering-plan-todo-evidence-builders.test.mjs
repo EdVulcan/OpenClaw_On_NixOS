@@ -71,6 +71,20 @@ test("native engineering plan/todo evidence reads task plan steps as todo eviden
   assert.equal(response.planningEvidence.todoWrite.items[1].taskId, "task-plan-1");
 });
 
+test("native engineering plan/todo evidence can guide the existing screen observation control", () => {
+  const response = buildNativeEngineeringPlanTodoEvidence({
+    todos: [
+      { id: "observe-work-view", description: "Observe the current trusted AI work-view screen", status: "in_progress" },
+    ],
+  });
+
+  assert.equal(response.nextGovernedActionSuggestion.suggestion.actionId, "observe_current_screen");
+  assert.equal(response.nextGovernedActionSuggestion.suggestion.existingObserverControlId, "invoke-screen-observation-button");
+  assert.equal(response.nextGovernedActionSuggestion.suggestion.existingCapabilityId, "sense.screen.observe");
+  assert.equal(response.nextGovernedActionSuggestion.suggestion.requiresApproval, false);
+  assert.equal(response.nextGovernedActionSuggestion.governance.guidanceOnly, true);
+});
+
 test("native engineering plan/todo evidence reads governed workbench storage before task plan steps", () => {
   const response = buildNativeEngineeringPlanTodoEvidence({
     tasks: new Map([

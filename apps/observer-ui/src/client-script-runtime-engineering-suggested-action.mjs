@@ -1,23 +1,39 @@
 export const observerClientRuntimeEngineeringSuggestedActionScript = `const GOVERNED_PLAN_TODO_SUGGESTION_CONTROLS = Object.freeze({
   review_current_todo: {
     controlId: "engineering-plan-todo-bridge-button",
+    capabilityId: "sense.openclaw.engineering_context.plan_todo_evidence",
+    requiresApproval: false,
     run: bridgeEngineeringPlanningWorkbenchState,
   },
   save_workbench_state: {
     controlId: "engineering-plan-todo-save-button",
+    capabilityId: "act.openclaw.engineering_context.plan_todo_workbench_state",
+    requiresApproval: false,
     run: saveEngineeringPlanningWorkbenchState,
   },
   create_edit_proposal_task: {
     controlId: "engineering-edit-proposal-task-button",
+    capabilityId: "act.openclaw.engineering_tool.edit_proposal_task",
+    requiresApproval: true,
     run: createEngineeringEditLoopApprovalTask,
   },
   create_write_proposal_task: {
     controlId: "engineering-write-proposal-task-button",
+    capabilityId: "act.openclaw.engineering_tool.write_proposal",
+    requiresApproval: true,
     run: createEngineeringWriteLoopApprovalTask,
   },
   create_verification_task: {
     controlId: "engineering-verification-task-button",
+    capabilityId: "act.openclaw.engineering_tool.verify",
+    requiresApproval: true,
     run: createEngineeringVerificationLoopApprovalTask,
+  },
+  observe_current_screen: {
+    controlId: "invoke-screen-observation-button",
+    capabilityId: "sense.screen.observe",
+    requiresApproval: false,
+    run: () => invokeCapabilityFromUi("screenObservation"),
   },
 });
 
@@ -84,7 +100,7 @@ async function useEngineeringPlanningSuggestedAction() {
     return;
   }
 
-  const suggestionLink = actionId === "save_workbench_state"
+  const suggestionLink = ["save_workbench_state", "observe_current_screen"].includes(actionId)
     ? null
     : buildEngineeringPlanTodoSuggestionLinkInput(suggestion, control);
   await control.run(suggestionLink);
