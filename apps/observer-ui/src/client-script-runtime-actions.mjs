@@ -531,27 +531,6 @@ async function refreshScreenNow() {
   await refreshScreen();
 }
 
-async function runAction(path, payload) {
-  const result = await fetchJson(\`\${observerConfig.screenActUrl}\${path}\`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  if (currentTaskState?.id) {
-    await updateTaskPhase(currentTaskState.id, "acting_on_target", {
-      actionKind: result.action?.kind ?? null,
-      degraded: result.action?.degraded ?? false,
-    });
-  }
-  setControlMessage(\`Action \${result.action?.kind ?? "unknown"} completed (\${result.action?.result ?? "unknown"})\`);
-  await refreshRuntime();
-  await refreshTaskList();
-  await refreshTaskHistoryDetail();
-  await refreshActionState();
-  await refreshScreen();
-  await refreshWorkView();
-}
-
 async function runBrowserOpenCapability(url) {
   const result = await fetchJson(observerConfig.coreUrl + "/capabilities/invoke", {
     method: "POST",
