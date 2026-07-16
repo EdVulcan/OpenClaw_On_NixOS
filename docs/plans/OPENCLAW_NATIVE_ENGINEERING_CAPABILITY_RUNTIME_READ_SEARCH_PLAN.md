@@ -1,6 +1,6 @@
 # OpenClaw Native Engineering Capability Runtime Read/Search Plan
 
-Updated: 2026-07-15
+Updated: 2026-07-16
 
 ## Active Slice
 
@@ -65,6 +65,15 @@ nix/scripts/dev-observer-capability-invoke-check.sh
 Observer reads the same capability registry and invocation history panels; no
 new UI route or parallel audit surface is needed.
 
+## Observer Common-Path Closure
+
+The existing Observer Read/Search panel now requests its bounded read, glob, and
+grep results through the three common capability ids. It unwraps only the
+transient builder results for the existing renderer, while policy decisions,
+invocation summaries, and capability events remain on the common runtime path.
+The dedicated native adapter routes remain authoritative read models and are
+still covered by the direct route evidence.
+
 ## Governance
 
 ```text
@@ -88,7 +97,8 @@ provider calls and network egress
 
 ## Next Smallest Capability
 
-The Level 1 read/search entry-point gap is closed. Do not add another evidence
-wrapper; return to the smallest real Level 2 trusted work-view/session-helper
-capability when its authority boundary is explicit. Keep workspace scope,
-provider egress, root, and desktop-wide capture boundaries unchanged.
+The Level 1 read/search entry-point and Observer common-path gaps are closed. Do
+not add another evidence wrapper; return to the smallest real Level 2
+trusted work-view/session-helper capability when its authority boundary is
+explicit. Keep workspace scope, provider egress, root, and desktop-wide capture
+boundaries unchanged.

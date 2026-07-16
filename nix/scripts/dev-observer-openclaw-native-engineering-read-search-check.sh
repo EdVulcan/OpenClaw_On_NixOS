@@ -31,7 +31,8 @@ prepare_engineering_read_search_fixture "$WORKSPACE_DIR" "OBSERVER_ENGINEERING_R
 rm -f "$OPENCLAW_CORE_STATE_FILE" "$OPENCLAW_CORE_STATE_FILE.tmp" "$OPENCLAW_EVENT_LOG_FILE"
 
 cleanup() {
-  rm -f "${HTML_FILE:-}" "${CLIENT_FILE:-}" "${READ_FILE:-}" "${GLOB_FILE:-}" "${GREP_FILE:-}"
+  rm -f "${HTML_FILE:-}" "${CLIENT_FILE:-}" "${READ_FILE:-}" "${GLOB_FILE:-}" "${GREP_FILE:-}" \
+    "${READ_CAPABILITY_FILE:-}" "${GLOB_CAPABILITY_FILE:-}" "${GREP_CAPABILITY_FILE:-}"
   "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -43,14 +44,29 @@ CLIENT_FILE="$(mktemp)"
 READ_FILE="$(mktemp)"
 GLOB_FILE="$(mktemp)"
 GREP_FILE="$(mktemp)"
+READ_CAPABILITY_FILE="$(mktemp)"
+GLOB_CAPABILITY_FILE="$(mktemp)"
+GREP_CAPABILITY_FILE="$(mktemp)"
 
 curl --silent --fail "$OBSERVER_URL/" > "$HTML_FILE"
 curl --silent --fail "$OBSERVER_URL/client-v5.js" > "$CLIENT_FILE"
 curl --silent --fail "$CORE_URL/plugins/native-adapter/engineering-read-search/read?relativePath=src/app.ts&startLine=2&endLine=3&maxOutputChars=1000" > "$READ_FILE"
 curl --silent --fail "$CORE_URL/plugins/native-adapter/engineering-read-search/glob?pattern=src/**/*.ts&limit=10" > "$GLOB_FILE"
 curl --silent --fail "$CORE_URL/plugins/native-adapter/engineering-read-search/grep?query=OpenClawNeedle&literal=true&include=**/*.ts&limit=10&maxOutputChars=1200" > "$GREP_FILE"
+curl --silent --fail -X POST "$CORE_URL/capabilities/invoke" \
+  -H 'content-type: application/json' \
+  --data '{"capabilityId":"sense.openclaw.engineering_tool.read","intent":"engineering.read","params":{"relativePath":"src/app.ts","startLine":2,"endLine":3,"maxOutputChars":1000}}' \
+  > "$READ_CAPABILITY_FILE"
+curl --silent --fail -X POST "$CORE_URL/capabilities/invoke" \
+  -H 'content-type: application/json' \
+  --data '{"capabilityId":"sense.openclaw.engineering_tool.glob","intent":"engineering.glob","params":{"pattern":"src/**/*.ts","limit":10}}' \
+  > "$GLOB_CAPABILITY_FILE"
+curl --silent --fail -X POST "$CORE_URL/capabilities/invoke" \
+  -H 'content-type: application/json' \
+  --data '{"capabilityId":"sense.openclaw.engineering_tool.grep","intent":"engineering.grep","params":{"query":"OpenClawNeedle","literal":true,"include":"**/*.ts","limit":10,"maxOutputChars":1200}}' \
+  > "$GREP_CAPABILITY_FILE"
 
-node - <<'EOF' "$HTML_FILE" "$CLIENT_FILE" "$READ_FILE" "$GLOB_FILE" "$GREP_FILE"
+node - <<'EOF' "$HTML_FILE" "$CLIENT_FILE" "$READ_FILE" "$GLOB_FILE" "$GREP_FILE" "$READ_CAPABILITY_FILE" "$GLOB_CAPABILITY_FILE" "$GREP_CAPABILITY_FILE"
 const fs = require("node:fs");
 const readText = (index) => fs.readFileSync(process.argv[index], "utf8");
 const readJson = (index) => JSON.parse(readText(index));
@@ -60,7 +76,10 @@ const client = readText(3);
 const read = readJson(4);
 const glob = readJson(5);
 const grep = readJson(6);
-const raw = JSON.stringify({ html, client, read, glob, grep });
+const readCapability = readJson(7);
+const globCapability = readJson(8);
+const grepCapability = readJson(9);
+const raw = JSON.stringify({ html, client, read, glob, grep, readCapability, globCapability, grepCapability });
 
 for (const token of [
   "OpenClaw Engineering Read/Search",
@@ -76,15 +95,34 @@ for (const token of [
   }
 }
 for (const token of [
-  "/plugins/native-adapter/engineering-read-search/read",
-  "/plugins/native-adapter/engineering-read-search/glob",
-  "/plugins/native-adapter/engineering-read-search/grep",
+  "/capabilities/invoke",
+  "sense.openclaw.engineering_tool.read",
+  "sense.openclaw.engineering_tool.glob",
+  "sense.openclaw.engineering_tool.grep",
+  "engineering.read",
+  "engineering.glob",
+  "engineering.grep",
   "refreshEngineeringReadSearch",
   "renderEngineeringReadSearch",
   "Native governed read/search surface",
 ]) {
   if (!client.includes(token)) {
     throw new Error(`Observer client missing engineering read/search token: ${token}`);
+  }
+}
+for (const [label, capability, id, kind] of [
+  ["read", readCapability, "sense.openclaw.engineering_tool.read", "engineering.read"],
+  ["glob", globCapability, "sense.openclaw.engineering_tool.glob", "engineering.glob"],
+  ["grep", grepCapability, "sense.openclaw.engineering_tool.grep", "engineering.grep"],
+]) {
+  if (
+    !capability.ok
+    || capability.invoked !== true
+    || capability.capability?.id !== id
+    || capability.result?.ok !== true
+    || capability.summary?.kind !== kind
+  ) {
+    throw new Error(`Observer common ${label} capability invocation mismatch: ${JSON.stringify(capability)}`);
   }
 }
 if (

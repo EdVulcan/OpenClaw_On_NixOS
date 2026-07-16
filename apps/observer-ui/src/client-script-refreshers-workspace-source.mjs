@@ -307,12 +307,36 @@ async function refreshEngineeringToolSurface() {
 
 async function refreshEngineeringReadSearch() {
   try {
-    const [read, glob, grep] = await Promise.all([
-      fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/engineering-read-search/read?relativePath=package.json&maxOutputChars=2000\`),
-      fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/engineering-read-search/glob?pattern=**/*.ts&limit=20\`),
-      fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/engineering-read-search/grep?query=openclaw&literal=true&include=**/*&limit=10&maxOutputChars=4000\`),
+    const invoke = (body) => fetchJson(\`\${observerConfig.coreUrl}/capabilities/invoke\`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const [readResponse, globResponse, grepResponse] = await Promise.all([
+      invoke({
+        capabilityId: "sense.openclaw.engineering_tool.read",
+        intent: "engineering.read",
+        params: { relativePath: "package.json", maxOutputChars: 2000 },
+      }),
+      invoke({
+        capabilityId: "sense.openclaw.engineering_tool.glob",
+        intent: "engineering.glob",
+        params: { pattern: "**/*.ts", limit: 20 },
+      }),
+      invoke({
+        capabilityId: "sense.openclaw.engineering_tool.grep",
+        intent: "engineering.grep",
+        params: { query: "openclaw", literal: true, include: "**/*", limit: 10, maxOutputChars: 4000 },
+      }),
     ]);
-    renderEngineeringReadSearch({ read, glob, grep });
+    if ([readResponse, globResponse, grepResponse].some((response) => response.invoked !== true)) {
+      throw new Error("Engineering read/search capability was not invoked.");
+    }
+    renderEngineeringReadSearch({
+      read: readResponse.result ?? {},
+      glob: globResponse.result ?? {},
+      grep: grepResponse.result ?? {},
+    });
   } catch {
     engineeringReadSearchRegistry.textContent = "offline";
     engineeringReadSearchRead.textContent = "0";

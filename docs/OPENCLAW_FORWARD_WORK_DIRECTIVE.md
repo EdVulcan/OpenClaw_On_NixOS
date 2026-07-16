@@ -302,6 +302,10 @@ invocation, and audit events. File bodies and search snippets remain transient
 response data and are absent from persisted capability history. This bridge is
 documented in
 `docs/plans/OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_READ_SEARCH_PLAN.md`.
+The existing Observer Read/Search panel now also requests those three bounded
+results through the common capability runtime, while the dedicated native
+adapter routes remain the detailed read-model owners. The panel adds no write,
+command, LSP, task, approval, provider, or network authority.
 It adds no task, approval, write, command, LSP, provider, or network authority.
 
 The existing `cc_verify` verification-evidence builder is likewise available

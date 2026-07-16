@@ -792,3 +792,10 @@ capability runtime for its existing read-only inventory. It sends
 existing renderer, and leaves the dedicated route as the authoritative builder
 and direct read-model proof. No tool execution, LSP start, mutation, task,
 approval, provider call, or network egress is added.
+
+The existing Observer Read/Search panel now likewise uses the common capability
+runtime for `sense.openclaw.engineering_tool.read`, `.glob`, and `.grep`. It
+unwraps only the transient bounded builder results for the existing renderer;
+workspace limits, invocation/audit evidence, file-content non-persistence, and
+all negative execution boundaries remain owned by the existing native builders
+and common runtime.
