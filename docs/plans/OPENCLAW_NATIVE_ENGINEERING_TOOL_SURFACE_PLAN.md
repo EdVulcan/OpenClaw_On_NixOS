@@ -784,3 +784,11 @@ authoritative readback recommends `prepare_work_view`, the operator can invoke
 the existing allowlisted prepare action from that panel and receive a refreshed
 association. No new endpoint, bind variant, automatic recovery, action replay,
 provider call, or arbitrary endpoint execution was added.
+
+The native engineering tool surface Observer panel now also uses the common
+capability runtime for its existing read-only inventory. It sends
+`sense.openclaw.engineering_tool_surface_inventory` through
+`/capabilities/invoke`, unwraps only the transient detailed inventory for the
+existing renderer, and leaves the dedicated route as the authoritative builder
+and direct read-model proof. No tool execution, LSP start, mutation, task,
+approval, provider call, or network egress is added.

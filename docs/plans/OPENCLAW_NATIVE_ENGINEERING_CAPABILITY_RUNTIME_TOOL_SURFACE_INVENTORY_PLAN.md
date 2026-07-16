@@ -31,6 +31,16 @@ The dedicated route remains the detailed inventory read model and continues to
 own source-contract evidence. No source body, package content, or tool output
 is copied into invocation history or audit events.
 
+## Observer Common-Path Closure
+
+The existing Observer engineering tool surface panel now requests the inventory
+through `POST /capabilities/invoke` using
+`sense.openclaw.engineering_tool_surface_inventory`. It unwraps only the
+transient detailed result for the existing panel renderer; policy, invocation,
+and capability-event evidence remains on the common runtime path. The direct
+inventory route remains a read-model proof and builder owner, not a second UI
+execution path.
+
 ## Governance
 
 ```text
@@ -73,6 +83,6 @@ declarative host mutation, root/system daemon work, and desktop-wide capture
 
 ## Next Smallest Capability
 
-Keep the inventory bridge read-only. Select the next concrete local capability
-from the forward directive after this declared/runtime contract is proven; do
-not turn the inventory into a generic tool dispatcher.
+Keep the inventory and Observer bridge read-only. Select the next concrete local
+capability from the forward directive after this declared/runtime contract is
+proven; do not turn the inventory into a generic tool dispatcher or action proxy.

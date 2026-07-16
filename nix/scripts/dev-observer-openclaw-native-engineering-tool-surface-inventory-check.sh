@@ -31,7 +31,7 @@ prepare_engineering_tool_surface_fixture "$WORKSPACE_DIR" "OBSERVER_ENGINEERING_
 rm -f "$OPENCLAW_CORE_STATE_FILE" "$OPENCLAW_CORE_STATE_FILE.tmp" "$OPENCLAW_EVENT_LOG_FILE"
 
 cleanup() {
-  rm -f "${HTML_FILE:-}" "${CLIENT_FILE:-}" "${INVENTORY_FILE:-}"
+  rm -f "${HTML_FILE:-}" "${CLIENT_FILE:-}" "${INVENTORY_FILE:-}" "${CAPABILITY_FILE:-}"
   "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -41,12 +41,17 @@ trap cleanup EXIT
 HTML_FILE="$(mktemp)"
 CLIENT_FILE="$(mktemp)"
 INVENTORY_FILE="$(mktemp)"
+CAPABILITY_FILE="$(mktemp)"
 
 curl --silent --fail "$OBSERVER_URL/" > "$HTML_FILE"
 curl --silent --fail "$OBSERVER_URL/client-v5.js" > "$CLIENT_FILE"
 curl --silent --fail "$CORE_URL/plugins/native-adapter/engineering-tool-surface" > "$INVENTORY_FILE"
+curl --silent --fail -X POST "$CORE_URL/capabilities/invoke" \
+  -H 'content-type: application/json' \
+  --data '{"capabilityId":"sense.openclaw.engineering_tool_surface_inventory","intent":"engineering.tool_surface_inventory"}' \
+  > "$CAPABILITY_FILE"
 
-node - <<'EOF' "$HTML_FILE" "$CLIENT_FILE" "$INVENTORY_FILE"
+node - <<'EOF' "$HTML_FILE" "$CLIENT_FILE" "$INVENTORY_FILE" "$CAPABILITY_FILE"
 const fs = require("node:fs");
 const readText = (index) => fs.readFileSync(process.argv[index], "utf8");
 const readJson = (index) => JSON.parse(readText(index));
@@ -54,7 +59,8 @@ const readJson = (index) => JSON.parse(readText(index));
 const html = readText(2);
 const client = readText(3);
 const inventory = readJson(4);
-const raw = JSON.stringify({ html, client, inventory });
+const capability = readJson(5);
+const raw = JSON.stringify({ html, client, inventory, capability });
 
 for (const token of [
   "OpenClaw Engineering Tool Surface",
@@ -70,7 +76,9 @@ for (const token of [
   }
 }
 for (const token of [
-  "/plugins/native-adapter/engineering-tool-surface",
+  "/capabilities/invoke",
+  "sense.openclaw.engineering_tool_surface_inventory",
+  "engineering.tool_surface_inventory",
   "refreshEngineeringToolSurface",
   "renderEngineeringToolSurface",
   "Native governed engineering tool surface inventory",
@@ -79,6 +87,18 @@ for (const token of [
   if (!client.includes(token)) {
     throw new Error(`Observer client missing engineering tool surface token: ${token}`);
   }
+}
+if (
+  !capability.ok
+  || capability.invoked !== true
+  || capability.capability?.id !== "sense.openclaw.engineering_tool_surface_inventory"
+  || capability.result?.registry !== "openclaw-native-engineering-tool-surface-inventory-v0"
+  || capability.summary?.kind !== "engineering.tool_surface_inventory"
+  || capability.summary?.noToolExecution !== true
+  || capability.summary?.noMutation !== true
+  || capability.summary?.noProviderEgress !== true
+) {
+  throw new Error(`Observer common capability inventory invocation mismatch: ${JSON.stringify(capability)}`);
 }
 if (
   !inventory.ok

@@ -236,14 +236,13 @@ rate, latest outcome, and a safe next-action suggestion from matching terminal
 history. This is experience absorption, not automatic code self-modification;
 the pattern and suggestion remain advisory and cannot execute anything.
 
-The first Level 2 observation-to-decision bridge is now also complete. The
-existing trusted work-view association derives a read-only semantic-action
-readiness decision only when task binding, active authority, fresh capture, and
-visual/inventory frame provenance agree. Observer and Context Packet show the
-bounded reason and existing recovery control; no target item, selector, action
-parameter, task, approval, dispatch, provider call, or network egress is added.
-The next slice is one explicitly approved semantic click through the existing
-browser action owner with a fresh frame-scoped revalidation.
+The first Level 2 observation-to-decision bridge and the existing Core semantic
+action handoff are complete. The trusted work-view association requires task
+binding, active authority, fresh capture, and visual/inventory frame provenance;
+the approved semantic click and write-only semantic type paths then revalidate
+the current frame through the existing browser action owner. Observer and
+Context Packet retain only bounded reasons and recovery controls. Do not reopen
+the completed browser eye-hand variants or add another action/readiness shell.
 
 The planning workbench contract is now closed through the common capability
 runtime as well as its dedicated routes. `sense.openclaw.engineering_context.plan_todo_evidence`

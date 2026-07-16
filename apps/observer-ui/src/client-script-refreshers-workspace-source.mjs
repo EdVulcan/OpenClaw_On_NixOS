@@ -282,8 +282,19 @@ async function refreshToolCatalogAdapter() {
 
 async function refreshEngineeringToolSurface() {
   try {
-    const data = await fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/engineering-tool-surface\`);
-    renderEngineeringToolSurface(data);
+    const response = await fetchJson(\`\${observerConfig.coreUrl}/capabilities/invoke\`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        capabilityId: "sense.openclaw.engineering_tool_surface_inventory",
+        intent: "engineering.tool_surface_inventory",
+        params: {},
+      }),
+    });
+    if (response.invoked !== true) {
+      throw new Error("Engineering tool surface inventory capability was not invoked.");
+    }
+    renderEngineeringToolSurface(response.result ?? {});
   } catch {
     engineeringToolSurfaceRegistry.textContent = "offline";
     engineeringToolSurfaceTools.textContent = "0";
