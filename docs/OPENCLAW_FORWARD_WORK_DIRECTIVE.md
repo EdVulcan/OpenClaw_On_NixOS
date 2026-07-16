@@ -298,11 +298,12 @@ existing Phase 63 egress task-shell check. Provider egress remains explicitly
 operator-approved; the draft cannot create tasks or approvals, execute controls,
 write files, or change the workspace by itself.
 
-The next route is a concrete Level 2 trusted work-view/session-helper operator
-gap selected from current bounded observation. Do not add another provider
-response schema, readiness marker, LSP variant, or browser action family unless
-the evidence demonstrates a decision that the existing owner and recovery
-controls cannot make.
+The next route was a concrete Level 2 trusted work-view/session-helper operator
+gap selected from current bounded observation. That bounded route is now closed;
+do not add another provider response schema, readiness marker, LSP variant, or
+browser action family unless the evidence demonstrates a decision that the
+existing owner and recovery controls cannot make. Continue with the next
+separately justified Level 3 host capability.
 
 The first concrete Level 2 gap selected from that route was the recovery
 decision exposed by trusted work-view observation. It is now closed without a
@@ -938,6 +939,18 @@ unit intentionally not observed there, an unexpected system copy, and an
 actual system-bus observation failure. The existing Observer inventory renders
 compact matched/mismatch/unresolved scope counts. This remains read-only and
 does not add a user-bus proxy, hostd capability, approval, task, or mutation.
+
+That separately justified Phase B capability is now implemented and locally
+proven for one concrete operator gap: the foundational
+`openclaw-event-hub.service` can be selected in the existing approved
+next-repair task and is bound to the same descriptor-bound `openclaw-hostd`
+socket as system-sense. Core re-reads native inventory before task creation,
+hostd accepts only the two fixed operation/unit pairs, and Nix expands the
+descriptor into exact Polkit rules. Focused tests and generated closure checks
+prove this contract; the switched VM has real system-sense execution evidence,
+but event-hub host mutation has not yet been run. Unknown units, automatic
+restart, arbitrary D-Bus arguments, and direct command fallback remain blocked;
+event-hub execution remains an explicit approval and Operator Step/Run boundary.
 
 The Level 1 live-plugin-refresh migration now owns a real fixed-registry
 generation lifecycle. An approved existing refresh task builds and validates a

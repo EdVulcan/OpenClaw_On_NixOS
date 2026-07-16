@@ -60,14 +60,16 @@ async function createSystemdRepairCandidateTaskShell() {
 }
 
 async function createSystemdNextRepairTaskShell() {
+  const targetUnit = systemdNextRepairTargetUnit?.value ?? "openclaw-system-sense.service";
   const result = await fetchJson(\`\${observerConfig.coreUrl}/system/systemd/next-repair-tasks\`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       confirm: true,
+      targetUnit,
     }),
   });
-  setControlMessage(\`Next systemd repair task shell queued: \${result.task?.id ?? "unknown"} approval=\${result.approval?.id ?? "none"} approvalState=pending-after-create mutation=\${Boolean(result.governance?.hostMutation)}\`);
+  setControlMessage(\`Next systemd repair task shell queued for \${targetUnit}: \${result.task?.id ?? "unknown"} approval=\${result.approval?.id ?? "none"} approvalState=pending-after-create mutation=\${Boolean(result.governance?.hostMutation)}\`);
   taskHistoryFocus = "selected-task";
   selectedHistoryTaskId = result.task?.id ?? null;
   taskDetailIdInput.value = result.task?.id ?? "";
@@ -82,15 +84,17 @@ async function createSystemdNextRepairTaskShell() {
 }
 
 async function createSystemdNextRepairRealExecutionTask() {
+  const targetUnit = systemdNextRepairTargetUnit?.value ?? "openclaw-system-sense.service";
   const result = await fetchJson(\`\${observerConfig.coreUrl}/system/systemd/next-repair-tasks\`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       confirm: true,
       execute: true,
+      targetUnit,
     }),
   });
-  setControlMessage(\`Next systemd repair real execution task queued: \${result.task?.id ?? "unknown"} approval=\${result.approval?.id ?? "none"} realExecutionEnabled=\${Boolean(result.governance?.realExecutionEnabled)}\`);
+  setControlMessage(\`Next systemd repair real execution task queued for \${targetUnit}: \${result.task?.id ?? "unknown"} approval=\${result.approval?.id ?? "none"} realExecutionEnabled=\${Boolean(result.governance?.realExecutionEnabled)}\`);
   taskHistoryFocus = "selected-task";
   selectedHistoryTaskId = result.task?.id ?? null;
   taskDetailIdInput.value = result.task?.id ?? "";

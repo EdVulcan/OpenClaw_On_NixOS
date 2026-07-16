@@ -5,7 +5,7 @@ import { createNativePluginRuntimeRefreshTaskHandlers } from "./task-executor-na
 import { createNativeAcpxCodexBridgeTaskHandlers } from "./task-executor-native-acpx-codex-bridge-handlers.mjs";
 import { createNativeEngineeringLspLifecycleTaskHandlers } from "./native-engineering-lsp-lifecycle-tasks.mjs";
 import { createSystemBodyTaskHandlers } from "./task-executor-system-body-handlers.mjs";
-import { requestHostdSystemSenseRestart } from "./hostd-control-client.mjs";
+import { requestHostdRestart } from "./hostd-control-client.mjs";
 import { planCapabilityActionSteps } from "./task-recovery.mjs";
 import {
   browserTaskActionsForExecution,
@@ -41,7 +41,7 @@ export function createTaskExecutor(deps) {
     workspaceOps,
     policyEvaluator,
     publishEvent,
-    hostdControlClient = requestHostdSystemSenseRestart,
+    hostdControlClient = requestHostdRestart,
     buildExperienceMemoryReadModel = () => null,
     readWorkViewState = readNativeEngineeringWorkViewState,
   } = deps;

@@ -4,13 +4,14 @@
 
 Advance kernel-whitepaper Phase B by replacing command-line `systemctl`
 wrappers with a native Node.js D-Bus boundary. Start with real read-only systemd
-unit inventory from the local system bus, then prove one fixed Polkit-authorized
-restart through the existing governed repair lifecycle.
+unit inventory from the local system bus, then prove fixed Polkit-authorized
+restarts through the existing governed repair lifecycle.
 
-The fixed restart is now owned by a dedicated `openclaw-hostd` system service.
+The fixed restarts are now owned by a dedicated `openclaw-hostd` system service.
 Core reaches it through a bounded Unix socket protocol, and hostd accepts only
-the fixed system-sense restart capability. This boundary is deliberately
-smaller than a general systemd RPC surface.
+the two descriptor-backed OpenClaw restart capabilities for system-sense and
+event-hub. This boundary remains deliberately smaller than a general systemd
+RPC surface.
 
 ## Phase A Prerequisite
 
@@ -84,17 +85,20 @@ does not shell out to `systemctl`.
 
 ## Second Slice: Fixed Native Restart
 
-The fixed native restart behavior and its owner split are proven in the switched
-VM generation:
+The fixed native restart owner split and the original system-sense restart are
+proven in the switched VM generation. This slice extends the same contract to
+the fixed event-hub target; its protocol, task, hostd, Nix, and Polkit evidence
+is locally proven below, while the real event-hub mutation remains a separate
+operator-approved VM check.
 
 1. Desktop system services run as the dedicated `openclaw-service` account
    instead of root; session-manager and browser-runtime remain user-manager
    services.
 2. A dedicated `openclaw-hostd` store-native service account owns the fixed
-   hostd process and its Polkit subject. It accepts one no-argument restart
-   capability and invokes only
-   `org.freedesktop.systemd1.Manager.RestartUnit` for
-   `openclaw-system-sense.service` with mode `replace`.
+   hostd process and its Polkit subject. It accepts only the descriptor-backed
+   no-argument restart capabilities for `openclaw-system-sense.service` and
+   `openclaw-event-hub.service`, and invokes only
+   `org.freedesktop.systemd1.Manager.RestartUnit` with mode `replace`.
 3. The helper waits for the unit to return to `active/running` with a different
    main PID, then returns compact job and before/after evidence.
 4. Polkit grants only `org.freedesktop.systemd1.manage-units` when unit,
@@ -129,12 +133,15 @@ full body-config gates prove Nix/Polkit evaluation and all store closures. The
 existing core and Observer real-execution milestones now require successful
 native transport rather than accepting a failed attempt.
 
-The switched generation now proves two separately approved executions, one
-through the core milestone and one through the Observer milestone. Both returned
-exit zero, an `org.freedesktop.systemd1` job path, changed positive main PIDs,
-restored readiness, `polkit-dbus-fixed-unit`, and the fixed hostd store closure
-with no sudo or direct systemctl execution. Core ran as `openclaw-service` while
-the Polkit subject and hostd process ran as `openclaw-hostd`.
+The switched generation proves the original system-sense execution through the
+core and Observer milestones: both returned exit zero, an
+`org.freedesktop.systemd1` job path, changed positive main PIDs, restored
+readiness, `polkit-dbus-fixed-unit`, and the fixed hostd store closure with no
+sudo or direct systemctl execution. Core ran as `openclaw-service` while the
+Polkit subject and hostd process ran as `openclaw-hostd`. The event-hub
+extension has not been run against a real host during this development slice;
+its focused tests, closure builds, generated authorization, and operator
+boundary are the current evidence.
 
 ## Completed Hostd Boundary
 
@@ -145,7 +152,9 @@ group for request submission, while only the hostd identity matches the fixed
 Polkit rule. The accepted socket FD now passes through a fixed Nix-native
 `SO_PEERCRED` helper that matches `openclaw-service` and `openclaw` before the
 request handler runs. The protocol rejects unknown fields, arbitrary units,
-arbitrary methods, non-fixed operations, and mismatched peer identities. The
+arbitrary methods, non-descriptor operations, and mismatched peer identities.
+The shared JSON descriptor is the source for the runtime allowlist; the Nix
+module expands the same fixed units into the Polkit rule. The
 hostd response carries the request id, owner, transport, method, unit, job path,
 before/after PID evidence, and compact kernel-peer verification state; the core
 client rejects a response whose request id or peer evidence does not match the
@@ -153,8 +162,10 @@ request it sent.
 
 Focused hostd tests, core executor tests, auth-delegation checks, Nix closure
 builds, body configuration, a real helper socket check, and the switched
-core/Observer milestones prove the owner/socket contract. No new public route
-or arbitrary privileged API was added.
+core/Observer milestones prove the owner/socket contract. The event-hub target
+has local protocol and generated-authorization proof but still needs the
+explicit real execution check. No new public route or arbitrary privileged API
+was added.
 
 ## Third Slice: Live Dependency Evidence
 
@@ -198,18 +209,47 @@ login-session ownership path. Unexpected system copies are explicit
 `unexpected_system_unit` evidence. No user-bus proxy, hostd operation, new
 D-Bus method, task, approval, mutation, or route was added.
 
+## Fifth Slice: Fixed Event-Hub Recovery
+
+The system-sense restart was sufficient to prove the first native mutation, but
+it could not recover its upstream event hub even though the existing inventory
+and dependency map identify `openclaw-event-hub.service` as a foundational body
+unit. This slice closes that concrete Level 3 gap through the same lifecycle:
+
+```text
+Observer selects fixed event-hub target
+-> Core re-reads native unit inventory
+-> queued approval-gated next-repair task records capability binding
+-> explicit approval and Operator Step/Run remain required
+-> Core sends the descriptor operation through hostd
+-> hostd verifies peer identity and exact target before native D-Bus restart
+-> post-verification reports event-hub state and changed PID
+```
+
+The shared descriptor is
+`packages/shared-systemd/src/openclaw-hostd-capabilities.json`. The default
+system-sense route remains backward compatible. Unknown units, operation/target
+mismatches, direct systemctl fallback, automatic restart, arbitrary D-Bus
+arguments, and user-owned units remain rejected. Focused Core/hostd tests prove
+the positive event-hub path and negative allowlist/peer boundaries. Real host
+mutation remains an explicit operator action and was not run during development
+validation.
+
 ## Deferred
 
-- D-Bus start/stop/reload operations and any restart target other than the fixed
-  system-sense unit.
-- Any hostd capability beyond the fixed system-sense restart, including
-  arbitrary unit names, methods, arguments, or caller-supplied D-Bus paths.
+- D-Bus start/stop/reload operations and restart targets outside the two fixed
+  descriptor entries.
+- Any hostd capability beyond the fixed system-sense and event-hub restarts,
+  including arbitrary unit names, methods, arguments, or caller-supplied D-Bus
+  paths.
 - eBPF kernel event transport and declarative Nix self-evolution.
 
 ## Next Slice
 
-The fixed Level 3 hostd socket boundary is now complete for peer identity:
-future work must keep the native helper, exact user/group match, and compact
-verified/matched readback. Continue with a separately justified capability
+The fixed Level 3 hostd socket contract is complete for the two allowlisted
+restart capabilities; real VM evidence is complete for system-sense and
+deferred for event-hub until its explicit execution check. Future work must keep
+the native helper, exact user/group match, compact verified/matched readback,
+and descriptor-bound target. Continue with a separately justified capability
 behind the existing hostd owner; do not broaden this fixed restart into an
 arbitrary systemd control API.

@@ -1,5 +1,9 @@
 import { randomUUID } from "node:crypto";
 import net from "node:net";
+import {
+  HOSTD_RESTART_CAPABILITY_REGISTRY,
+  hostdRestartCapabilityForTarget,
+} from "../../../packages/shared-systemd/src/openclaw-hostd-capabilities.mjs";
 
 export const OPENCLAW_HOSTD_SOCKET_PATH_ENV = "OPENCLAW_HOSTD_SOCKET_PATH";
 export const DEFAULT_OPENCLAW_HOSTD_SOCKET_PATH = "/run/openclaw/hostd.sock";
@@ -26,7 +30,8 @@ function parseResponse(line, expectedRequestId) {
   }
   if (!response || typeof response !== "object" || Array.isArray(response)
     || response.registry !== HOSTD_RESPONSE_REGISTRY
-    || response.protocolVersion !== HOSTD_PROTOCOL_VERSION) {
+    || response.protocolVersion !== HOSTD_PROTOCOL_VERSION
+    || (response.ok === true && response.capability?.registry !== HOSTD_RESTART_CAPABILITY_REGISTRY)) {
     throw new Error("OpenClaw hostd returned an invalid protocol response.");
   }
   if (response.requestId !== expectedRequestId) {
@@ -35,17 +40,23 @@ function parseResponse(line, expectedRequestId) {
   return response;
 }
 
-export async function requestHostdSystemSenseRestart({
+export async function requestHostdRestart({
   socketPath = process.env[OPENCLAW_HOSTD_SOCKET_PATH_ENV] ?? DEFAULT_OPENCLAW_HOSTD_SOCKET_PATH,
+  targetUnit = HOSTD_TARGET_UNIT,
+  operation = null,
   requestId = randomUUID(),
   timeoutMs = DEFAULT_TIMEOUT_MS,
   createConnection = net.createConnection,
 } = {}) {
   const targetSocketPath = boundedSocketPath(socketPath);
+  const capability = hostdRestartCapabilityForTarget(targetUnit);
+  if (!capability || (operation !== null && operation !== capability.operation)) {
+    throw new Error(`OpenClaw hostd client rejects restart target ${targetUnit}.`);
+  }
   const request = JSON.stringify({
     version: HOSTD_PROTOCOL_VERSION,
-    operation: HOSTD_REQUEST_OPERATION,
-    target: HOSTD_TARGET_UNIT,
+    operation: capability.operation,
+    target: capability.targetUnit,
     requestId,
   });
   if (Buffer.byteLength(request, "utf8") > HOSTD_REQUEST_MAX_BYTES) {
@@ -96,3 +107,11 @@ export async function requestHostdSystemSenseRestart({
     socket.on("connect", () => socket.end(`${request}\n`));
   });
 }
+
+export const requestHostdSystemSenseRestart = (options = {}) => requestHostdRestart({
+  ...options,
+  targetUnit: HOSTD_TARGET_UNIT,
+  operation: HOSTD_REQUEST_OPERATION,
+});
+
+export { HOSTD_RESTART_CAPABILITY_REGISTRY };

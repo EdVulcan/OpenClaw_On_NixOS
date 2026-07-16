@@ -2,14 +2,15 @@ import { createHash, randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { createEventName } from "../../../packages/shared-events/src/event-factory.mjs";
-import { requestHostdSystemSenseRestart } from "./hostd-control-client.mjs";
+import { hostdRestartCapabilityForTarget } from "../../../packages/shared-systemd/src/openclaw-hostd-capabilities.mjs";
+import { requestHostdRestart } from "./hostd-control-client.mjs";
 
 export function createSystemBodyTaskHandlers({
   client,
   state,
   taskManager,
   publishEvent,
-  hostdControlClient = requestHostdSystemSenseRestart,
+  hostdControlClient = requestHostdRestart,
 }) {
   const { fetchJson, postJson, systemSenseUrl } = client;
   const {
@@ -191,12 +192,13 @@ export function createSystemBodyTaskHandlers({
     const repair = task.systemdRepair ?? task.systemdNextRepair ?? {};
     const command = repair.command ?? {};
     const requestedArgs = Array.isArray(command.args) ? command.args : ["restart", repair.target?.unit ?? SYSTEMD_REPAIR_REAL_EXECUTION_UNIT];
+    const targetCapability = hostdRestartCapabilityForTarget(repair.target?.unit ?? null);
     const useHostd = Boolean(
       HOSTD_SOCKET_PATH
-      && repair.target?.unit === SYSTEMD_NEXT_REPAIR_REAL_EXECUTION_UNIT
+      && targetCapability
       && command.command === "systemctl"
       && requestedArgs[0] === "restart"
-      && requestedArgs[1] === SYSTEMD_NEXT_REPAIR_REAL_EXECUTION_UNIT
+      && requestedArgs[1] === targetCapability.targetUnit
     );
     const args = [];
     const authDelegation = useHostd
@@ -208,7 +210,7 @@ export function createSystemBodyTaskHandlers({
           transport: "unix_socket",
           method: "org.freedesktop.systemd1.Manager.RestartUnit",
           passwordPromptAllowed: false,
-          scope: "restart openclaw-system-sense.service only",
+          scope: `restart ${targetCapability?.targetUnit ?? "allowlisted OpenClaw unit"} only`,
         }
       : {
           mode: "hostd-control-required",
@@ -244,6 +246,8 @@ export function createSystemBodyTaskHandlers({
       const hostdResponse = await hostdControlClient({
         socketPath: HOSTD_SOCKET_PATH,
         timeoutMs: SYSTEMD_REPAIR_EXECUTION_TIMEOUT_MS,
+        targetUnit: targetCapability.targetUnit,
+        operation: targetCapability.operation,
       });
       const nativeMutation = hostdResponse?.nativeMutation;
       const peerIdentity = compactHostdPeerIdentity(hostdResponse);
@@ -254,7 +258,8 @@ export function createSystemBodyTaskHandlers({
         || nativeMutation.owner !== "openclaw-hostd"
         || nativeMutation.transport !== "dbus_native"
         || nativeMutation.method !== "org.freedesktop.systemd1.Manager.RestartUnit"
-        || nativeMutation.unit !== SYSTEMD_NEXT_REPAIR_REAL_EXECUTION_UNIT
+        || nativeMutation.unit !== targetCapability.targetUnit
+        || nativeMutation.capability?.capabilityId !== targetCapability.capabilityId
         || !String(nativeMutation.jobPath).startsWith("/org/freedesktop/systemd1/job/")
         || !Number.isInteger(nativeMutation.before?.mainPid)
         || !Number.isInteger(nativeMutation.after?.mainPid)
@@ -1053,13 +1058,14 @@ export function createSystemBodyTaskHandlers({
 
   async function executeSystemdNextRepairTask(task) {
     const targetUnit = task.systemdNextRepair?.target?.unit ?? null;
-    if (targetUnit !== SYSTEMD_NEXT_REPAIR_REAL_EXECUTION_UNIT) {
-      throw new Error(`Next real systemd repair execution is limited to ${SYSTEMD_NEXT_REPAIR_REAL_EXECUTION_UNIT}.`);
+    const targetCapability = hostdRestartCapabilityForTarget(targetUnit);
+    if (!targetCapability) {
+      throw new Error(`Next real systemd repair execution is not supported by hostd for ${targetUnit}.`);
     }
 
     const command = task.systemdNextRepair?.command ?? {};
     const args = Array.isArray(command.args) ? command.args : [];
-    if (command.command !== "systemctl" || args[0] !== "restart" || args[1] !== SYSTEMD_NEXT_REPAIR_REAL_EXECUTION_UNIT) {
+    if (command.command !== "systemctl" || args[0] !== "restart" || args[1] !== targetCapability.targetUnit) {
       throw new Error(`Unexpected next systemd repair command: ${JSON.stringify(command)}`);
     }
 

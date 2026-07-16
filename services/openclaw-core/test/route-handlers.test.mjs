@@ -1106,6 +1106,42 @@ test("egress task route forwards only the allowlisted live provider binding inpu
   assert.equal(response.body.task.id, "egress-task");
 });
 
+test("next-repair task route forwards the explicit fixed hostd target", async () => {
+  let observedInput = null;
+  const deps = createBaseDeps({
+    planBuilder: {
+      createSystemdNextRepairTaskShell: async (input) => {
+        observedInput = input;
+        return {
+          registry: "openclaw-systemd-next-repair-real-execution-v0",
+          mode: "test",
+          generatedAt: "2026-07-17T01:20:00.000Z",
+          sourceRegistry: "openclaw-hostd-fixed-restart-route-v0",
+          routeGate: { routeDecision: { targetUnit: "openclaw-event-hub.service" } },
+          task: { id: "event-hub-repair-task" },
+          approval: { id: "event-hub-repair-approval" },
+          governance: {},
+        };
+      },
+    },
+  });
+
+  const response = await invokeRoute(deps, "POST", "/system/systemd/next-repair-tasks", {
+    confirm: true,
+    execute: true,
+    targetUnit: "openclaw-event-hub.service",
+    ignored: "not forwarded",
+  });
+
+  assert.equal(response.statusCode, 201, JSON.stringify(response.body));
+  assert.deepEqual(observedInput, {
+    confirm: true,
+    execute: true,
+    targetUnit: "openclaw-event-hub.service",
+  });
+  assert.equal(response.body.task.id, "event-hub-repair-task");
+});
+
 test("control stop route fails current task and emits task failed event", async () => {
   const task = { id: "task-stop", status: "running", updatedAt: "2026-07-08T00:00:00.000Z" };
   const phases = [];

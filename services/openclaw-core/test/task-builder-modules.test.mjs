@@ -103,6 +103,48 @@ test("native systemd execution task uses observed inventory without historical l
   assert.equal(result.governance.hostMutation, false);
 });
 
+test("native hostd task builder accepts only the fixed event-hub recovery target", async () => {
+  const { deps, fetchUrls } = createTaskLifecycleHarness({
+    fetchJson: () => ({
+      registry: "openclaw-systemd-unit-inventory-v0",
+      observedAt: "2026-07-17T01:20:00.000Z",
+      source: { transport: "dbus_native" },
+      units: [{
+        unit: "openclaw-event-hub.service",
+        loadState: "loaded",
+        activeState: "active",
+        systemdObserved: true,
+      }],
+    }),
+  });
+  const builders = createSystemdTaskBuilders(deps);
+
+  const result = await builders.createSystemdNextRepairTaskShell({
+    confirm: true,
+    execute: true,
+    targetUnit: "openclaw-event-hub.service",
+  });
+
+  assert.deepEqual(fetchUrls, ["http://127.0.0.1:4106/system/systemd/units"]);
+  assert.equal(result.task.systemdNextRepair.target.unit, "openclaw-event-hub.service");
+  assert.deepEqual(result.task.systemdNextRepair.capability, {
+    registry: "openclaw-hostd-restart-capability-v1",
+    operation: "restart_event_hub",
+    capabilityId: "hostd.restart_event_hub",
+  });
+  assert.equal(result.routeGate.registry, "openclaw-hostd-fixed-restart-route-v0");
+  assert.equal(result.approval.status, "pending");
+
+  await assert.rejects(
+    builders.createSystemdNextRepairTaskShell({
+      confirm: true,
+      execute: true,
+      targetUnit: "ssh.service",
+    }),
+    /not allowlisted/u,
+  );
+});
+
 test("native systemd execution task fails closed without the fixed helper authorization", async () => {
   const { deps, fetchUrls } = createTaskLifecycleHarness();
   const buildersWithoutHostd = createSystemdTaskBuilders({

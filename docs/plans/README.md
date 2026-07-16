@@ -212,6 +212,16 @@ explicit Observer review and the existing semantic-click planner. Its compact
 provenance and deferred boundaries are recorded in
 `OPENCLAW_NATIVE_ENGINEERING_PROVIDER_RECOMMENDATION_SEMANTIC_TASK_LINK_PLAN.md`.
 
+The first post-Level-2 hostd capability is now implemented and locally proven.
+The existing approval-gated next-repair task can explicitly select the fixed
+`openclaw-event-hub.service` recovery target, while the default
+`openclaw-system-sense.service` route remains compatible. Core and hostd share
+the descriptor-bound operation, Nix expands the same units into Polkit, and
+Observer exposes the selection without accepting arbitrary units or automatic
+restart. System-sense retains real switched-VM execution evidence; event-hub
+real mutation remains pending its explicit operator-approved check. The
+detailed record is in `OPENCLAW_DBUS_NATIVE_SYSTEMD_CONTROL_PLAN.md`.
+
 The active Level 2 bridge is documented in:
 
 ```text

@@ -1,5 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { HOSTD_RESTART_METHOD, HOSTD_TARGET_UNIT, runFixedSystemdRestart } from "./systemd-hostd-control.mjs";
+import {
+  HOSTD_RESTART_CAPABILITY_REGISTRY,
+  findHostdRestartCapability,
+} from "../../../packages/shared-systemd/src/openclaw-hostd-capabilities.mjs";
 
 export const HOSTD_PROTOCOL_VERSION = 1;
 export const HOSTD_REQUEST_MAX_BYTES = 8192;
@@ -57,9 +61,12 @@ export function parseHostdRequest(line) {
   if (Object.keys(request).some((key) => !ALLOWED_REQUEST_KEYS.has(key))) {
     return { ok: false, response: errorResponse({ code: "unknown_field", error: "Hostd request contains an unsupported field." }) };
   }
+  const capability = findHostdRestartCapability({
+    operation: request.operation,
+    targetUnit: request.target,
+  });
   if (request.version !== HOSTD_PROTOCOL_VERSION
-    || request.operation !== HOSTD_REQUEST_OPERATION
-    || request.target !== HOSTD_TARGET_UNIT
+    || !capability
     || typeof request.requestId !== "string"
     || !REQUEST_ID_PATTERN.test(request.requestId)) {
     return {
@@ -67,7 +74,7 @@ export function parseHostdRequest(line) {
       response: errorResponse({
         requestId: typeof request.requestId === "string" ? request.requestId : null,
         code: "unsupported_capability",
-        error: "Hostd accepts only the fixed system-sense restart capability.",
+        error: "Hostd accepts only a fixed allowlisted OpenClaw restart capability.",
       }),
     };
   }
@@ -83,6 +90,10 @@ export function createHostdRequestHandler({
     if (!parsed.ok) return parsed.response;
 
     const { request } = parsed;
+    const capability = findHostdRestartCapability({
+      operation: request.operation,
+      targetUnit: request.target,
+    });
     if (requirePeerIdentity && (peerIdentity?.verified !== true || peerIdentity?.matched !== true)) {
       return errorResponse({
         requestId: request.requestId,
@@ -92,12 +103,15 @@ export function createHostdRequestHandler({
       });
     }
     try {
-      const nativeMutation = await runRestart({ args: [] });
+      const nativeMutation = await runRestart({ args: [], unit: capability.targetUnit });
       if (nativeMutation?.ok !== true
         || nativeMutation.owner !== "openclaw-hostd"
         || nativeMutation.transport !== "dbus_native"
         || nativeMutation.method !== HOSTD_RESTART_METHOD
-        || nativeMutation.unit !== HOSTD_TARGET_UNIT) {
+        || nativeMutation.unit !== capability.targetUnit
+        || nativeMutation.capability?.registry !== HOSTD_RESTART_CAPABILITY_REGISTRY
+        || nativeMutation.capability?.operation !== capability.operation
+        || nativeMutation.capability?.capabilityId !== capability.capabilityId) {
         return errorResponse({
           requestId: request.requestId,
           code: "invalid_mutation_evidence",
@@ -114,7 +128,12 @@ export function createHostdRequestHandler({
         owner: "openclaw-hostd",
         transport: "unix_socket",
         method: HOSTD_RESTART_METHOD,
-        unit: HOSTD_TARGET_UNIT,
+        unit: capability.targetUnit,
+        capability: {
+          registry: HOSTD_RESTART_CAPABILITY_REGISTRY,
+          operation: capability.operation,
+          capabilityId: capability.capabilityId,
+        },
         nativeMutation,
         governance: {
           ...buildHostdGovernance(peerIdentity),

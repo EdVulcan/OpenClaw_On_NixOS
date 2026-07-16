@@ -1,0 +1,15 @@
+{
+  "registry": "openclaw-hostd-restart-capability-v1",
+  "capabilities": [
+    {
+      "operation": "restart_system_sense",
+      "targetUnit": "openclaw-system-sense.service",
+      "capabilityId": "hostd.restart_system_sense"
+    },
+    {
+      "operation": "restart_event_hub",
+      "targetUnit": "openclaw-event-hub.service",
+      "capabilityId": "hostd.restart_event_hub"
+    }
+  ]
+}

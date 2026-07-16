@@ -1800,9 +1800,11 @@ test("approved next systemd repair executes only through the fixed hostd boundar
         },
         postJson: async () => ({ ok: true }),
       },
-      hostdControlClient: async ({ socketPath, timeoutMs }) => {
+      hostdControlClient: async ({ socketPath, timeoutMs, targetUnit, operation }) => {
         assert.equal(socketPath, "/run/openclaw/hostd.sock");
         assert.equal(timeoutMs, 3000);
+        assert.equal(targetUnit, "openclaw-system-sense.service");
+        assert.equal(operation, "restart_system_sense");
         return {
           ok: true,
           registry: "openclaw-hostd-systemd-restart-response-v0",
@@ -1812,6 +1814,11 @@ test("approved next systemd repair executes only through the fixed hostd boundar
           transport: "unix_socket",
           method: "org.freedesktop.systemd1.Manager.RestartUnit",
           unit: "openclaw-system-sense.service",
+          capability: {
+            registry: "openclaw-hostd-restart-capability-v1",
+            operation: "restart_system_sense",
+            capabilityId: "hostd.restart_system_sense",
+          },
           governance: {
             callerBoundary: "kernel_so_peercred",
             socketPeerIdentityVerified: true,
@@ -1823,6 +1830,11 @@ test("approved next systemd repair executes only through the fixed hostd boundar
             transport: "dbus_native",
             method: "org.freedesktop.systemd1.Manager.RestartUnit",
             unit: "openclaw-system-sense.service",
+            capability: {
+              registry: "openclaw-hostd-restart-capability-v1",
+              operation: "restart_system_sense",
+              capabilityId: "hostd.restart_system_sense",
+            },
             jobPath: "/org/freedesktop/systemd1/job/42",
             before: { activeState: "active", subState: "running", mainPid: 100 },
             after: { activeState: "active", subState: "running", mainPid: 200 },
@@ -1870,6 +1882,105 @@ test("approved next systemd repair executes only through the fixed hostd boundar
   assert.equal(finalTask.outcome.details.postExecutionVerification.after.readinessAttempts, 2);
   assert.equal(inventoryCalls, 3);
   assert(events.some((event) => event.name === "systemd.next_repair.execution_completed"));
+});
+
+test("approved event-hub repair stays on the fixed hostd capability", async () => {
+  let inventoryCalls = 0;
+  let hostdTarget = null;
+  const { executor } = createExecutorHarness({
+    state: {
+      SYSTEMD_REPAIR_EXECUTION_TIMEOUT_MS: 3000,
+      SYSTEMD_REPAIR_POST_VERIFICATION_ATTEMPTS: 2,
+      SYSTEMD_REPAIR_POST_VERIFICATION_POLL_MS: 1,
+      HOSTD_SOCKET_PATH: "/run/openclaw/hostd.sock",
+      SYSTEMD_REPAIR_AUTH_DELEGATION: "polkit-dbus-fixed-unit",
+    },
+    deps: {
+      client: {
+        sessionManagerUrl: "http://127.0.0.1:4102",
+        screenSenseUrl: "http://127.0.0.1:4104",
+        screenActUrl: "http://127.0.0.1:4105",
+        systemSenseUrl: "http://127.0.0.1:4106",
+        fetchJson: async (url) => {
+          if (url.endsWith("/system/systemd/units")) {
+            inventoryCalls += 1;
+            return {
+              registry: "openclaw-systemd-unit-inventory-v0",
+              observedAt: new Date().toISOString(),
+              units: [{
+                unit: "openclaw-event-hub.service",
+                loadState: "loaded",
+                activeState: "active",
+                subState: "running",
+                mainPid: inventoryCalls === 1 ? 300 : 400,
+                systemdObserved: true,
+              }],
+            };
+          }
+          return { system: { timestamp: new Date().toISOString(), alerts: [], network: {} } };
+        },
+        postJson: async () => ({ ok: true }),
+      },
+      hostdControlClient: async ({ targetUnit, operation }) => {
+        hostdTarget = { targetUnit, operation };
+        return {
+          ok: true,
+          registry: "openclaw-hostd-systemd-restart-response-v0",
+          protocolVersion: 1,
+          requestId: "hostd-event-hub-request-1",
+          owner: "openclaw-hostd",
+          transport: "unix_socket",
+          method: "org.freedesktop.systemd1.Manager.RestartUnit",
+          unit: "openclaw-event-hub.service",
+          capability: {
+            registry: "openclaw-hostd-restart-capability-v1",
+            operation: "restart_event_hub",
+            capabilityId: "hostd.restart_event_hub",
+          },
+          governance: {
+            callerBoundary: "kernel_so_peercred",
+            socketPeerIdentityVerified: true,
+            socketPeerIdentityMatched: true,
+          },
+          nativeMutation: {
+            ok: true,
+            owner: "openclaw-hostd",
+            transport: "dbus_native",
+            method: "org.freedesktop.systemd1.Manager.RestartUnit",
+            unit: "openclaw-event-hub.service",
+            capability: {
+              registry: "openclaw-hostd-restart-capability-v1",
+              operation: "restart_event_hub",
+              capabilityId: "hostd.restart_event_hub",
+            },
+            jobPath: "/org/freedesktop/systemd1/job/44",
+            before: { activeState: "active", subState: "running", mainPid: 300 },
+            after: { activeState: "active", subState: "running", mainPid: 400 },
+          },
+        };
+      },
+    },
+  });
+  const task = {
+    id: "systemd-event-hub-repair-1",
+    type: "systemd_next_repair_task",
+    goal: "Execute approved event-hub recovery",
+    status: "queued",
+    systemdNextRepair: {
+      registry: "openclaw-systemd-next-repair-real-execution-v0",
+      target: { unit: "openclaw-event-hub.service" },
+      command: { command: "systemctl", args: ["restart", "openclaw-event-hub.service"] },
+      execution: { realExecutionEnabled: true },
+    },
+  };
+
+  const result = await executor.executeTaskWithRecovery(task, { autoRecover: false });
+  assert.equal(result.finalExecution.task.outcome.kind, "systemd_next_repair_execution_completed");
+  assert.deepEqual(hostdTarget, {
+    targetUnit: "openclaw-event-hub.service",
+    operation: "restart_event_hub",
+  });
+  assert.equal(inventoryCalls, 2);
 });
 
 test("failed native systemd repair recommends operator recovery without fallback or retry", async () => {

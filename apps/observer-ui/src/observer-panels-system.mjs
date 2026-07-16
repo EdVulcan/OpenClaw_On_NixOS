@@ -297,6 +297,11 @@ export function observerSystemPanels() {
           <h2>Next Repair Task Shell</h2>
           <div class="metric"><span>Ready</span><span id="systemd-next-repair-task-shell-ready">loading</span></div>
           <div class="metric"><span>Target</span><span id="systemd-next-repair-task-shell-target">openclaw-system-sense.service</span></div>
+          <label for="systemd-next-repair-target-unit">Recovery target</label>
+          <select id="systemd-next-repair-target-unit">
+            <option value="openclaw-system-sense.service">openclaw-system-sense.service</option>
+            <option value="openclaw-event-hub.service">openclaw-event-hub.service</option>
+          </select>
           <div class="metric"><span>Approval</span><span id="systemd-next-repair-task-shell-approval">pending-after-create</span></div>
           <div class="metric"><span>Mutation</span><span id="systemd-next-repair-task-shell-mutation">false</span></div>
           <div class="actions tight">

@@ -1,4 +1,5 @@
 import { createEventName } from "../../../packages/shared-events/src/event-factory.mjs";
+import { hostdRestartCapabilityForTarget } from "../../../packages/shared-systemd/src/openclaw-hostd-capabilities.mjs";
 
 export function createSystemdTaskBuilders(deps) {
   const {
@@ -28,6 +29,57 @@ export function createSystemdTaskBuilders(deps) {
       ? value.trim()
       : "openclaw-browser-runtime.service";
     return unit.endsWith(".service") ? unit : `${unit}.service`;
+  }
+
+  async function buildHostdRestartRouteGate({ targetUnit, execute, legacy = false }) {
+    const capability = hostdRestartCapabilityForTarget(targetUnit);
+    if (!capability) {
+      throw new Error(`Hostd restart target is not allowlisted: ${targetUnit}.`);
+    }
+    const inventory = await fetchJson(`${systemSenseUrl}/system/systemd/units`);
+    const target = inventory.units?.find((unit) => unit.unit === capability.targetUnit);
+    if (inventory.source?.transport !== "dbus_native"
+      || target?.systemdObserved !== true
+      || target?.loadState !== "loaded") {
+      throw new Error(`Hostd restart target requires an observed native unit inventory: ${capability.targetUnit}.`);
+    }
+    const command = {
+      command: "systemctl",
+      args: ["restart", capability.targetUnit],
+      transport: "dbus_native",
+      method: "org.freedesktop.systemd1.Manager.RestartUnit",
+      capability: {
+        operation: capability.operation,
+        capabilityId: capability.capabilityId,
+      },
+    };
+    return {
+      registry: legacy ? inventory.registry : "openclaw-hostd-fixed-restart-route-v0",
+      mode: execute
+        ? "operator_reviewed_hostd_fixed_restart_route"
+        : "approval_gated_hostd_fixed_restart_route",
+      generatedAt: new Date().toISOString(),
+      sourceRegistry: inventory.registry,
+      routeDecision: {
+        taskShellAllowed: true,
+        selectedSlice: legacy
+          ? "openclaw-systemd-next-repair-real-execution"
+          : execute
+            ? "openclaw-hostd-fixed-restart-real-execution"
+            : "openclaw-hostd-fixed-restart-task-shell",
+        targetUnit: capability.targetUnit,
+        capability: {
+          registry: "openclaw-hostd-restart-capability-v1",
+          operation: capability.operation,
+          capabilityId: capability.capabilityId,
+        },
+      },
+      evidence: {
+        ...command,
+        targetUnit: capability.targetUnit,
+        inventoryObservedAt: inventory.observedAt ?? null,
+      },
+    };
   }
 
   async function buildSystemdRepairExecutionTaskDraft({ unit = null, execute = false } = {}) {
@@ -253,7 +305,7 @@ export function createSystemdTaskBuilders(deps) {
     };
   }
 
-  async function createSystemdNextRepairTaskShell({ confirm = false, execute = false } = {}) {
+  async function createSystemdNextRepairTaskShell({ confirm = false, execute = false, targetUnit: requestedTargetUnit = null } = {}) {
     if (confirm !== true) {
       throw new Error("Next systemd repair task shell creation requires confirm=true.");
     }
@@ -261,43 +313,39 @@ export function createSystemdTaskBuilders(deps) {
     let routeGate;
     let dryRunEvidence;
     let targetUnit;
+    const explicitTargetUnit = requestedTargetUnit === null
+      ? null
+      : normaliseSystemdRepairUnit(requestedTargetUnit);
     if (execute === true) {
       if (!HOSTD_SOCKET_PATH || SYSTEMD_REPAIR_AUTH_DELEGATION !== "polkit-dbus-fixed-unit") {
         throw new Error("Native systemd repair execution requires the fixed OpenClaw hostd boundary.");
       }
-      const inventory = await fetchJson(`${systemSenseUrl}/system/systemd/units`);
-      const target = inventory.units?.find((unit) => unit.unit === SYSTEMD_NEXT_REPAIR_REAL_EXECUTION_UNIT);
-      if (inventory.source?.transport !== "dbus_native"
-        || target?.systemdObserved !== true
-        || target?.loadState !== "loaded") {
-        throw new Error("Native systemd repair execution requires an observed system-sense unit inventory.");
-      }
-      targetUnit = SYSTEMD_NEXT_REPAIR_REAL_EXECUTION_UNIT;
-      dryRunEvidence = {
-        command: "systemctl",
-        args: ["restart", targetUnit],
-        transport: "dbus_native",
-        method: "org.freedesktop.systemd1.Manager.RestartUnit",
-      };
-      routeGate = {
-        registry: inventory.registry,
-        routeDecision: {
-          taskShellAllowed: true,
-          selectedSlice: "openclaw-systemd-next-repair-real-execution",
-          targetUnit,
-        },
-        evidence: dryRunEvidence,
-        inventoryObservedAt: inventory.observedAt ?? null,
-      };
+      targetUnit = explicitTargetUnit ?? SYSTEMD_NEXT_REPAIR_REAL_EXECUTION_UNIT;
+      routeGate = await buildHostdRestartRouteGate({
+        targetUnit,
+        execute: true,
+        legacy: explicitTargetUnit === null,
+      });
+      dryRunEvidence = routeGate.evidence;
     } else {
-      routeGate = await fetchJson(`${systemSenseUrl}/system/systemd/next-repair-task-route`);
-      if (routeGate.routeDecision?.taskShellAllowed !== true
-        || routeGate.routeDecision?.selectedSlice !== "openclaw-systemd-next-repair-task-shell"
-        || routeGate.routeDecision?.targetUnit !== SYSTEMD_NEXT_REPAIR_REAL_EXECUTION_UNIT) {
-        throw new Error("Next systemd repair task shell requires the approved task route for openclaw-system-sense.service.");
+      if (explicitTargetUnit !== null) {
+        targetUnit = explicitTargetUnit;
+        routeGate = await buildHostdRestartRouteGate({ targetUnit, execute: false });
+      } else {
+        routeGate = await fetchJson(`${systemSenseUrl}/system/systemd/next-repair-task-route`);
+        if (routeGate.routeDecision?.taskShellAllowed !== true
+          || routeGate.routeDecision?.selectedSlice !== "openclaw-systemd-next-repair-task-shell"
+          || routeGate.routeDecision?.targetUnit !== SYSTEMD_NEXT_REPAIR_REAL_EXECUTION_UNIT) {
+          throw new Error("Next systemd repair task shell requires the approved task route for openclaw-system-sense.service.");
+        }
+        targetUnit = routeGate.routeDecision.targetUnit;
+        dryRunEvidence = routeGate.evidence ?? {};
       }
-      dryRunEvidence = routeGate.evidence ?? {};
-      targetUnit = routeGate.routeDecision.targetUnit;
+      dryRunEvidence ??= routeGate.evidence ?? {};
+    }
+    const capability = hostdRestartCapabilityForTarget(targetUnit);
+    if (!capability) {
+      throw new Error(`Next real systemd repair target is not supported by hostd: ${targetUnit}.`);
     }
     const command = {
       command: dryRunEvidence.command ?? "systemctl",
@@ -373,6 +421,11 @@ export function createSystemdTaskBuilders(deps) {
       dryRunRegistry: dryRunEvidence.dryRunRegistry ?? null,
       target: {
         unit: targetUnit,
+      },
+      capability: {
+        registry: "openclaw-hostd-restart-capability-v1",
+        operation: capability.operation,
+        capabilityId: capability.capabilityId,
       },
       command,
       evidence: {

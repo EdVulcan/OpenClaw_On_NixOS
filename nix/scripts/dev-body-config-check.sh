@@ -318,6 +318,7 @@ for (const [name, unit] of Object.entries(ownership).filter(([name]) =>
 }
 if (ownership.polkitEnabled !== true
   || !ownership.polkitExtraConfig.includes('action.lookup("unit") == "openclaw-system-sense.service"')
+  || !ownership.polkitExtraConfig.includes('action.lookup("unit") == "openclaw-event-hub.service"')
   || !ownership.polkitExtraConfig.includes('action.lookup("verb") == "restart"')
   || !ownership.polkitExtraConfig.includes('subject.user == "openclaw-hostd"')) {
   throw new Error(`desktop body must expose fixed native systemd Polkit delegation: ${JSON.stringify({
@@ -604,12 +605,14 @@ EOF
     || ! -f "$core_out/share/openclaw/services/openclaw-core/src/capability-runtime-plugin-refresh.mjs"
     || ! -f "$core_out/share/openclaw/services/openclaw-core/src/capability-runtime-engineering-plan-todo.mjs"
     || ! -f "$core_out/share/openclaw/services/openclaw-core/src/hostd-control-client.mjs"
+    || ! -f "$core_out/share/openclaw/packages/shared-systemd/src/openclaw-hostd-capabilities.mjs"
+    || ! -f "$core_out/share/openclaw/packages/shared-systemd/src/openclaw-hostd-capabilities.json"
     || ! -f "$core_out/share/openclaw/packages/plugin-runtime/src/plugin-registry.mjs"
     || ! -f "$core_out/share/openclaw/packages/plugin-runtime/src/plugin-registry-generation-store.mjs"
     || ! -f "$core_out/share/openclaw/packages/shared-utils/src/persist.mjs"
     || -w "$core_server"
     || -e "$core_out/share/openclaw/services/openclaw-core/test"
-    || "$(find "$core_out" -type f | wc -l)" -ne 189 ]]; then
+    || "$(find "$core_out" -type f | wc -l)" -ne 191 ]]; then
     echo "core Nix closure is not exact and read-only: $core_out" >&2
     exit 1
   fi
@@ -1161,6 +1164,8 @@ EOF
     || ! -f "$hostd_working_dir/src/openclaw-hostd-peer-credentials.c"
     || ! -x "$hostd_out/bin/openclaw-hostd-peer-credentials"
     || ! -f "$hostd_out/share/openclaw/packages/shared-systemd/src/systemd-dbus-transport.mjs"
+    || ! -f "$hostd_out/share/openclaw/packages/shared-systemd/src/openclaw-hostd-capabilities.mjs"
+    || ! -f "$hostd_out/share/openclaw/packages/shared-systemd/src/openclaw-hostd-capabilities.json"
     || ! -f "$hostd_working_dir/node_modules/@homebridge/dbus-native/package.json"
     || -w "$hostd_working_dir/src/server.mjs"
     || -e "$hostd_working_dir/test" ]]; then

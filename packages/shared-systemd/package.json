@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "exports": {
-    "./systemd-dbus-transport": "./src/systemd-dbus-transport.mjs"
+    "./systemd-dbus-transport": "./src/systemd-dbus-transport.mjs",
+    "./openclaw-hostd-capabilities": "./src/openclaw-hostd-capabilities.mjs"
   }
 }

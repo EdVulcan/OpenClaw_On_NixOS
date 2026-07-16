@@ -2,8 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createHostdRequestHandler, parseHostdRequest } from "../src/hostd-protocol.mjs";
 import { HOSTD_TARGET_UNIT, runFixedSystemdRestart } from "../src/systemd-hostd-control.mjs";
+import { HOSTD_RESTART_CAPABILITY_REGISTRY } from "../../../packages/shared-systemd/src/openclaw-hostd-capabilities.mjs";
 import { createHostdServer } from "../src/server.mjs";
-import { requestHostdSystemSenseRestart } from "../../openclaw-core/src/hostd-control-client.mjs";
+import {
+  requestHostdRestart,
+  requestHostdSystemSenseRestart,
+} from "../../openclaw-core/src/hostd-control-client.mjs";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -39,6 +43,14 @@ test("hostd protocol accepts only the fixed system-sense restart capability", ()
   }));
   assert.equal(extraField.ok, false);
   assert.equal(extraField.response.error.code, "unknown_field");
+
+  const eventHub = parseHostdRequest(JSON.stringify({
+    version: 1,
+    operation: "restart_event_hub",
+    target: "openclaw-event-hub.service",
+    requestId: "test-event-hub-request",
+  }));
+  assert.equal(eventHub.ok, true);
 });
 
 test("hostd restart control verifies changed PID and closes its D-Bus transport", async () => {
@@ -80,6 +92,45 @@ test("hostd restart control verifies changed PID and closes its D-Bus transport"
   assert.equal(closed, true);
 });
 
+test("hostd restart control uses the same bounded evidence for event-hub", async () => {
+  let readIndex = 0;
+  const restartCalls = [];
+  const transport = {
+    async getUnitPath(unitName) {
+      assert.equal(unitName, "openclaw-event-hub.service");
+      return "/org/freedesktop/systemd1/unit/openclaw_2devent_2dhub_2eservice";
+    },
+    async getAll(_path, interfaceName) {
+      const state = readIndex === 0
+        ? { activeState: "active", subState: "running", mainPid: 300 }
+        : { activeState: "active", subState: "running", mainPid: 400 };
+      if (interfaceName.endsWith(".Unit")) {
+        return { LoadState: "loaded", ActiveState: state.activeState, SubState: state.subState };
+      }
+      readIndex += 1;
+      return { MainPID: state.mainPid };
+    },
+    async restartUnit(unitName) {
+      restartCalls.push(unitName);
+      return "/org/freedesktop/systemd1/job/43";
+    },
+    close() {},
+  };
+
+  const result = await runFixedSystemdRestart({
+    unit: "openclaw-event-hub.service",
+    createTransport: () => transport,
+    pollIntervalMs: 0,
+  });
+  assert.deepEqual(restartCalls, ["openclaw-event-hub.service"]);
+  assert.equal(result.unit, "openclaw-event-hub.service");
+  assert.deepEqual(result.capability, {
+    registry: HOSTD_RESTART_CAPABILITY_REGISTRY,
+    operation: "restart_event_hub",
+    capabilityId: "hostd.restart_event_hub",
+  });
+});
+
 test("hostd socket boundary carries compact owner evidence to the core client", async () => {
   const socketPath = path.join(mkdtempSync(path.join(tmpdir(), "openclaw-hostd-test-")), "hostd.sock");
   const runtime = createHostdServer({
@@ -92,6 +143,11 @@ test("hostd socket boundary carries compact owner evidence to the core client", 
         transport: "dbus_native",
         method: "org.freedesktop.systemd1.Manager.RestartUnit",
         unit: HOSTD_TARGET_UNIT,
+        capability: {
+          registry: HOSTD_RESTART_CAPABILITY_REGISTRY,
+          operation: "restart_system_sense",
+          capabilityId: "hostd.restart_system_sense",
+        },
         jobPath: "/org/freedesktop/systemd1/job/42",
         before: { mainPid: 100 },
         after: { activeState: "active", subState: "running", mainPid: 200 },
@@ -115,6 +171,48 @@ test("hostd socket boundary carries compact owner evidence to the core client", 
   }
 });
 
+test("hostd socket forwards the fixed event-hub capability without widening the request", async () => {
+  const socketPath = path.join(mkdtempSync(path.join(tmpdir(), "openclaw-hostd-event-hub-")), "hostd.sock");
+  const runtime = createHostdServer({
+    socketPath,
+    peerVerifier: allowPeer,
+    requestHandler: createHostdRequestHandler({
+      runRestart: async ({ unit }) => {
+        assert.equal(unit, "openclaw-event-hub.service");
+        return {
+          ok: true,
+          owner: "openclaw-hostd",
+          transport: "dbus_native",
+          method: "org.freedesktop.systemd1.Manager.RestartUnit",
+          unit,
+          capability: {
+            registry: HOSTD_RESTART_CAPABILITY_REGISTRY,
+            operation: "restart_event_hub",
+            capabilityId: "hostd.restart_event_hub",
+          },
+          jobPath: "/org/freedesktop/systemd1/job/45",
+          before: { mainPid: 500 },
+          after: { activeState: "active", subState: "running", mainPid: 600 },
+        };
+      },
+    }),
+  });
+  await runtime.listen();
+  try {
+    const response = await requestHostdRestart({
+      socketPath,
+      targetUnit: "openclaw-event-hub.service",
+      operation: "restart_event_hub",
+      requestId: "event-hub-client-request",
+    });
+    assert.equal(response.ok, true);
+    assert.equal(response.unit, "openclaw-event-hub.service");
+    assert.equal(response.capability.capabilityId, "hostd.restart_event_hub");
+  } finally {
+    await runtime.close();
+  }
+});
+
 test("hostd keeps the response channel open after a client half-closes its request", async () => {
   const socketPath = path.join(mkdtempSync(path.join(tmpdir(), "openclaw-hostd-half-close-")), "hostd.sock");
   const runtime = createHostdServer({
@@ -129,6 +227,11 @@ test("hostd keeps the response channel open after a client half-closes its reque
           transport: "dbus_native",
           method: "org.freedesktop.systemd1.Manager.RestartUnit",
           unit: HOSTD_TARGET_UNIT,
+          capability: {
+            registry: HOSTD_RESTART_CAPABILITY_REGISTRY,
+            operation: "restart_system_sense",
+            capabilityId: "hostd.restart_system_sense",
+          },
           jobPath: "/org/freedesktop/systemd1/job/43",
           before: { mainPid: 300 },
           after: { activeState: "active", subState: "running", mainPid: 400 },
@@ -158,6 +261,11 @@ test("hostd client rejects a response bound to a different request", async () =>
       protocolVersion: 1,
       requestId: "different-request",
       owner: "openclaw-hostd",
+      capability: {
+        registry: HOSTD_RESTART_CAPABILITY_REGISTRY,
+        operation: "restart_system_sense",
+        capabilityId: "hostd.restart_system_sense",
+      },
     }),
   });
   await runtime.listen();

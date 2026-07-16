@@ -8,6 +8,7 @@ function confirmExecuteInput(body) {
   return {
     confirm: body.confirm === true,
     execute: body.execute === true,
+    targetUnit: typeof body.targetUnit === "string" && body.targetUnit.trim() ? body.targetUnit.trim() : null,
   };
 }
 

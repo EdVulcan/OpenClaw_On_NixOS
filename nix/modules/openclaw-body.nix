@@ -3,6 +3,10 @@
 let
   cfg = config.services.openclaw;
   inherit (lib) mkEnableOption mkIf mkOption optionalAttrs types;
+  hostdRestartCapabilities = (builtins.fromJSON (builtins.readFile ../../packages/shared-systemd/src/openclaw-hostd-capabilities.json)).capabilities;
+  hostdRestartUnitPolicy = lib.concatStringsSep " || " (map
+    (capability: "action.lookup(\"unit\") == \"${capability.targetUnit}\"")
+    hostdRestartCapabilities);
 
   serviceSpecs = [
     {
@@ -476,7 +480,7 @@ in
     };
 
     systemdRepairAuthDelegation = {
-      enable = mkEnableOption "Polkit-authorized native D-Bus repair of one OpenClaw-owned systemd unit";
+      enable = mkEnableOption "Polkit-authorized native D-Bus repair of fixed OpenClaw-owned systemd units";
     };
 
     kernelEventCapture = {
@@ -548,9 +552,11 @@ in
         assertion = !cfg.systemdRepairAuthDelegation.enable
           || (builtins.elem "systemSense" cfg.components
             && !builtins.elem "systemSense" cfg.componentOwnership.user
+            && builtins.elem "eventHub" cfg.components
+            && !builtins.elem "eventHub" cfg.componentOwnership.user
             && cfg.runtimePackages.systemSense != null
             && cfg.runtimePackages.hostd != null);
-        message = "systemd repair delegation requires store-native system-sense and hostd components.";
+        message = "systemd repair delegation requires store-native system-sense, event-hub, and hostd components.";
       }
       {
         assertion = !cfg.kernelEventCapture.enable
@@ -612,7 +618,7 @@ in
     security.polkit.extraConfig = mkIf cfg.systemdRepairAuthDelegation.enable ''
       polkit.addRule(function(action, subject) {
         if (action.id == "org.freedesktop.systemd1.manage-units"
-            && action.lookup("unit") == "openclaw-system-sense.service"
+            && (${hostdRestartUnitPolicy})
             && action.lookup("verb") == "restart"
             && subject.user == "${delegationUser}") {
           return polkit.Result.YES;

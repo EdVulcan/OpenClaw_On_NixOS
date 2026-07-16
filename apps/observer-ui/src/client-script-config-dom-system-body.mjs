@@ -198,6 +198,7 @@ const systemdNextRepairTaskRouteMutation = document.querySelector("#systemd-next
 const systemdNextRepairTaskRouteJson = document.querySelector("#systemd-next-repair-task-route-json");
 const systemdNextRepairTaskShellReady = document.querySelector("#systemd-next-repair-task-shell-ready");
 const systemdNextRepairTaskShellTarget = document.querySelector("#systemd-next-repair-task-shell-target");
+const systemdNextRepairTargetUnit = document.querySelector("#systemd-next-repair-target-unit");
 const systemdNextRepairTaskShellApproval = document.querySelector("#systemd-next-repair-task-shell-approval");
 const systemdNextRepairTaskShellMutation = document.querySelector("#systemd-next-repair-task-shell-mutation");
 const systemdNextRepairTaskShellJson = document.querySelector("#systemd-next-repair-task-shell-json");

@@ -26,5 +26,7 @@ mkOpenClawNpmRuntimeClosure {
     hostdRuntimeModules
     ../../services/openclaw-hostd/src/openclaw-hostd-peer-credentials.c
     ../../packages/shared-systemd/src/systemd-dbus-transport.mjs
+    ../../packages/shared-systemd/src/openclaw-hostd-capabilities.json
+    ../../packages/shared-systemd/src/openclaw-hostd-capabilities.mjs
   ];
 }
