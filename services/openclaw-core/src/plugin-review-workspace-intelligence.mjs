@@ -1459,6 +1459,8 @@ export function createPluginReviewWorkspaceIntelligence({
         canMutate: false,
         createsTask: false,
         createsApproval: false,
+        canCallProvider: false,
+        canUseNetwork: false,
         canFeedPatchProposal: Boolean(selectedTarget),
       },
       governance: {
@@ -1477,6 +1479,8 @@ export function createPluginReviewWorkspaceIntelligence({
         canActivateRuntime: false,
         createsTask: false,
         createsApproval: false,
+        canCallProvider: false,
+        canUseNetwork: false,
         requiresPolicyInvocation: true,
         outputMode: "bounded_target_metadata_only",
       },

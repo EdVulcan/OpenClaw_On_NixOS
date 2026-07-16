@@ -27,6 +27,7 @@ OPENCLAW_NATIVE_ENGINEERING_LOOP_RECOVERY_ACTION_DRAFT_PLAN.md
 OPENCLAW_NATIVE_ENGINEERING_LOOP_RECOVERY_RERUN_READBACK_PLAN.md
 OPENCLAW_NATIVE_ENGINEERING_PROMPT_WORK_STANDARDS_PLAN.md
 OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_PROMPT_STANDARDS_PLAN.md
+OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_WORKSPACE_EDIT_TARGET_SELECTION_PLAN.md
 OPENCLAW_NATIVE_ENGINEERING_LOOP_WORK_STANDARDS_BRIDGE_PLAN.md
 OPENCLAW_NATIVE_ENGINEERING_WRITE_PROPOSAL_PLAN.md
 OPENCLAW_NATIVE_ENGINEERING_WRITE_APPROVAL_BRIDGE_PLAN.md
@@ -146,6 +147,16 @@ registry and invoke path: bounded evidence is read through
 is performed through `act.openclaw.engineering_context.plan_todo_workbench_state`.
 The existing core check proves the two dispatches, explicit confirmation gate,
 revision increment, task-status preservation, and compact invocation metadata.
+
+The existing source-derived workspace edit target selection is also aligned with
+the common capability registry and invoke path through
+`sense.openclaw.workspace_edit_target_select`. It reuses the direct bounded
+builder, records only target metadata and governance flags in the invocation
+summary, and keeps file mutation, task/approval creation, plugin execution,
+runtime activation, provider calls, and network egress disabled. The existing
+Core/Observer target-selection pair proves both the direct route and the common
+invoke path. Its boundary is documented in
+`OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_WORKSPACE_EDIT_TARGET_SELECTION_PLAN.md`.
 
 The browser binding keeps the existing rule-v1 task target and action shape
 linked to operator execution, while the read/search bridge exposes

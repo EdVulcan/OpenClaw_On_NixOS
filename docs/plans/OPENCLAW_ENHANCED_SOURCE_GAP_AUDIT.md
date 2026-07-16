@@ -307,6 +307,27 @@ Recommendation:
 - Continue using the native governed read surface. Do not import or execute
   enhanced `FileReadTool.ts`, and do not add unbounded system-path reads.
 
+### Source-derived workspace edit target selection
+
+Current OpenClaw now exposes the existing source-derived selector through the
+common capability runtime as `sense.openclaw.workspace_edit_target_select`. The
+descriptor and handler reuse the semantic-index, symbol-lookup, and catalog
+derived builder already used by the direct
+`/plugins/native-adapter/workspace-edit-target-selection` route. The common
+summary keeps only registry, scope, candidate/selection metadata, proposal
+eligibility, and explicit negative authority flags. Source bodies, mutation,
+task/approval creation, plugin execution, runtime activation, provider calls,
+and network use remain outside the invocation summary.
+
+Classification: absorbed through the common capability-runtime boundary.
+
+Recommendation:
+
+- Keep target selection read-only and separate from proposal, approval, and
+  patch execution. Do not add automatic target-to-task or target-to-provider
+  routing. The existing Core and Observer target-selection checks prove both
+  the direct route and the common invoke path.
+
 ### `cc_edit`
 
 Enhanced source:

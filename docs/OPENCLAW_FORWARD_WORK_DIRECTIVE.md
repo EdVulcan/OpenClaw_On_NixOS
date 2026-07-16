@@ -968,6 +968,18 @@ Core and Observer capability-invoke checks exercise this path against a local
 fixture. The detailed boundary is documented in
 `docs/plans/OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_PROMPT_STANDARDS_PLAN.md`.
 
+The existing source-derived workspace edit target selection is now also
+declared in the common capability runtime as
+`sense.openclaw.workspace_edit_target_select`. It reuses the direct bounded
+selection builder, records only registry/scope/candidate/selection metadata and
+explicit negative authority flags, and keeps source bodies, mutation,
+task/approval creation, plugin execution, runtime activation, provider calls,
+and network use outside the invocation summary. The existing Core and Observer
+target-selection checks invoke this capability against the same fixture. This
+closes a declared-versus-runtime contract gap; it is not a new edit or
+approval path. Details are in
+`docs/plans/OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_WORKSPACE_EDIT_TARGET_SELECTION_PLAN.md`.
+
 ## Identity-Upgrade Alignment
 
 Every new capability must state which identity level it serves:

@@ -15,6 +15,7 @@ import { createPluginRuntimeRefreshCapabilityHandlers } from "./capability-runti
 import { createEngineeringProviderHandoffCapabilityHandlers } from "./capability-runtime-engineering-provider-handoff.mjs";
 import { createAcpxCodexCompatibilityCapabilityHandlers } from "./capability-runtime-acpx-codex.mjs";
 import { createPromptPackCapabilityHandlers } from "./capability-runtime-prompt-pack.mjs";
+import { createWorkspaceEditTargetCapabilityHandlers } from "./capability-runtime-workspace-edit-target.mjs";
 
 export function createCapabilityRuntime(deps) {
   const {
@@ -133,6 +134,9 @@ export function createCapabilityRuntime(deps) {
   });
   const promptPackHandlers = createPromptPackCapabilityHandlers({
     buildNativeOpenClawPromptSemanticsProfile: pluginReview.buildNativeOpenClawPromptSemanticsProfile,
+  });
+  const workspaceEditTargetHandlers = createWorkspaceEditTargetCapabilityHandlers({
+    buildNativeOpenClawWorkspaceEditTargetSelection: buildNativeOpenClawWorkspaceEditTargetSelection,
   });
 
   function baseCapabilities() {
@@ -370,6 +374,10 @@ export function createCapabilityRuntime(deps) {
     if (promptPack.handled) {
       return promptPack.result;
     }
+    const workspaceEditTarget = workspaceEditTargetHandlers.callBackend(capability, request);
+    if (workspaceEditTarget.handled) {
+      return workspaceEditTarget.result;
+    }
 
     if (capability.id === "sense.system.vitals") {
       return fetchJson(`${systemSenseUrl}/system/health`);
@@ -454,15 +462,6 @@ export function createCapabilityRuntime(deps) {
 
     if (capability.id === "sense.openclaw.workspace_symbol_lookup") {
       return buildNativeOpenClawWorkspaceSymbolLookup({
-        workspacePath: request.params.workspacePath,
-        scope: request.params.scope,
-        query: request.params.query ?? request.params.q,
-        limit: request.params.limit,
-      });
-    }
-
-    if (capability.id === "sense.openclaw.workspace_edit_target_select") {
-      return buildNativeOpenClawWorkspaceEditTargetSelection({
         workspacePath: request.params.workspacePath,
         scope: request.params.scope,
         query: request.params.query ?? request.params.q,
@@ -588,6 +587,10 @@ export function createCapabilityRuntime(deps) {
     const promptPackSummary = promptPackHandlers.summariseResult(capability, result);
     if (promptPackSummary) {
       return promptPackSummary;
+    }
+    const workspaceEditTargetSummary = workspaceEditTargetHandlers.summariseResult(capability, result);
+    if (workspaceEditTargetSummary) {
+      return workspaceEditTargetSummary;
     }
 
     if (capability.id === "sense.system.vitals") {

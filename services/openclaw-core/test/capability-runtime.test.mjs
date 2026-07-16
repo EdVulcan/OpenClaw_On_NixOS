@@ -110,6 +110,85 @@ test("capability runtime builds the local body registry with service health", as
   assert.ok(calls.health.some((url) => url === "http://127.0.0.1:4106/health"));
 });
 
+test("capability runtime exposes workspace edit target selection through the governed invoke path", async () => {
+  const builderInputs = [];
+  const { runtime, state, events } = createHarness({
+    pluginReview: {
+      buildNativeOpenClawWorkspaceEditTargetSelection: (input) => {
+        builderInputs.push(input);
+        return {
+          ok: true,
+          registry: "openclaw-native-workspace-edit-target-selection-v0",
+          query: { scope: "tools" },
+          selectedTarget: { relativePath: "src/agents/tools/edit-target-tool.ts" },
+          summary: {
+            candidateCount: 1,
+            selected: true,
+            canFeedPatchProposal: true,
+            exposesSourceFileContent: false,
+            canExecutePluginCode: false,
+            canExecuteToolCode: false,
+            canActivateRuntime: false,
+            canMutate: false,
+            createsTask: false,
+            createsApproval: false,
+            canCallProvider: false,
+            canUseNetwork: false,
+          },
+          governance: {
+            exposesSourceFileContent: false,
+            canExecutePluginCode: false,
+            canExecuteToolCode: false,
+            canActivateRuntime: false,
+            canMutate: false,
+            createsTask: false,
+            createsApproval: false,
+            canCallProvider: false,
+            canUseNetwork: false,
+          },
+        };
+      },
+    },
+  });
+
+  const registry = await runtime.buildCapabilityRegistry();
+  const capability = registry.capabilities.find((item) => item.id === "sense.openclaw.workspace_edit_target_select");
+  assert.equal(capability?.kind, "sensor");
+  assert.equal(capability?.governance, "audit_only");
+  assert.equal(capability?.available, true);
+
+  const result = await runtime.invokeCapability({
+    capabilityId: "sense.openclaw.workspace_edit_target_select",
+    params: {
+      workspacePath: "/workspace/fixture",
+      scope: "tools",
+      q: "edit",
+      limit: 8,
+    },
+  });
+
+  assert.equal(result.statusCode, 200);
+  assert.equal(result.response.invoked, true);
+  assert.equal(result.response.summary.selectedTarget, "src/agents/tools/edit-target-tool.ts");
+  assert.equal(result.response.summary.noSourceContentExposure, true);
+  assert.equal(result.response.summary.noMutation, true);
+  assert.equal(result.response.summary.noTaskCreation, true);
+  assert.equal(result.response.summary.noApprovalCreation, true);
+  assert.equal(result.response.summary.noPluginExecution, true);
+  assert.equal(result.response.summary.noRuntimeActivation, true);
+  assert.equal(result.response.summary.canCallProvider, false);
+  assert.equal(result.response.summary.canUseNetwork, false);
+  assert.equal(result.response.summary.noProviderEgress, true);
+  assert.deepEqual(builderInputs, [{
+    workspacePath: "/workspace/fixture",
+    scope: "tools",
+    query: "edit",
+    limit: 8,
+  }]);
+  assert.equal(state.capabilityInvocationLog.at(-1).summary.noSourceContentExposure, true);
+  assert(events.some((event) => event.name === "capability.invoked"));
+});
+
 test("capability runtime normalises invoke requests and policy inputs", () => {
   const { runtime } = createHarness();
   const capability = runtime.capabilityById("act.filesystem.write_text");

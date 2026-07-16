@@ -26,6 +26,14 @@ bridge is documented in
 keeps prompt bodies, execution authority, task/approval creation, provider
 calls, and network use outside the capability summary and audit path.
 
+The source-derived workspace edit target selection is now also declared in the
+common capability registry as `sense.openclaw.workspace_edit_target_select`.
+Its runtime bridge reuses the existing direct builder and emits only bounded
+target metadata plus explicit no-mutation/no-execution/no-provider flags. Core
+and Observer invoke the capability through the existing target-selection
+lifecycle; the detailed boundary is documented in
+`OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_WORKSPACE_EDIT_TARGET_SELECTION_PLAN.md`.
+
 The latest completed slices are the compact work-view association, the explicit
 operator-reviewed task bind documented in
 `OPENCLAW_NATIVE_ENGINEERING_WORK_VIEW_ASSOCIATION_PLAN.md` and
@@ -87,6 +95,7 @@ governed by the existing local policy, invocation ledger, and audit event path.
 | --- | --- | --- | --- | --- | --- |
 | `cc_read` | `sense.openclaw.engineering_tool.read` | `read_only_file_read` | low | no approval for bounded content reads; workspace scope, budget, and audit required | absorbed through bounded native route and capability-runtime invoke |
 | `cc_edit` | `act.openclaw.engineering_tool.edit_proposal` / `act.openclaw.engineering_tool.edit_proposal_task` / `sense.openclaw.engineering_tool.edit_execution_evidence` | `mutation_proposal_approval_execution_evidence` | high | approval required before apply | absorbed through governed proposal, approval bridge, thin execution evidence, and closed-loop proof |
+| `source-derived edit target selection` | `sense.openclaw.workspace_edit_target_select` | `bounded_source_derived_target_selection` | low | no approval for metadata-only selection; proposal and mutation remain separate | absorbed through the native builder and common capability-runtime invoke |
 | `cc_write` | `act.openclaw.engineering_tool.write_proposal` / `sense.openclaw.engineering_tool.write_execution_evidence` | `mutation_proposal_and_execution_evidence` | high | approval required before create or overwrite | absorbed through governed proposal, approval bridge, and execution evidence |
 | `cc_glob` | `sense.openclaw.engineering_tool.glob` | `read_only_path_search` | low | no approval for bounded metadata search | absorbed through bounded native route and capability-runtime invoke |
 | `cc_grep` | `sense.openclaw.engineering_tool.grep` | `read_only_content_search` | low | no approval for bounded search; snippets require budget and audit | absorbed through bounded native route and capability-runtime invoke |
@@ -126,6 +135,7 @@ services/openclaw-core/src/capability-runtime-engineering-microcompact.mjs
 services/openclaw-core/src/capability-runtime-engineering-execution-evidence.mjs
 services/openclaw-core/src/capability-runtime-work-view.mjs
 services/openclaw-core/src/capability-runtime-prompt-pack.mjs
+services/openclaw-core/src/capability-runtime-workspace-edit-target.mjs
 ```
 
 Core route:
@@ -150,6 +160,7 @@ Validation targets:
 services/openclaw-core/test/native-engineering-tool-surface-builders.test.mjs
 services/openclaw-core/test/capability-runtime.test.mjs
 services/openclaw-core/test/capability-runtime-prompt-pack.test.mjs
+services/openclaw-core/test/capability-runtime-workspace-edit-target.test.mjs
 openclaw-native-engineering-tool-surface-inventory
 observer-openclaw-native-engineering-tool-surface-inventory
 capability-invoke
@@ -164,6 +175,13 @@ observer-openclaw-native-engineering-write-execution-evidence
 The Core and Observer `capability-invoke` checks also invoke
 `sense.openclaw.prompt_pack` against a local prompt fixture and verify its
 bounded work-standards summary and negative authority boundary.
+
+The existing workspace edit target-selection Core and Observer checks also
+invoke `sense.openclaw.workspace_edit_target_select` against their existing
+fixtures. They verify that the common summary preserves selected-target
+identity and proposal eligibility while reporting no source-content exposure,
+mutation, task/approval creation, plugin execution, runtime activation,
+provider call, or network use.
 
 ## Deferred Execution
 

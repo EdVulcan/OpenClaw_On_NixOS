@@ -60,7 +60,7 @@ export function editTargetTool() {
 EOF
 
 cleanup() {
-  rm -f "${SELECTION_FILE:-}" "${DRAFT_FILE:-}" "${TASK_FILE:-}"
+  rm -f "${SELECTION_FILE:-}" "${DRAFT_FILE:-}" "${TASK_FILE:-}" "${CAPABILITY_FILE:-}"
   "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -70,6 +70,7 @@ trap cleanup EXIT
 SELECTION_FILE="$(mktemp)"
 DRAFT_FILE="$(mktemp)"
 TASK_FILE="$(mktemp)"
+CAPABILITY_FILE="$(mktemp)"
 EDITS_JSON='[{"search":"before","replacement":"after","occurrence":1},{"search":"omega","replacement":"zeta","occurrence":1}]'
 EDITS_ENCODED="$(node -e 'process.stdout.write(encodeURIComponent(process.argv[1]))' "$EDITS_JSON")"
 
@@ -79,17 +80,22 @@ curl --silent --fail \
   -H "content-type: application/json" \
   -d "{\"edits\":$EDITS_JSON,\"deriveProposalFromSource\":true,\"proposalQuery\":\"edit\",\"selectTargetFromSource\":true,\"targetSelectionQuery\":\"edit\",\"contextLines\":0,\"confirm\":true}" \
   "$CORE_URL/plugins/native-adapter/workspace-patch-apply-tasks" > "$TASK_FILE"
+curl --silent --fail \
+  -H "content-type: application/json" \
+  -d "{\"capabilityId\":\"sense.openclaw.workspace_edit_target_select\",\"params\":{\"workspacePath\":\"$WORKSPACE_DIR\",\"scope\":\"tools\",\"query\":\"edit\",\"limit\":8}}" \
+  "$CORE_URL/capabilities/invoke" > "$CAPABILITY_FILE"
 
-node - <<'EOF' "$SELECTION_FILE" "$DRAFT_FILE" "$TASK_FILE" "$TARGET_RELATIVE_PATH" "$UNRELATED_SECRET"
+node - <<'EOF' "$SELECTION_FILE" "$DRAFT_FILE" "$TASK_FILE" "$CAPABILITY_FILE" "$TARGET_RELATIVE_PATH" "$UNRELATED_SECRET"
 const fs = require("node:fs");
 const readJson = (index) => JSON.parse(fs.readFileSync(process.argv[index], "utf8"));
 
 const selection = readJson(2);
 const draft = readJson(3);
 const task = readJson(4);
-const expectedTarget = process.argv[5];
-const unrelatedSecret = process.argv[6];
-const raw = JSON.stringify({ selection, draft, task });
+const capability = readJson(5);
+const expectedTarget = process.argv[6];
+const unrelatedSecret = process.argv[7];
+const raw = JSON.stringify({ selection, draft, task, capability });
 
 if (
   !selection.ok
@@ -119,6 +125,28 @@ if (
   || task.task?.approval?.required !== true
 ) {
   throw new Error(`target-selected task mismatch: ${JSON.stringify(task)}`);
+}
+if (
+  !capability.ok
+  || capability.invoked !== true
+  || capability.capability?.id !== "sense.openclaw.workspace_edit_target_select"
+  || capability.summary?.kind !== "openclaw.workspace_edit_target_select"
+  || capability.summary?.registry !== "openclaw-native-workspace-edit-target-selection-v0"
+  || capability.summary?.scope !== "tools"
+  || capability.summary?.selected !== true
+  || capability.summary?.selectedTarget !== expectedTarget
+  || capability.summary?.canFeedPatchProposal !== true
+  || capability.summary?.noSourceContentExposure !== true
+  || capability.summary?.noMutation !== true
+  || capability.summary?.noTaskCreation !== true
+  || capability.summary?.noApprovalCreation !== true
+  || capability.summary?.noPluginExecution !== true
+  || capability.summary?.noRuntimeActivation !== true
+  || capability.summary?.canCallProvider !== false
+  || capability.summary?.canUseNetwork !== false
+  || capability.summary?.noProviderEgress !== true
+) {
+  throw new Error(`workspace edit target capability mismatch: ${JSON.stringify(capability)}`);
 }
 for (const secret of [unrelatedSecret, "EDIT_TARGET_SELECTION_SECRET_DO_NOT_LEAK"]) {
   if (raw.includes(secret)) {

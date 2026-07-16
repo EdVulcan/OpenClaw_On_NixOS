@@ -128,5 +128,9 @@ test("plugin review workspace intelligence builds read-only workspace surfaces",
   assert.equal(editTarget.registry, "openclaw-native-workspace-edit-target-selection-v0");
   assert.equal(editTarget.summary.exposesSourceFileContent, false);
   assert.equal(editTarget.summary.canFeedPatchProposal, true);
+  assert.equal(editTarget.summary.canCallProvider, false);
+  assert.equal(editTarget.summary.canUseNetwork, false);
+  assert.equal(editTarget.governance.canCallProvider, false);
+  assert.equal(editTarget.governance.canUseNetwork, false);
   assert.equal(editTarget.selectedTarget.relativePath, "src/agents/tools/web-search-tool.ts");
 });
