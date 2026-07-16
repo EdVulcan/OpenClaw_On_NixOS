@@ -552,6 +552,32 @@ async function runAction(path, payload) {
   await refreshWorkView();
 }
 
+async function runBrowserOpenCapability(url) {
+  const result = await fetchJson(observerConfig.coreUrl + "/capabilities/invoke", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      capabilityId: "act.browser.open",
+      operation: "browser.new_tab",
+      params: { url },
+    }),
+  });
+  const action = result.result?.action ?? {};
+  if (currentTaskState?.id) {
+    await updateTaskPhase(currentTaskState.id, "acting_on_target", {
+      actionKind: action.kind ?? "browser.new_tab",
+      degraded: action.degraded === true,
+    });
+  }
+  setControlMessage("Capability browser.new_tab completed (" + (action.result ?? "unknown") + ")");
+  await refreshRuntime();
+  await refreshTaskList();
+  await refreshTaskHistoryDetail();
+  await refreshActionState();
+  await refreshScreen();
+  await refreshWorkView();
+}
+
 async function runHeal(service) {
   const result = await fetchJson(\`\${observerConfig.systemHealUrl}/heal/restart-service\`, {
     method: "POST",

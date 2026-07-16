@@ -160,6 +160,63 @@ test("capability runtime invokes bounded screen observation through the screen-s
   assert.deepEqual(calls.fetchJson, ["http://127.0.0.1:4104/screen/current"]);
 });
 
+test("capability runtime dispatches browser new-tab through screen-act with a bound intent", async () => {
+  const targetUrl = "https://example.com/capability-browser-action";
+  const { runtime, state, events, calls } = createHarness({
+    postJsonResult: {
+      ok: true,
+      action: {
+        kind: "browser.new_tab",
+        result: "executed-browser-runtime",
+        degraded: false,
+        params: { url: targetUrl },
+        mediation: {
+          attempted: true,
+          accepted: true,
+          status: "accepted",
+          reason: null,
+          leaseMatched: true,
+          transport: "trusted-sidecar",
+          visualGrounding: {
+            required: true,
+            status: "advanced",
+            sequenceAdvanced: true,
+            pageUrl: targetUrl,
+            dataUrl: "data:image/jpeg;base64,secret",
+          },
+        },
+      },
+    },
+  });
+
+  const result = await runtime.invokeCapability({
+    capabilityId: "act.browser.open",
+    operation: "browser.new_tab",
+    params: { url: targetUrl },
+  });
+
+  assert.equal(result.statusCode, 200);
+  assert.equal(result.response.invoked, true);
+  assert.equal(result.response.capability.id, "act.browser.open");
+  assert.equal(result.response.policy.input.intent, "browser.new_tab");
+  assert.equal(result.response.invocation.request.intent, "browser.new_tab");
+  assert.equal(result.response.summary.kind, "browser.new_tab");
+  assert.equal(result.response.summary.accepted, true);
+  assert.equal(result.response.summary.browserRuntimeExecuted, true);
+  assert.equal(result.response.summary.noPayloadExposure, true);
+  assert.equal(result.response.summary.noProviderEgress, true);
+  assert.equal(result.response.result.governance.dispatchesExistingScreenActOwner, true);
+  assert.deepEqual(calls.postJson, [{
+    url: "http://127.0.0.1:4105/act/browser/new-tab",
+    body: { url: targetUrl },
+  }]);
+  assert.equal(JSON.stringify(result.response.invocation).includes(targetUrl), false);
+  assert.equal(JSON.stringify(result.response.summary).includes(targetUrl), false);
+  assert.equal(JSON.stringify(result.response.result).includes("data:image/jpeg"), false);
+  assert.equal(state.capabilityInvocationLog.at(-1)?.request.intent, "browser.new_tab");
+  assert.equal(events.at(-1)?.name, "capability.invoked");
+});
+
 test("capability runtime exposes workspace edit target selection through the governed invoke path", async () => {
   const builderInputs = [];
   const { runtime, state, events } = createHarness({

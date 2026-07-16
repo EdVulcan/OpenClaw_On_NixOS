@@ -18,6 +18,7 @@ import { createPromptPackCapabilityHandlers } from "./capability-runtime-prompt-
 import { createWorkspaceEditTargetCapabilityHandlers } from "./capability-runtime-workspace-edit-target.mjs";
 import { createWorkspaceMutationCapabilityHandlers } from "./capability-runtime-workspace-mutations.mjs";
 import { createScreenObservationCapabilityHandlers } from "./capability-runtime-screen.mjs";
+import { createBrowserActionCapabilityHandlers } from "./capability-runtime-browser-actions.mjs";
 
 export function createCapabilityRuntime(deps) {
   const {
@@ -154,6 +155,10 @@ export function createCapabilityRuntime(deps) {
     screenSenseUrl,
     fetchJson,
   });
+  const browserActionHandlers = createBrowserActionCapabilityHandlers({
+    screenActUrl,
+    postJson,
+  });
 
   function baseCapabilities() {
     return buildBaseCapabilities({
@@ -184,6 +189,13 @@ export function createCapabilityRuntime(deps) {
         ?? request.intent
         ?? request.params?.operation
         ?? request.params?.action
+        ?? capability.intents?.[0]
+        ?? "capability.invoke";
+    }
+    if (capability.id === "act.browser.open") {
+      return request.operation
+        ?? request.params?.operation
+        ?? request.intent
         ?? capability.intents?.[0]
         ?? "capability.invoke";
     }
@@ -401,6 +413,10 @@ export function createCapabilityRuntime(deps) {
     const screenObservation = await screenObservationHandlers.callBackend(capability, request);
     if (screenObservation.handled) {
       return screenObservation.result;
+    }
+    const browserAction = await browserActionHandlers.callBackend(capability, request);
+    if (browserAction.handled) {
+      return browserAction.result;
     }
 
     if (capability.id === "sense.system.vitals") {
@@ -623,6 +639,10 @@ export function createCapabilityRuntime(deps) {
     const screenObservationSummary = screenObservationHandlers.summariseResult(capability, result);
     if (screenObservationSummary) {
       return screenObservationSummary;
+    }
+    const browserActionSummary = browserActionHandlers.summariseResult(capability, result);
+    if (browserActionSummary) {
+      return browserActionSummary;
     }
 
     if (capability.id === "sense.system.vitals") {
@@ -953,6 +973,13 @@ export function createCapabilityRuntime(deps) {
       return {
         statusCode: 400,
         response: { ok: false, error: screenObservationValidationError },
+      };
+    }
+    const browserActionValidationError = browserActionHandlers.validateRequest(capability, request);
+    if (browserActionValidationError) {
+      return {
+        statusCode: 400,
+        response: { ok: false, error: browserActionValidationError },
       };
     }
 

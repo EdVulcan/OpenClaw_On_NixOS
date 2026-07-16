@@ -334,9 +334,7 @@ typeActionButton.addEventListener("click", () => {
 });
 
 newTabActionButton.addEventListener("click", () => {
-  runAction("/act/browser/new-tab", {
-    url: getDesiredWorkViewUrl(),
-  }).catch((error) => {
+  runBrowserOpenCapability(getDesiredWorkViewUrl()).catch((error) => {
     setControlMessage(\`Request failed: \${formatError(error)}\`);
   });
 });

@@ -53,6 +53,7 @@ cleanup() {
     "${WORKSPACE_PATCH_APPLY_FILE:-}" \
     "${WORK_VIEW_FILE:-}" \
     "${WORK_VIEW_CONTROL_FILE:-}" \
+    "${BROWSER_OPEN_FILE:-}" \
     "${CONTEXT_PACKET_FILE:-}" \
     "${PROVIDER_HANDOFF_FILE:-}" \
     "${ACPX_COMPATIBILITY_FILE:-}" \
@@ -89,6 +90,7 @@ WORKSPACE_TEXT_WRITE_FILE="$(mktemp)"
 WORKSPACE_PATCH_APPLY_FILE="$(mktemp)"
 WORK_VIEW_FILE="$(mktemp)"
 WORK_VIEW_CONTROL_FILE="$(mktemp)"
+BROWSER_OPEN_FILE="$(mktemp)"
 CONTEXT_PACKET_FILE="$(mktemp)"
 PROVIDER_HANDOFF_FILE="$(mktemp)"
 ACPX_COMPATIBILITY_FILE="$(mktemp)"
@@ -114,6 +116,7 @@ post_json "$CORE_URL/capabilities/invoke" "{\"capabilityId\":\"act.openclaw.work
 post_json "$CORE_URL/capabilities/invoke" "{\"capabilityId\":\"act.openclaw.workspace_patch_apply\",\"approved\":true,\"params\":{\"workspacePath\":\"$FIXTURE_DIR\",\"relativePath\":\"src/app.ts\",\"search\":\"observerNeedle\",\"replacement\":\"transient observer common patch replacement\",\"occurrence\":1,\"contextLines\":1,\"confirm\":true}}" > "$WORKSPACE_PATCH_APPLY_FILE"
 post_json "http://127.0.0.1:$OPENCLAW_SESSION_MANAGER_PORT/work-view/prepare" '{"displayTarget":"workspace-2","entryUrl":"https://example.com/observer-capability-work-view"}' > /dev/null
 post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"act.work_view.control","operation":"work_view.reveal","params":{"entryUrl":"https://example.com/observer-capability-work-view"}}' > "$WORK_VIEW_CONTROL_FILE"
+post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"act.browser.open","operation":"browser.new_tab","params":{"url":"https://example.com/observer-capability-browser-action"}}' > "$BROWSER_OPEN_FILE"
 post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"sense.openclaw.engineering_context.packet","params":{"limit":4,"thresholdChars":256,"protectRecentAssistantTurns":0}}' > "$CONTEXT_PACKET_FILE"
 post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"sense.openclaw.engineering_context.work_view_observation"}' > "$WORK_VIEW_FILE"
 curl --silent --fail "$CORE_URL/capabilities" > "$CAPABILITIES_FILE"
@@ -148,7 +151,8 @@ node - <<'EOF' \
   "$ACPX_COMPATIBILITY_FILE" \
   "$PROMPT_PACK_FILE" \
   "$CAPABILITIES_FILE" \
-  "$SCREEN_FILE"
+  "$SCREEN_FILE" \
+  "$BROWSER_OPEN_FILE"
 const fs = require("node:fs");
 const html = fs.readFileSync(process.argv[2], "utf8");
 const client = fs.readFileSync(process.argv[3], "utf8");
@@ -174,6 +178,7 @@ const acpxCompatibility = JSON.parse(fs.readFileSync(process.argv[22], "utf8"));
 const promptPack = JSON.parse(fs.readFileSync(process.argv[23], "utf8"));
 const capabilities = JSON.parse(fs.readFileSync(process.argv[24], "utf8"));
 const screen = JSON.parse(fs.readFileSync(process.argv[25], "utf8"));
+const browserOpen = JSON.parse(fs.readFileSync(process.argv[26], "utf8"));
 
 for (const token of [
   "invoke-vitals-button",
@@ -188,6 +193,7 @@ for (const token of [
   "engineering-provider-handoff-json",
   "workspace-text-write-task-button",
   "workspace-patch-apply-task-button",
+  "new-tab-action-button",
 ]) {
   if (!html.includes(token)) {
     throw new Error(`Observer HTML missing ${token}`);
@@ -213,6 +219,9 @@ for (const token of [
   "openclaw://credential/deepseek-api-key",
   "act.openclaw.workspace_text_write",
   "act.openclaw.workspace_patch_apply",
+  "runBrowserOpenCapability",
+  "act.browser.open",
+  "browser.new_tab",
 ]) {
   if (!client.includes(token)) {
     throw new Error(`Observer client missing ${token}`);
@@ -390,6 +399,24 @@ if (
   || JSON.stringify(workViewControl).includes("leaseId")
 ) {
   throw new Error("Observer trusted work-view control invoke path should remain allowlisted and compact");
+}
+if (
+  !browserOpen.ok
+  || browserOpen.invoked !== true
+  || browserOpen.capability?.id !== "act.browser.open"
+  || browserOpen.policy?.subject?.intent !== "browser.new_tab"
+  || browserOpen.invocation?.request?.intent !== "browser.new_tab"
+  || browserOpen.result?.registry !== "openclaw-browser-action-capability-v0"
+  || browserOpen.result?.operation !== "browser.new_tab"
+  || browserOpen.result?.action?.mediation?.accepted !== true
+  || browserOpen.result?.governance?.dispatchesExistingScreenActOwner !== true
+  || browserOpen.summary?.kind !== "browser.new_tab"
+  || browserOpen.summary?.accepted !== true
+  || browserOpen.summary?.noPayloadExposure !== true
+  || browserOpen.summary?.noProviderEgress !== true
+  || JSON.stringify(browserOpen).includes("observer-capability-browser-action")
+) {
+  throw new Error("Observer browser new-tab capability should use the existing screen-act owner with compact evidence");
 }
 if (
   !contextPacket.ok

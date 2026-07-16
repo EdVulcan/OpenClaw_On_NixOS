@@ -206,6 +206,13 @@ The same explicit task creation is available through
 the existing egress owner and still leaves operator execution and provider
 egress separately gated.
 
+The existing browser navigation descriptor now also has a bounded common
+runtime bridge documented in
+`OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_BROWSER_ACTION_PLAN.md`.
+Only explicit `browser.new_tab` requests reach the existing screen-act owner;
+fresh capture, trusted lease mediation, and browser network navigation remain
+on that owner, while invocation evidence excludes the URL and browser payload.
+
 The provider handoff's explicit source-task continuity is documented in:
 
 ```text

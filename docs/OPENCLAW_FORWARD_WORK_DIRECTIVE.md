@@ -1066,6 +1066,17 @@ contracts. This is a Level 1 contract closure, not a new write executor or
 automatic approval path. Details are in
 `docs/plans/OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_WORKSPACE_MUTATIONS_PLAN.md`.
 
+The next declared/runtime gap is now also closed for one concrete Level 2
+operator action. `act.browser.open` accepts only an explicit
+`browser.new_tab` operation through the common capability runtime and delegates
+to the existing screen-act owner. Screen-act still owns fresh capture, trusted
+lease, sidecar mediation, browser navigation, and visual grounding; invocation
+evidence retains no URL or browser payload. Observer's existing Open New Tab
+control uses the same path. This does not create a task, approval, automatic
+dispatch, selector surface, page-script authority, or generic action proxy.
+The boundary is documented in
+`docs/plans/OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_BROWSER_ACTION_PLAN.md`.
+
 ## Identity-Upgrade Alignment
 
 Every new capability must state which identity level it serves:
