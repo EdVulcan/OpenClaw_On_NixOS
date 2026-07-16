@@ -88,6 +88,10 @@ export function createCapabilityRuntime(deps) {
     buildNativeEngineeringToolSurfaceInventory,
   });
   const engineeringLspHandlers = createEngineeringLspCapabilityHandlers({
+    buildNativeEngineeringLspEvidence: pluginReview.buildNativeEngineeringLspEvidence,
+    buildNativeEngineeringLspLifecycleDraft: pluginReview.buildNativeEngineeringLspLifecycleDraft,
+    buildNativeEngineeringLspSourceTransferProposal: pluginReview.buildNativeEngineeringLspSourceTransferProposal,
+    buildNativeEngineeringLspSymbolRequestProposal: pluginReview.buildNativeEngineeringLspSymbolRequestProposal,
     buildNativeEngineeringLspSelectedTargetReadBridge: pluginReview.buildNativeEngineeringLspSelectedTargetReadBridge,
   });
   const engineeringVerificationHandlers = createEngineeringVerificationCapabilityHandlers({

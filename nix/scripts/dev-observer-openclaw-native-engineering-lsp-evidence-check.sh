@@ -57,7 +57,11 @@ cleanup() {
     "${EVIDENCE_FILE:-}" \
     "${DRAFT_FILE:-}" \
     "${SOURCE_TRANSFER_FILE:-}" \
-    "${SYMBOL_REQUEST_FILE:-}"
+    "${SYMBOL_REQUEST_FILE:-}" \
+    "${CAPABILITY_EVIDENCE_FILE:-}" \
+    "${CAPABILITY_LIFECYCLE_FILE:-}" \
+    "${CAPABILITY_SOURCE_TRANSFER_FILE:-}" \
+    "${CAPABILITY_SYMBOL_REQUEST_FILE:-}"
   "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -70,6 +74,10 @@ EVIDENCE_FILE="$(mktemp)"
 DRAFT_FILE="$(mktemp)"
 SOURCE_TRANSFER_FILE="$(mktemp)"
 SYMBOL_REQUEST_FILE="$(mktemp)"
+CAPABILITY_EVIDENCE_FILE="$(mktemp)"
+CAPABILITY_LIFECYCLE_FILE="$(mktemp)"
+CAPABILITY_SOURCE_TRANSFER_FILE="$(mktemp)"
+CAPABILITY_SYMBOL_REQUEST_FILE="$(mktemp)"
 
 curl --silent --fail "$OBSERVER_URL/" > "$HTML_FILE"
 curl --silent --fail "$OBSERVER_URL/client-v5.js" > "$CLIENT_FILE"
@@ -77,8 +85,24 @@ curl --silent --fail "$CORE_URL/plugins/native-adapter/engineering-lsp/evidence?
 curl --silent --fail "$CORE_URL/plugins/native-adapter/engineering-lsp/lifecycle-draft?language=typescript&lifecycleAction=start&limit=200" > "$DRAFT_FILE"
 curl --silent --fail "$CORE_URL/plugins/native-adapter/engineering-lsp/source-transfer-proposal?language=typescript&relativePath=src/app.ts&maxPreviewChars=1200" > "$SOURCE_TRANSFER_FILE"
 curl --silent --fail "$CORE_URL/plugins/native-adapter/engineering-lsp/symbol-request-proposal?language=typescript&action=definition&relativePath=src/app.ts&line=2&character=14" > "$SYMBOL_REQUEST_FILE"
+curl --silent --fail -X POST "$CORE_URL/capabilities/invoke" \
+  -H 'content-type: application/json' \
+  --data '{"capabilityId":"sense.openclaw.engineering_tool.lsp_evidence","intent":"engineering.lsp.evidence","params":{"action":"check","language":"typescript","limit":200}}' \
+  > "$CAPABILITY_EVIDENCE_FILE"
+curl --silent --fail -X POST "$CORE_URL/capabilities/invoke" \
+  -H 'content-type: application/json' \
+  --data '{"capabilityId":"plan.openclaw.engineering_tool.lsp_lifecycle","intent":"engineering.lsp.lifecycle","params":{"language":"typescript","lifecycleAction":"start","limit":200}}' \
+  > "$CAPABILITY_LIFECYCLE_FILE"
+curl --silent --fail -X POST "$CORE_URL/capabilities/invoke" \
+  -H 'content-type: application/json' \
+  --data '{"capabilityId":"plan.openclaw.engineering_tool.lsp_source_transfer","intent":"engineering.lsp.source_transfer","params":{"language":"typescript","relativePath":"src/app.ts","maxPreviewChars":1200}}' \
+  > "$CAPABILITY_SOURCE_TRANSFER_FILE"
+curl --silent --fail -X POST "$CORE_URL/capabilities/invoke" \
+  -H 'content-type: application/json' \
+  --data '{"capabilityId":"plan.openclaw.engineering_tool.lsp_symbol_request","intent":"engineering.lsp.symbol_request","params":{"language":"typescript","action":"definition","relativePath":"src/app.ts","line":2,"character":14}}' \
+  > "$CAPABILITY_SYMBOL_REQUEST_FILE"
 
-node - <<'EOF' "$HTML_FILE" "$CLIENT_FILE" "$EVIDENCE_FILE" "$DRAFT_FILE" "$SOURCE_TRANSFER_FILE" "$SYMBOL_REQUEST_FILE"
+node - <<'EOF' "$HTML_FILE" "$CLIENT_FILE" "$EVIDENCE_FILE" "$DRAFT_FILE" "$SOURCE_TRANSFER_FILE" "$SYMBOL_REQUEST_FILE" "$CAPABILITY_EVIDENCE_FILE" "$CAPABILITY_LIFECYCLE_FILE" "$CAPABILITY_SOURCE_TRANSFER_FILE" "$CAPABILITY_SYMBOL_REQUEST_FILE"
 const fs = require("node:fs");
 const readText = (index) => fs.readFileSync(process.argv[index], "utf8");
 const readJson = (index) => JSON.parse(readText(index));
@@ -89,6 +113,10 @@ const evidence = readJson(4);
 const draft = readJson(5);
 const sourceTransfer = readJson(6);
 const symbolRequest = readJson(7);
+const capabilityEvidence = readJson(8);
+const capabilityLifecycle = readJson(9);
+const capabilitySourceTransfer = readJson(10);
+const capabilitySymbolRequest = readJson(11);
 const raw = JSON.stringify({ evidence, draft, sourceTransfer, symbolRequest });
 
 for (const token of [
@@ -121,11 +149,15 @@ for (const token of [
   }
 }
 for (const token of [
-  "/plugins/native-adapter/engineering-lsp/evidence",
-  "/plugins/native-adapter/engineering-lsp/lifecycle-draft",
-  "/plugins/native-adapter/engineering-lsp/source-transfer-proposal",
-  "/plugins/native-adapter/engineering-lsp/symbol-request-proposal",
   "/capabilities/invoke",
+  "sense.openclaw.engineering_tool.lsp_evidence",
+  "plan.openclaw.engineering_tool.lsp_lifecycle",
+  "plan.openclaw.engineering_tool.lsp_source_transfer",
+  "plan.openclaw.engineering_tool.lsp_symbol_request",
+  "engineering.lsp.evidence",
+  "engineering.lsp.lifecycle",
+  "engineering.lsp.source_transfer",
+  "engineering.lsp.symbol_request",
   "/plugins/native-adapter/engineering-lsp/selected-target-edit-proposal-seed",
   "/plugins/native-adapter/engineering-lsp/lifecycle-tasks",
   "/tasks/",
@@ -184,6 +216,16 @@ for (const token of [
 }
 if (client.includes("observerConfig.coreUrl}/plugins/native-adapter/engineering-lsp/selected-target-read-bridge")) {
   throw new Error("Observer LSP selected-target reads must use the common capability runtime");
+}
+for (const directRoute of [
+  "/plugins/native-adapter/engineering-lsp/evidence",
+  "/plugins/native-adapter/engineering-lsp/lifecycle-draft",
+  "/plugins/native-adapter/engineering-lsp/source-transfer-proposal",
+  "/plugins/native-adapter/engineering-lsp/symbol-request-proposal",
+]) {
+  if (client.includes(`observerConfig.coreUrl}${directRoute}`)) {
+    throw new Error(`Observer LSP refresh must use the common capability runtime: ${directRoute}`);
+  }
 }
 if (
   !evidence.ok
@@ -261,6 +303,68 @@ if (
 ) {
   throw new Error(`Observer LSP symbol request proposal mismatch: ${JSON.stringify(symbolRequest)}`);
 }
+if (
+  !capabilityEvidence.ok
+  || capabilityEvidence.invoked !== true
+  || capabilityEvidence.capability?.id !== "sense.openclaw.engineering_tool.lsp_evidence"
+  || capabilityEvidence.result?.registry !== "openclaw-native-engineering-lsp-evidence-v0"
+  || capabilityEvidence.summary?.kind !== "engineering.lsp_evidence"
+  || capabilityEvidence.summary?.noSourceContentRead !== true
+  || capabilityEvidence.summary?.noServerStart !== true
+  || capabilityEvidence.summary?.noJsonRpcRequest !== true
+  || capabilityEvidence.summary?.noProviderEgress !== true
+) {
+  throw new Error(`Observer LSP evidence capability mismatch: ${JSON.stringify(capabilityEvidence)}`);
+}
+if (
+  !capabilityLifecycle.ok
+  || capabilityLifecycle.invoked !== true
+  || capabilityLifecycle.capability?.id !== "plan.openclaw.engineering_tool.lsp_lifecycle"
+  || capabilityLifecycle.result?.registry !== "openclaw-native-engineering-lsp-lifecycle-draft-v0"
+  || capabilityLifecycle.summary?.kind !== "engineering.lsp_lifecycle"
+  || capabilityLifecycle.summary?.noServerStart !== true
+  || capabilityLifecycle.summary?.noTaskCreation !== true
+  || capabilityLifecycle.summary?.noApprovalCreation !== true
+  || capabilityLifecycle.summary?.noProviderEgress !== true
+) {
+  throw new Error(`Observer LSP lifecycle capability mismatch: ${JSON.stringify(capabilityLifecycle)}`);
+}
+if (
+  !capabilitySourceTransfer.ok
+  || capabilitySourceTransfer.invoked !== true
+  || capabilitySourceTransfer.capability?.id !== "plan.openclaw.engineering_tool.lsp_source_transfer"
+  || capabilitySourceTransfer.result?.registry !== "openclaw-native-engineering-lsp-source-transfer-proposal-v0"
+  || capabilitySourceTransfer.summary?.kind !== "engineering.lsp_source_transfer_proposal"
+  || capabilitySourceTransfer.summary?.noSourceTransfer !== true
+  || capabilitySourceTransfer.summary?.noServerStart !== true
+  || capabilitySourceTransfer.summary?.noTaskCreation !== true
+  || capabilitySourceTransfer.summary?.noMutation !== true
+  || capabilitySourceTransfer.summary?.noProviderEgress !== true
+) {
+  throw new Error(`Observer LSP source-transfer capability mismatch: ${JSON.stringify(capabilitySourceTransfer)}`);
+}
+if (
+  !capabilitySymbolRequest.ok
+  || capabilitySymbolRequest.invoked !== true
+  || capabilitySymbolRequest.capability?.id !== "plan.openclaw.engineering_tool.lsp_symbol_request"
+  || capabilitySymbolRequest.result?.registry !== "openclaw-native-engineering-lsp-symbol-request-proposal-v0"
+  || capabilitySymbolRequest.summary?.kind !== "engineering.lsp_symbol_request_proposal"
+  || capabilitySymbolRequest.summary?.noJsonRpcRequest !== true
+  || capabilitySymbolRequest.summary?.noServerStart !== true
+  || capabilitySymbolRequest.summary?.noTaskCreation !== true
+  || capabilitySymbolRequest.summary?.noMutation !== true
+  || capabilitySymbolRequest.summary?.noProviderEgress !== true
+) {
+  throw new Error(`Observer LSP symbol-request capability mismatch: ${JSON.stringify(capabilitySymbolRequest)}`);
+}
+if (JSON.stringify([
+  capabilityEvidence.invocation,
+  capabilityLifecycle.invocation,
+  capabilitySourceTransfer.invocation,
+  capabilitySymbolRequest.invocation,
+]).includes("OpenClawNeedle")) {
+  throw new Error("Observer LSP capability invocation evidence must not persist source preview content");
+}
 for (const secret of [
   "OBSERVER_ENGINEERING_LSP_EVIDENCE_NODE_MODULES_SECRET",
   "OBSERVER_ENGINEERING_LSP_EVIDENCE_CACHE_SECRET",
@@ -283,6 +387,12 @@ console.log(JSON.stringify({
     lifecycleAction: draft.summary.lifecycleAction,
     sourceTransferPath: sourceTransfer.file.relativePath,
     sourceTransferDidOpenSent: sourceTransfer.proposedDidOpen.sent,
+    capabilityRefresh: [
+      capabilityEvidence.capability.id,
+      capabilityLifecycle.capability.id,
+      capabilitySourceTransfer.capability.id,
+      capabilitySymbolRequest.capability.id,
+    ],
     selectedTargetReadControl: "visible",
     selectedTargetEditSeedControl: "visible",
     serverStatus: evidence.serverReadiness.status,

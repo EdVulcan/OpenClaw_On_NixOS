@@ -64,6 +64,7 @@ const resultEnvelopeCommonEnvHelper = "dev-openclaw-live-provider-result-envelop
 const resultEnvelopePrereqHelper = "dev-openclaw-live-provider-result-envelope-prereq.sh";
 const resultEnvelopeAssertionsHelper = "dev-openclaw-live-provider-result-envelope-assertions.sh";
 const nativeEngineeringContextPacketPairBatchCheck = "openclaw-native-engineering-context-packet-pair-batch-reuse";
+const nativeEngineeringLspCoreCheck = "openclaw-native-engineering-lsp-evidence";
 const nativeEngineeringLspObserverCheck = "observer-openclaw-native-engineering-lsp-evidence";
 
 function readCredentialValueLocalReadCommonScripts() {
@@ -555,8 +556,9 @@ function selectSourceHeuristics(file) {
     ["services/openclaw-core/src/task-executor.mjs", ["task-executor", "operator-loop", nativeEngineeringContextPacketPairBatchCheck]],
     ["services/openclaw-core/src/task-manager.mjs", ["task-executor", "operator-loop", nativeEngineeringContextPacketPairBatchCheck]],
     ["services/openclaw-core/src/native-engineering-experience-memory.mjs", ["openclaw-core-service-unit-tests", nativeEngineeringContextPacketPairBatchCheck, "capability-invoke", "observer-capability-invoke"]],
-    ["services/openclaw-core/src/capability-descriptors.mjs", ["capability-invoke", "observer-capability-invoke"]],
-    ["services/openclaw-core/src/capability-runtime.mjs", ["openclaw-core-service-unit-tests", "capability-invoke", "observer-capability-invoke"]],
+    ["services/openclaw-core/src/capability-descriptors.mjs", ["capability-invoke", "observer-capability-invoke", nativeEngineeringLspCoreCheck, nativeEngineeringLspObserverCheck]],
+    ["services/openclaw-core/src/capability-runtime.mjs", ["openclaw-core-service-unit-tests", "capability-invoke", "observer-capability-invoke", nativeEngineeringLspCoreCheck, nativeEngineeringLspObserverCheck]],
+    ["services/openclaw-core/src/capability-runtime-engineering-lsp.mjs", ["openclaw-core-service-unit-tests", nativeEngineeringLspCoreCheck, nativeEngineeringLspObserverCheck]],
     ["services/openclaw-core/src/capability-runtime-engineering-read-search.mjs", ["openclaw-core-service-unit-tests", "capability-invoke", "observer-capability-invoke"]],
     ["services/openclaw-core/src/capability-runtime-engineering-tool-surface.mjs", ["openclaw-core-service-unit-tests", "capability-invoke", "observer-capability-invoke", "openclaw-native-engineering-tool-surface-inventory", "observer-openclaw-native-engineering-tool-surface-inventory"]],
     ["services/openclaw-core/src/capability-runtime-engineering-verification.mjs", ["openclaw-core-service-unit-tests", "capability-invoke", "observer-capability-invoke"]],
@@ -580,6 +582,7 @@ function selectSourceHeuristics(file) {
     ["services/openclaw-core/src/plan-builder.mjs", ["openclaw-core-service-unit-tests", "capability-invoke", "observer-capability-invoke", nativeEngineeringContextPacketPairBatchCheck, "openclaw-native-plugin-runtime-refresh-evidence", "observer-openclaw-native-plugin-runtime-refresh-evidence"]],
     ["services/openclaw-core/src/native-engineering-tool-surface-builders.mjs", ["openclaw-native-engineering-tool-surface-inventory", "observer-openclaw-native-engineering-tool-surface-inventory", "capability-invoke", "observer-capability-invoke"]],
     ["services/openclaw-core/test/capability-runtime.test.mjs", ["openclaw-core-service-unit-tests", "capability-invoke", "observer-capability-invoke"]],
+    ["services/openclaw-core/test/capability-runtime-engineering-lsp.test.mjs", ["openclaw-core-service-unit-tests", nativeEngineeringLspCoreCheck, nativeEngineeringLspObserverCheck]],
     ["services/openclaw-core/test/capability-runtime-engineering-microcompact.test.mjs", ["openclaw-core-service-unit-tests", "capability-invoke", "observer-capability-invoke", "openclaw-native-engineering-microcompact-evidence", "observer-openclaw-native-engineering-microcompact-evidence"]],
     ["services/openclaw-core/test/capability-runtime-plugin-refresh.test.mjs", ["openclaw-core-service-unit-tests", "capability-invoke", "observer-capability-invoke", "openclaw-native-plugin-runtime-refresh-evidence", "observer-openclaw-native-plugin-runtime-refresh-evidence"]],
     ["services/openclaw-core/test/capability-runtime-engineering-provider-handoff.test.mjs", ["openclaw-core-service-unit-tests", "capability-invoke", "observer-capability-invoke"]],
@@ -630,7 +633,7 @@ function selectSourceHeuristics(file) {
     ["apps/observer-ui/src/client-script-refreshers-app.mjs", ["observer-capability-invoke"]],
     ["apps/observer-ui/src/client-script-runtime-bindings.mjs", ["observer-capability-invoke"]],
     ["apps/observer-ui/src/client-script-config-dom-workspace-source.mjs", [nativeEngineeringLspObserverCheck]],
-    ["apps/observer-ui/src/client-script-refreshers-workspace-source.mjs", ["observer-openclaw-native-engineering-tool-surface-inventory", "observer-openclaw-native-engineering-read-search", "observer-openclaw-native-engineering-edit-proposal", "observer-openclaw-native-engineering-write-proposal", "observer-capability-invoke"]],
+    ["apps/observer-ui/src/client-script-refreshers-workspace-source.mjs", ["observer-openclaw-native-engineering-tool-surface-inventory", "observer-openclaw-native-engineering-read-search", "observer-openclaw-native-engineering-edit-proposal", "observer-openclaw-native-engineering-write-proposal", nativeEngineeringLspObserverCheck, "observer-capability-invoke"]],
     ["apps/observer-ui/src/client-script-runtime-actions.mjs", [nativeEngineeringLspObserverCheck, "observer-capability-invoke"]],
     ["apps/observer-ui/src/client-script-runtime-screen-observation.mjs", ["observer-capability-invoke"]],
     ["apps/observer-ui/src/client-script-runtime-engineering-loop-controls.mjs", [nativeEngineeringLspObserverCheck, "observer-capability-invoke"]],

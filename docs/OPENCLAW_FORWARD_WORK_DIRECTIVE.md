@@ -1145,6 +1145,18 @@ bind sends `taskId`, `confirm:true`, and the explicit `rebind` decision through
 `act.openclaw.engineering_context.work_view_bind`; no packet content is persisted
 and no task execution or provider handoff is triggered automatically.
 
+The Observer LSP Evidence / Lifecycle / Source / Symbol panel now also refreshes
+its existing evidence and proposal builders through the common capability
+runtime as `sense.openclaw.engineering_tool.lsp_evidence`,
+`plan.openclaw.engineering_tool.lsp_lifecycle`,
+`plan.openclaw.engineering_tool.lsp_source_transfer`, and
+`plan.openclaw.engineering_tool.lsp_symbol_request`. Source previews remain
+transient and capability summaries/events retain only compact metadata; LSP task
+creation, approval, operator execution, selected-target reads/edits, and
+short-lived process requests remain on their existing explicit governed paths.
+The boundary is documented in
+`OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_LSP_READ_PROPOSALS_PLAN.md`.
+
 ## Identity-Upgrade Alignment
 
 Every new capability must state which identity level it serves:

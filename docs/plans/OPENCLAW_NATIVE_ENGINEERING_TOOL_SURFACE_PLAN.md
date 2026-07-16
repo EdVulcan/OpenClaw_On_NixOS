@@ -811,3 +811,15 @@ The existing Observer Write Proposal panel now likewise uses
 It preserves redacted transient proposal metadata and leaves actual writing on
 the explicit approval-gated workspace text-write path; no file, task, approval,
 command, provider, or network authority is added by the panel refresh.
+
+The existing Observer LSP Evidence / Lifecycle / Source / Symbol panel now also
+uses the common capability runtime for its four read/proposal refreshes:
+`sense.openclaw.engineering_tool.lsp_evidence`,
+`plan.openclaw.engineering_tool.lsp_lifecycle`,
+`plan.openclaw.engineering_tool.lsp_source_transfer`, and
+`plan.openclaw.engineering_tool.lsp_symbol_request`. It unwraps only transient
+builder results for the existing renderer; source previews do not enter
+capability summaries or events. Task creation, approval, process execution,
+selected-target reads/edits, and verification remain on their existing explicit
+governed paths. The focused boundary is documented in
+`OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_LSP_READ_PROPOSALS_PLAN.md`.

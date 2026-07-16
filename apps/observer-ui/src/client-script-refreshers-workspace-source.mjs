@@ -349,13 +349,42 @@ async function refreshEngineeringReadSearch() {
 
 async function refreshEngineeringLspEvidence() {
   try {
+    const invoke = (body) => fetchJson(\`\${observerConfig.coreUrl}/capabilities/invoke\`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
     const [evidence, lifecycleDraft, sourceTransferProposal, symbolRequestProposal] = await Promise.all([
-      fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/engineering-lsp/evidence?action=check&language=typescript&limit=200\`),
-      fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/engineering-lsp/lifecycle-draft?language=typescript&lifecycleAction=start&limit=200\`),
-      fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/engineering-lsp/source-transfer-proposal?language=typescript&relativePath=src/app.ts&maxPreviewChars=1200\`),
-      fetchJson(\`\${observerConfig.coreUrl}/plugins/native-adapter/engineering-lsp/symbol-request-proposal?language=typescript&action=definition&relativePath=src/app.ts&line=2&character=14\`),
+      invoke({
+        capabilityId: "sense.openclaw.engineering_tool.lsp_evidence",
+        intent: "engineering.lsp.evidence",
+        params: { action: "check", language: "typescript", limit: 200 },
+      }),
+      invoke({
+        capabilityId: "plan.openclaw.engineering_tool.lsp_lifecycle",
+        intent: "engineering.lsp.lifecycle",
+        params: { language: "typescript", lifecycleAction: "start", limit: 200 },
+      }),
+      invoke({
+        capabilityId: "plan.openclaw.engineering_tool.lsp_source_transfer",
+        intent: "engineering.lsp.source_transfer",
+        params: { language: "typescript", relativePath: "src/app.ts", maxPreviewChars: 1200 },
+      }),
+      invoke({
+        capabilityId: "plan.openclaw.engineering_tool.lsp_symbol_request",
+        intent: "engineering.lsp.symbol_request",
+        params: { language: "typescript", action: "definition", relativePath: "src/app.ts", line: 2, character: 14 },
+      }),
     ]);
-    renderEngineeringLspEvidence({ evidence, lifecycleDraft, sourceTransferProposal, symbolRequestProposal });
+    if ([evidence, lifecycleDraft, sourceTransferProposal, symbolRequestProposal].some((response) => response.invoked !== true)) {
+      throw new Error("Engineering LSP capability refresh was not invoked.");
+    }
+    renderEngineeringLspEvidence({
+      evidence: evidence.result ?? {},
+      lifecycleDraft: lifecycleDraft.result ?? {},
+      sourceTransferProposal: sourceTransferProposal.result ?? {},
+      symbolRequestProposal: symbolRequestProposal.result ?? {},
+    });
   } catch {
     engineeringLspRegistry.textContent = "offline";
     engineeringLspLanguages.textContent = "none";
