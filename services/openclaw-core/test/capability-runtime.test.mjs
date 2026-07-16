@@ -106,8 +106,57 @@ test("capability runtime builds the local body registry with service health", as
   assert.ok(registry.summary.total > 20);
   assert.ok(registry.summary.online > 0);
   assert.equal(registry.capabilities.find((capability) => capability.id === "sense.system.vitals")?.available, true);
+  assert.equal(
+    registry.capabilities.find((capability) => capability.id === "sense.screen.observe")?.endpoint,
+    "http://127.0.0.1:4104/screen/current",
+  );
   assert.equal(runtime.capabilityByIntent("cloud.provider.send")?.id, "boundary.cross_domain.approval");
   assert.ok(calls.health.some((url) => url === "http://127.0.0.1:4106/health"));
+});
+
+test("capability runtime invokes bounded screen observation through the screen-sense owner", async () => {
+  const { runtime, state, events, calls } = createHarness({
+    fetchJsonResult: {
+      ok: true,
+      screen: {
+        timestamp: "2026-07-16T00:00:00.000Z",
+        readiness: "ready",
+        captureSource: "browser",
+        captureStrategy: "browser-runtime-backed",
+        focusedWindow: { title: "private", pid: 42 },
+        windowList: [{ title: "private", pid: 42 }],
+        ocrBlocks: [{ text: "private", confidence: 0.9 }],
+        snapshotText: "private snapshot",
+        trustedSession: { sessionIdentity: { sessionId: "private-session" } },
+        visualFrame: { available: true, width: 960, height: 540, fresh: true, dataUrl: "secret" },
+        semanticTargets: { available: true, itemCount: 2, items: [{ name: "private" }] },
+        workView: { status: "ready", visibility: "observable", mode: "ai-owned-work-view" },
+        workViewSummary: { tabCount: 2, visibleTextBlocks: ["private"] },
+      },
+    },
+  });
+
+  const result = await runtime.invokeCapability({ capabilityId: "sense.screen.observe" });
+
+  assert.equal(result.statusCode, 200);
+  assert.equal(result.response.invoked, true);
+  assert.equal(result.response.summary.kind, "screen.observe");
+  assert.equal(result.response.summary.readiness, "ready");
+  assert.equal(result.response.summary.noScreenPayload, true);
+  assert.equal(result.response.summary.noMutation, true);
+  assert.equal(result.response.summary.noProviderEgress, true);
+  assert.deepEqual(calls.fetchJson, ["http://127.0.0.1:4104/screen/current"]);
+  assert.equal(state.capabilityInvocationLog.at(-1)?.capability?.id, "sense.screen.observe");
+  assert.equal(events.at(-1)?.name, "capability.invoked");
+  assert.equal(JSON.stringify(result.response).includes("private snapshot"), false);
+
+  const rejected = await runtime.invokeCapability({
+    capabilityId: "sense.screen.observe",
+    params: { includeVisualFrame: true },
+  });
+  assert.equal(rejected.statusCode, 400);
+  assert.match(rejected.response.error, /not supported/);
+  assert.deepEqual(calls.fetchJson, ["http://127.0.0.1:4104/screen/current"]);
 });
 
 test("capability runtime exposes workspace edit target selection through the governed invoke path", async () => {

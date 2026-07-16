@@ -17,6 +17,7 @@ import { createAcpxCodexCompatibilityCapabilityHandlers } from "./capability-run
 import { createPromptPackCapabilityHandlers } from "./capability-runtime-prompt-pack.mjs";
 import { createWorkspaceEditTargetCapabilityHandlers } from "./capability-runtime-workspace-edit-target.mjs";
 import { createWorkspaceMutationCapabilityHandlers } from "./capability-runtime-workspace-mutations.mjs";
+import { createScreenObservationCapabilityHandlers } from "./capability-runtime-screen.mjs";
 
 export function createCapabilityRuntime(deps) {
   const {
@@ -146,6 +147,10 @@ export function createCapabilityRuntime(deps) {
     workspaceOps,
     serialiseTask,
     serialiseApproval,
+  });
+  const screenObservationHandlers = createScreenObservationCapabilityHandlers({
+    screenSenseUrl,
+    fetchJson,
   });
 
   function baseCapabilities() {
@@ -391,6 +396,10 @@ export function createCapabilityRuntime(deps) {
     if (workspaceMutation.handled) {
       return workspaceMutation.result;
     }
+    const screenObservation = await screenObservationHandlers.callBackend(capability, request);
+    if (screenObservation.handled) {
+      return screenObservation.result;
+    }
 
     if (capability.id === "sense.system.vitals") {
       return fetchJson(`${systemSenseUrl}/system/health`);
@@ -608,6 +617,10 @@ export function createCapabilityRuntime(deps) {
     const workspaceMutationSummary = workspaceMutationHandlers.summariseResult(capability, result);
     if (workspaceMutationSummary) {
       return workspaceMutationSummary;
+    }
+    const screenObservationSummary = screenObservationHandlers.summariseResult(capability, result);
+    if (screenObservationSummary) {
+      return screenObservationSummary;
     }
 
     if (capability.id === "sense.system.vitals") {
@@ -931,6 +944,13 @@ export function createCapabilityRuntime(deps) {
       return {
         statusCode: 400,
         response: { ok: false, error: workspaceMutationValidationError },
+      };
+    }
+    const screenObservationValidationError = screenObservationHandlers.validateRequest(capability, request);
+    if (screenObservationValidationError) {
+      return {
+        statusCode: 400,
+        response: { ok: false, error: screenObservationValidationError },
       };
     }
 

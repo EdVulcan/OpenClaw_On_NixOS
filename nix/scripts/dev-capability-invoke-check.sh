@@ -41,6 +41,7 @@ printf '%s\n' \
 cleanup() {
   rm -f \
     "${VITALS_FILE:-}" \
+    "${SCREEN_FILE:-}" \
     "${FILES_FILE:-}" \
     "${SEARCH_FILE:-}" \
     "${ENGINEERING_READ_FILE:-}" \
@@ -75,6 +76,7 @@ source "$SCRIPT_DIR/dev-openclaw-http-json-helper.sh"
 "$SCRIPT_DIR/dev-up.sh"
 
 VITALS_FILE="$(mktemp)"
+SCREEN_FILE="$(mktemp)"
 FILES_FILE="$(mktemp)"
 SEARCH_FILE="$(mktemp)"
 ENGINEERING_READ_FILE="$(mktemp)"
@@ -99,6 +101,7 @@ APPROVED_COMMAND_FILE="$(mktemp)"
 EVENTS_FILE="$(mktemp)"
 
 post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"sense.system.vitals","intent":"system.observe"}' > "$VITALS_FILE"
+post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"sense.screen.observe","intent":"screen.observe"}' > "$SCREEN_FILE"
 post_json "$CORE_URL/capabilities/invoke" "{\"capabilityId\":\"sense.filesystem.read\",\"intent\":\"filesystem.list\",\"operation\":\"list\",\"params\":{\"path\":\"$FIXTURE_DIR\",\"limit\":10}}" > "$FILES_FILE"
 post_json "$CORE_URL/capabilities/invoke" "{\"capabilityId\":\"sense.filesystem.read\",\"intent\":\"filesystem.search\",\"operation\":\"search\",\"params\":{\"path\":\"$FIXTURE_DIR\",\"query\":\"search-note\",\"limit\":10}}" > "$SEARCH_FILE"
 post_json "$CORE_URL/capabilities/invoke" "{\"capabilityId\":\"sense.openclaw.engineering_tool.read\",\"params\":{\"workspacePath\":\"$FIXTURE_DIR\",\"relativePath\":\"src/app.ts\",\"startLine\":1,\"endLine\":1}}" > "$ENGINEERING_READ_FILE"
@@ -147,7 +150,8 @@ node - <<'EOF' \
   "$ACPX_COMPATIBILITY_FILE" \
   "$PROMPT_PACK_FILE" \
   "$CAPABILITIES_FILE" \
-  "$FIXTURE_DIR"
+  "$FIXTURE_DIR" \
+  "$SCREEN_FILE"
 const fs = require("node:fs");
 const readJson = (index) => JSON.parse(fs.readFileSync(process.argv[index], "utf8"));
 const vitals = readJson(2);
@@ -174,9 +178,23 @@ const acpxCompatibility = readJson(22);
 const promptPack = readJson(23);
 const capabilities = readJson(24);
 const fixtureDir = process.argv[25];
+const screen = readJson(26);
 
 if (!vitals.ok || vitals.invoked !== true || vitals.capability?.id !== "sense.system.vitals" || vitals.policy?.decision !== "audit_only") {
   throw new Error("system vitals capability should be invoked with audit-only governance");
+}
+if (
+  !screen.ok
+  || screen.invoked !== true
+  || screen.capability?.id !== "sense.screen.observe"
+  || screen.result?.registry !== "openclaw-screen-observation-v0"
+  || screen.summary?.kind !== "screen.observe"
+  || screen.summary?.noScreenPayload !== true
+  || screen.summary?.noMutation !== true
+  || screen.summary?.noProviderEgress !== true
+  || JSON.stringify(screen).includes("snapshotText")
+) {
+  throw new Error(`screen observation capability should use the bounded screen-sense summary owner: ${JSON.stringify(screen)}`);
 }
 if (!files.ok || files.invoked !== true || files.result?.path !== fixtureDir || !files.result?.entries?.some((entry) => entry.name === "nested")) {
   throw new Error("filesystem list capability should route through core to allowed fixture root");
@@ -465,6 +483,12 @@ console.log(JSON.stringify({
       invoked: vitals.invoked,
       policy: vitals.policy.decision,
       alerts: vitals.summary.alerts,
+    },
+    screenObservation: {
+      readiness: screen.summary.readiness,
+      focusedWindowAvailable: screen.summary.focusedWindowAvailable,
+      visualFrameAvailable: screen.summary.visualFrameAvailable,
+      noScreenPayload: screen.summary.noScreenPayload,
     },
     filesystem: {
       path: files.result.path,

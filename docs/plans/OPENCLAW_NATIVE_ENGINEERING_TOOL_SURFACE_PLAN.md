@@ -63,6 +63,11 @@ documented in
 `OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_WORK_VIEW_OBSERVATION_PLAN.md`
 and
 `OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_WORK_VIEW_CONTROL_PLAN.md`.
+The declared `sense.screen.observe` sensor is also now closed through the same
+runtime boundary; it reuses screen-sense `/screen/current` and returns only
+bounded structural observation metadata without raw screen payloads. Its
+boundary is documented in
+`OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_SCREEN_OBSERVATION_PLAN.md`.
 
 Do not select historical inventory or LSP variant text below as a new slice.
 

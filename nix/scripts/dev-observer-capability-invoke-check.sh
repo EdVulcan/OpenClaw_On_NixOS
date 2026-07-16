@@ -39,6 +39,7 @@ cleanup() {
   rm -f \
     "${HTML_FILE:-}" \
     "${CLIENT_FILE:-}" \
+    "${SCREEN_FILE:-}" \
     "${VITALS_FILE:-}" \
     "${PROCESS_FILE:-}" \
     "${ENGINEERING_READ_FILE:-}" \
@@ -74,6 +75,7 @@ source "$SCRIPT_DIR/dev-openclaw-http-json-helper.sh"
 
 HTML_FILE="$(mktemp)"
 CLIENT_FILE="$(mktemp)"
+SCREEN_FILE="$(mktemp)"
 VITALS_FILE="$(mktemp)"
 PROCESS_FILE="$(mktemp)"
 ENGINEERING_READ_FILE="$(mktemp)"
@@ -98,6 +100,7 @@ EVENTS_FILE="$(mktemp)"
 
 curl --silent --fail "$OBSERVER_URL/" > "$HTML_FILE"
 curl --silent --fail "$OBSERVER_URL/client-v5.js" > "$CLIENT_FILE"
+post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"sense.screen.observe","intent":"screen.observe"}' > "$SCREEN_FILE"
 post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"sense.system.vitals","intent":"system.observe"}' > "$VITALS_FILE"
 post_json "$CORE_URL/capabilities/invoke" '{"capabilityId":"sense.process.list","intent":"process.list","params":{"limit":10}}' > "$PROCESS_FILE"
 post_json "$CORE_URL/capabilities/invoke" "{\"capabilityId\":\"sense.openclaw.engineering_tool.read\",\"params\":{\"workspacePath\":\"$FIXTURE_DIR\",\"relativePath\":\"src/app.ts\",\"startLine\":1,\"endLine\":1}}" > "$ENGINEERING_READ_FILE"
@@ -144,7 +147,8 @@ node - <<'EOF' \
   "$PROVIDER_HANDOFF_FILE" \
   "$ACPX_COMPATIBILITY_FILE" \
   "$PROMPT_PACK_FILE" \
-  "$CAPABILITIES_FILE"
+  "$CAPABILITIES_FILE" \
+  "$SCREEN_FILE"
 const fs = require("node:fs");
 const html = fs.readFileSync(process.argv[2], "utf8");
 const client = fs.readFileSync(process.argv[3], "utf8");
@@ -169,6 +173,7 @@ const providerHandoff = JSON.parse(fs.readFileSync(process.argv[21], "utf8"));
 const acpxCompatibility = JSON.parse(fs.readFileSync(process.argv[22], "utf8"));
 const promptPack = JSON.parse(fs.readFileSync(process.argv[23], "utf8"));
 const capabilities = JSON.parse(fs.readFileSync(process.argv[24], "utf8"));
+const screen = JSON.parse(fs.readFileSync(process.argv[25], "utf8"));
 
 for (const token of [
   "invoke-vitals-button",
@@ -208,6 +213,19 @@ for (const token of [
 
 if (!vitals.ok || vitals.invoked !== true || vitals.policy?.decision !== "audit_only") {
   throw new Error("Observer vitals invoke path should return an audited invocation");
+}
+if (
+  !screen.ok
+  || screen.invoked !== true
+  || screen.capability?.id !== "sense.screen.observe"
+  || screen.result?.registry !== "openclaw-screen-observation-v0"
+  || screen.summary?.kind !== "screen.observe"
+  || screen.summary?.noScreenPayload !== true
+  || screen.summary?.noMutation !== true
+  || screen.summary?.noProviderEgress !== true
+  || JSON.stringify(screen).includes("snapshotText")
+) {
+  throw new Error("Observer screen observation invoke path should remain bounded and read-only");
 }
 if (!processes.ok || processes.invoked !== true || processes.result?.count < 1) {
   throw new Error("Observer process invoke path should return process summaries");

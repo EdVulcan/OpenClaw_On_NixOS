@@ -413,6 +413,16 @@ is included in the existing context-packet pair batch. The boundary is
 documented in
 `docs/plans/OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_WORK_VIEW_BIND_PLAN.md`.
 
+The declared `sense.screen.observe` capability is now also executable through
+the common `/capabilities/invoke` path. It reuses the existing screen-sense
+`/screen/current` owner and returns only bounded readiness, structural window/
+OCR/frame counts, and trusted work-view status metadata. The descriptor no
+longer points at the removed `/screen/state` path. Titles, OCR text, snapshot
+text, URLs, session/lease identifiers, visual bytes, semantic target items,
+mutation, action dispatch, provider calls, and network egress remain outside
+the capability response and invocation history. Details are in
+`docs/plans/OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_SCREEN_OBSERVATION_PLAN.md`.
+
 The selected Level 1 consistency closures are complete. Do not reopen the LSP
 symbol chain or add another evidence/readiness shell; choose the next concrete
 identity-upgrade capability only after its Level 2 authority boundary is
