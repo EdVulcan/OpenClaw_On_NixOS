@@ -221,6 +221,8 @@ Observer exposes the selection without accepting arbitrary units or automatic
 restart. System-sense retains real switched-VM execution evidence, and the
 2026-07-17 switched generation now proves event-hub real mutation through both
 Core and Observer checks with changed-PID and restored-readiness evidence. The
+same descriptor-bound route now includes system-heal, and the switched
+generation proves its real mutation through both Core and Observer checks. The
 detailed record is in `OPENCLAW_DBUS_NATIVE_SYSTEMD_CONTROL_PLAN.md`.
 
 The active Level 2 bridge is documented in:

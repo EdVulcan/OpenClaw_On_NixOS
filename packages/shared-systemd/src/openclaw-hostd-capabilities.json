@@ -10,6 +10,11 @@
       "operation": "restart_event_hub",
       "targetUnit": "openclaw-event-hub.service",
       "capabilityId": "hostd.restart_event_hub"
+    },
+    {
+      "operation": "restart_system_heal",
+      "targetUnit": "openclaw-system-heal.service",
+      "capabilityId": "hostd.restart_system_heal"
     }
   ]
 }

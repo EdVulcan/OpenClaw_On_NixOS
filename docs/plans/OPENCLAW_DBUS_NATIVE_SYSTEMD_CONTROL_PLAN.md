@@ -9,9 +9,9 @@ restarts through the existing governed repair lifecycle.
 
 The fixed restarts are now owned by a dedicated `openclaw-hostd` system service.
 Core reaches it through a bounded Unix socket protocol, and hostd accepts only
-the two descriptor-backed OpenClaw restart capabilities for system-sense and
-event-hub. This boundary remains deliberately smaller than a general systemd
-RPC surface.
+the three descriptor-backed OpenClaw restart capabilities for system-sense,
+event-hub, and system-heal. This boundary remains deliberately smaller than a
+general systemd RPC surface.
 
 ## Phase A Prerequisite
 
@@ -96,8 +96,8 @@ separate explicit operator-approved VM check.
    services.
 2. A dedicated `openclaw-hostd` store-native service account owns the fixed
    hostd process and its Polkit subject. It accepts only the descriptor-backed
-   no-argument restart capabilities for `openclaw-system-sense.service` and
-   `openclaw-event-hub.service`, and invokes only
+   no-argument restart capabilities for `openclaw-system-sense.service`,
+   `openclaw-event-hub.service`, and `openclaw-system-heal.service`, and invokes only
    `org.freedesktop.systemd1.Manager.RestartUnit` with mode `replace`.
 3. The helper waits for the unit to return to `active/running` with a different
    main PID, then returns compact job and before/after evidence.
@@ -164,8 +164,8 @@ request it sent.
 
 Focused hostd tests, core executor tests, auth-delegation checks, Nix closure
 builds, body configuration, a real helper socket check, and the switched
-core/Observer milestones prove the owner/socket contract for both fixed
-targets. No new public route or arbitrary privileged API was added.
+core/Observer milestones prove the owner/socket contract for the fixed target
+set. No new public route or arbitrary privileged API was added.
 
 ## Third Slice: Live Dependency Evidence
 
@@ -237,19 +237,45 @@ post-restart readiness through the existing approval and Operator Step/Run
 lifecycle.
 
 The existing core and Observer real-execution checks now accept the bounded
-`OPENCLAW_SYSTEMD_NEXT_REPAIR_TARGET_UNIT` selector for either descriptor entry,
+`OPENCLAW_SYSTEMD_NEXT_REPAIR_TARGET_UNIT` selector for any descriptor entry,
 defaulting to `openclaw-system-sense.service`. Each check derives the expected
 operation and capability id from that same fixed mapping and verifies the task,
 native mutation, and command transcript agree. The shared host-mutation guard
 still refuses `execute:true` unless an intentional VM lane sets its explicit
 allow flag; the intentional 2026-07-17 VM lane used that guard and completed
-both target checks.
+all three target checks.
+
+## Sixth Slice: Fixed System-Heal Recovery
+
+The system-heal service is a declared system-owned body component that depends
+on event-hub and system-sense, but the fixed hostd recovery contract previously
+could not restore it when its process was inactive. This slice reuses the same
+descriptor, native D-Bus helper, high-risk approval, Operator Step/Run, and
+post-restart readiness path for one additional fixed target:
+
+```text
+Observer selects openclaw-system-heal.service
+-> Core verifies the native systemd inventory and descriptor binding
+-> explicit approval remains required
+-> hostd invokes only RestartUnit with no arguments
+-> Core verifies the changed PID and system-heal readiness
+```
+
+The capability is `restart_system_heal` / `hostd.restart_system_heal` and is
+allowlisted only for `openclaw-system-heal.service`. It adds no new route,
+system-heal mutation API, automatic recovery, command fallback, arbitrary
+unit input, or user-supplied D-Bus argument. The system-heal owner's own
+maintenance operations remain simulated; this target only restores its fixed
+service process through the existing governed host boundary. On 2026-07-17 the
+Core check verified PID `191453 -> 196563`, and the Observer check verified
+`196563 -> 196638`; both completed through `hostd.restart_system_heal`, native
+D-Bus, explicit approval, Operator Step/Run, and restored-readiness evidence.
 
 ## Deferred
 
-- D-Bus start/stop/reload operations and restart targets outside the two fixed
+- D-Bus start/stop/reload operations and restart targets outside the three fixed
   descriptor entries.
-- Any hostd capability beyond the fixed system-sense and event-hub restarts,
+- Any hostd capability beyond the fixed system-sense, event-hub, and system-heal restarts,
   including arbitrary unit names, methods, arguments, or caller-supplied D-Bus
   paths.
 - eBPF kernel event transport and declarative Nix self-evolution.
@@ -257,8 +283,8 @@ both target checks.
 ## Next Slice
 
 The fixed Level 3 hostd socket contract and real VM evidence are complete for
-both allowlisted restart capabilities. Future work must keep the native helper,
-exact user/group match, compact verified/matched readback, and
-descriptor-bound target. Continue with a separately justified capability behind
-the existing hostd owner; do not broaden this fixed restart into an arbitrary
+all three allowlisted restart capabilities. Future work must keep the native
+helper, exact user/group match, compact verified/matched readback, and
+descriptor-bound target. Select another capability only with a separate
+operator gap; do not broaden this fixed restart contract into an arbitrary
 systemd control API.

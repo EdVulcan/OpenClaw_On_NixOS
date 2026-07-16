@@ -17,6 +17,10 @@ case "$TARGET_UNIT" in
     TARGET_OPERATION="restart_event_hub"
     TARGET_CAPABILITY_ID="hostd.restart_event_hub"
     ;;
+  openclaw-system-heal.service)
+    TARGET_OPERATION="restart_system_heal"
+    TARGET_CAPABILITY_ID="hostd.restart_system_heal"
+    ;;
   *)
     echo "Unsupported fixed next-repair target: $TARGET_UNIT" >&2
     exit 64
@@ -38,7 +42,7 @@ if [[ "$core_user" != "openclaw-service"
   echo "installed OpenClaw core has not loaded the native Polkit D-Bus generation" >&2
   exit 65
 fi
-systemctl is-active --quiet openclaw-core.service openclaw-system-sense.service openclaw-hostd.service observer-ui.service
+systemctl is-active --quiet openclaw-core.service openclaw-system-sense.service openclaw-hostd.service observer-ui.service "$TARGET_UNIT"
 curl --silent --fail "$CORE_URL/health" >/dev/null
 curl --silent --fail "$OBSERVER_URL/health" >/dev/null
 
@@ -78,6 +82,7 @@ const targetCapabilityId = process.argv[9];
 for (const token of [
   "Create Next Repair Real Execution Task",
   "create-systemd-next-repair-real-execution-button",
+  "openclaw-system-heal.service",
 ]) {
   if (!html.includes(token)) {
     throw new Error(`Observer HTML missing ${token}`);

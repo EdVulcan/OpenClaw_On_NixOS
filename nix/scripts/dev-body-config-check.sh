@@ -319,6 +319,7 @@ for (const [name, unit] of Object.entries(ownership).filter(([name]) =>
 if (ownership.polkitEnabled !== true
   || !ownership.polkitExtraConfig.includes('action.lookup("unit") == "openclaw-system-sense.service"')
   || !ownership.polkitExtraConfig.includes('action.lookup("unit") == "openclaw-event-hub.service"')
+  || !ownership.polkitExtraConfig.includes('action.lookup("unit") == "openclaw-system-heal.service"')
   || !ownership.polkitExtraConfig.includes('action.lookup("verb") == "restart"')
   || !ownership.polkitExtraConfig.includes('subject.user == "openclaw-hostd"')) {
   throw new Error(`desktop body must expose fixed native systemd Polkit delegation: ${JSON.stringify({

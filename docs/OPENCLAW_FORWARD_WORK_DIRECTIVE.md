@@ -945,7 +945,7 @@ proven for one concrete operator gap: the foundational
 `openclaw-event-hub.service` can be selected in the existing approved
 next-repair task and is bound to the same descriptor-bound `openclaw-hostd`
 socket as system-sense. Core re-reads native inventory before task creation,
-hostd accepts only the two fixed operation/unit pairs, and Nix expands the
+hostd accepts only the fixed descriptor operation/unit pairs, and Nix expands the
 descriptor into exact Polkit rules. Focused tests and generated closure checks
 prove this contract; the switched VM has real system-sense execution evidence,
 and the 2026-07-17 switched generation now proves the event-hub mutation through
@@ -956,6 +956,16 @@ reported `openclaw-hostd` with `dbus_native` and
 `org.freedesktop.systemd1.Manager.RestartUnit`, and completed restored-health
 verification. Unknown units, automatic restart, arbitrary D-Bus arguments, and
 direct command fallback remain blocked.
+
+The next separately justified hostd capability is now the fixed
+`openclaw-system-heal.service` recovery target. It is a declared system-owned
+body service downstream of event-hub and system-sense; the existing native
+inventory, approval, Operator Step/Run, hostd, and post-verification lifecycle
+now accepts its descriptor-bound target. The system-heal owner's maintenance
+operations remain simulated, while the 2026-07-17 switched generation now
+proves its fixed restart through both Core and Observer. Core verified PID
+`191453 -> 196563`; Observer verified `196563 -> 196638`, with
+`hostd.restart_system_heal`, native D-Bus, and restored-health evidence.
 
 The Level 1 live-plugin-refresh migration now owns a real fixed-registry
 generation lifecycle. An approved existing refresh task builds and validates a

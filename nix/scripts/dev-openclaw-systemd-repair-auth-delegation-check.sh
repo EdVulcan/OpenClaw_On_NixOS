@@ -13,6 +13,7 @@ const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), "u
 
 const plan = read("docs/plans/OPENCLAW_DBUS_NATIVE_SYSTEMD_CONTROL_PLAN.md");
 const bodyModule = read("nix/modules/openclaw-body.nix");
+const hostdDescriptor = JSON.parse(read("packages/shared-systemd/src/openclaw-hostd-capabilities.json"));
 const desktopProfile = read("nix/profiles/desktop-body.nix");
 const core = [
   read("services/openclaw-core/src/runtime-state.mjs"),
@@ -41,8 +42,9 @@ for (const token of [
   "polkit-dbus-fixed-unit",
   "security.polkit.extraConfig",
   'action.id == "org.freedesktop.systemd1.manage-units"',
-  'action.lookup("unit") == "openclaw-system-sense.service"',
   'action.lookup("verb") == "restart"',
+  "hostdRestartCapabilities",
+  "hostdRestartUnitPolicy",
   "hostdUser",
   "delegationUser = cfg.hostdUser",
   'subject.user == "${delegationUser}"',
@@ -50,6 +52,16 @@ for (const token of [
   if (!bodyModule.includes(token)) {
     throw new Error(`NixOS body module missing narrow auth delegation token: ${token}`);
   }
+}
+
+const expectedCapabilities = [
+  { operation: "restart_system_sense", targetUnit: "openclaw-system-sense.service", capabilityId: "hostd.restart_system_sense" },
+  { operation: "restart_event_hub", targetUnit: "openclaw-event-hub.service", capabilityId: "hostd.restart_event_hub" },
+  { operation: "restart_system_heal", targetUnit: "openclaw-system-heal.service", capabilityId: "hostd.restart_system_heal" },
+];
+if (hostdDescriptor.registry !== "openclaw-hostd-restart-capability-v1"
+  || JSON.stringify(hostdDescriptor.capabilities) !== JSON.stringify(expectedCapabilities)) {
+  throw new Error(`Hostd descriptor must remain the exact fixed restart source: ${JSON.stringify(hostdDescriptor)}`);
 }
 
 if (bodyModule.includes("security.sudo.extraRules") || bodyModule.includes("systemctl restart")) {
@@ -64,7 +76,8 @@ for (const token of [
   "SYSTEMD_REPAIR_AUTH_DELEGATION",
   "polkit-dbus-fixed-unit",
   "passwordPromptAllowed: false",
-  "scope: \"restart openclaw-system-sense.service only\"",
+  "scope:",
+  "targetCapability.targetUnit",
   "org.freedesktop.systemd1.Manager.RestartUnit",
   "hostd-control-required",
   "hostdControlClient",
@@ -100,7 +113,7 @@ console.log(JSON.stringify({
     coreServiceUser: "openclaw-service",
     hostdServiceUser: "openclaw-hostd",
     socketGroup: "openclaw",
-    delegatedUnit: "openclaw-system-sense.service",
+    delegatedUnits: expectedCapabilities.map((capability) => capability.targetUnit),
     delegatedAction: "restart",
     transport: "unix_socket->dbus_native",
     polkitAction: "org.freedesktop.systemd1.manage-units",

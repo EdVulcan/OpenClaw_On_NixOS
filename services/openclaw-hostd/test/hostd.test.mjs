@@ -14,7 +14,7 @@ import path from "node:path";
 
 const allowPeer = async () => ({ verified: true, matched: true, reason: null });
 
-test("hostd protocol accepts only the fixed system-sense restart capability", () => {
+test("hostd protocol accepts only descriptor-backed restart capabilities", () => {
   const parsed = parseHostdRequest(JSON.stringify({
     version: 1,
     operation: "restart_system_sense",
@@ -51,6 +51,14 @@ test("hostd protocol accepts only the fixed system-sense restart capability", ()
     requestId: "test-event-hub-request",
   }));
   assert.equal(eventHub.ok, true);
+
+  const systemHeal = parseHostdRequest(JSON.stringify({
+    version: 1,
+    operation: "restart_system_heal",
+    target: "openclaw-system-heal.service",
+    requestId: "test-system-heal-request",
+  }));
+  assert.equal(systemHeal.ok, true);
 });
 
 test("hostd restart control verifies changed PID and closes its D-Bus transport", async () => {
@@ -128,6 +136,45 @@ test("hostd restart control uses the same bounded evidence for event-hub", async
     registry: HOSTD_RESTART_CAPABILITY_REGISTRY,
     operation: "restart_event_hub",
     capabilityId: "hostd.restart_event_hub",
+  });
+});
+
+test("hostd restart control uses the same bounded evidence for system-heal", async () => {
+  let readIndex = 0;
+  const restartCalls = [];
+  const transport = {
+    async getUnitPath(unitName) {
+      assert.equal(unitName, "openclaw-system-heal.service");
+      return "/org/freedesktop/systemd1/unit/openclaw_2dsystem_2dheal_2eservice";
+    },
+    async getAll(_path, interfaceName) {
+      const state = readIndex === 0
+        ? { activeState: "active", subState: "running", mainPid: 500 }
+        : { activeState: "active", subState: "running", mainPid: 600 };
+      if (interfaceName.endsWith(".Unit")) {
+        return { LoadState: "loaded", ActiveState: state.activeState, SubState: state.subState };
+      }
+      readIndex += 1;
+      return { MainPID: state.mainPid };
+    },
+    async restartUnit(unitName) {
+      restartCalls.push(unitName);
+      return "/org/freedesktop/systemd1/job/44";
+    },
+    close() {},
+  };
+
+  const result = await runFixedSystemdRestart({
+    unit: "openclaw-system-heal.service",
+    createTransport: () => transport,
+    pollIntervalMs: 0,
+  });
+  assert.deepEqual(restartCalls, ["openclaw-system-heal.service"]);
+  assert.equal(result.unit, "openclaw-system-heal.service");
+  assert.deepEqual(result.capability, {
+    registry: HOSTD_RESTART_CAPABILITY_REGISTRY,
+    operation: "restart_system_heal",
+    capabilityId: "hostd.restart_system_heal",
   });
 });
 

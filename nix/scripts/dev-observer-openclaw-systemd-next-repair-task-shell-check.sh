@@ -74,6 +74,7 @@ const requiredHtml = [
   "systemd-next-repair-task-shell-target",
   "systemd-next-repair-target-unit",
   "openclaw-event-hub.service",
+  "openclaw-system-heal.service",
   "systemd-next-repair-task-shell-approval",
   "systemd-next-repair-task-shell-mutation",
   "systemd-next-repair-task-shell-json",

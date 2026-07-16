@@ -191,7 +191,7 @@ export function createSystemdTaskBuilders(deps) {
               mode: "hostd-control-required",
               helperConfigured: false,
               passwordlessExpected: false,
-              scope: "fixed openclaw-hostd system-sense restart only",
+              scope: "fixed descriptor-backed OpenClaw hostd restart only",
             },
           },
         },
