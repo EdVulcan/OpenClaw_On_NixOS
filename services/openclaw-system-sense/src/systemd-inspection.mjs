@@ -6,6 +6,23 @@ export function createSystemdInspection({
 } = {}) {
   const SYSTEMD_UNIT_INVENTORY_REGISTRY = registries.systemdUnitInventory ?? "openclaw-systemd-unit-inventory-v0";
   const SYSTEMD_DEPENDENCY_MAP_REGISTRY = registries.systemdDependencyMap ?? "openclaw-systemd-dependency-map-v0";
+  const NATIVE_DEPENDENCIES = Symbol("nativeDependencies");
+
+  function sameStringSet(left, right) {
+    return left.length === right.length && left.every((value, index) => value === right[index]);
+  }
+
+  function attachNativeDependencyEvidence(response, systemd) {
+    Object.defineProperty(response, NATIVE_DEPENDENCIES, {
+      value: systemd.nativeDependencies instanceof Map ? systemd.nativeDependencies : null,
+      enumerable: false,
+    });
+    return response;
+  }
+
+  function systemdNativeDependencies(inventory) {
+    return inventory[NATIVE_DEPENDENCIES] instanceof Map ? inventory[NATIVE_DEPENDENCIES] : null;
+  }
 
 async function detectSystemdAvailability() {
   if (platform !== "linux") {
@@ -113,7 +130,7 @@ async function buildSystemdUnitInventory() {
   const inactive = units.filter((unit) => unit.activeState === "inactive").length;
   const observed = units.filter((unit) => unit.systemdObserved).length;
 
-  return {
+  return attachNativeDependencyEvidence({
     ok: true,
     registry: SYSTEMD_UNIT_INVENTORY_REGISTRY,
     mode: "read_only",
@@ -158,7 +175,7 @@ async function buildSystemdUnitInventory() {
       recommendedSlice: "openclaw-systemd-repair-plan",
       boundary: "plan-only repair proposal before any host mutation",
     },
-  };
+  }, systemd);
 }
 
 function toUnitName(serviceName) {
@@ -232,12 +249,30 @@ async function buildSystemdDependencyMap() {
       description: `${spec.unit} starts after ${toUnitName(dependency)}.`,
     }));
   });
+  const nativeDependencies = systemdNativeDependencies(inventory);
+  const observedEdges = nativeDependencies
+    ? [...nativeDependencies.entries()].flatMap(([dependent, upstream]) => upstream.map((dependency) => ({
+      from: dependency,
+      to: dependent,
+      relation: "after",
+      direction: "upstream_to_dependent",
+      bodyOwned: true,
+      canMutate: false,
+      evidence: "dbus_native_unit_after",
+      description: `${dependent} is observed after ${dependency} in the running systemd manager.`,
+    })))
+    : [];
+  const observedDownstreamMap = buildDownstreamMap(observedEdges);
   const downstreamMap = buildDownstreamMap(edges);
   const layerMemo = new Map();
   const nodes = openClawSystemdUnitSpecs.map((spec) => {
     const unit = unitByName.get(spec.unit) ?? {};
-    const upstream = (spec.after ?? []).map(toUnitName).sort();
+    const plannedUpstream = (spec.after ?? []).map(toUnitName).sort();
+    const observedUpstream = nativeDependencies?.has(spec.unit) ? nativeDependencies.get(spec.unit) : null;
+    const dependencyDrift = Array.isArray(observedUpstream)
+      && !sameStringSet(plannedUpstream, observedUpstream);
     const downstream = collectDownstreamUnits(spec.unit, downstreamMap);
+    const observedDownstream = collectDownstreamUnits(spec.unit, observedDownstreamMap);
     return {
       key: spec.key,
       name: spec.name,
@@ -247,8 +282,13 @@ async function buildSystemdDependencyMap() {
       activeState: unit.activeState ?? "unknown",
       subState: unit.subState ?? "unknown",
       systemdObserved: unit.systemdObserved === true,
-      upstream,
+      upstream: plannedUpstream,
       downstream,
+      plannedUpstream,
+      observedUpstream,
+      observedDownstream,
+      dependencyEvidence: observedUpstream === null ? "service_specs_after" : "dbus_native_unit_after",
+      dependencyDrift,
       dependencyLayer: dependencyLayerForSpec(spec, specByUnit, layerMemo),
       impactRadius: downstream.length,
       impactClass: classifyDependencyImpact(spec.unit, downstream.length),
@@ -276,6 +316,11 @@ async function buildSystemdDependencyMap() {
       inventoryObservedAt: inventory.observedAt,
       plannedFrom: "nix/modules/openclaw-body.nix serviceSpecs",
       evidence: "body_service_dependency_map",
+      dependencyEvidence: nativeDependencies ? "dbus_native_unit_after" : "service_specs_after",
+      nativeDependencyObservedNodes: nativeDependencies ? nativeDependencies.size : 0,
+      nativeDependencyReadOnlyMethod: nativeDependencies
+        ? "org.freedesktop.DBus.Properties.GetAll"
+        : null,
     },
     governance: {
       domain: "body_internal",
@@ -286,7 +331,11 @@ async function buildSystemdDependencyMap() {
       canMutate: false,
       canRestart: false,
       executesCommand: false,
-      readOnlySources: [inventory.registry, "serviceSpecs.after"],
+      readOnlySources: [
+        inventory.registry,
+        "serviceSpecs.after",
+        ...(nativeDependencies ? ["systemd.Unit.After"] : []),
+      ],
       forbiddenActions: ["start", "stop", "restart", "reload", "enable", "disable"],
     },
     summary: {
@@ -295,6 +344,9 @@ async function buildSystemdDependencyMap() {
       roots: roots.length,
       leaves: leaves.length,
       observed: nodes.filter((node) => node.systemdObserved).length,
+      observedDependencyNodes: nativeDependencies?.size ?? 0,
+      observedEdges: observedEdges.length,
+      dependencyDriftNodes: nodes.filter((node) => node.dependencyDrift).length,
       active: nodes.filter((node) => node.activeState === "active").length,
       highImpact: nodes.filter((node) => ["foundational", "high"].includes(node.impactClass)).length,
       mutationEndpoints: 0,
@@ -305,6 +357,7 @@ async function buildSystemdDependencyMap() {
     startupLayers,
     nodes,
     edges,
+    observedEdges,
     next: {
       recommendedSlice: "openclaw-health-trend-summary",
       boundary: "summarize existing health snapshots before recommending recovery choices",

@@ -31,6 +31,7 @@ test("native systemd adapter reads fixed unit properties without mutation method
           ["SubState", variant("running")],
           ["UnitFileState", variant("enabled")],
           ["FragmentPath", variant("/nix/store/openclaw-core.service")],
+          ["After", variant(["openclaw-event-hub.service", "network-online.target"])],
           ["Environment", variant("SECRET_MUST_NOT_ESCAPE=hidden")],
         ]);
         return;
@@ -43,7 +44,7 @@ test("native systemd adapter reads fixed unit properties without mutation method
   };
   const adapter = createSystemdDbusAdapter({ createSystemBus: () => bus });
 
-  const result = await adapter.inspectUnits(["openclaw-core.service"]);
+  const result = await adapter.inspectUnits(["openclaw-event-hub.service", "openclaw-core.service"]);
   const unit = result.units.get("openclaw-core.service");
 
   assert.equal(result.transport, "dbus_native");
@@ -52,6 +53,8 @@ test("native systemd adapter reads fixed unit properties without mutation method
   assert.equal(unit.properties.ActiveState, "active");
   assert.equal(unit.properties.MainPID, 1234);
   assert.equal("Environment" in unit.properties, false);
+  assert.deepEqual(result.nativeDependencies.get("openclaw-core.service"), ["openclaw-event-hub.service"]);
+  assert.deepEqual(result.nativeDependencyObservedUnits, ["openclaw-core.service", "openclaw-event-hub.service"]);
   assert.equal(closed, true);
   assert.deepEqual([...new Set(calls.map((call) => call.member))].sort(), ["GetAll", "GetUnit"]);
 });

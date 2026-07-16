@@ -156,6 +156,30 @@ builds, body configuration, a real helper socket check, and the switched
 core/Observer milestones prove the owner/socket contract. No new public route
 or arbitrary privileged API was added.
 
+## Third Slice: Live Dependency Evidence
+
+The existing body dependency map previously described only the declarative
+`serviceSpecs.after` plan. That is insufficient when system and user service
+managers own different components: the plan can name a cross-manager edge that
+the running systemd manager cannot actually materialize.
+
+The system-sense D-Bus adapter now reads the bounded `Unit.After` property in
+the same fixed `GetAll` call used by the read-only inventory. It retains only
+relationships between the nine allowlisted OpenClaw service units. The existing
+dependency-map route keeps its compatibility `upstream`/`edges` fields tied to
+the declarative plan, and adds `observedUpstream`, `observedDownstream`,
+`observedEdges`, dependency evidence source, and compact plan-drift counts.
+Observer renders that evidence in the existing Body Dependency Map panel.
+
+This remains read-only: it adds no D-Bus mutation method, hostd operation,
+approval, task, command fallback, persistence, or arbitrary unit input. A bus
+failure leaves the observed dependency fields unavailable and preserves the
+existing planned map with explicit `service_specs_after` evidence.
+
+The native systemd inventory and Observer milestones prove the live
+`openclaw-core.service` -> `openclaw-event-hub.service` edge and expose the
+number of observed nodes and declarative drift nodes from the switched VM.
+
 ## Deferred
 
 - D-Bus start/stop/reload operations and any restart target other than the fixed

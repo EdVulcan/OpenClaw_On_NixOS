@@ -78,6 +78,11 @@ test("systemd inspection prefers native D-Bus without invoking commands", async 
               FragmentPath: "/nix/store/openclaw.service",
             },
           }])),
+          nativeDependencies: new Map([
+            ["openclaw-event-hub.service", []],
+            ["openclaw-core.service", ["openclaw-event-hub.service"]],
+            ["observer-ui.service", ["openclaw-core.service"]],
+          ]),
         };
       },
     },
@@ -88,6 +93,7 @@ test("systemd inspection prefers native D-Bus without invoking commands", async 
 
   assert.equal(inventory.source.transport, "dbus_native");
   assert.equal(inventory.source.systemdVersion, "systemd 258.5");
+  assert.equal(JSON.stringify(inventory).includes("nativeDependencies"), false);
   assert.equal(inventory.units[0].observation, "dbus_properties_read_only");
   assert.deepEqual(inventory.governance.readOnlyCommands, []);
   assert.deepEqual(inventory.governance.readOnlyDbusMethods, [
@@ -95,6 +101,17 @@ test("systemd inspection prefers native D-Bus without invoking commands", async 
     "org.freedesktop.DBus.Properties.GetAll",
   ]);
   assert.equal(dependencyMap.summary.nodes, specs.length);
+  assert.equal(dependencyMap.source.dependencyEvidence, "dbus_native_unit_after");
+  assert.equal(dependencyMap.summary.observedDependencyNodes, 3);
+  assert.equal(dependencyMap.summary.observedEdges, 2);
+  assert.deepEqual(
+    dependencyMap.nodes.find((node) => node.unit === "openclaw-core.service").observedUpstream,
+    ["openclaw-event-hub.service"],
+  );
+  assert.equal(
+    dependencyMap.nodes.find((node) => node.unit === "observer-ui.service").dependencyDrift,
+    true,
+  );
   assert.equal(inspectCalls.length, 2);
 });
 
@@ -124,6 +141,9 @@ test("systemd inspection fails closed without command fallback when native D-Bus
   assert.equal(inventory.governance.hostMutation, false);
   assert.equal(dependencyMap.summary.nodes, specs.length);
   assert.equal(dependencyMap.summary.edges, 3);
+  assert.equal(dependencyMap.source.dependencyEvidence, "service_specs_after");
+  assert.equal(dependencyMap.summary.observedDependencyNodes, 0);
+  assert.equal(dependencyMap.summary.observedEdges, 0);
   assert.deepEqual(dependencyMap.roots, ["openclaw-event-hub.service"]);
   assert.equal(dependencyMap.nodes.find((node) => node.unit === "openclaw-event-hub.service").impactClass, "foundational");
 });

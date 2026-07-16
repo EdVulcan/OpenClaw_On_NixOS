@@ -234,6 +234,10 @@ follow-up now also has core and Observer real-execution proof: hostd runs as
 `openclaw-hostd`, core runs as `openclaw-service`, the socket remains group-bound,
 and both milestones record exit zero, native D-Bus job paths, changed PIDs,
 restored readiness, and removal of the host's historical sudo helper.
+The existing dependency-map route now additionally reads bounded live
+`Unit.After` evidence for the fixed OpenClaw inventory, separates observed
+edges from declarative plan edges, and reports compact dependency drift through
+the native systemd and Observer milestones.
 
 It now closes browser action mediation through operator takeover suspension and
 explicit resume/rebind, then runs a bounded approval-gated user-space helper

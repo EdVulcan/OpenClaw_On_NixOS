@@ -33,8 +33,10 @@ trap cleanup EXIT
 "$SCRIPT_DIR/dev-up.sh"
 
 inventory="$(curl --silent --fail "$SYSTEM_URL/system/systemd/units")"
+dependency_map="$(curl --silent --fail "$SYSTEM_URL/system/systemd/dependency-map")"
 
-node - <<'EOF' "$inventory"
+node - <<'EOF' "$inventory" "$dependency_map"
+const dependencyMap = JSON.parse(process.argv[3]);
 const inventory = JSON.parse(process.argv[2]);
 const expectedUnits = [
   "openclaw-event-hub.service",
@@ -70,6 +72,15 @@ if (inventory.source?.kind !== "openclaw-body-systemd-inventory" || inventory.so
 if (inventory.source?.transport !== "dbus_native" || !String(inventory.source?.systemdVersion).startsWith("systemd ")) {
   throw new Error(`systemd unit inventory should use the native system bus: ${JSON.stringify(inventory.source)}`);
 }
+if (dependencyMap.source?.dependencyEvidence !== "dbus_native_unit_after"
+  || dependencyMap.summary?.observedDependencyNodes < 1
+  || dependencyMap.governance?.readOnlySources?.includes("systemd.Unit.After") !== true) {
+  throw new Error(`systemd dependency map should expose native Unit.After evidence: ${JSON.stringify({
+    source: dependencyMap.source,
+    summary: dependencyMap.summary,
+    governance: dependencyMap.governance,
+  })}`);
+}
 if (inventory.governance?.hostMutation !== false || inventory.governance?.autonomy !== "observe_only") {
   throw new Error(`systemd unit inventory governance should stay observe-only: ${JSON.stringify(inventory.governance)}`);
 }
@@ -101,6 +112,12 @@ if (coreUnit?.observation !== "dbus_properties_read_only"
   throw new Error(`native inventory should observe the running core unit: ${JSON.stringify(coreUnit)}`);
 }
 
+const coreDependency = dependencyMap.nodes?.find((node) => node.unit === "openclaw-core.service");
+if (!coreDependency?.observedUpstream?.includes("openclaw-event-hub.service")
+  || coreDependency.dependencyEvidence !== "dbus_native_unit_after") {
+  throw new Error(`native dependency evidence should observe core after event hub: ${JSON.stringify(coreDependency)}`);
+}
+
 if (inventory.next?.boundary !== "plan-only repair proposal before any host mutation") {
   throw new Error(`systemd unit inventory should point to plan-only repair next: ${JSON.stringify(inventory.next)}`);
 }
@@ -115,6 +132,9 @@ console.log(JSON.stringify({
     coreState: `${coreUnit.loadState}/${coreUnit.activeState}/${coreUnit.subState}`,
     total: inventory.summary.total,
     plannedUnits: expectedUnits.length,
+    dependencyEvidence: dependencyMap.source.dependencyEvidence,
+    observedDependencyNodes: dependencyMap.summary.observedDependencyNodes,
+    dependencyDriftNodes: dependencyMap.summary.dependencyDriftNodes,
     next: inventory.next.recommendedSlice,
   },
 }, null, 2));

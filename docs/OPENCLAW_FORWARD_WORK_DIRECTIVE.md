@@ -851,6 +851,17 @@ fields, arbitrary units/methods, and response evidence whose request id is not
 bound to the originating core request; core also requires the compact matching
 peer-identity evidence. Broader systemd mutation remains deferred.
 
+The next bounded Phase B operator gap is now closed on the existing systemd
+dependency-map route. System-sense reads only the allowlisted live
+`org.freedesktop.systemd1.Unit.After` property through native D-Bus and keeps
+only edges between the fixed OpenClaw service inventory. The response separates
+declarative `serviceSpecs.after` edges from observed `observedEdges`, reports
+compact dependency drift, and Observer renders the evidence. Bus failure leaves
+the live dependency fields unavailable without command fallback. No hostd
+operation, approval, task, mutation, arbitrary unit, or new route was added.
+The next Phase B capability still requires a separate operator justification
+behind the existing fixed hostd owner.
+
 The Level 1 live-plugin-refresh migration now owns a real fixed-registry
 generation lifecycle. An approved existing refresh task builds and validates a
 new built-in registry generation, atomically swaps the shared native plugin

@@ -11,11 +11,22 @@ const UNIT_PROPERTY_NAMES = [
   "SubState",
   "UnitFileState",
   "FragmentPath",
+  "After",
 ];
 const SERVICE_PROPERTY_NAMES = ["MainPID", "ExecMainStatus"];
 
 function selectProperties(properties, names) {
   return Object.fromEntries(names.filter((name) => name in properties).map((name) => [name, properties[name]]));
+}
+
+function selectKnownServiceDependencies(after, knownUnitNames) {
+  if (!Array.isArray(after)) return null;
+  return [...new Set(after.flatMap((dependency) => {
+    if (typeof dependency !== "string") return [];
+    if (knownUnitNames.has(dependency)) return [dependency];
+    const serviceName = dependency.endsWith(".service") ? dependency : `${dependency}.service`;
+    return knownUnitNames.has(serviceName) ? [serviceName] : [];
+  }))].sort();
 }
 
 export function createSystemdDbusAdapter({
@@ -62,11 +73,22 @@ export function createSystemdDbusAdapter({
     try {
       const manager = await transport.getAll(transport.managerPath, transport.managerInterface);
       const units = await Promise.all(names.map((unitName) => inspectUnit(transport, unitName)));
+      const knownUnitNames = new Set(names);
+      const nativeDependencies = new Map();
+      const nativeDependencyObservedUnits = [];
+      for (const unit of units) {
+        const dependencies = selectKnownServiceDependencies(unit.properties?.After, knownUnitNames);
+        if (unit.found !== true || dependencies === null) continue;
+        nativeDependencies.set(unit.unitName, dependencies);
+        nativeDependencyObservedUnits.push(unit.unitName);
+      }
       return {
         available: true,
         transport: "dbus_native",
         version: manager.Version ? `systemd ${manager.Version}` : "systemd D-Bus",
         units: new Map(units.map((unit) => [unit.unitName, unit])),
+        nativeDependencies,
+        nativeDependencyObservedUnits: nativeDependencyObservedUnits.sort(),
         readOnlyMethods: [
           "org.freedesktop.systemd1.Manager.GetUnit",
           "org.freedesktop.DBus.Properties.GetAll",

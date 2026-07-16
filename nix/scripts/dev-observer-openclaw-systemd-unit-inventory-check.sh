@@ -39,12 +39,14 @@ CLIENT_FILE="$(mktemp)"
 curl --silent --fail "$OBSERVER_URL/" > "$HTML_FILE"
 curl --silent --fail "$OBSERVER_URL/client-v5.js" > "$CLIENT_FILE"
 inventory="$(curl --silent --fail "$SYSTEM_URL/system/systemd/units")"
+dependency_map="$(curl --silent --fail "$SYSTEM_URL/system/systemd/dependency-map")"
 
-node - <<'EOF' "$HTML_FILE" "$CLIENT_FILE" "$inventory"
+node - <<'EOF' "$HTML_FILE" "$CLIENT_FILE" "$inventory" "$dependency_map"
 const fs = require("node:fs");
 const html = fs.readFileSync(process.argv[2], "utf8");
 const client = fs.readFileSync(process.argv[3], "utf8");
 const inventory = JSON.parse(process.argv[4]);
+const dependencyMap = JSON.parse(process.argv[5]);
 
 const requiredHtml = [
   "Systemd Unit Inventory",
@@ -98,6 +100,16 @@ if (!inventory.units?.some((unit) => unit.unit === "openclaw-system-sense.servic
 if (!inventory.units?.some((unit) => unit.unit === "observer-ui.service")) {
   throw new Error(`Observer-facing inventory should include observer-ui unit: ${JSON.stringify(inventory.units)}`);
 }
+if (dependencyMap.source?.dependencyEvidence !== "dbus_native_unit_after"
+  || dependencyMap.summary?.observedDependencyNodes < 1
+  || !dependencyMap.nodes?.some((node) => node.unit === "openclaw-core.service"
+    && node.observedUpstream?.includes("openclaw-event-hub.service"))) {
+  throw new Error(`Observer-facing dependency map should retain native Unit.After evidence: ${JSON.stringify({
+    source: dependencyMap.source,
+    summary: dependencyMap.summary,
+    core: dependencyMap.nodes?.find((node) => node.unit === "openclaw-core.service"),
+  })}`);
+}
 const coreUnit = inventory.units.find((unit) => unit.unit === "openclaw-core.service");
 if (coreUnit?.observation !== "dbus_properties_read_only"
   || coreUnit.loadState !== "loaded"
@@ -116,6 +128,8 @@ console.log(JSON.stringify({
     systemdAvailable: inventory.source?.systemdAvailable,
     transport: inventory.source?.transport,
     coreState: `${coreUnit.loadState}/${coreUnit.activeState}/${coreUnit.subState}`,
+    dependencyEvidence: dependencyMap.source?.dependencyEvidence,
+    observedDependencyNodes: dependencyMap.summary?.observedDependencyNodes,
   },
 }, null, 2));
 EOF

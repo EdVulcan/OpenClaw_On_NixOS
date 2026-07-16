@@ -431,6 +431,7 @@ async function refreshSystemdDependencyMap() {
   try {
     const data = await fetchJson(\`\${observerConfig.systemSenseUrl}/system/systemd/dependency-map\`);
     const summary = data.summary ?? {};
+    const source = data.source ?? {};
     const governance = data.governance ?? {};
     const nodes = Array.isArray(data.nodes) ? data.nodes : [];
     const edges = Array.isArray(data.edges) ? data.edges : [];
@@ -447,6 +448,12 @@ async function refreshSystemdDependencyMap() {
       \`Roots: \${(data.roots ?? []).join(", ") || "none"}\`,
       \`Leaves: \${(data.leaves ?? []).join(", ") || "none"}\`,
       \`High impact: \${highImpact.join(", ") || "none"}\`,
+      "Dependency evidence: " + String(source.dependencyEvidence ?? "planned")
+        + " observedNodes=" + String(summary.observedDependencyNodes ?? 0)
+        + " observedEdges=" + String(summary.observedEdges ?? 0)
+        + " driftNodes=" + String(summary.dependencyDriftNodes ?? 0),
+      "Observed edges: " + ((data.observedEdges ?? [])
+        .map((edge) => String(edge.from) + "->" + String(edge.to)).join(", ") || "none"),
       \`Layers: \${Object.entries(data.startupLayers ?? {}).map(([layer, units]) => \`\${layer}=[\${units.join(", ")}]\`).join(" ")}\`,
       \`Edges: \${edges.map((edge) => \`\${edge.from}->\${edge.to}\`).join(", ")}\`,
       \`Next: \${data.next?.recommendedSlice ?? "health trend summary"}\`,
