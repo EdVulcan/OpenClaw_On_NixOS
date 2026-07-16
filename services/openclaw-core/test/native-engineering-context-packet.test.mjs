@@ -175,3 +175,65 @@ test("engineering context packet protects explicit plan/todo guidance", () => {
   assert.equal(packet.summary.compactedMessages, 0);
   assert.equal(JSON.stringify(packet).includes('"executesAutomatically":true'), false);
 });
+
+test("engineering context packet carries bounded advisory experience memory as protected evidence", () => {
+  const packet = buildNativeEngineeringContextPacket({
+    transcriptRecords: [],
+    taskId: "task-experience-context",
+    experienceMemory: {
+      ok: true,
+      registry: "openclaw-native-engineering-experience-memory-v0",
+      records: [{
+        id: "experience-record-1",
+        taskType: "system_task",
+        lesson: "Reuse bounded verification evidence before retrying.",
+        outcome: "failed",
+        executionPhase: "verifying_result",
+        applicabilityTokens: ["type:system_task", "verify"],
+        confidence: 0.58,
+        recordedAt: "2026-07-16T00:00:00.000Z",
+        source: {
+          registry: "openclaw-task-lifecycle-terminal-v0",
+          taskId: "source-experience-task",
+          outcomeHash: "a".repeat(64),
+        },
+      }],
+      summary: {
+        storedRecords: 1,
+        recalledRecords: 1,
+        status: "recalled",
+        advisoryOnly: true,
+      },
+      bounds: { maxRecallRecords: 8 },
+      governance: { advisoryOnly: true },
+      auditEvidence: {
+        summary: {
+          storedRecords: 1,
+          recalledRecords: 1,
+          queryTokenCount: 2,
+          queryHash: "b".repeat(64),
+          advisoryOnly: true,
+        },
+      },
+    },
+    thresholdChars: 1,
+    protectRecentAssistantTurns: 0,
+  });
+
+  const experienceMessage = packet.messages.find((message) => message.evidenceKind === "experience_memory_evidence");
+  assert.equal(experienceMessage?.toolName, "experience_memory");
+  assert.equal(packet.summary.experienceMemoryIncluded, true);
+  assert.equal(packet.summary.experienceMemoryRecalled, 1);
+  assert.equal(packet.summary.experienceMemoryStatus, "recalled");
+  assert.equal(packet.summary.experienceMemoryAdvisoryOnly, true);
+  assert.equal(packet.governance.readsExperienceMemory, true);
+  assert.equal(packet.governance.experienceMemoryAdvisoryOnly, true);
+  assert.deepEqual(packet.auditEvidence.summary.experienceMemory, {
+    storedRecords: 1,
+    recalledRecords: 1,
+    queryTokenCount: 2,
+    queryHash: "b".repeat(64),
+    advisoryOnly: true,
+  });
+  assert.equal(JSON.stringify(packet.auditEvidence).includes("Reuse bounded"), false);
+});

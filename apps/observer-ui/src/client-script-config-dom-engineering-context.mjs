@@ -10,6 +10,7 @@ const engineeringContextPacketAuthority = document.querySelector("#engineering-c
 const engineeringContextPacketCapture = document.querySelector("#engineering-context-packet-capture");
 const engineeringContextPacketTargets = document.querySelector("#engineering-context-packet-targets");
 const engineeringContextPacketPlanTodo = document.querySelector("#engineering-context-packet-plan-todo");
+const engineeringContextPacketExperienceMemory = document.querySelector("#engineering-context-packet-experience-memory");
 const engineeringContextPacketRecovery = document.querySelector("#engineering-context-packet-recovery");
 const engineeringContextPacketSourceTask = document.querySelector("#engineering-context-packet-source-task");
 const engineeringContextPacketSourceTaskIdInput = document.querySelector("#engineering-context-packet-source-task-id-input");

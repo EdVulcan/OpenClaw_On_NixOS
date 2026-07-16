@@ -1,6 +1,6 @@
 # OpenClaw Native Engineering Context Packet Plan
 
-Updated: 2026-07-14
+Updated: 2026-07-16
 
 ## Active Slice
 
@@ -33,6 +33,7 @@ reads the existing command transcript ledger and task map
 reuses existing verification and recovery builders
 orders selected command evidence chronologically
 adds bounded task goal/status/outcome summaries
+recalls a small set of matching advisory experience lessons from the persisted core state
 caps stdout/stderr per record
 redacts password/token/secret/api-key/credential, Bearer, and sk-* patterns
 applies the native in-memory microcompact projection
@@ -54,6 +55,7 @@ no command execution
 no provider SDK or provider call
 no network egress
 no raw packet content in audit events
+experience lessons are advisory-only and cannot create tasks, approvals, commands, or provider calls
 ```
 
 The packet may contain bounded local command output because its purpose is to
@@ -66,6 +68,7 @@ Implementation:
 
 ```text
 services/openclaw-core/src/native-engineering-context-packet.mjs
+services/openclaw-core/src/native-engineering-experience-memory.mjs
 services/openclaw-core/src/native-engineering-context-routes.mjs
 ```
 
@@ -73,6 +76,7 @@ Tests:
 
 ```text
 services/openclaw-core/test/native-engineering-context-packet.test.mjs
+services/openclaw-core/test/native-engineering-experience-memory.test.mjs
 services/openclaw-core/test/native-engineering-context-routes.test.mjs
 services/openclaw-core/test/route-handlers.test.mjs
 apps/observer-ui/src/observer-panels-engineering-context.mjs
@@ -85,7 +89,8 @@ Tests prove task filtering, output bounds, credential-like redaction,
 microcompaction, verification/recovery protection, no provider/network flags,
 and summary-only audit publication. The core/Observer milestone also proves an
 explicit packet build from an approved command transcript, visible HTML/client
-tokens, redaction and microcompaction evidence, and no provider/network use.
+tokens, redaction and microcompaction evidence, recalled terminal experience,
+and no provider/network use.
 
 ## Deferred
 
@@ -251,6 +256,22 @@ It proves the full recommendation remains transient in `execution.recommendation
 while `recommendationEvidence` retains only compact action/status data and no
 reason. The fixture uses no provider sender, credential, endpoint, or network
 egress.
+
+## Experience Memory Follow-Up Complete
+
+Task completion and failure now feed one bounded `experienceMemoryRecords` store
+in core state. Each record contains only a task type, a fixed bounded lesson,
+terminal outcome, execution phase, applicability tokens, confidence, and compact
+source/hash metadata. Goal text is used only to derive filtered applicability
+tokens; URLs, credential-like values, command output, task details, and
+executable parameters are excluded from the record.
+
+The existing Context Packet assembly recalls at most four matching records by
+task type and goal tokens. It injects them as protected
+`experience_memory_evidence` with explicit advisory-only governance. The same
+assembly is reused by the capability route, direct route, Observer readback, and
+explicit provider handoff, so the provider path inherits no new authority. The
+memory recall stores only counts and a query hash in audit evidence.
 
 ## Next Slice
 

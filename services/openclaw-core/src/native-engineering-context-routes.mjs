@@ -26,6 +26,7 @@ export async function handleNativeEngineeringContextRoute({
   planBuilder,
   publishEvent,
   sessionManagerUrl,
+  buildExperienceMemoryReadModel = () => null,
   readWorkViewState = readNativeEngineeringWorkViewState,
 }) {
   if (![MICROCOMPACT_PROJECTION_PATH, ENGINEERING_CONTEXT_PACKET_PATH].includes(requestUrl.pathname)) return false;
@@ -44,6 +45,7 @@ export async function handleNativeEngineeringContextRoute({
         workbenchRecords: state.nativeEngineeringPlanTodoWorkbenchRecords,
         listCommandTranscriptRecords: (options) => executor.listCommandTranscriptRecords(options),
         listCapabilityInvocations: (options) => planBuilder.listCapabilityInvocations(options),
+        buildExperienceMemoryReadModel,
         sessionManagerUrl,
         readWorkViewState,
       });

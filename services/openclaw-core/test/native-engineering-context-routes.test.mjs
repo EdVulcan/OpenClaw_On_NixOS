@@ -12,6 +12,7 @@ async function invoke({
   state = { tasks: new Map() },
   executor = { listCommandTranscriptRecords: () => [] },
   planBuilder = { listCapabilityInvocations: () => [] },
+  buildExperienceMemoryReadModel = () => null,
   sessionManagerUrl = "http://127.0.0.1:4102",
   readWorkViewState = async () => ({ ok: false, data: null }),
 } = {}) {
@@ -29,6 +30,7 @@ async function invoke({
     state,
     executor,
     planBuilder,
+    buildExperienceMemoryReadModel,
     publishEvent,
     sessionManagerUrl,
     readWorkViewState,
@@ -110,6 +112,26 @@ test("engineering context packet route assembles existing task evidence without 
     state: { tasks: new Map([[task.id, task]]) },
     executor: { listCommandTranscriptRecords: () => [record] },
     planBuilder: { listCapabilityInvocations: () => [] },
+    buildExperienceMemoryReadModel: () => ({
+      ok: true,
+      registry: "openclaw-native-engineering-experience-memory-v0",
+      records: [{
+        id: "experience-route-1",
+        taskType: "system_task",
+        lesson: "Reuse bounded context verification.",
+        outcome: "completed",
+        executionPhase: "completed",
+        applicabilityTokens: ["type:system_task"],
+        confidence: 0.72,
+        recordedAt: "2026-07-16T00:00:00.000Z",
+        source: { registry: "openclaw-task-lifecycle-terminal-v0", taskId: task.id, outcomeHash: "a".repeat(64) },
+        relevance: 101,
+      }],
+      summary: { storedRecords: 1, recalledRecords: 1, status: "recalled", advisoryOnly: true },
+      bounds: { maxRecallRecords: 8 },
+      governance: { advisoryOnly: true },
+      auditEvidence: { summary: { storedRecords: 1, recalledRecords: 1, queryTokenCount: 1, queryHash: "b".repeat(64), advisoryOnly: true } },
+    }),
     publishEvent: async (name, payload) => events.push({ name, payload }),
   });
 
@@ -119,6 +141,8 @@ test("engineering context packet route assembles existing task evidence without 
   assert.equal(JSON.stringify(response.body).includes("do-not-include"), false);
   assert.equal(response.body.governance.callsProvider, false);
   assert.equal(response.body.governance.networkEgress, false);
+  assert.equal(response.body.summary.experienceMemoryRecalled, 1);
+  assert.equal(response.body.messages.some((message) => message.evidenceKind === "experience_memory_evidence"), true);
   assert.equal(events[0].name, "native_engineering.context_packet_built");
   assert.equal(JSON.stringify(events).includes("do-not-include"), false);
 });

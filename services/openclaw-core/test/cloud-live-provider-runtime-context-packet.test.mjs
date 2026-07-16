@@ -65,6 +65,26 @@ test("context packet handoff materialises one bounded provider message with comp
         instruction: "Recommend the next local verification step.",
       },
     },
+    buildExperienceMemoryReadModel: ({ taskType }) => ({
+      ok: true,
+      registry: "openclaw-native-engineering-experience-memory-v0",
+      records: [{
+        id: "experience-provider-1",
+        taskType,
+        lesson: "Reuse bounded verification evidence.",
+        outcome: "completed",
+        executionPhase: "completed",
+        applicabilityTokens: ["type:source_command_task"],
+        confidence: 0.72,
+        recordedAt: "2026-07-16T00:00:00.000Z",
+        source: { registry: "openclaw-task-lifecycle-terminal-v0", taskId: "task-context-1", outcomeHash: "a".repeat(64) },
+        relevance: 101,
+      }],
+      summary: { storedRecords: 1, recalledRecords: 1, status: "recalled", advisoryOnly: true },
+      bounds: { maxRecallRecords: 8 },
+      governance: { advisoryOnly: true },
+      auditEvidence: { summary: { storedRecords: 1, recalledRecords: 1, queryTokenCount: 1, queryHash: "b".repeat(64), advisoryOnly: true } },
+    }),
   });
 
   assert.equal(result.ok, true);
@@ -73,9 +93,13 @@ test("context packet handoff materialises one bounded provider message with comp
   assert.equal(result.evidence.sourceTranscriptRecords, 1);
   assert.equal(result.evidence.contextContentIncluded, false);
   assert.equal(result.evidence.requestEnvelopeMaterialized, true);
+  assert.equal(result.evidence.experienceMemoryIncluded, true);
+  assert.equal(result.evidence.experienceMemoryRecalled, 1);
+  assert.equal(result.evidence.experienceMemoryAdvisoryOnly, true);
   assert.equal(result.liveProviderExecution.requestEnvelope.messages.length, 1);
   assert.match(result.liveProviderExecution.requestEnvelope.messages[0].content, /npm test/);
   assert.match(result.liveProviderExecution.requestEnvelope.messages[0].content, /Return only a JSON object/);
+  assert.match(result.liveProviderExecution.requestEnvelope.messages[0].content, /Reuse bounded verification evidence/);
   assert.equal(result.liveProviderExecution.responseContract, "engineering_recommendation_v0");
   assert.doesNotMatch(result.liveProviderExecution.requestEnvelope.messages[0].content, /should-be-redacted/);
   assert.doesNotMatch(JSON.stringify(result.evidence), /tests passed/);

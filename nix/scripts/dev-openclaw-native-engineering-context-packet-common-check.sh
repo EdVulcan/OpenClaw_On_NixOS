@@ -253,6 +253,10 @@ if (
   || packet.summary?.workViewObservationIncluded !== true
   || packet.summary?.planTodoEvidenceIncluded !== true
   || packet.summary?.planTodoCurrentAction === null
+  || packet.summary?.experienceMemoryIncluded !== true
+  || packet.summary?.experienceMemoryRecalled < 1
+  || packet.summary?.experienceMemoryAdvisoryOnly !== true
+  || !packet.messages?.some((message) => message.evidenceKind === "experience_memory_evidence")
   || !packet.messages?.some((message) => message.evidenceKind === "engineering_plan_todo_evidence")
   || !packet.workViewAssociation?.registry
   || packet.workViewAssociation?.observation?.registry !== "openclaw-native-engineering-work-view-observation-v0"
@@ -358,6 +362,7 @@ if (observerCheck) {
     "engineering-context-packet-capture",
     "engineering-context-packet-targets",
     "engineering-context-packet-plan-todo",
+    "engineering-context-packet-experience-memory",
     "engineering-context-packet-recovery",
     "engineering-context-packet-build-button",
     "engineering-context-packet-bind-work-view-button",
@@ -385,6 +390,8 @@ if (observerCheck) {
     "engineeringContextPacketUseTaskDetailButton",
     "sourceTaskId",
     "Task Selection:",
+    "Experience Memory:",
+    "engineeringContextPacketExperienceMemory",
     "engineeringContextPacketRecoveryButton",
     "Reveal Trusted Work View",
     "Rebind Task to Work View",

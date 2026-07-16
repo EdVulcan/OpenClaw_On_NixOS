@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { createTaskManager } from "../src/task-manager.mjs";
 
-function createHarness({ buildRulePlan = () => null, shouldBuildPlan = () => false } = {}) {
+function createHarness({ buildRulePlan = () => null, shouldBuildPlan = () => false, recordTaskExperience = () => null } = {}) {
   const tasks = new Map();
   const runtimeState = {
     status: "idle",
@@ -40,6 +40,7 @@ function createHarness({ buildRulePlan = () => null, shouldBuildPlan = () => fal
     ensureTaskPolicy: () => {},
     updatePlanForPhase: () => {},
     publishEvent: async () => {},
+    recordTaskExperience,
   });
 
   return { manager, tasks };
@@ -72,6 +73,25 @@ test("task manager stores a compact browser execution binding on planned tasks",
   assert.equal(task.operatorExecutionBinding?.inputTextBound, false);
   assert.doesNotMatch(JSON.stringify(task.operatorExecutionBinding), /private transient value/u);
   assert.equal(manager.serialiseTask(task).operatorExecutionBinding.actionCount, 1);
+});
+
+test("task manager records experience at both terminal lifecycle boundaries", () => {
+  const experiences = [];
+  const { manager } = createHarness({
+    recordTaskExperience: (task) => {
+      experiences.push({ id: task.id, outcome: task.outcome?.kind, phase: task.executionPhase });
+    },
+  });
+  const completed = manager.createTask({ goal: "Complete one governed task", type: "system_task" });
+  const failed = manager.createTask({ goal: "Fail one governed task", type: "system_task" });
+
+  manager.completeTask(completed, { summary: "completed" });
+  manager.failTask(failed, "bounded failure");
+
+  assert.deepEqual(experiences, [
+    { id: completed.id, outcome: "completed", phase: "completed" },
+    { id: failed.id, outcome: "failed", phase: "failed" },
+  ]);
 });
 
 test("task manager centralizes extension field creation and serialization", () => {

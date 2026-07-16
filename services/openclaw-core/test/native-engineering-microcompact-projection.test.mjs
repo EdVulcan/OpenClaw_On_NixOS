@@ -76,6 +76,27 @@ test("microcompact projection protects trusted work-view association outside rec
   assert.match(result.messages[1].content[0].text, /status=bound/u);
 });
 
+test("microcompact projection protects recalled experience memory outside recent window", () => {
+  const result = buildNativeEngineeringMicrocompactProjection({
+    thresholdChars: 10,
+    protectRecentAssistantTurns: 0,
+    messages: [
+      { role: "assistant", content: [{ type: "text", text: "old" }] },
+      {
+        role: "toolResult",
+        toolName: "experience_memory",
+        evidenceKind: "experience_memory_evidence",
+        content: [{ type: "text", text: "lesson=".concat("bounded advisory lesson ".repeat(20)) }],
+      },
+      { role: "assistant", content: [{ type: "text", text: "new" }] },
+    ],
+  });
+
+  assert.equal(result.summary.protectedEvidenceMessages, 1);
+  assert.equal(result.summary.compactedMessages, 0);
+  assert.match(result.messages[1].content[0].text, /bounded advisory lesson/u);
+});
+
 test("microcompact projection rejects oversized message collections and text", () => {
   assert.throws(
     () => buildNativeEngineeringMicrocompactProjection({

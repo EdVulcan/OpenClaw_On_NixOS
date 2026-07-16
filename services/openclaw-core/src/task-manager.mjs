@@ -93,6 +93,7 @@ export function createTaskManager(deps) {
     ensureTaskPolicy,
     updatePlanForPhase,
     publishEvent,
+    recordTaskExperience = () => null,
   } = deps;
   const {
     tasks,
@@ -550,6 +551,7 @@ function completeTask(task, details = null) {
     at: task.updatedAt,
   };
   task.closedAt = task.updatedAt;
+  recordTerminalTaskExperience(task);
   reconcileRuntimeState();
   persistState();
   return task;
@@ -572,9 +574,19 @@ function failTask(task, reason, details = null) {
     at: task.updatedAt,
   };
   task.closedAt = task.updatedAt;
+  recordTerminalTaskExperience(task);
   reconcileRuntimeState();
   persistState();
   return task;
+}
+
+function recordTerminalTaskExperience(task) {
+  try {
+    return recordTaskExperience(task);
+  } catch (error) {
+    console.error("Failed to record advisory task experience:", error instanceof Error ? error.message : error);
+    return null;
+  }
 }
 
 function buildWorkViewAttachPayload(data, targetUrl) {

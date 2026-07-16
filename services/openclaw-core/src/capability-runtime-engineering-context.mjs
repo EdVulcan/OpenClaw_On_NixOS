@@ -8,6 +8,7 @@ export function createEngineeringContextCapabilityHandlers({
   workbenchRecords = [],
   listCommandTranscriptRecords = () => [],
   listCapabilityInvocations = () => [],
+  buildExperienceMemoryReadModel = () => null,
   sessionManagerUrl,
   fetchImpl = globalThis.fetch,
   readWorkViewState,
@@ -25,6 +26,7 @@ export function createEngineeringContextCapabilityHandlers({
       workbenchRecords,
       listCommandTranscriptRecords,
       listCapabilityInvocations,
+      buildExperienceMemoryReadModel,
       sessionManagerUrl,
       fetchImpl,
       readWorkViewState,
@@ -53,6 +55,10 @@ export function createEngineeringContextCapabilityHandlers({
       workViewObservationIncluded: summary.workViewObservationIncluded === true,
       workViewObservationFreshness: summary.workViewObservationFreshness ?? null,
       planTodoEvidenceIncluded: summary.planTodoEvidenceIncluded === true,
+      experienceMemoryIncluded: summary.experienceMemoryIncluded === true,
+      experienceMemoryRecalled: summary.experienceMemoryRecalled ?? 0,
+      experienceMemoryStatus: summary.experienceMemoryStatus ?? null,
+      experienceMemoryAdvisoryOnly: summary.experienceMemoryAdvisoryOnly === true,
       noContentPersistence: governance.mutatesPersistedLogs === false
         && governance.mutatesTaskState === false,
       noProviderEgress: governance.callsProvider === false

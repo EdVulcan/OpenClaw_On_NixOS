@@ -39,6 +39,7 @@ export function createTaskExecutor(deps) {
     policyEvaluator,
     publishEvent,
     hostdControlClient = requestHostdSystemSenseRestart,
+    buildExperienceMemoryReadModel = () => null,
     readWorkViewState = readNativeEngineeringWorkViewState,
   } = deps;
   const {
@@ -1315,6 +1316,7 @@ async function buildOperatorOptions(task, body = {}) {
       tasks,
       runtimeState,
       workbenchRecords: state.nativeEngineeringPlanTodoWorkbenchRecords,
+      buildExperienceMemoryReadModel,
       sessionManagerUrl,
       readWorkViewState,
     });

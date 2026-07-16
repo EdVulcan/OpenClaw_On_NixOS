@@ -14,6 +14,7 @@ export function observerEngineeringContextPanels() {
           <div class="metric"><span>Capture</span><span id="engineering-context-packet-capture">none</span></div>
           <div class="metric"><span>Targets</span><span id="engineering-context-packet-targets">none</span></div>
           <div class="metric"><span>Plan/Todo</span><span id="engineering-context-packet-plan-todo">none</span></div>
+          <div class="metric"><span>Experience Memory</span><span id="engineering-context-packet-experience-memory">none</span></div>
           <div class="metric"><span>Recovery</span><span id="engineering-context-packet-recovery">none</span></div>
           <div class="control-stack">
             <div class="field">

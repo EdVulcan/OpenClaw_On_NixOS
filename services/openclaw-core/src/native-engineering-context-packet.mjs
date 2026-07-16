@@ -131,6 +131,7 @@ export function buildNativeEngineeringContextPacket({
   protectRecentAssistantTurns,
   workViewAssociation = null,
   planTodoEvidence = null,
+  experienceMemory = null,
 } = {}) {
   const safeLimit = boundedPositiveInteger(limit, DEFAULT_LIMIT, MAX_LIMIT);
   const safeMaxOutputChars = boundedPositiveInteger(maxOutputChars, DEFAULT_MAX_OUTPUT_CHARS, MAX_OUTPUT_CHARS);
@@ -155,6 +156,9 @@ export function buildNativeEngineeringContextPacket({
   }
   if (planTodoEvidence) {
     sourceMessages.push(protectedSummaryMessage("engineering_plan_todo", planTodoContextSummary(planTodoEvidence)));
+  }
+  if (experienceMemory) {
+    sourceMessages.push(protectedSummaryMessage("experience_memory", experienceMemory));
   }
   sourceMessages.push(protectedSummaryMessage("verification", verificationEvidence?.summary));
   sourceMessages.push(protectedSummaryMessage("recovery", recoveryEvidence?.summary));
@@ -198,12 +202,18 @@ export function buildNativeEngineeringContextPacket({
       planTodoEvidenceIncluded: Boolean(planTodoEvidence),
       planTodoTodoSource: planTodoEvidence?.summary?.todoSource ?? null,
       planTodoCurrentAction: planTodoEvidence?.nextGovernedActionSuggestion?.suggestion?.actionId ?? null,
+      experienceMemoryIncluded: Boolean(experienceMemory),
+      experienceMemoryRecalled: experienceMemory?.summary?.recalledRecords ?? 0,
+      experienceMemoryStored: experienceMemory?.summary?.storedRecords ?? 0,
+      experienceMemoryStatus: experienceMemory?.summary?.status ?? null,
+      experienceMemoryAdvisoryOnly: experienceMemory?.summary?.advisoryOnly === true,
     },
     bounds: {
       maxTranscriptRecords: MAX_LIMIT,
       selectedTranscriptRecords: safeLimit,
       maxOutputCharsPerRecord: safeMaxOutputChars,
       projection: projection.bounds,
+      experienceMemory: experienceMemory?.bounds ?? null,
     },
     provenance: {
       transcriptRegistry: "command-transcript-ledger",
@@ -212,6 +222,7 @@ export function buildNativeEngineeringContextPacket({
       taskId,
       sourceTaskId: selectedSourceTaskId,
       workViewAssociationRegistry: workViewAssociation?.registry ?? null,
+      experienceMemoryRegistry: experienceMemory?.registry ?? null,
     },
     governance: {
       localAssemblyOnly: true,
@@ -226,6 +237,8 @@ export function buildNativeEngineeringContextPacket({
       readsTrustedWorkViewState: Boolean(workViewAssociation),
       readsTrustedWorkViewObservation: workViewAssociation?.observation != null,
       readsPlanTodoEvidence: Boolean(planTodoEvidence),
+      readsExperienceMemory: Boolean(experienceMemory),
+      experienceMemoryAdvisoryOnly: experienceMemory?.governance?.advisoryOnly === true,
       localServiceReadOnly: Boolean(workViewAssociation),
     },
     auditEvidence: {
@@ -239,9 +252,10 @@ export function buildNativeEngineeringContextPacket({
         messageCount: projection.messages.length,
         redactions,
         compactedMessages: projection.summary.compactedMessages,
-        reclaimedChars: projection.summary.reclaimedChars,
-        workViewAssociation: workViewAssociation?.summary ?? null,
-      },
+          reclaimedChars: projection.summary.reclaimedChars,
+          workViewAssociation: workViewAssociation?.summary ?? null,
+          experienceMemory: experienceMemory?.auditEvidence?.summary ?? null,
+        },
     },
     workViewAssociation,
   };

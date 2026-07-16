@@ -45,3 +45,38 @@ test("core state persists input evidence and requires re-entry after restart", a
   assert.equal(restoredTask.outcome.details.inputTextPersisted, false);
   assert.equal(restoredTask.outcome.details.automaticReplay, false);
 });
+
+test("core state persists and restores bounded experience memory records", async (t) => {
+  const root = mkdtempSync(path.join(tmpdir(), "openclaw-core-experience-state-"));
+  const stateFilePath = path.join(root, "state.json");
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+
+  const runtime = createRuntimeState({ stateFilePath, getTaskById: () => null });
+  runtime.experienceMemoryRecords.set("experience-task-1", {
+    id: "experience-record-1",
+    schema: "openclaw.native_engineering_experience.v0",
+    recordedAt: "2026-07-16T00:00:00.000Z",
+    taskType: "system_task",
+    lesson: "A bounded advisory lesson.",
+    outcome: "completed",
+    executionPhase: "completed",
+    applicabilityTokens: ["type:system_task", "verify"],
+    confidence: 0.72,
+    source: {
+      registry: "openclaw-task-lifecycle-terminal-v0",
+      taskId: "experience-task-1",
+      outcomeHash: "a".repeat(64),
+    },
+  });
+  runtime.persistState();
+  await new Promise((resolve) => setTimeout(resolve, 100));
+
+  const persisted = JSON.parse(readFileSync(stateFilePath, "utf8"));
+  assert.equal(persisted.experienceMemoryRecords.length, 1);
+  assert.equal(persisted.experienceMemoryRecords[0].lesson, "A bounded advisory lesson.");
+
+  const restored = createRuntimeState({ stateFilePath, getTaskById: () => null });
+  restored.loadPersistentState();
+  assert.equal(restored.experienceMemoryRecords.size, 1);
+  assert.equal(restored.experienceMemoryRecords.get("experience-task-1").taskType, "system_task");
+});

@@ -35,6 +35,7 @@ function rendererContext() {
     engineeringContextPacketCapture: element(),
     engineeringContextPacketTargets: element(),
     engineeringContextPacketPlanTodo: element(),
+    engineeringContextPacketExperienceMemory: element(),
     engineeringContextPacketRecovery: element(),
     engineeringContextPacketBindWorkViewButton: element(),
     engineeringContextPacketRecoveryButton: element({ hidden: true }),
@@ -50,6 +51,7 @@ test("Observer exposes only the allowlisted trusted work-view recovery actions",
     "engineering-context-packet-capture",
     "engineering-context-packet-targets",
     "engineering-context-packet-plan-todo",
+    "engineering-context-packet-experience-memory",
     "engineering-context-packet-source-task",
     "engineering-context-packet-source-task-id-input",
     "engineering-context-packet-use-task-detail-button",
@@ -69,6 +71,11 @@ test("Observer exposes only the allowlisted trusted work-view recovery actions",
       planTodoEvidenceIncluded: true,
       planTodoTodoSource: "workbench_storage",
       planTodoCurrentAction: "create_verification_task",
+      experienceMemoryIncluded: true,
+      experienceMemoryRecalled: 2,
+      experienceMemoryStored: 5,
+      experienceMemoryStatus: "recalled",
+      experienceMemoryAdvisoryOnly: true,
     },
     governance: { callsProvider: false },
     workViewAssociation: {
@@ -92,7 +99,9 @@ test("Observer exposes only the allowlisted trusted work-view recovery actions",
   assert.equal(context.engineeringContextPacketCapture.textContent, "ready/fresh");
   assert.equal(context.engineeringContextPacketTargets.textContent, "3");
   assert.equal(context.engineeringContextPacketPlanTodo.textContent, "workbench_storage/create_verification_task");
+  assert.equal(context.engineeringContextPacketExperienceMemory.textContent, "2/recalled");
   assert.match(context.engineeringContextPacketJson.textContent, /recovery=prepare_work_view/);
+  assert.match(context.engineeringContextPacketJson.textContent, /Experience Memory: included=true recalled=2 stored=5 status=recalled advisoryOnly=true/);
 
   context.renderEngineeringContextPacket({
     summary: { workViewAssociationIncluded: true, messageCount: 1 },

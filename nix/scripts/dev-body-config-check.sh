@@ -587,6 +587,7 @@ EOF
     || ! -f "$core_server"
     || ! -f "$core_out/share/openclaw/services/openclaw-core/src/native-engineering-context-routes.mjs"
     || ! -f "$core_out/share/openclaw/services/openclaw-core/src/native-engineering-context-packet.mjs"
+    || ! -f "$core_out/share/openclaw/services/openclaw-core/src/native-engineering-experience-memory.mjs"
     || ! -f "$core_out/share/openclaw/services/openclaw-core/src/native-engineering-microcompact-projection.mjs"
     || ! -f "$core_out/share/openclaw/services/openclaw-core/src/native-engineering-work-view-association.mjs"
     || ! -f "$core_out/share/openclaw/services/openclaw-core/src/native-engineering-work-view-binding.mjs"
@@ -603,7 +604,7 @@ EOF
     || ! -f "$core_out/share/openclaw/packages/shared-utils/src/persist.mjs"
     || -w "$core_server"
     || -e "$core_out/share/openclaw/services/openclaw-core/test"
-    || "$(find "$core_out" -type f | wc -l)" -ne 175 ]]; then
+    || "$(find "$core_out" -type f | wc -l)" -ne 181 ]]; then
     echo "core Nix closure is not exact and read-only: $core_out" >&2
     exit 1
   fi

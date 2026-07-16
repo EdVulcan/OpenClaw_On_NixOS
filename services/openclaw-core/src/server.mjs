@@ -16,6 +16,7 @@ import { createWorkspaceOps } from "./workspace-ops.mjs";
 import { createPlanBuilder } from "./plan-builder.mjs";
 import { createTaskExecutor } from "./task-executor.mjs";
 import { registerRoutes } from "./route-handlers.mjs";
+import { createNativeEngineeringExperienceMemory } from "./native-engineering-experience-memory.mjs";
 
 // configure state & client
 const host = process.env.OPENCLAW_CORE_HOST ?? "127.0.0.1";
@@ -42,6 +43,9 @@ const state = createRuntimeState({
   stateFilePath,
   getTaskById: (id) => taskManager.getTaskById(id)
 });
+const experienceMemory = createNativeEngineeringExperienceMemory({
+  records: state.experienceMemoryRecords,
+});
 
 const policyEvaluator = createPolicyEvaluator({
   state,
@@ -57,6 +61,7 @@ const taskManager = createTaskManager({
   ensureTaskPolicy: (task, context) => policyEvaluator.ensureTaskPolicy(task, context),
   createApprovalRequestForTask: (task, decision) => approvalEngine.createApprovalRequestForTask(task, decision),
   publishEvent,
+  recordTaskExperience: (task) => experienceMemory.recordTaskExperience(task),
 });
 
 const approvalEngine = createApprovalEngine({ state, taskManager, policyEvaluator, publishEvent });
@@ -112,12 +117,14 @@ const planBuilder = createPlanBuilder({
   port,
   listCommandTranscriptRecords: (options) => executor?.listCommandTranscriptRecords(options) ?? [],
   listFilesystemChangeRecords: (options) => executor?.listFilesystemChangeRecords(options) ?? [],
+  buildExperienceMemoryReadModel: (...args) => experienceMemory.buildExperienceMemoryReadModel(...args),
 });
 
 executor = createTaskExecutor({
   client,
   state,
   taskManager,
+  buildExperienceMemoryReadModel: (...args) => experienceMemory.buildExperienceMemoryReadModel(...args),
   planBuilder,
   approvalEngine,
   workspaceOps,
@@ -147,6 +154,7 @@ const handleRequest = registerRoutes({
   screenActUrl,
   systemSenseUrl,
   systemHealUrl,
+  buildExperienceMemoryReadModel: (...args) => experienceMemory.buildExperienceMemoryReadModel(...args),
 });
 
 // create server

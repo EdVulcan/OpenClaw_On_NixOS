@@ -35,6 +35,7 @@ export function createPlanBuilder(deps) {
     port,
     listCommandTranscriptRecords = () => [],
     listFilesystemChangeRecords = () => [],
+    buildExperienceMemoryReadModel = () => null,
   } = deps;
   const {
     fetchJson,
@@ -127,6 +128,7 @@ export function createPlanBuilder(deps) {
     publishEvent,
     listCommandTranscriptRecords,
     listFilesystemChangeRecords,
+    buildExperienceMemoryReadModel,
     pluginRuntime: {
       buildNativePluginRuntimeRefreshEvidence: (...args) => {
         if (!nativePluginPlanBuilders) {

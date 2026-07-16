@@ -34,6 +34,11 @@ export const observerClientEngineeringContextRenderersScript = `function renderE
       ? \`\${summary.planTodoTodoSource ?? "unknown"}/\${summary.planTodoCurrentAction ?? "review_current_todo"}\`
       : "none";
   }
+  if (engineeringContextPacketExperienceMemory) {
+    engineeringContextPacketExperienceMemory.textContent = summary.experienceMemoryIncluded
+      ? \`\${summary.experienceMemoryRecalled ?? 0}/\${summary.experienceMemoryStatus ?? "unknown"}\`
+      : "none";
+  }
   const recoveryAction = workViewSummary.recoveryAction ?? "none";
   const recoveryButtonLabels = {
     prepare_work_view: "Prepare Trusted Work View",
@@ -62,6 +67,7 @@ export const observerClientEngineeringContextRenderersScript = `function renderE
     \`Summary: records=\${summary.sourceTranscriptRecords ?? 0} messages=\${summary.messageCount ?? messages.length} redactions=\${summary.redactions ?? 0} compacted=\${summary.compactedMessages ?? 0} reclaimedChars=\${summary.reclaimedChars ?? 0}\`,
     \`Task Selection: executionTask=\${data?.provenance?.taskId ?? "none"} sourceTask=\${summary.sourceTaskId ?? data?.provenance?.sourceTaskId ?? "none"}\`,
     \`Protection: verification=\${Boolean(summary.verificationEvidenceProtected)} recovery=\${Boolean(summary.recoveryEvidenceProtected)} planTodo=\${Boolean(summary.planTodoEvidenceIncluded)}\`,
+    \`Experience Memory: included=\${Boolean(summary.experienceMemoryIncluded)} recalled=\${summary.experienceMemoryRecalled ?? 0} stored=\${summary.experienceMemoryStored ?? 0} status=\${summary.experienceMemoryStatus ?? "none"} advisoryOnly=\${Boolean(summary.experienceMemoryAdvisoryOnly)}\`,
     \`Trusted Work View (\${workViewAssociationToolName}): included=\${Boolean(summary.workViewAssociationIncluded)} status=\${workViewSummary.status ?? "none"} workView=\${workViewSummary.workViewId ?? "none"} binding=\${workViewSummary.bindingStatus ?? "none"} authority=\${workViewSummary.actionAuthority ?? "inactive"} recovery=\${recoveryAction} leaseMatched=\${Boolean(workViewSummary.leaseMatched)} observationRegistry=\${workViewObservation?.registry ?? "openclaw-native-engineering-work-view-observation-v0"} observation=\${workViewSummary.workViewObservationStatus ?? "none"}/\${workViewSummary.workViewObservationFreshness ?? "none"} sequence=\${workViewSummary.workViewObservationSequence ?? "none"} semanticTargets=\${workViewSummary.semanticTargetCount ?? "none"}\`,
     \`Governance: local=\${Boolean(governance.localAssemblyOnly)} credentialStore=\${Boolean(governance.readsCredentialStore)} taskMutation=\${Boolean(governance.mutatesTaskState)} provider=\${Boolean(governance.callsProvider)} network=\${Boolean(governance.networkEgress)}\`,
     \`Audit: operation=\${data?.auditEvidence?.operation ?? "missing"} inputContent=\${Boolean(data?.auditEvidence?.inputContentRecorded)} outputContent=\${Boolean(data?.auditEvidence?.outputContentRecorded)}\`,

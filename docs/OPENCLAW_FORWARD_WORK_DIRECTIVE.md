@@ -225,6 +225,14 @@ assembles bounded task/transcript context with credential-like redaction and
 protected verification/recovery summaries without provider use. Do not reopen completed LSP symbol-request slices or add another
 standalone engineering evidence/readiness shell without a concrete operator gap.
 
+The first Hermes-inspired experience-memory slice is now also implemented. Core
+records a bounded advisory lesson automatically at task completion or failure,
+persists only sanitized task type/phase/tokens/confidence/hash metadata, and
+recalls at most four matching lessons into the existing Engineering Context
+Packet. The recalled evidence is visible in Observer and remains guidance only:
+it cannot create tasks, approvals, commands, actions, provider calls, or network
+egress. This is experience absorption, not automatic code self-modification.
+
 The planning workbench contract is now closed through the common capability
 runtime as well as its dedicated routes. `sense.openclaw.engineering_context.plan_todo_evidence`
 reads the existing bounded task/workbench builder, while

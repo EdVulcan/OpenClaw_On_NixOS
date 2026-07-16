@@ -42,6 +42,7 @@ export async function buildNativeEngineeringContextPacketReadModel({
   workbenchRecords = [],
   listCommandTranscriptRecords = () => [],
   listCapabilityInvocations = () => [],
+  buildExperienceMemoryReadModel = () => null,
   sessionManagerUrl,
   fetchImpl = globalThis.fetch,
   readWorkViewState = readNativeEngineeringWorkViewState,
@@ -75,6 +76,13 @@ export async function buildNativeEngineeringContextPacketReadModel({
     limit,
   });
   const selectedTaskId = selectedSourceTaskId ?? runtimeState.currentTaskId ?? null;
+  const selectedTask = taskForId(tasks, selectedTaskId);
+  const recallTask = selectedTask ?? latestTranscriptTask({ tasks, transcriptRecords });
+  const experienceMemory = buildExperienceMemoryReadModel({
+    taskType: recallTask?.type ?? taskTypeFromTranscript(transcriptRecords, selectedTaskId),
+    goal: recallTask?.goal ?? null,
+    limit: 4,
+  });
 
   let workViewAssociation = null;
   if (params.includeWorkView === true) {
@@ -111,5 +119,22 @@ export async function buildNativeEngineeringContextPacketReadModel({
     protectRecentAssistantTurns: params.protectRecentAssistantTurns,
     workViewAssociation,
     planTodoEvidence,
+    experienceMemory,
   });
+}
+
+function taskTypeFromTranscript(transcriptRecords, taskId) {
+  const record = Array.isArray(transcriptRecords)
+    ? transcriptRecords.find((entry) => !taskId || entry?.taskId === taskId)
+    : null;
+  return record?.taskType ?? "generic_task";
+}
+
+function latestTranscriptTask({ tasks, transcriptRecords }) {
+  if (!Array.isArray(transcriptRecords)) return null;
+  for (const record of transcriptRecords) {
+    const task = taskForId(tasks, record?.taskId);
+    if (task) return task;
+  }
+  return null;
 }

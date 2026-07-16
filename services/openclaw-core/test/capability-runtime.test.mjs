@@ -80,6 +80,7 @@ function createHarness(overrides = {}) {
     readWorkViewState: overrides.readWorkViewState,
     listCommandTranscriptRecords: overrides.listCommandTranscriptRecords ?? (() => []),
     listFilesystemChangeRecords: overrides.listFilesystemChangeRecords ?? (() => []),
+    buildExperienceMemoryReadModel: overrides.buildExperienceMemoryReadModel ?? (() => null),
     fetchImpl: overrides.fetchImpl ?? (async (url) => {
       calls.health.push(url);
       return {
@@ -1013,6 +1014,27 @@ test("capability runtime exposes the local engineering context packet through th
       assert.equal(limit, 100);
       return [transcriptRecord];
     },
+    buildExperienceMemoryReadModel: ({ taskType, goal }) => ({
+      ok: true,
+      registry: "openclaw-native-engineering-experience-memory-v0",
+      records: [{
+        id: "experience-context-1",
+        taskType,
+        lesson: "Reuse bounded verification evidence.",
+        outcome: "completed",
+        executionPhase: "completed",
+        applicabilityTokens: ["type:system_task"],
+        confidence: 0.72,
+        recordedAt: "2026-07-08T00:00:00.000Z",
+        source: { registry: "openclaw-task-lifecycle-terminal-v0", taskId, outcomeHash: "a".repeat(64) },
+        relevance: 101,
+      }],
+      summary: { storedRecords: 1, recalledRecords: 1, status: "recalled", advisoryOnly: true, queryTokenCount: 1 },
+      bounds: { maxRecallRecords: 8 },
+      governance: { advisoryOnly: true },
+      auditEvidence: { summary: { storedRecords: 1, recalledRecords: 1, queryTokenCount: 1, queryHash: "b".repeat(64), advisoryOnly: true } },
+      goal,
+    }),
   });
 
   const registry = await runtime.buildCapabilityRegistry();
@@ -1038,6 +1060,9 @@ test("capability runtime exposes the local engineering context packet through th
   assert.equal(result.response.summary.kind, "engineering.context_packet");
   assert.equal(result.response.summary.noContentPersistence, true);
   assert.equal(result.response.summary.noProviderEgress, true);
+  assert.equal(result.response.summary.experienceMemoryIncluded, true);
+  assert.equal(result.response.summary.experienceMemoryRecalled, 1);
+  assert.equal(result.response.summary.experienceMemoryAdvisoryOnly, true);
   assert.equal(JSON.stringify(state.capabilityInvocationLog).includes("private-context-value"), false);
   assert.deepEqual(events.map((event) => event.name), [
     "policy.evaluated",

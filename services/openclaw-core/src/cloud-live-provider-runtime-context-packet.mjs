@@ -105,6 +105,10 @@ function compactPacketEvidence(packet, {
     planTodoEvidenceIncluded: packet.summary?.planTodoEvidenceIncluded === true,
     planTodoTodoSource: packet.summary?.planTodoTodoSource ?? null,
     planTodoCurrentAction: packet.summary?.planTodoCurrentAction ?? null,
+    experienceMemoryIncluded: packet.summary?.experienceMemoryIncluded === true,
+    experienceMemoryRecalled: packet.summary?.experienceMemoryRecalled ?? 0,
+    experienceMemoryStatus: packet.summary?.experienceMemoryStatus ?? null,
+    experienceMemoryAdvisoryOnly: packet.summary?.experienceMemoryAdvisoryOnly === true,
     contextContentHash: hashText(contextText),
     providerMessageChars,
     contextTruncated,
@@ -121,6 +125,7 @@ export async function materialiseCloudLiveProviderContextPacketExecution({
   tasks = new Map(),
   runtimeState = {},
   workbenchRecords = new Map(),
+  buildExperienceMemoryReadModel = () => null,
   sessionManagerUrl,
   readWorkViewState = readNativeEngineeringWorkViewState,
 } = {}) {
@@ -231,6 +236,11 @@ export async function materialiseCloudLiveProviderContextPacketExecution({
     protectRecentAssistantTurns: contextRequest.protectRecentAssistantTurns,
     workViewAssociation,
     planTodoEvidence,
+    experienceMemory: buildExperienceMemoryReadModel({
+      taskType: contextTask.type,
+      goal: contextTask.goal,
+      limit: 4,
+    }),
   });
   const fullContextText = packet.messages.map(packetMessageText).filter(Boolean).join("\n\n");
   const requestedInstruction = boundedText(
