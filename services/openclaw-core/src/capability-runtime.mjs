@@ -83,6 +83,7 @@ export function createCapabilityRuntime(deps) {
     buildOpenClawPluginCapabilityPlan,
     buildOpenClawPluginSearchWebAdapterContract,
     buildNativeDeclarativeEvolutionCandidate,
+    buildNativeDeclarativeEvolutionHealthGate,
   } = pluginReview;
   const engineeringReadSearchHandlers = createEngineeringReadSearchCapabilityHandlers({
     buildNativeEngineeringReadFile: pluginReview.buildNativeEngineeringReadFile,
@@ -187,6 +188,7 @@ export function createCapabilityRuntime(deps) {
   });
   const declarativeEvolutionHandlers = createDeclarativeEvolutionCapabilityHandlers({
     buildNativeDeclarativeEvolutionCandidate,
+    buildNativeDeclarativeEvolutionHealthGate,
     createNativeDeclarativeEvolutionStagingTask: declarativeEvolution.createNativeDeclarativeEvolutionStagingTask,
   });
 

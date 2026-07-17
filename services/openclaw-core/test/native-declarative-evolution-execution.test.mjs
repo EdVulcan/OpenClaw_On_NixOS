@@ -27,11 +27,16 @@ test("declarative evolution execution stages only the approved candidate hash an
         return { status: "passed", mode: "nix-instantiate" };
       },
       runNixCommand: async (args) => {
-        calls.push({ name: args.includes("eval") ? "eval" : "build", args });
-        if (args.includes("eval")) {
-          return {
-            status: "passed",
-            stdout: JSON.stringify({ candidateType: "lambda", components: ["core"], toplevelEvaluated: true }),
+          calls.push({ name: args.includes("eval") ? "eval" : "build", args });
+          if (args.includes("eval")) {
+            return {
+              status: "passed",
+            stdout: JSON.stringify({
+              candidateType: "lambda",
+              components: ["core"],
+              toplevelPath: "/nix/store/abc123-openclaw-system",
+              toplevelEvaluated: true,
+            }),
           };
         }
         return { status: "passed", stdout: "" };
@@ -44,6 +49,7 @@ test("declarative evolution execution stages only the approved candidate hash an
     assert.match(result.staging.path, new RegExp(`${candidateHash}\\.nix$`));
     assert.equal(await readFile(result.staging.path, "utf8"), candidateText);
     assert.equal(result.evaluation.status, "passed");
+    assert.equal(result.evaluation.toplevelPath, "/nix/store/abc123-openclaw-system");
     assert.equal(result.build.mode, "nix-build-dry-run");
     assert.equal(result.governance.writesManagedConfig, false);
     assert.equal(result.governance.switchesGeneration, false);

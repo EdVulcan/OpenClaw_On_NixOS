@@ -1267,7 +1267,7 @@ This closes the Level 1 navigation boundary and stops here; it does not add
 another LSP request, generic tool dispatcher, task, approval, mutation,
 provider call, or network path.
 
-## Completed Phase D Candidate And Staging Slice
+## Completed Phase D Candidate, Staging, And Health-Gate Slice
 
 The first real Phase D declarative-evolution capability is complete. Core
 accepts only structured allowlisted changes, generates a transient
@@ -1288,10 +1288,24 @@ bounded.
 
 This slice still does not write `/etc/nixos`, run `nixos-rebuild`, switch a
 generation, execute rollback, read credentials, call a provider, or use network
-egress. The next mainline slice is a read-only health-gate assessment bound to
-the exact staged candidate and evaluated system closure. Activation and
-physical rollback remain separate capabilities and cannot be inferred from a
-successful build.
+egress.
+
+The read-only health-gate assessment is now complete through
+`sense.openclaw.declarative_evolution.health_gate` and
+`GET /plugins/native-adapter/declarative-evolution/health-gate?taskId=...`.
+After a completed staging task it re-reads the exact OpenClaw-owned staging
+file, recomputes its SHA-256 and byte count, verifies candidate/approval/
+execution hash bindings, and binds the evaluated `/nix/store/...` to the
+staging execution evidence. It reports `eligible_for_activation_review` only
+when every check passes. It explicitly reports `hostHealth=not_assessed` and
+does not write managed configuration, switch generations, activate a system,
+or execute rollback. The Core and Observer staging checks prove this path with
+real services and no candidate-text exposure.
+
+The next mainline slice is an explicit activation decision and host-health
+boundary. `nixos-rebuild`, generation switching, host-health assessment, and
+physical rollback remain deferred capabilities; none can be inferred from a
+successful health-gate assessment.
 
 ## Identity-Upgrade Alignment
 

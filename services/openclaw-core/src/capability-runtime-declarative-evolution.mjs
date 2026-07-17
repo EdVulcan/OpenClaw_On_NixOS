@@ -1,5 +1,10 @@
+import {
+  NATIVE_DECLARATIVE_EVOLUTION_HEALTH_GATE_CAPABILITY_ID,
+} from "./native-declarative-evolution-health-gate.mjs";
+
 const CAPABILITY_ID = "plan.openclaw.declarative_evolution.managed_config_candidate";
 const STAGING_TASK_CAPABILITY_ID = "act.openclaw.declarative_evolution.staging_task";
+const HEALTH_GATE_CAPABILITY_ID = NATIVE_DECLARATIVE_EVOLUTION_HEALTH_GATE_CAPABILITY_ID;
 
 function blockedTaskResult(reason) {
   return {
@@ -22,10 +27,17 @@ function blockedTaskResult(reason) {
 
 export function createDeclarativeEvolutionCapabilityHandlers({
   buildNativeDeclarativeEvolutionCandidate,
+  buildNativeDeclarativeEvolutionHealthGate,
   createNativeDeclarativeEvolutionStagingTask,
 } = {}) {
   function validateRequest(capability, request) {
-    if (![CAPABILITY_ID, STAGING_TASK_CAPABILITY_ID].includes(capability.id)) {
+    if (![CAPABILITY_ID, STAGING_TASK_CAPABILITY_ID, HEALTH_GATE_CAPABILITY_ID].includes(capability.id)) {
+      return null;
+    }
+    if (capability.id === HEALTH_GATE_CAPABILITY_ID) {
+      if (typeof request.params?.taskId !== "string" || !request.params.taskId.trim()) {
+        return "Declarative evolution health gate requires taskId.";
+      }
       return null;
     }
     if (!Array.isArray(request.params?.changes) || request.params.changes.length === 0) {
@@ -39,6 +51,17 @@ export function createDeclarativeEvolutionCapabilityHandlers({
   }
 
   async function callBackend(capability, request) {
+    if (capability.id === HEALTH_GATE_CAPABILITY_ID) {
+      if (typeof buildNativeDeclarativeEvolutionHealthGate !== "function") {
+        throw new Error("Native declarative evolution health-gate builder is unavailable.");
+      }
+      return {
+        handled: true,
+        result: await buildNativeDeclarativeEvolutionHealthGate({
+          taskId: request.params.taskId,
+        }),
+      };
+    }
     if (capability.id === STAGING_TASK_CAPABILITY_ID) {
       if (request.params?.confirm !== true) {
         return {
@@ -69,6 +92,29 @@ export function createDeclarativeEvolutionCapabilityHandlers({
   }
 
   function summariseResult(capability, result) {
+    if (capability.id === HEALTH_GATE_CAPABILITY_ID) {
+      return {
+        kind: "declarative_evolution.health_gate",
+        ok: result?.ok === true,
+        blocked: result?.blocked === true,
+        reason: result?.reason ?? null,
+        taskId: result?.taskId ?? null,
+        candidateHash: result?.candidate?.candidateHash ?? null,
+        stagedFileHash: result?.staging?.fileHash ?? null,
+        evaluatedToplevelPath: result?.evaluatedClosure?.path ?? null,
+        assessment: result?.assessment?.status ?? null,
+        eligibleForActivationReview: result?.assessment?.eligibleForActivationReview === true,
+        failedCheckCount: Array.isArray(result?.failedChecks) ? result.failedChecks.length : null,
+        hostHealth: result?.assessment?.hostHealth ?? "not_assessed",
+        noManagedConfigWrite: result?.governance?.writesManagedConfig === false,
+        noGenerationSwitch: result?.governance?.switchesGeneration === false,
+        noRollback: result?.governance?.executesRollback === false,
+        noHostHealthAssessment: result?.governance?.assessesHostHealth === false,
+        noAutomaticActivation: result?.governance?.automaticActivation === false,
+        noAutomaticRollback: result?.governance?.automaticRollback === false,
+        candidateTextInSummary: false,
+      };
+    }
     if (capability.id === STAGING_TASK_CAPABILITY_ID) {
       return {
         kind: "declarative_evolution.staging_task",

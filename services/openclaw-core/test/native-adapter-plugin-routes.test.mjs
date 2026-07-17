@@ -604,6 +604,26 @@ test("native adapter declarative evolution route accepts only structured changes
   assert.equal(response.body.registry, "openclaw-native-declarative-evolution-candidate-v0");
 });
 
+test("native adapter declarative evolution health-gate route forwards only taskId and awaits the builder", async () => {
+  let observedInput = null;
+  const response = await invokeNativeAdapterPluginRoute({
+    buildNativeDeclarativeEvolutionHealthGate: async (input) => {
+      observedInput = input;
+      return {
+        ok: true,
+        registry: "openclaw-native-declarative-evolution-health-gate-v0",
+        assessment: { status: "eligible_for_activation_review" },
+      };
+    },
+  }, "GET", "/plugins/native-adapter/declarative-evolution/health-gate?taskId=task-staging&candidateHash=must-not-forward");
+
+  assert.equal(response.handled, true);
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(observedInput, { taskId: "task-staging" });
+  assert.equal(response.body.registry, "openclaw-native-declarative-evolution-health-gate-v0");
+  assert.equal(response.body.assessment.status, "eligible_for_activation_review");
+});
+
 test("native adapter plugin route reports misses without writing a response", async () => {
   const missed = await invokeNativeAdapterPluginRoute({}, "GET", "/workspaces");
 

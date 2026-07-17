@@ -2,8 +2,8 @@
 
 ## Status
 
-Complete on 2026-07-17 as the first bounded Phase D capability and its
-approval-bound staging/build loop.
+Complete on 2026-07-17 as the first bounded Phase D capability, its
+approval-bound staging/build loop, and its read-only health-gate assessment.
 
 ## Delivered Capability
 
@@ -66,17 +66,33 @@ candidate to an OpenClaw-owned staging directory, and runs `nix-instantiate`,
 candidate body remains transient; task, approval, state, and events retain
 only compact hash/path/validation metadata.
 
+The read-only health-gate slice is complete through:
+
+```text
+GET /plugins/native-adapter/declarative-evolution/health-gate?taskId=...
+sense.openclaw.declarative_evolution.health_gate
+```
+
+For a completed staging task, Core re-reads the exact OpenClaw-owned staging
+file, recomputes its hash and byte count, verifies the candidate/approval/
+execution bindings, and requires the evaluated `/nix/store/...` to remain
+bound to the staging execution record. A passing assessment is
+`eligible_for_activation_review`; host health remains `not_assessed`.
+
 ## Evidence
 
 ```text
 services/openclaw-core/src/native-declarative-evolution-builders.mjs
 services/openclaw-core/src/capability-runtime-declarative-evolution.mjs
 services/openclaw-core/src/native-declarative-evolution-execution.mjs
+services/openclaw-core/src/native-declarative-evolution-health-gate.mjs
+services/openclaw-core/src/native-declarative-evolution-paths.mjs
 services/openclaw-core/src/native-declarative-evolution-task-builders.mjs
 services/openclaw-core/src/native-declarative-evolution-task-routes.mjs
 services/openclaw-core/src/task-executor-native-declarative-evolution-handlers.mjs
 services/openclaw-core/test/native-declarative-evolution-builders.test.mjs
 services/openclaw-core/test/native-declarative-evolution-execution.test.mjs
+services/openclaw-core/test/native-declarative-evolution-health-gate.test.mjs
 services/openclaw-core/test/native-declarative-evolution-task-builders.test.mjs
 services/openclaw-core/test/native-declarative-evolution-task-routes.test.mjs
 services/openclaw-core/test/capability-runtime.test.mjs
@@ -90,15 +106,15 @@ nix/scripts/dev-capability-invoke-check.sh
 The focused builder, execution, task-builder, route, capability-runtime, and
 executor tests pass. The Core and Observer staging checks pass with real
 services. Core proves approval binding, staging-file hash equality, real
-`nix-instantiate`, `nix eval`, and read-only `nix build --dry-run` evidence;
-Observer proves the generic capability registry, blocked confirmation path,
-invocation history, and no candidate-text exposure.
+`nix-instantiate`, `nix eval`, read-only `nix build --dry-run`, and health-gate
+closure binding; Observer proves the generic capability registry, blocked
+confirmation and missing-task fail-closed paths, invocation history, and no
+candidate-text exposure. No managed config write, generation switch, host
+health inference, activation, or rollback is performed.
 
 ## Next Real Slice
 
-The next mainline slice is a read-only health-gate assessment bound to the
-same staged candidate and its evaluated system closure. It may report whether
-the candidate is eligible for a future activation decision, but it must not
-switch a generation, mutate `/etc/nixos`, run rollback, or infer host health
-from build success. Host activation and physical rollback remain separate
-follow-up capabilities.
+The next mainline slice is an explicit activation decision and host-health
+boundary. It must remain separate from this read-only assessment: activation,
+`nixos-rebuild`, generation switching, host-health assessment, and physical
+rollback are deferred follow-up capabilities.

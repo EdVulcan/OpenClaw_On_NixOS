@@ -733,6 +733,22 @@ export function buildBaseCapabilities({
       description: "Create an explicitly confirmed task that binds one validated candidate hash to an OpenClaw-owned staging file and runs read-only NixOS evaluation/build; activation and rollback remain disabled.",
     },
     {
+      id: "sense.openclaw.declarative_evolution.health_gate",
+      name: "Declarative Evolution Health Gate",
+      kind: "sensor",
+      service: "openclaw-core",
+      endpoint: `http://${host}:${port}/plugins/native-adapter/declarative-evolution/health-gate`,
+      intents: [
+        "openclaw.declarative_evolution.health_gate",
+        "declarative.evolution.health_gate",
+        "nix.managed_config_health_gate",
+      ],
+      domains: ["body_internal"],
+      risk: "medium",
+      governance: "audit_only",
+      description: "Re-read a completed OpenClaw-owned staging file and verify its candidate, approval, Nix validation, evaluated closure, and build bindings without assessing host health or activating a generation.",
+    },
+    {
       id: "act.system.command.dry_run",
       name: "System Command Dry Run",
       kind: "actuator",

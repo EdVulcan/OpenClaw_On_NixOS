@@ -17,6 +17,7 @@ import { createNativeEngineeringLspSelectedTargetReadBridgeBuilders } from "./na
 import { buildNativeEngineeringEditExecutionEvidence } from "./native-engineering-edit-execution-evidence-builders.mjs";
 import { buildNativeEngineeringWriteExecutionEvidence } from "./native-engineering-write-execution-evidence-builders.mjs";
 import { createNativeDeclarativeEvolutionBuilders } from "./native-declarative-evolution-builders.mjs";
+import { createNativeDeclarativeEvolutionHealthGateBuilders } from "./native-declarative-evolution-health-gate.mjs";
 import { createNativeAcpxCodexBridgeBuilders } from "./native-acpx-codex-bridge-builders.mjs";
 import { createNativeAcpxCodexBridgeTaskBuilders } from "./native-acpx-codex-bridge-task-builders.mjs";
 import {
@@ -115,6 +116,12 @@ export function createPluginReview(deps) {
   const {
     buildNativeDeclarativeEvolutionCandidate,
   } = createNativeDeclarativeEvolutionBuilders();
+  const {
+    buildNativeDeclarativeEvolutionHealthGate,
+  } = createNativeDeclarativeEvolutionHealthGateBuilders({
+    tasks,
+    stagingDirectory: process.env.OPENCLAW_MANAGED_CONFIG_STAGING_DIR,
+  });
   const {
     buildNativeEngineeringReadFile,
     buildNativeEngineeringGlob,
@@ -392,10 +399,11 @@ function buildOpenClawNativePluginAdapterStatus() {
       "plan.plugin.runtime_adapter_contract",
       "plan.openclaw.declarative_evolution.managed_config_candidate",
       "act.openclaw.declarative_evolution.staging_task",
+      "sense.openclaw.declarative_evolution.health_gate",
     ],
     pendingCapabilities: ["act.plugin.capability.invoke"],
     summary: {
-      implemented: 53,
+      implemented: 54,
       pending: 1,
       canReadManifestMetadata: true,
       canReadToolCatalogMetadata: true,
@@ -444,6 +452,7 @@ function buildOpenClawNativePluginAdapterStatus() {
       canPlanNativeRuntimeAdapterContract: true,
       canPlanDeclarativeEvolutionCandidate: true,
       canCreateDeclarativeEvolutionStagingTask: true,
+      canReadDeclarativeEvolutionHealthGate: true,
       canReadWorkspaceSemanticMetadata: true,
       canExecuteWorkspaceSymbolLookup: true,
       canSelectWorkspaceEditTargets: true,
@@ -505,6 +514,7 @@ function buildOpenClawNativePluginAdapterStatus() {
       "mutating plugin invocation remains pending explicit adapter design and approval gates",
       "declarative evolution candidates generate only allowlisted managed Nix fragments and never write, switch generations, or roll back automatically",
       "declarative evolution staging tasks bind approval and execution to one candidate hash, write only OpenClaw-owned staging, and run read-only NixOS evaluation/build without activation or rollback",
+      "declarative evolution health-gate reads the completed staging task and restages no content, verifies candidate/file/approval hashes plus evaluated closure binding, and never infers host health or activates a generation",
     ],
   };
 }
@@ -553,6 +563,7 @@ function buildOpenClawNativePluginAdapterStatus() {
     buildNativeOpenClawWorkspaceEditTargetSelection,
     buildNativeEngineeringToolSurfaceInventory,
     buildNativeDeclarativeEvolutionCandidate,
+    buildNativeDeclarativeEvolutionHealthGate,
     buildNativeEngineeringReadFile,
     buildNativeEngineeringGlob,
     buildNativeEngineeringGrep,

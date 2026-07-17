@@ -218,6 +218,12 @@ function declarativeEvolutionCandidateInput(body) {
   };
 }
 
+function declarativeEvolutionHealthGateInput(requestUrl) {
+  return {
+    taskId: requestUrl.searchParams.get("taskId"),
+  };
+}
+
 const GET_ROUTES = new Map([
   [
     "/plugins/native-adapter/manifest-profile",
@@ -496,6 +502,14 @@ const GET_ROUTES = new Map([
       input: acpxCodexBridgeWrapperWriteProposalInput,
     },
   ],
+  [
+    "/plugins/native-adapter/declarative-evolution/health-gate",
+    {
+      builder: "buildNativeDeclarativeEvolutionHealthGate",
+      errorStatus: 400,
+      input: declarativeEvolutionHealthGateInput,
+    },
+  ],
 ]);
 
 const POST_RECORD_ROUTES = new Map([
@@ -562,7 +576,7 @@ export async function handleNativeAdapterPluginRoute({
     }
     try {
       const builder = pluginReview[route.builder];
-      sendJson(res, 200, builder(route.input(requestUrl)));
+      sendJson(res, 200, await builder(route.input(requestUrl)));
     } catch (error) {
       sendError(res, route.errorStatus, error);
     }

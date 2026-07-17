@@ -216,6 +216,82 @@ test("capability runtime creates a hash-bound declarative evolution staging task
   assert.equal(JSON.stringify(events).includes(candidateHash), true);
 });
 
+test("capability runtime exposes the read-only declarative evolution health gate and fails closed without taskId", async () => {
+  const candidateHash = "a".repeat(64);
+  const calls = [];
+  const { runtime, state, events } = createHarness({
+    pluginReview: {
+      buildNativeDeclarativeEvolutionHealthGate: async (input) => {
+        calls.push(input);
+        return {
+          ok: true,
+          blocked: false,
+          registry: "openclaw-native-declarative-evolution-health-gate-v0",
+          taskId: input.taskId,
+          candidate: { candidateHash },
+          staging: { fileHash: candidateHash, fileBytes: 64 },
+          evaluatedClosure: { path: "/nix/store/abc123-openclaw-system", status: "bound" },
+          failedChecks: [],
+          assessment: {
+            status: "eligible_for_activation_review",
+            eligibleForActivationReview: true,
+            hostHealth: "not_assessed",
+          },
+          governance: {
+            readsStagingFile: true,
+            writesManagedConfig: false,
+            switchesGeneration: false,
+            executesRollback: false,
+            assessesHostHealth: false,
+            automaticActivation: false,
+            automaticRollback: false,
+            candidateTextExposed: false,
+            providerEgress: false,
+            networkEgress: false,
+          },
+          candidateText: "must-not-leave-the-builder",
+        };
+      },
+    },
+  });
+
+  const registry = await runtime.buildCapabilityRegistry();
+  const capability = registry.capabilities.find((item) => item.id === "sense.openclaw.declarative_evolution.health_gate");
+  assert.equal(capability?.kind, "sensor");
+  assert.equal(capability?.governance, "audit_only");
+  assert.equal(capability?.available, true);
+
+  const missingTaskId = await runtime.invokeCapability({
+    capabilityId: "sense.openclaw.declarative_evolution.health_gate",
+    params: {},
+  });
+  assert.equal(missingTaskId.statusCode, 400);
+  assert.match(missingTaskId.response.error, /requires taskId/);
+  assert.equal(calls.length, 0);
+
+  const result = await runtime.invokeCapability({
+    capabilityId: "sense.openclaw.declarative_evolution.health_gate",
+    params: { taskId: "task-staging" },
+  });
+  assert.equal(result.statusCode, 200);
+  assert.equal(result.response.invoked, true);
+  assert.equal(result.response.summary.kind, "declarative_evolution.health_gate");
+  assert.equal(result.response.summary.assessment, "eligible_for_activation_review");
+  assert.equal(result.response.summary.eligibleForActivationReview, true);
+  assert.equal(result.response.summary.evaluatedToplevelPath, "/nix/store/abc123-openclaw-system");
+  assert.equal(result.response.summary.hostHealth, "not_assessed");
+  assert.equal(result.response.summary.noManagedConfigWrite, true);
+  assert.equal(result.response.summary.noGenerationSwitch, true);
+  assert.equal(result.response.summary.noRollback, true);
+  assert.equal(result.response.summary.noHostHealthAssessment, true);
+  assert.equal(result.response.summary.noAutomaticActivation, true);
+  assert.equal(result.response.summary.noAutomaticRollback, true);
+  assert.equal(result.response.summary.candidateTextInSummary, false);
+  assert.deepEqual(calls, [{ taskId: "task-staging" }]);
+  assert.equal(JSON.stringify(state.capabilityInvocationLog).includes("must-not-leave-the-builder"), false);
+  assert.deepEqual(events.slice(-2).map((event) => event.name), ["policy.evaluated", "capability.invoked"]);
+});
+
 test("capability runtime exposes the native engineering tool surface inventory without execution authority", async () => {
   const { runtime, state, events } = createHarness({
     pluginReview: {

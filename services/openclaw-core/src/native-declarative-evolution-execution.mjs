@@ -5,22 +5,11 @@ import path from "node:path";
 import { promisify } from "node:util";
 
 import { validateNativeDeclarativeEvolutionNixFile } from "./native-declarative-evolution-builders.mjs";
+import { resolveNativeDeclarativeEvolutionStagingDirectory } from "./native-declarative-evolution-paths.mjs";
 
 const execFileAsync = promisify(execFile);
 const MAX_COMMAND_OUTPUT = 512;
 const DEFAULT_TIMEOUT_MS = 120000;
-
-function normaliseAbsolutePath(value, fallback) {
-  const candidate = typeof value === "string" && value.trim() ? value.trim() : fallback;
-  return path.resolve(candidate);
-}
-
-function assertSafeStagingDirectory(stagingDir) {
-  if (stagingDir === "/etc/nixos" || stagingDir.startsWith("/etc/nixos/")) {
-    throw new Error("Declarative evolution staging must remain outside /etc/nixos.");
-  }
-  return stagingDir;
-}
 
 function assertCandidateHash(candidateHash) {
   if (!/^[a-f0-9]{64}$/.test(candidateHash)) {
@@ -110,10 +99,10 @@ export function createNativeDeclarativeEvolutionExecution({
   readFileImpl = readFile,
   writeFileImpl = writeFile,
 } = {}) {
-  const resolvedStagingDir = assertSafeStagingDirectory(normaliseAbsolutePath(stagingDir, path.resolve("managed-config-staging")));
-  const resolvedFlakePath = flakePath ? normaliseAbsolutePath(flakePath, process.cwd()) : null;
+  const resolvedStagingDir = resolveNativeDeclarativeEvolutionStagingDirectory({ stagingDir });
+  const resolvedFlakePath = flakePath ? path.resolve(flakePath) : null;
   const resolvedBaseModulePath = baseModulePath
-    ? normaliseAbsolutePath(baseModulePath, process.cwd())
+    ? path.resolve(baseModulePath)
     : resolvedFlakePath
       ? path.join(resolvedFlakePath, "nix/hosts/local-dev.nix")
       : null;
@@ -198,7 +187,7 @@ export function createNativeDeclarativeEvolutionExecution({
       baseModulePath: resolvedBaseModulePath,
       stagedPath: candidatePath,
       system,
-      body: "{ candidateType = builtins.typeOf (import candidate); components = system.config.services.openclaw.components; toplevelEvaluated = builtins.isString (builtins.toString system.config.system.build.toplevel); }",
+      body: "{ candidateType = builtins.typeOf (import candidate); components = system.config.services.openclaw.components; toplevelPath = builtins.toString system.config.system.build.toplevel; toplevelEvaluated = builtins.isString (builtins.toString system.config.system.build.toplevel); }",
     });
     const evaluationResult = await runNixCommand(
       buildNixCommandArgs("eval", evaluationExpression, { buildMode: safeBuildMode }),
@@ -223,10 +212,16 @@ export function createNativeDeclarativeEvolutionExecution({
     try {
       const parsed = JSON.parse(String(evaluationResult.stdout ?? "").trim());
       evaluation = {
-        status: parsed?.candidateType === "lambda" && parsed?.toplevelEvaluated === true ? "passed" : "failed",
+        status: parsed?.candidateType === "lambda"
+          && parsed?.toplevelEvaluated === true
+          && typeof parsed?.toplevelPath === "string"
+          && parsed.toplevelPath.startsWith("/nix/store/")
+          ? "passed"
+          : "failed",
         mode: "nix-eval",
         candidateType: parsed?.candidateType ?? null,
         componentCount: Array.isArray(parsed?.components) ? parsed.components.length : 0,
+        toplevelPath: parsed?.toplevelPath ?? null,
         toplevelEvaluated: parsed?.toplevelEvaluated === true,
       };
     } catch {

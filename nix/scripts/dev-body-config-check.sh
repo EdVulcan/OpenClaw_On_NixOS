@@ -606,6 +606,8 @@ EOF
     || ! -f "$core_out/share/openclaw/services/openclaw-core/src/capability-runtime-plugin-refresh.mjs"
     || ! -f "$core_out/share/openclaw/services/openclaw-core/src/capability-runtime-engineering-plan-todo.mjs"
     || ! -f "$core_out/share/openclaw/services/openclaw-core/src/native-declarative-evolution-execution.mjs"
+    || ! -f "$core_out/share/openclaw/services/openclaw-core/src/native-declarative-evolution-health-gate.mjs"
+    || ! -f "$core_out/share/openclaw/services/openclaw-core/src/native-declarative-evolution-paths.mjs"
     || ! -f "$core_out/share/openclaw/services/openclaw-core/src/native-declarative-evolution-task-builders.mjs"
     || ! -f "$core_out/share/openclaw/services/openclaw-core/src/native-declarative-evolution-task-routes.mjs"
     || ! -f "$core_out/share/openclaw/services/openclaw-core/src/task-executor-native-declarative-evolution-handlers.mjs"
@@ -617,7 +619,7 @@ EOF
     || ! -f "$core_out/share/openclaw/packages/shared-utils/src/persist.mjs"
     || -w "$core_server"
     || -e "$core_out/share/openclaw/services/openclaw-core/test"
-    || "$(find "$core_out" -type f | wc -l)" -ne 198 ]]; then
+    || "$(find "$core_out" -type f | wc -l)" -ne 200 ]]; then
     echo "core Nix closure is not exact and read-only: $core_out" >&2
     exit 1
   fi
