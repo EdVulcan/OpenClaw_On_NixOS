@@ -52,13 +52,14 @@ body-config and event-audit integration checks pass, the 811-entry milestone
 registry audit passes, and the Windows path budget has no file over 160
 repository-relative characters.
 
-The running physical-host generation is older than that capability baseline.
-Its services are healthy, but the new systemd journal-evidence endpoint returns
-`404` and `openclaw-system-sense` does not yet have the `systemd-journal`
-supplementary group. Treat bounded journal evidence as source-complete and
-validated, not deployed. Do not run `nixos-rebuild switch`, real hostd
-activation, generation rollback, or other privileged mutation without a
-separately authorized mutation environment.
+The physical host now runs generation
+`/nix/store/gb72w3qavm6b0vv114ml723g7y8jv5qh-nixos-system-nixos-26.05.4808.569d57850992`.
+All system and user services restarted without a loop, seven HTTP health probes
+returned 200, anonymous protected task/triage/repair routes returned 401, the
+bounded journal endpoint returned live read-only evidence, and the first
+five-minute scheduler tick recorded all three fixed targets healthy without an
+incident. This proves deployment and observation, not real repair, hostd
+activation, or rollback.
 
 The Event Hub audit-log blocker is closed in source through reverse bounded tail
 reads, streaming cached summaries, serialized rotation, and a fixed retained
@@ -1626,11 +1627,14 @@ unit, and hostd capability before creating one existing real repair task and
 pending approval. It does not approve, execute, invoke hostd, call a provider,
 activate a generation, or roll one back.
 
-Freeze the scheduled incident-to-repair-task slice and the provider/systemd
-diagnosis lane. The next real capability is explicitly authorized deployment
-of this validated source baseline followed by non-mutating service, operator
-auth, scheduler, and Observer probes. Real promoted repair execution and hostd
-mutation require a disposable mutation environment.
+Freeze the provider/systemd diagnosis lane and do not add another evidence
+wrapper. The next real capability is automatic low-risk local triage after a
+scheduled incident so the operator only enters at repair promotion. The
+automatic path must reuse the same source/fingerprint/unit validation, audit
+before task mutation, retry after transient triage failure without duplicating
+the incident, and retain no approval, provider, hostd, activation, or rollback
+authority. Real promoted repair execution requires a disposable mutation
+environment.
 
 ## Operator Identity And Mutation Boundary Checkpoint
 

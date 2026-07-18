@@ -15,10 +15,11 @@ paragraph. Reconcile this baseline with the repository and live host first.
 | --- | --- | --- |
 | Capability source | Current `main` through the Level 3 fixed-unit incident scheduler, local triage bridge, and governed repair/diagnosis loop | Implemented; commit history is authoritative |
 | Local validation | 870 workspace tests and typecheck pass; body-config and event-audit integration pass; 811 registry entries pass | Validated |
-| Installed system | NixOS `26.05.4808.569d57850992`, generation `/nix/store/735kfj8knq1nn092hq4z57sjlc9di3q5-nixos-system-nixos-26.05.4808.569d57850992` | Running but behind the capability source |
-| Deployed journal probe | `/system/systemd/journal-evidence` returns `404`; `openclaw-system-sense` has no `systemd-journal` supplementary group | Not deployed |
-| Deployed audit store | Installed Event Hub predates streaming tail reads, cached summaries, and rotation | Not deployed |
-| Privileged actions | Real hostd activation, generation switch, and rollback | Deferred unless a separate mutation environment is explicitly authorized |
+| Installed system | NixOS `26.05.4808.569d57850992`, generation `/nix/store/gb72w3qavm6b0vv114ml723g7y8jv5qh-nixos-system-nixos-26.05.4808.569d57850992` | Current source baseline deployed 2026-07-18 |
+| Deployed journal probe | Bounded `/system/systemd/journal-evidence` returns live read-only JSON; `openclaw-system-sense` has the `systemd-journal` supplementary group | Deployed and probed |
+| Deployed scheduler | First five-minute tick recorded all three fixed targets healthy with no incident task | Deployed and probed |
+| Deployed audit store | Current Event Hub package is active; retention and rotation remain source-validated without destructive live rehearsal | Deployed |
+| Privileged actions | Physical-host generation switch is proven; real repair, hostd activation, and rollback | Deferred to explicit/disposable mutation checks |
 
 The current checkout is on the only available physical host
 (`systemd-detect-virt=none`). Historical VM results remain acceptance evidence,
@@ -83,8 +84,8 @@ The completed bounded frontier is:
   scheduler chain and creates the existing fixed-target real repair task with a
   pending approval, without approval resolution or hostd invocation.
 
-Real generation activation and rollback remain unproven on a disposable
-mutation environment. Level 4 graphics-stack ownership remains future work.
+Real repair execution and rollback remain unproven on a disposable mutation
+environment. Level 4 graphics-stack ownership remains future work.
 
 ## Active Route
 
@@ -120,12 +121,14 @@ body health + bounded journal evidence
 ```
 
 Do not broaden hostd into arbitrary systemd control or add another provider
-readiness wrapper. Freeze the completed provider/systemd and scheduled incident
-to repair-task lanes. The next real capability is an explicitly authorized
-deployment of this validated source baseline followed by non-mutating health,
-auth, scheduler, and Observer probes. Real hostd mutation, generation rollback,
-and a promoted repair execution receipt remain deferred to a disposable
-mutation environment.
+readiness wrapper. The validated source baseline is now deployed: all service
+health probes returned 200, anonymous protected reads/mutations returned 401,
+the journal endpoint is live, Observer contains both incident controls, and the
+first scheduler tick observed all fixed targets healthy. The next real
+capability is automatic low-risk local triage after a scheduled incident, while
+repair promotion remains explicit and high-risk execution remains approval
+gated. Real hostd mutation, generation rollback, and a promoted repair receipt
+remain deferred to a disposable mutation environment.
 
 ## Progress Estimate
 

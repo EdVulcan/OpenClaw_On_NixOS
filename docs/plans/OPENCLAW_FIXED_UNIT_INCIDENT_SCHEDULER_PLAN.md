@@ -82,21 +82,24 @@ restart does not duplicate an unchanged incident.
 - full `dev-body-config-check.sh`, including exact 221-file Core and 77-file
   Observer Nix closures.
 
-No real provider request, hostd mutation, system switch, activation, rollback,
-or reboot was used for validation.
+The validated source baseline was switched onto the physical host as generation
+`/nix/store/gb72w3qavm6b0vv114ml723g7y8jv5qh-nixos-system-nixos-26.05.4808.569d57850992`.
+Post-deployment probes covered service health, operator-auth rejection, live
+bounded journal evidence, Observer controls, and one healthy scheduler tick.
+No provider request, repair execution, hostd mutation, rollback, or reboot was
+used.
 
 ## Deferred
 
 - automatic provider diagnosis;
 - automatic repair or approval creation;
 - arbitrary systemd targets;
-- deployment to the current physical-host generation;
+- automatic local triage after scheduler observation;
 - real activation and rollback validation in a disposable mutation environment.
 
 ## Next Real Capability
 
-Deploy the validated source baseline only after explicit physical-host change
-authorization, then run non-mutating service, scheduler, operator-auth, and
-Observer route probes. Keep generation activation/rollback and real hostd
-mutation out of that deployment checkpoint; use a disposable mutation
-environment for a real promoted repair execution receipt.
+Automatically create or reuse the low-risk local triage task after each current
+unhealthy scheduler observation. Retry transient triage failures without
+duplicating the incident, and stop before repair promotion or approval. Keep
+provider, hostd, activation, rollback, and repair execution disabled.
