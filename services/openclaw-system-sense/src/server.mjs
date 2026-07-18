@@ -18,6 +18,7 @@ import { createSystemdInspection } from "./systemd-inspection.mjs";
 import { createSystemdNextRepairPlanning } from "./systemd-next-repair-planning.mjs";
 import { createSystemdRepairCandidatePlanning } from "./systemd-repair-candidate-planning.mjs";
 import { createSystemdRepairProposals } from "./systemd-repair-proposals.mjs";
+import { createSystemdJournalEvidence, JOURNAL_EVIDENCE_REGISTRY } from "./systemd-journal-evidence.mjs";
 import { handleSystemdRoutes } from "./systemd-routes.mjs";
 import { createExecutionGrantVerifier } from "../../../packages/shared-utils/src/execution-grants.mjs";
 
@@ -364,6 +365,16 @@ const {
   },
 });
 
+const { buildSystemdJournalEvidence } = createSystemdJournalEvidence({
+  allowedUnits: openClawSystemdUnitSpecs
+    .filter((spec) => spec.expectedManager === "system")
+    .map((spec) => spec.unit),
+  journalctlPath: process.env.OPENCLAW_SYSTEM_JOURNALCTL_PATH ?? "journalctl",
+  maxLines: Number.parseInt(process.env.OPENCLAW_SYSTEM_JOURNAL_MAX_LINES ?? "25", 10),
+  timeoutMs: serviceTimeoutMs,
+  registry: JOURNAL_EVIDENCE_REGISTRY,
+});
+
 function normaliseUnitName(value) {
   const raw = typeof value === "string" && value.trim()
     ? value.trim()
@@ -517,6 +528,7 @@ const systemdRouteBuilders = {
   buildSystemdNextRepairTaskRoute,
   buildSystemdRepairPlan,
   buildSystemdRepairDryRun,
+  buildSystemdJournalEvidence,
 };
 async function refreshSystemState() {
   const entries = await Promise.all(

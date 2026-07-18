@@ -321,10 +321,12 @@ export const OBSERVER_STARTUP_REFRESH_GROUPS = [
 ];
 
 export const OBSERVER_STARTUP_REFRESH_NAMES = OBSERVER_STARTUP_REFRESH_GROUPS.flatMap((group) => group.refreshNames);
+export const OBSERVER_STARTUP_INITIAL_REFRESH_NAMES = ["refreshSystemdJournalEvidence"];
 
 export function renderObserverClientStartupScript() {
   return [
     ...OBSERVER_STARTUP_REFRESH_NAMES.map((name) => `await ${name}();`),
+    ...OBSERVER_STARTUP_INITIAL_REFRESH_NAMES.map((name) => `await ${name}();`),
     "await loadRecentEvents();",
     "setControlMessage(\"Controls ready.\");",
     "await autoRestoreEngineeringLoopStateOnStartup();",

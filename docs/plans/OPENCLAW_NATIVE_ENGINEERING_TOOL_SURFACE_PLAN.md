@@ -35,12 +35,13 @@ summaries. This closes the current Level 1 navigation boundary without adding
 another LSP request, dispatcher, task, approval, or execution path. See
 `OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_WORKSPACE_NAVIGATION_PLAN.md`.
 
-The next identity-upgrade slice has now moved to the kernel whitepaper's Phase
-D boundary. Core can generate and validate a bounded managed-Nix candidate as
-`plan.openclaw.declarative_evolution.managed_config_candidate`; the candidate
-is transient and hash-bound in invocation evidence. Host writes, approvals,
-`nixos-rebuild`, generation switching, and rollback are the next separate
-vertical capabilities, not part of this engineering-tool route.
+The kernel whitepaper's Phase D boundary is now complete through the managed-Nix
+candidate, closure-integrity receipt, independent host-health oracle, controlled
+activation contract, manual rollback evidence, and physical-host-safe failure
+rehearsal. Those capabilities remain separate from this engineering-tool route;
+the next selected identity-upgrade capability is the bounded Level 3 systemd
+journal evidence contract documented in
+`OPENCLAW_DBUS_NATIVE_SYSTEMD_CONTROL_PLAN.md`.
 
 The existing read-only tool contract inventory is now also available through
 the common capability runtime as

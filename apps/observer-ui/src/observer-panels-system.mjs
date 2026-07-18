@@ -319,6 +319,31 @@ export function observerSystemPanels() {
           <div class="metric"><span>Mode</span><span id="systemd-unit-mode">read_only</span></div>
           <pre id="systemd-unit-json">Loading read-only OpenClaw systemd unit inventory...</pre>
         </section>
+        <section class="panel" id="systemd-journal-evidence-panel">
+          <h2>Service Journal Evidence</h2>
+          <div class="metric"><span>Available</span><span id="systemd-journal-evidence-available">unknown</span></div>
+          <div class="metric"><span>Entries</span><span id="systemd-journal-evidence-count">0</span></div>
+          <div class="metric"><span>Mode</span><span id="systemd-journal-evidence-mode">read_only</span></div>
+          <label for="systemd-journal-evidence-unit">Log target</label>
+          <select id="systemd-journal-evidence-unit">
+            <option value="openclaw-system-sense.service">openclaw-system-sense.service</option>
+            <option value="openclaw-event-hub.service">openclaw-event-hub.service</option>
+            <option value="openclaw-core.service">openclaw-core.service</option>
+            <option value="openclaw-screen-sense.service">openclaw-screen-sense.service</option>
+            <option value="openclaw-screen-act.service">openclaw-screen-act.service</option>
+            <option value="openclaw-system-heal.service">openclaw-system-heal.service</option>
+          </select>
+          <label for="systemd-journal-evidence-lines">Recent entries</label>
+          <select id="systemd-journal-evidence-lines">
+            <option value="10">10</option>
+            <option value="25" selected>25</option>
+            <option value="50">50</option>
+          </select>
+          <div class="actions tight">
+            <button id="refresh-systemd-journal-evidence-button" class="secondary">Refresh Service Journal</button>
+          </div>
+          <pre id="systemd-journal-evidence-json">Loading bounded service journal evidence...</pre>
+        </section>
         <section class="panel" id="systemd-dependency-map">
           <h2>Body Dependency Map</h2>
           <div class="metric"><span>Nodes</span><span id="systemd-dependency-node-count">0</span></div>

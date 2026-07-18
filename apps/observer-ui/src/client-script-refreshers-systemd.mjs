@@ -471,6 +471,37 @@ async function refreshSystemdDependencyMap() {
   }
 }
 
+async function refreshSystemdJournalEvidence() {
+  const unit = systemdJournalEvidenceUnit?.value ?? "openclaw-system-sense.service";
+  const lines = systemdJournalEvidenceLines?.value ?? "25";
+  try {
+    const data = await fetchJson(\`\${observerConfig.systemSenseUrl}/system/systemd/journal-evidence?unit=\${encodeURIComponent(unit)}&lines=\${encodeURIComponent(lines)}\`);
+    const summary = data.summary ?? {};
+    const source = data.source ?? {};
+    const governance = data.governance ?? {};
+    const entries = Array.isArray(data.entries) ? data.entries : [];
+    systemdJournalEvidenceAvailable.textContent = String(Boolean(data.available));
+    systemdJournalEvidenceCount.textContent = String(summary.returned ?? entries.length);
+    systemdJournalEvidenceMode.textContent = data.mode ?? "read_only";
+    systemdJournalEvidenceJson.textContent = [
+      \`Registry: \${data.registry ?? "unknown"}\`,
+      \`Query: unit=\${data.unit ?? unit} requestedLines=\${data.requestedLines ?? lines}\`,
+      \`Source: \${source.transport ?? "unknown"} command=\${source.command ?? "unknown"} argsBound=\${Boolean(governance.commandArgsBound)}\`,
+      \`Governance: autonomy=\${governance.autonomy ?? "unknown"} readOnlyCommand=\${Boolean(governance.readOnlyCommand)} executesCommand=\${Boolean(governance.executesCommand)} mutation=\${Boolean(governance.hostMutation)}\`,
+      \`Summary: returned=\${summary.returned ?? 0} parseErrors=\${summary.parseErrors ?? 0}\`,
+      data.error ? \`Read error: \${data.error.code ?? "unknown"} \${data.error.message ?? "unavailable"}\` : "Read error: none",
+      "Entries:",
+      entries.map((entry) => \`\${entry.at ?? "unknown"} priority=\${entry.priority ?? "?"} \${entry.identifier ?? "system"}: \${entry.message ?? ""}\`).join("\\n") || "none",
+      \`Next: \${data.next?.recommendedSlice ?? "openclaw-systemd-repair-post-verification"} boundary=\${data.next?.boundary ?? "read-only journal evidence"}\`,
+    ].join("\\n");
+  } catch {
+    systemdJournalEvidenceAvailable.textContent = "false";
+    systemdJournalEvidenceCount.textContent = "0";
+    systemdJournalEvidenceMode.textContent = "offline";
+    systemdJournalEvidenceJson.textContent = "Unable to read bounded service journal evidence.";
+  }
+}
+
 async function refreshSystemdRepairPlan() {
   try {
     const [plan, dryRun] = await Promise.all([

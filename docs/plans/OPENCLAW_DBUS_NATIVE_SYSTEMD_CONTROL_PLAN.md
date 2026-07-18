@@ -278,6 +278,30 @@ approval-gated task is created and Operator Step remains blocked before
 approval. The real-execution checks retain their explicit host-mutation guard
 and are the only checks that perform the fixed restart.
 
+## Seventh Slice: Bounded Journal Evidence
+
+The fixed restart path now has the missing operator readback needed to explain
+why a body unit is unhealthy. System-sense exposes
+`GET /system/systemd/journal-evidence` through a dedicated read-only owner. The
+request must name one of the configured OpenClaw system-manager units, and the
+line count is clamped to a small fixed budget. The owner invokes only a fixed
+JSON `journalctl` shape, filters entries back to the requested unit, bounds the
+message field, and redacts credential-like values before returning evidence.
+
+The NixOS system-sense service receives the explicit `journalctl` store path and
+the standard `systemd-journal` read group. This is a read authority for bounded
+body diagnosis, not a hostd mutation authority. Observer renders the selected
+unit, line budget, availability, sanitized messages, command-binding state, and
+the unchanged `hostMutation=false` boundary; the refresh is manual after the
+initial read so the UI does not poll system logs continuously.
+
+Core and Observer journal-evidence checks run on the physical host in an
+isolated dev-service run with a private event log. They prove actual journal
+availability, fixed arguments, non-allowlisted-unit rejection, sanitized
+readback, generated client syntax, and no task, approval, restart, activation,
+or rollback. The route remains unavailable rather than widening its allowlist
+when manager ownership is unknown.
+
 ## Deferred
 
 - D-Bus start/stop/reload operations and restart targets outside the three fixed
@@ -289,9 +313,9 @@ and are the only checks that perform the fixed restart.
 
 ## Next Slice
 
-The fixed Level 3 hostd socket contract and real VM evidence are complete for
-all three allowlisted restart capabilities. Future work must keep the native
-helper, exact user/group match, compact verified/matched readback, and
-descriptor-bound target. Select another capability only with a separate
-operator gap; do not broaden this fixed restart contract into an arbitrary
-systemd control API.
+The fixed Level 3 hostd socket contract, all three allowlisted restart
+capabilities, and bounded journal diagnosis are complete. Future work must
+keep the native helper, exact user/group match, compact verified/matched
+readback, and descriptor-bound mutation targets. Select another capability only
+with a separate operator gap; do not broaden this fixed restart contract into
+an arbitrary systemd control API.

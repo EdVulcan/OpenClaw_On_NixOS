@@ -375,6 +375,14 @@ createSystemdNextRepairRealExecutionButton.addEventListener("click", () => {
   });
 });
 
+refreshSystemdJournalEvidenceButton.addEventListener("click", () => {
+  refreshSystemdJournalEvidence().then(() => {
+    setControlMessage("Service journal evidence refreshed.");
+  }).catch((error) => {
+    setControlMessage(\`Request failed: \${formatError(error)}\`);
+  });
+});
+
 createBodyEvidenceLedgerDirectoryTaskButton.addEventListener("click", () => {
   createBodyEvidenceLedgerDirectoryTask().catch((error) => {
     setControlMessage(\`Request failed: \${formatError(error)}\`);

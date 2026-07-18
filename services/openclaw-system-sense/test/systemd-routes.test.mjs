@@ -95,3 +95,28 @@ test("systemd routes preserve repair error envelope", async () => {
     details: { unit: "ssh.service" },
   });
 });
+
+test("systemd routes dispatch bounded journal evidence with query parameters", async () => {
+  const res = createResponseCapture();
+  const handled = await handleSystemdRoutes({
+    req: { method: "GET" },
+    res,
+    requestUrl: new URL("http://127.0.0.1/system/systemd/journal-evidence?unit=openclaw-core.service&lines=7"),
+    builders: {
+      buildSystemdJournalEvidence: async (request) => ({
+        ok: true,
+        request,
+      }),
+    },
+  });
+
+  assert.equal(handled, true);
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(parseResponse(res), {
+    ok: true,
+    request: {
+      unit: "openclaw-core.service",
+      lines: "7",
+    },
+  });
+});

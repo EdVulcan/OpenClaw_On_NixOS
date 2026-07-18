@@ -165,7 +165,9 @@ let
       port = cfg.ports.systemSense;
       after = [ "openclaw-event-hub" "openclaw-core" ];
       runtimePackage = cfg.runtimePackages.systemSense;
-      extraEnvironment = _: optionalAttrs cfg.kernelEventCapture.enable {
+      extraEnvironment = _: {
+        OPENCLAW_SYSTEM_JOURNALCTL_PATH = "${pkgs.systemd}/bin/journalctl";
+      } // optionalAttrs cfg.kernelEventCapture.enable {
         OPENCLAW_KERNEL_EVENT_CAPTURE_ENABLED = "1";
         OPENCLAW_KERNEL_EVENT_PROBE = "${cfg.kernelEventCapture.probePackage}/bin/openclaw-kernel-process-exec";
         OPENCLAW_KERNEL_EVENT_CAPTURE_DURATION_MS = toString cfg.kernelEventCapture.durationMs;
@@ -402,6 +404,8 @@ let
         Group = cfg.group;
       } // optionalAttrs (credentialLoads != [ ]) {
         LoadCredential = credentialLoads;
+      } // optionalAttrs (!userScope && spec.key == "systemSense") {
+        SupplementaryGroups = [ "systemd-journal" ];
       } // optionalAttrs (!userScope && cfg.user != null && spec.key == "eventHub") {
         ExecStartPre = [ "+${eventLogOwnershipMigration}" ];
       } // optionalAttrs (!userScope && spec.key == "systemSense" && cfg.kernelEventCapture.enable) {

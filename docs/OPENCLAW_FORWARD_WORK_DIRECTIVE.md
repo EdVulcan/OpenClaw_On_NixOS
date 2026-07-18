@@ -1459,9 +1459,30 @@ through the production executor with injected receipt/oracle inputs and renders
 the failed task through the existing Observer readback. It does not connect to
 real hostd, write `/etc/nixos`, run `nixos-rebuild`, switch a generation, or
 execute rollback. Phase D local evidence is complete; do not add another
-activation readiness/evidence wrapper. Select the next concrete user-space
-capability, while treating any disposable-VM mutation test as a future release
-gate rather than a current workspace assumption.
+activation readiness/evidence wrapper. The next separately justified Level 3
+operator gap was bounded journal evidence, which is now closed below. Treat any
+disposable-VM mutation test as a future release gate rather than a current
+workspace assumption.
+
+## Completed Level 3 Bounded Journal Evidence
+
+The next separately justified Level 3 operator gap is now closed through the
+existing system-sense/systemd surface. `GET
+/system/systemd/journal-evidence` reads only a configured OpenClaw system-manager
+unit with a bounded line budget, fixed JSON `journalctl` arguments, unit
+revalidation, bounded message output, and credential-like redaction. Observer
+shows the selected target, availability, sanitized entries, and the unchanged
+read-only governance state. The NixOS system-sense unit receives an explicit
+`journalctl` store path and `systemd-journal` read group; hostd mutation is not
+expanded.
+
+The Core and Observer checks use isolated run ids and private event logs so
+historical audit files cannot inflate a service process or make a validation
+result depend on stale state. They prove actual physical-host journal
+availability, non-allowlisted rejection, readback redaction, generated client
+syntax, and no task, approval, restart, activation, or rollback. The next
+Level 3 capability must again be selected from a concrete operator gap; do not
+turn this read model into arbitrary journal queries or a new readiness chain.
 
 ## Operator Identity And Mutation Boundary Checkpoint
 

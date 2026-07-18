@@ -98,8 +98,10 @@ materialization. The manual rollback evidence path binds receipt and health
 hashes without executing rollback. The physical-host-safe injected
 health-failure rehearsal now also covers production task-executor dispatch and
 Observer readback; it does not write `/etc/nixos`, run `nixos-rebuild`, switch
-generations, or roll back. Phase D local evidence is complete; the active plan
-now returns to the next concrete user-space capability:
+generations, or roll back. Phase D local evidence is complete. The next
+separately justified Level 3 capability is bounded read-only journal evidence
+for fixed OpenClaw systemd repair targets; it does not expand hostd mutation or
+perform activation. The Phase D plan remains the historical evidence record:
 [OPENCLAW_PHASE_D_DECLARATIVE_EVOLUTION_CANDIDATE_PLAN.md](./plans/OPENCLAW_PHASE_D_DECLARATIVE_EVOLUTION_CANDIDATE_PLAN.md).
 
 ## Windows Checkout Path Policy

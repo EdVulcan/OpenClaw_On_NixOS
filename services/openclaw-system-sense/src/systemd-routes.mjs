@@ -14,6 +14,7 @@ const SYSTEMD_GET_ROUTES = new Map([
   ["/system/systemd/next-repair-route-review", "buildSystemdNextRepairRouteReview"],
   ["/system/systemd/next-repair-dry-run", "buildSystemdNextRepairDryRun"],
   ["/system/systemd/next-repair-task-route", "buildSystemdNextRepairTaskRoute"],
+  ["/system/systemd/journal-evidence", "buildSystemdJournalEvidence"],
 ]);
 
 function sendSystemdError(res, error) {
@@ -33,6 +34,13 @@ function buildRepairRequest(requestUrl) {
   };
 }
 
+function buildJournalRequest(requestUrl) {
+  return {
+    unit: requestUrl.searchParams.get("unit") ?? requestUrl.searchParams.get("target"),
+    lines: requestUrl.searchParams.get("lines"),
+  };
+}
+
 export async function handleSystemdRoutes({ req, res, requestUrl, builders }) {
   if (req.method !== "GET") {
     return false;
@@ -40,8 +48,14 @@ export async function handleSystemdRoutes({ req, res, requestUrl, builders }) {
 
   const builderName = SYSTEMD_GET_ROUTES.get(requestUrl.pathname);
   if (builderName) {
-    const payload = await builders[builderName]();
-    sendJson(res, 200, payload);
+    try {
+      const payload = await builders[builderName](builderName === "buildSystemdJournalEvidence"
+        ? buildJournalRequest(requestUrl)
+        : undefined);
+      sendJson(res, 200, payload);
+    } catch (error) {
+      sendSystemdError(res, error);
+    }
     return true;
   }
 

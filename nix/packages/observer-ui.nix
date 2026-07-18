@@ -48,6 +48,7 @@ mkOpenClawSourceClosure {
     ../../apps/observer-ui/src/client-script-renderers-engineering-plan-todo.mjs
     ../../apps/observer-ui/src/client-script-renderers-engineering-recovery.mjs
     ../../apps/observer-ui/src/client-script-renderers-engineering-verification.mjs
+    ../../apps/observer-ui/src/client-script-renderers-engineering-verification-followup.mjs
     ../../apps/observer-ui/src/client-script-renderers-engineering-write-execution.mjs
     ../../apps/observer-ui/src/client-script-renderers-engineering-write.mjs
     ../../apps/observer-ui/src/client-script-renderers-native-runtime-refresh.mjs
