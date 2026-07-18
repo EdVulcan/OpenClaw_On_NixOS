@@ -14,9 +14,47 @@ function rehashReceipt(receipt) {
   receipt.receiptHash = `sha256:${createHash("sha256").update(JSON.stringify(content)).digest("hex")}`;
 }
 
+function experienceRecord(sourceReceiptHash, overrides = {}) {
+  return {
+    incidentPattern: {
+      registry: "openclaw-systemd-incident-experience-v0",
+      targetUnit: "openclaw-event-hub.service",
+      sourceReceiptHash,
+      restoredHealthy: false,
+      preHealthy: false,
+      postHealthy: false,
+      journalAvailable: true,
+      journalEntries: 2,
+      restartCommandSucceeded: true,
+      nativeMutationObserved: true,
+      journalMessagesIncluded: false,
+      providerOutputIncluded: false,
+      ...overrides,
+    },
+    lesson: "This text must not enter the provider request.",
+  };
+}
+
+function experienceReader(records) {
+  return () => ({ records });
+}
+
 test("systemd incident provider context projects only bounded receipt evidence", () => {
   const sourceTask = createSystemdIncidentRepairTask();
-  const context = buildSystemdIncidentProviderContext({ sourceTask });
+  const currentReceiptHash = sourceTask.outcome.details.incidentReceipt.receiptHash;
+  const priorReceiptHash = `sha256:${"a".repeat(64)}`;
+  const context = buildSystemdIncidentProviderContext({
+    sourceTask,
+    buildExperienceMemoryReadModel: experienceReader([
+      experienceRecord(currentReceiptHash),
+      experienceRecord(priorReceiptHash),
+      experienceRecord(`sha256:${"c".repeat(64)}`, { restoredHealthy: true, postHealthy: true }),
+      experienceRecord(`sha256:${"d".repeat(64)}`),
+      experienceRecord(`sha256:${"e".repeat(64)}`, { restoredHealthy: true, postHealthy: true }),
+      experienceRecord(`sha256:${"b".repeat(64)}`, { targetUnit: "openclaw-system-sense.service" }),
+      experienceRecord("not-a-receipt-hash"),
+    ]),
+  });
 
   assert.equal(context.ok, true, context.reason);
   assert.equal(context.projection.target.unit, "openclaw-event-hub.service");
@@ -25,6 +63,12 @@ test("systemd incident provider context projects only bounded receipt evidence",
   assert.equal(context.projection.journalEvidence.messagesIncluded, false);
   assert.equal(context.projection.restoredHealthy, false);
   assert.equal(context.projection.operatorRecoveryRecommended, true);
+  assert.equal(context.projection.priorIncidentExperience.matchedPatterns, 3);
+  assert.equal(context.projection.priorIncidentExperience.restoredPatterns, 1);
+  assert.equal(context.projection.priorIncidentExperience.recoveryRequiredPatterns, 2);
+  assert.equal(context.projection.priorIncidentExperience.patterns[0].sourceReceiptHash, priorReceiptHash);
+  assert.equal(context.evidence.systemdIncidentExperiencePatterns, 3);
+  assert.equal(context.evidence.systemdIncidentExperienceRecoveryRequiredPatterns, 2);
   assert.equal(context.evidence.systemdIncidentContextIncluded, true);
   assert.equal(context.evidence.contextContentIncluded, false);
   assert.match(context.contextContentHash, /^[a-f0-9]{64}$/u);
@@ -32,13 +76,18 @@ test("systemd incident provider context projects only bounded receipt evidence",
   const serialized = JSON.stringify({ projection: context.projection, evidence: context.evidence });
   assert.doesNotMatch(serialized, /private-health|private diagnostic|hostd-private-invocation/u);
   assert.doesNotMatch(serialized, /job\/72|kernel_so_peercred/u);
+  assert.doesNotMatch(context.requestEnvelope.messages[0].content, /This text must not enter/u);
 });
 
 test("incident handoff materializes and later reconstructs one deterministic approved request", () => {
   const sourceTask = createSystemdIncidentRepairTask();
   const tasks = new Map([[sourceTask.id, sourceTask]]);
+  const buildExperienceMemoryReadModel = experienceReader([
+    experienceRecord(`sha256:${"c".repeat(64)}`, { restoredHealthy: true, postHealthy: true }),
+  ]);
   const handoff = materialiseSystemdIncidentProviderHandoff({
     tasks,
+    buildExperienceMemoryReadModel,
     liveProviderExecution: {
       requested: true,
       credentialReference: "openclaw://credential/deepseek-api-key",
@@ -62,7 +111,11 @@ test("incident handoff materializes and later reconstructs one deterministic app
     },
   };
   tasks.set(handoffTask.id, handoffTask);
-  const execution = materialiseStoredSystemdIncidentProviderExecution({ handoffTask, tasks });
+  const execution = materialiseStoredSystemdIncidentProviderExecution({
+    handoffTask,
+    tasks,
+    buildExperienceMemoryReadModel,
+  });
 
   assert.equal(execution.handled, true);
   assert.equal(execution.ok, true, execution.reason);
@@ -74,6 +127,45 @@ test("incident handoff materializes and later reconstructs one deterministic app
     handoff.liveProviderExecution.requestEnvelope.messages[0].content,
   );
   assert.equal(execution.evidence.executionTaskId, handoffTask.id);
+  assert.equal(execution.evidence.systemdIncidentExperiencePatterns, 1);
+});
+
+test("incident execution fails closed when matching experience changes after approval", () => {
+  const sourceTask = createSystemdIncidentRepairTask();
+  const tasks = new Map([[sourceTask.id, sourceTask]]);
+  const handoff = materialiseSystemdIncidentProviderHandoff({
+    tasks,
+    buildExperienceMemoryReadModel: experienceReader([
+      experienceRecord(`sha256:${"d".repeat(64)}`),
+    ]),
+    liveProviderExecution: {
+      requested: true,
+      contextPacket: {
+        requested: true,
+        sourceTaskId: sourceTask.id,
+        includeSystemdIncidentReceipt: true,
+      },
+    },
+  });
+  const handoffTask = {
+    id: "provider-incident-experience-drift",
+    cloudConsciousnessLiveProviderEgressExecution: {
+      systemdIncidentContext: handoff.incidentContext,
+      incidentContextContentHash: handoff.evidence.contextContentHash,
+    },
+  };
+
+  const execution = materialiseStoredSystemdIncidentProviderExecution({
+    handoffTask,
+    tasks,
+    buildExperienceMemoryReadModel: experienceReader([
+      experienceRecord(`sha256:${"e".repeat(64)}`),
+    ]),
+  });
+
+  assert.equal(execution.handled, true);
+  assert.equal(execution.ok, false);
+  assert.equal(execution.reason, "systemd_incident_stored_context_mismatch");
 });
 
 test("incident context fails closed when receipt or stored projection changes", () => {

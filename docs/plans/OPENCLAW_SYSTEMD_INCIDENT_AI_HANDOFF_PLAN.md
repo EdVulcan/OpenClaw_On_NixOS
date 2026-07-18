@@ -85,5 +85,7 @@ recommendation metadata and compact incident provenance.
 The local target-specific experience record and recall are now complete through
 `OPENCLAW_SYSTEMD_INCIDENT_EXPERIENCE_MEMORY_PLAN.md`. The next capability may
 include at most a small bounded set of matching patterns in this same exact
-request-bound handoff. It must retain the existing explicit approval and exclude
-journal text, provider output, automatic egress, and repair authority.
+request-bound handoff. That learned context is now complete through
+`OPENCLAW_SYSTEMD_INCIDENT_LEARNED_PROVIDER_CONTEXT_PLAN.md`: it retains the
+existing explicit approval and excludes journal text, provider output,
+automatic egress, and repair authority.

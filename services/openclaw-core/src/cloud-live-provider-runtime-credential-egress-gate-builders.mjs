@@ -48,6 +48,7 @@ export function createCloudLiveProviderRuntimeCredentialEgressGateBuilders(deps)
     approvals,
     getTaskById,
     listTasks,
+    buildExperienceMemoryReadModel = () => null,
     executeGovernedLiveProviderRequest,
     providerEnv = process.env,
   } = deps;
@@ -883,6 +884,7 @@ export function createCloudLiveProviderRuntimeCredentialEgressGateBuilders(deps)
     const incidentMaterialisation = materialiseSystemdIncidentProviderHandoff({
       liveProviderExecution,
       tasks: typeof listTasks === "function" ? listTasks() : [],
+      buildExperienceMemoryReadModel,
     });
     if (!incidentMaterialisation.ok) {
       throw new Error(`Systemd incident provider context rejected: ${incidentMaterialisation.reason}.`);

@@ -360,5 +360,8 @@ the host. No real provider contact was executed on the sole physical host.
 The bounded local incident-memory slice is complete through
 `OPENCLAW_SYSTEMD_INCIDENT_EXPERIENCE_MEMORY_PLAN.md`. Next, include only a
 small bounded matching-target pattern summary in the existing approved incident
-AI handoff. Do not retain or send journal text/provider output, add a provider
-schema, automatically contact a provider, or authorize repair.
+AI handoff. That learned context is now complete through
+`OPENCLAW_SYSTEMD_INCIDENT_LEARNED_PROVIDER_CONTEXT_PLAN.md`. The next gap is a
+read-only systemd incident-review action in the existing recommendation schema;
+do not retain or send journal text/provider output, add hostd authority,
+automatically contact a provider, or authorize repair.

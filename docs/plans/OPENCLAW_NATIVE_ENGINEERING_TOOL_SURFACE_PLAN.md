@@ -26,6 +26,11 @@ deterministic request, reuses `engineering_recommendation_v0`, and excludes
 journal messages, URLs, error text, credentials, and raw hostd identity. The
 existing high-risk provider approval and Operator execution remain the only
 egress owner; no systemd action is inferred from the provider response.
+The same exact request may now include up to three safe prior same-target
+incident patterns from the advisory memory owner, as documented in
+`OPENCLAW_SYSTEMD_INCIDENT_LEARNED_PROVIDER_CONTEXT_PLAN.md`; current and
+cross-target receipts, lesson text, journal text, and provider output remain
+excluded.
 
 The existing prompt-semantics work-standards profile is now also declared in
 the common capability registry as `sense.openclaw.prompt_pack`. Its runtime

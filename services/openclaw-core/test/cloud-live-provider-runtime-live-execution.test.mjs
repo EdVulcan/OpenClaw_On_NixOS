@@ -492,7 +492,11 @@ test("approved incident context returns a guidance-only recommendation and persi
   assert.equal(result.contextPacket.systemdIncidentTargetUnit, "openclaw-event-hub.service");
   assert.equal(result.contextPacket.systemdIncidentRestoredHealthy, false);
   assert.equal(result.contextPacket.systemdIncidentJournalEntries, 3);
+  assert.equal(result.contextPacket.systemdIncidentExperiencePatterns, 0);
+  assert.equal(result.contextPacket.systemdIncidentExperienceRestoredPatterns, 0);
+  assert.equal(result.contextPacket.systemdIncidentExperienceRecoveryRequiredPatterns, 0);
   assert.equal(result.contextPacket.journalMessagesIncluded, false);
+  assert.equal(result.contextPacket.providerOutputIncluded, false);
   assert.equal(result.task.cloudConsciousnessLiveProviderEgressExecution.recommendation.reasonIncluded, false);
   const persisted = JSON.stringify(result.task);
   assert.doesNotMatch(persisted, /event-hub application health remained offline/u);

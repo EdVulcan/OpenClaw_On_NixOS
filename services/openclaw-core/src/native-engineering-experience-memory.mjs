@@ -1,7 +1,10 @@
 import { createHash } from "node:crypto";
 
 import { systemdHealthServiceKeyForUnit } from "./systemd-repair-verification.mjs";
-import { validateSystemdIncidentReceiptTask } from "./systemd-incident-receipt.mjs";
+import {
+  SYSTEMD_INCIDENT_EXPERIENCE_REGISTRY,
+  validateSystemdIncidentReceiptTask,
+} from "./systemd-incident-receipt.mjs";
 
 export const NATIVE_ENGINEERING_EXPERIENCE_MEMORY_REGISTRY =
   "openclaw-native-engineering-experience-memory-v0";
@@ -15,7 +18,6 @@ const MAX_TOKEN_CHARS = 40;
 const MAX_APPLICABILITY_TOKENS = 16;
 const MAX_SOURCE_TASK_ID_CHARS = 120;
 const MAX_NEXT_ACTION_CHARS = 240;
-const SYSTEMD_INCIDENT_EXPERIENCE_REGISTRY = "openclaw-systemd-incident-experience-v0";
 const STOP_WORDS = new Set([
   "the",
   "and",

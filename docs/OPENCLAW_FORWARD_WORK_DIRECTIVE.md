@@ -1571,10 +1571,18 @@ provider request, command, or repair authority. The contract is documented in
 
 ### Next Real Capability
 
-Include at most a small bounded set of matching-target incident patterns in the
-existing exact request-bound systemd incident AI handoff. Preserve the existing
-explicit provider approval and `engineering_recommendation_v0`; do not send
-journal/provider text, create automatic egress, or authorize another repair.
+The bounded learned provider context is now complete through
+`docs/plans/OPENCLAW_SYSTEMD_INCIDENT_LEARNED_PROVIDER_CONTEXT_PLAN.md`. Up to
+three same-target prior patterns enter the existing exact request binding;
+current, cross-target, malformed, unbounded, journal-text, lesson-text, and
+provider-output records are excluded. Operator execution recomputes the same
+selection and rejects learned-context drift before provider contact.
+
+The next real capability is one systemd-relevant, read-only reviewed action in
+the existing `engineering_recommendation_v0` allowlist. It should open the
+bound source task's existing incident receipt and recovery evidence in Observer.
+Do not add hostd mutation, automatic retry, automatic provider egress, or a new
+response schema.
 
 ## Operator Identity And Mutation Boundary Checkpoint
 

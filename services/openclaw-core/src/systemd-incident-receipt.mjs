@@ -6,6 +6,7 @@ import { systemdHealthServiceKeyForUnit } from "./systemd-repair-verification.mj
 export const SYSTEMD_INCIDENT_RECEIPT_REGISTRY =
   "openclaw-systemd-repair-incident-receipt-v0";
 export const SYSTEMD_INCIDENT_STEP_ID = "execute-next-systemd-restart";
+export const SYSTEMD_INCIDENT_EXPERIENCE_REGISTRY = "openclaw-systemd-incident-experience-v0";
 
 const JOURNAL_EVIDENCE_REGISTRY = "openclaw-systemd-journal-evidence-v0";
 const SHA256_PATTERN = /^[a-f0-9]{64}$/u;

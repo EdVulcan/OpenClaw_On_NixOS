@@ -722,6 +722,7 @@ export function createPlanBuilder(deps) {
     approvals,
     getTaskById,
     listTasks,
+    buildExperienceMemoryReadModel,
   });
 
 function buildOperatorState() {

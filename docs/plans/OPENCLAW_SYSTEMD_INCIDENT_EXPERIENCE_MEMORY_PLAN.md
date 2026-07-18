@@ -80,8 +80,8 @@ evidence while preserving the existing generic task-history summary.
 
 ## Next Real Capability
 
-Include at most a small bounded set of matching-target incident patterns in the
-existing exact request-bound systemd incident AI handoff. The operator approval
-must bind the resulting request, and journal/provider text must remain excluded.
-This lets absorbed experience influence a later diagnosis without creating a
-new provider schema or automatic egress path.
+The matching-target learned provider context is complete through
+`OPENCLAW_SYSTEMD_INCIDENT_LEARNED_PROVIDER_CONTEXT_PLAN.md`. The next
+capability should give the existing recommendation schema one systemd-relevant,
+read-only incident-review action backed by the current Observer task detail.
+Do not add hostd mutation, automatic retry, or a new provider schema.

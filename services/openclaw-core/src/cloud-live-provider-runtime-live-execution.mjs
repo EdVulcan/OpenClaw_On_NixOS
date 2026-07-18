@@ -114,7 +114,19 @@ function compactContextPacketEvidence(evidence) {
       ? evidence.systemdIncidentJournalEntries
       : 0,
     systemdIncidentReceiptHash: evidence.systemdIncidentReceiptHash ?? null,
+    systemdIncidentExperiencePatterns: Number.isInteger(evidence.systemdIncidentExperiencePatterns)
+      ? evidence.systemdIncidentExperiencePatterns
+      : 0,
+    systemdIncidentExperienceRestoredPatterns:
+      Number.isInteger(evidence.systemdIncidentExperienceRestoredPatterns)
+        ? evidence.systemdIncidentExperienceRestoredPatterns
+        : 0,
+    systemdIncidentExperienceRecoveryRequiredPatterns:
+      Number.isInteger(evidence.systemdIncidentExperienceRecoveryRequiredPatterns)
+        ? evidence.systemdIncidentExperienceRecoveryRequiredPatterns
+        : 0,
     journalMessagesIncluded: false,
+    providerOutputIncluded: false,
   };
 }
 

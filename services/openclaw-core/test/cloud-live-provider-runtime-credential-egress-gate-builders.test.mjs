@@ -316,7 +316,29 @@ test("credential egress task binds the approved request without persisting its c
 test("credential egress task binds and persists only the safe systemd incident projection", async () => {
   const preflightTask = createEgressRouteTaskPreflightTask();
   const incidentTask = createSystemdIncidentRepairTask();
-  const { deps } = createCredentialEgressHarness({ tasks: [preflightTask, incidentTask] });
+  const priorReceiptHash = `sha256:${"f".repeat(64)}`;
+  const { deps } = createCredentialEgressHarness({
+    tasks: [preflightTask, incidentTask],
+    buildExperienceMemoryReadModel: () => ({
+      records: [{
+        incidentPattern: {
+          registry: "openclaw-systemd-incident-experience-v0",
+          targetUnit: "openclaw-event-hub.service",
+          sourceReceiptHash: priorReceiptHash,
+          restoredHealthy: true,
+          preHealthy: false,
+          postHealthy: true,
+          journalAvailable: true,
+          journalEntries: 3,
+          restartCommandSucceeded: true,
+          nativeMutationObserved: true,
+          journalMessagesIncluded: false,
+          providerOutputIncluded: false,
+        },
+        lesson: "private experience lesson must not persist in the egress task",
+      }],
+    }),
+  });
   const builders = createCloudLiveProviderRuntimeCredentialEgressGateBuilders(deps);
 
   const taskShell = await builders.createCloudConsciousnessLiveProviderEgressExecutionTask({
@@ -342,10 +364,16 @@ test("credential egress task binds and persists only the safe systemd incident p
     healthServiceKey: "eventHub",
   });
   assert.equal(shell.systemdIncidentContext.journalEvidence.messagesIncluded, false);
+  assert.equal(shell.systemdIncidentContext.priorIncidentExperience.matchedPatterns, 1);
+  assert.equal(
+    shell.systemdIncidentContext.priorIncidentExperience.patterns[0].sourceReceiptHash,
+    priorReceiptHash,
+  );
   assert.equal(shell.incidentContextContentHash, shell.requestBinding.contextContentHash);
   const persisted = JSON.stringify(taskShell.task);
   assert.doesNotMatch(persisted, /private-health|private diagnostic|hostd-private-invocation/u);
   assert.doesNotMatch(persisted, /Operator request: Diagnose/u);
+  assert.doesNotMatch(persisted, /private experience lesson/u);
   assert.equal(shell.endpointContacted, false);
   assert.equal(shell.networkEgress, false);
 });

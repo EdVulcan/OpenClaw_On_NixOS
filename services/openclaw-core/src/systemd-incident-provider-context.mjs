@@ -6,6 +6,7 @@ import {
   buildCloudLiveProviderEngineeringRecommendationInstruction,
 } from "./cloud-live-provider-runtime-response-contract.mjs";
 import {
+  SYSTEMD_INCIDENT_EXPERIENCE_REGISTRY,
   SYSTEMD_INCIDENT_RECEIPT_REGISTRY,
   validateSystemdIncidentReceiptTask,
 } from "./systemd-incident-receipt.mjs";
@@ -14,6 +15,11 @@ export const SYSTEMD_INCIDENT_PROVIDER_CONTEXT_REGISTRY =
   "openclaw-systemd-incident-provider-context-v0";
 
 const DEEPSEEK_MODEL = "deepseek-chat";
+const SYSTEMD_INCIDENT_EXPERIENCE_CONTEXT_REGISTRY =
+  "openclaw-systemd-incident-experience-context-v0";
+const MAX_INCIDENT_EXPERIENCE_PATTERNS = 3;
+const MAX_INCIDENT_JOURNAL_ENTRIES = 100;
+const RECEIPT_HASH_PATTERN = /^sha256:[a-f0-9]{64}$/u;
 
 function hashText(value) {
   return createHash("sha256").update(value).digest("hex");
@@ -97,6 +103,60 @@ function compactHostdReceipt(hostd) {
   };
 }
 
+function compactIncidentExperience({ experienceMemory, targetUnit, sourceReceiptHash }) {
+  const patterns = [];
+  for (const record of Array.isArray(experienceMemory?.records) ? experienceMemory.records : []) {
+    const pattern = record?.incidentPattern;
+    if (!pattern
+      || pattern.registry !== SYSTEMD_INCIDENT_EXPERIENCE_REGISTRY
+      || pattern.targetUnit !== targetUnit
+      || pattern.sourceReceiptHash === sourceReceiptHash
+      || !RECEIPT_HASH_PATTERN.test(pattern.sourceReceiptHash ?? "")
+      || pattern.journalMessagesIncluded !== false
+      || pattern.providerOutputIncluded !== false
+      || !Number.isInteger(pattern.journalEntries)
+      || pattern.journalEntries < 0
+      || pattern.journalEntries > MAX_INCIDENT_JOURNAL_ENTRIES
+      || [
+        "restoredHealthy",
+        "preHealthy",
+        "postHealthy",
+        "journalAvailable",
+        "restartCommandSucceeded",
+        "nativeMutationObserved",
+      ].some((key) => typeof pattern[key] !== "boolean")) {
+      continue;
+    }
+    patterns.push({
+      sourceReceiptHash: pattern.sourceReceiptHash,
+      restoredHealthy: pattern.restoredHealthy,
+      preHealthy: pattern.preHealthy,
+      postHealthy: pattern.postHealthy,
+      journalAvailable: pattern.journalAvailable,
+      journalEntries: pattern.journalEntries,
+      restartCommandSucceeded: pattern.restartCommandSucceeded,
+      nativeMutationObserved: pattern.nativeMutationObserved,
+    });
+    if (patterns.length >= MAX_INCIDENT_EXPERIENCE_PATTERNS) break;
+  }
+  return {
+    registry: SYSTEMD_INCIDENT_EXPERIENCE_CONTEXT_REGISTRY,
+    targetUnit,
+    matchedPatterns: patterns.length,
+    restoredPatterns: patterns.filter((pattern) => pattern.restoredHealthy).length,
+    recoveryRequiredPatterns: patterns.filter((pattern) => !pattern.restoredHealthy).length,
+    patterns,
+    governance: {
+      advisoryOnly: true,
+      currentReceiptExcluded: true,
+      journalMessagesIncluded: false,
+      providerOutputIncluded: false,
+      createsTaskAutomatically: false,
+      executesAutomatically: false,
+    },
+  };
+}
+
 function projectionText(projection) {
   return JSON.stringify(projection);
 }
@@ -114,11 +174,30 @@ function invalid(reason) {
   return { ok: false, reason, projection: null, requestEnvelope: null, evidence: null };
 }
 
-export function buildSystemdIncidentProviderContext({ sourceTask } = {}) {
+export function buildSystemdIncidentProviderContext({
+  sourceTask,
+  buildExperienceMemoryReadModel = () => null,
+} = {}) {
   const validation = validateSystemdIncidentReceiptTask({ sourceTask });
   if (!validation.ok) return invalid(validation.reason);
   const { receipt, targetUnit, healthServiceKey: expectedHealthServiceKey } = validation;
   const journal = receipt.journalEvidence;
+  let experienceMemory;
+  try {
+    experienceMemory = buildExperienceMemoryReadModel({
+      taskType: sourceTask.type,
+      goal: sourceTask.goal ?? null,
+      incidentTargetUnit: targetUnit,
+      limit: MAX_INCIDENT_EXPERIENCE_PATTERNS + 1,
+    });
+  } catch {
+    return invalid("systemd_incident_experience_recall_failed");
+  }
+  const priorIncidentExperience = compactIncidentExperience({
+    experienceMemory,
+    targetUnit,
+    sourceReceiptHash: receipt.receiptHash,
+  });
 
   const projection = {
     registry: SYSTEMD_INCIDENT_PROVIDER_CONTEXT_REGISTRY,
@@ -136,6 +215,7 @@ export function buildSystemdIncidentProviderContext({ sourceTask } = {}) {
     postHealth: compactHealth(receipt.postHealth),
     restoredHealthy: receipt.restoredHealthy === true,
     operatorRecoveryRecommended: receipt.restoredHealthy !== true,
+    priorIncidentExperience,
     governance: {
       guidanceOnly: true,
       journalMessagesIncluded: false,
@@ -175,7 +255,12 @@ export function buildSystemdIncidentProviderContext({ sourceTask } = {}) {
       systemdIncidentJournalAvailable: projection.journalEvidence.available,
       systemdIncidentJournalEntries: projection.journalEvidence.returned,
       systemdIncidentReceiptHash: projection.sourceReceiptHash,
+      systemdIncidentExperiencePatterns: projection.priorIncidentExperience.matchedPatterns,
+      systemdIncidentExperienceRestoredPatterns: projection.priorIncidentExperience.restoredPatterns,
+      systemdIncidentExperienceRecoveryRequiredPatterns:
+        projection.priorIncidentExperience.recoveryRequiredPatterns,
       journalMessagesIncluded: false,
+      providerOutputIncluded: false,
       contextContentIncluded: false,
     },
   };
@@ -184,13 +269,14 @@ export function buildSystemdIncidentProviderContext({ sourceTask } = {}) {
 export function materialiseSystemdIncidentProviderHandoff({
   liveProviderExecution,
   tasks,
+  buildExperienceMemoryReadModel,
 } = {}) {
   if (liveProviderExecution?.contextPacket?.includeSystemdIncidentReceipt !== true) {
     return { ok: true, liveProviderExecution, incidentContext: null, evidence: null };
   }
   const sourceTaskId = liveProviderExecution.contextPacket.sourceTaskId;
   const sourceTask = taskForId(tasks, sourceTaskId);
-  const context = buildSystemdIncidentProviderContext({ sourceTask });
+  const context = buildSystemdIncidentProviderContext({ sourceTask, buildExperienceMemoryReadModel });
   if (!context.ok) return context;
   return {
     ok: true,
@@ -216,11 +302,12 @@ export function materialiseSystemdIncidentProviderHandoff({
 export function materialiseStoredSystemdIncidentProviderExecution({
   handoffTask,
   tasks,
+  buildExperienceMemoryReadModel,
 } = {}) {
   const stored = handoffTask?.cloudConsciousnessLiveProviderEgressExecution?.systemdIncidentContext;
   if (!stored) return { handled: false, ok: true, liveProviderExecution: null, evidence: null };
   const sourceTask = taskForId(tasks, stored.sourceTaskId);
-  const context = buildSystemdIncidentProviderContext({ sourceTask });
+  const context = buildSystemdIncidentProviderContext({ sourceTask, buildExperienceMemoryReadModel });
   if (!context.ok) return { handled: true, ...context };
   if (context.contextContentHash
       !== handoffTask.cloudConsciousnessLiveProviderEgressExecution.incidentContextContentHash

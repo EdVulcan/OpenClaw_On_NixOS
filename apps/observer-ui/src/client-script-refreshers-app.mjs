@@ -317,6 +317,7 @@ function renderTaskSummary(task, { includeRecovery = true, includeOutcome = true
       lines.push(\`Provider Incident Context: \${providerContextPacket.registry ?? "unknown"} source=\${providerContextPacket.sourceTaskId ?? "none"}\`);
       lines.push(\`Provider Incident Target: \${providerContextPacket.systemdIncidentTargetUnit ?? "unknown"} restored=\${providerContextPacket.systemdIncidentRestoredHealthy ?? "unknown"}\`);
       lines.push(\`Provider Incident Journal: available=\${providerContextPacket.systemdIncidentJournalAvailable ?? "unknown"} entries=\${providerContextPacket.systemdIncidentJournalEntries ?? 0} messagesIncluded=\${Boolean(providerContextPacket.journalMessagesIncluded)}\`);
+      lines.push(\`Provider Incident Experience: matched=\${providerContextPacket.systemdIncidentExperiencePatterns ?? 0} restored=\${providerContextPacket.systemdIncidentExperienceRestoredPatterns ?? 0} recoveryRequired=\${providerContextPacket.systemdIncidentExperienceRecoveryRequiredPatterns ?? 0} providerOutputIncluded=\${Boolean(providerContextPacket.providerOutputIncluded)}\`);
     }
     if (task.bodyEvidenceLedgerFirstRecord) {
       const firstRecord = task.bodyEvidenceLedgerFirstRecord;

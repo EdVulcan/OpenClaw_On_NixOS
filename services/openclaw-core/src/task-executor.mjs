@@ -1436,6 +1436,7 @@ async function buildOperatorOptions(task, body = {}) {
     const incidentExecution = materialiseStoredSystemdIncidentProviderExecution({
       handoffTask: task,
       tasks,
+      buildExperienceMemoryReadModel,
     });
     if (incidentExecution.handled) {
       if (incidentExecution.ok) {

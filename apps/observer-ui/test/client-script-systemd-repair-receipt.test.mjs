@@ -15,7 +15,9 @@ test("Observer task detail renders compact systemd repair receipt evidence", () 
     "Provider Incident Context:",
     "Provider Incident Target:",
     "Provider Incident Journal:",
+    "Provider Incident Experience:",
     "journalMessagesIncluded",
+    "providerOutputIncluded",
   ]) {
     assert.match(observerClientAppRefreshersScript, new RegExp(token.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"));
   }

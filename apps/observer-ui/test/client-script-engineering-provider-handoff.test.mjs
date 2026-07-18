@@ -158,6 +158,7 @@ test("Observer creates a fixed systemd incident handoff without caller request t
                 registry: "openclaw-systemd-incident-provider-context-v0",
                 target: { unit: "openclaw-event-hub.service", healthServiceKey: "eventHub" },
                 restoredHealthy: false,
+                priorIncidentExperience: { matchedPatterns: 2 },
               },
             },
           },
@@ -187,6 +188,7 @@ test("Observer creates a fixed systemd incident handoff without caller request t
   });
   assert.match(context.engineeringProviderHandoffJson.textContent, /Systemd incident: included=true/u);
   assert.match(context.engineeringProviderHandoffJson.textContent, /openclaw-event-hub\.service/u);
+  assert.match(context.engineeringProviderHandoffJson.textContent, /experience=2/u);
   assert.doesNotMatch(context.engineeringProviderHandoffJson.textContent, /private|journal message/u);
   assert.match(calls.at(-1)[1], /pending systemd incident diagnosis task provider-incident-task-1/u);
 });

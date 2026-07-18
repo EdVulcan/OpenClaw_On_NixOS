@@ -23,7 +23,7 @@ export const observerClientEngineeringProviderHandoffRenderersScript = `function
     \`Binding: provider=\${binding.provider ?? summary.provider ?? "none"} model=\${binding.model ?? summary.model ?? "none"} sourceTask=\${binding.sourceTaskId ?? summary.sourceTaskId ?? "none"} requestBound=\${Boolean(binding.requestContentHash) || summary.requestBound === true}\`,
     \`Governance: createsTask=\${Boolean(result?.governance?.createsTask ?? summary.createsTask)} createsApproval=\${Boolean(result?.governance?.createsApproval ?? summary.createsApproval)} endpointContacted=\${Boolean(result?.governance?.endpointContacted ?? summary.endpointContacted)} networkEgress=\${Boolean(result?.governance?.networkEgress ?? summary.networkEgress)} providerCall=\${Boolean(result?.governance?.providerCall ?? false)}\`,
     \`Response: \${responseContract}\`,
-    \`Systemd incident: included=\${Boolean(incidentContext) || summary.systemdIncidentContextIncluded === true} target=\${incidentContext?.target?.unit ?? summary.systemdIncidentTargetUnit ?? "none"} restored=\${incidentContext?.restoredHealthy ?? summary.systemdIncidentRestoredHealthy ?? "unknown"}\`,
+    \`Systemd incident: included=\${Boolean(incidentContext) || summary.systemdIncidentContextIncluded === true} target=\${incidentContext?.target?.unit ?? summary.systemdIncidentTargetUnit ?? "none"} restored=\${incidentContext?.restoredHealthy ?? summary.systemdIncidentRestoredHealthy ?? "unknown"} experience=\${incidentContext?.priorIncidentExperience?.matchedPatterns ?? summary.systemdIncidentExperiencePatterns ?? 0}\`,
     "Request text and credential values are not shown or persisted in this readback.",
   ].join("\\n");
 }

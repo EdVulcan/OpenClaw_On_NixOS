@@ -45,6 +45,7 @@ export function createCloudLiveProviderRuntimeImplementation(deps) {
     approvals,
     getTaskById,
     listTasks,
+    buildExperienceMemoryReadModel = () => null,
   } = deps;
 
   const initialRuntimeBuilders = createCloudLiveProviderRuntimeInitialBuilders({
@@ -203,6 +204,7 @@ export function createCloudLiveProviderRuntimeImplementation(deps) {
     approvals,
     getTaskById,
     listTasks,
+    buildExperienceMemoryReadModel,
     executeGovernedLiveProviderRequest: executeCloudConsciousnessLiveProviderRequest,
   });
   const {

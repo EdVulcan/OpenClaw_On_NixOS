@@ -133,6 +133,11 @@ export function createEngineeringProviderHandoffCapabilityHandlers({
       systemdIncidentTargetUnit: incidentContext?.target?.unit ?? null,
       systemdIncidentRestoredHealthy: incidentContext?.restoredHealthy ?? null,
       systemdIncidentReceiptHash: incidentContext?.sourceReceiptHash ?? null,
+      systemdIncidentExperiencePatterns: incidentContext?.priorIncidentExperience?.matchedPatterns ?? 0,
+      systemdIncidentExperienceRestoredPatterns:
+        incidentContext?.priorIncidentExperience?.restoredPatterns ?? 0,
+      systemdIncidentExperienceRecoveryRequiredPatterns:
+        incidentContext?.priorIncidentExperience?.recoveryRequiredPatterns ?? 0,
       createsTask: governance.createsTask === true,
       createsApproval: governance.createsApproval === true,
       endpointContacted: governance.endpointContacted === true,

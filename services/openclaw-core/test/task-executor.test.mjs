@@ -2832,10 +2832,33 @@ test("operator options materialise the existing context packet for live provider
 
 test("approved systemd incident handoff reconstructs its exact provider request for Operator Step", async () => {
   const sourceTask = createSystemdIncidentRepairTask();
-  const incident = buildSystemdIncidentProviderContext({ sourceTask });
+  const priorReceiptHash = `sha256:${"f".repeat(64)}`;
+  const buildExperienceMemoryReadModel = () => ({
+    records: [{
+      incidentPattern: {
+        registry: "openclaw-systemd-incident-experience-v0",
+        targetUnit: "openclaw-event-hub.service",
+        sourceReceiptHash: priorReceiptHash,
+        restoredHealthy: false,
+        preHealthy: false,
+        postHealthy: false,
+        journalAvailable: true,
+        journalEntries: 2,
+        restartCommandSucceeded: true,
+        nativeMutationObserved: true,
+        journalMessagesIncluded: false,
+        providerOutputIncluded: false,
+      },
+    }],
+  });
+  const incident = buildSystemdIncidentProviderContext({
+    sourceTask,
+    buildExperienceMemoryReadModel,
+  });
   assert.equal(incident.ok, true, incident.reason);
   let capturedOptions = null;
   const { executor, state } = createExecutorHarness({
+    deps: { buildExperienceMemoryReadModel },
     planBuilder: {
       isCloudConsciousnessLiveProviderEgressExecutionTask: (task) => (
         task?.type === "cloud_consciousness_live_provider_egress_execution_task"
@@ -2882,6 +2905,12 @@ test("approved systemd incident handoff reconstructs its exact provider request 
     capturedOptions[CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CONTEXT_PACKET_EVIDENCE].systemdIncidentContextIncluded,
     true,
   );
+  assert.equal(
+    capturedOptions[CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CONTEXT_PACKET_EVIDENCE]
+      .systemdIncidentExperiencePatterns,
+    1,
+  );
+  assert.match(capturedOptions.liveProviderExecution.requestEnvelope.messages[0].content, new RegExp(priorReceiptHash, "u"));
   assert.doesNotMatch(
     capturedOptions.liveProviderExecution.requestEnvelope.messages[0].content,
     /private-health|private diagnostic|hostd-private-invocation/u,
