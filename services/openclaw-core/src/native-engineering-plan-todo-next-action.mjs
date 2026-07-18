@@ -51,6 +51,13 @@ const ACTIONS = {
     existingCapabilityId: null,
     requiresApproval: false,
   },
+  refreshSystemdIncident: {
+    actionId: "refresh_systemd_incident_observation",
+    label: "Refresh read-only health and journal observation for the bound systemd incident",
+    existingObserverControlId: "refresh-systemd-journal-evidence-button",
+    existingCapabilityId: null,
+    requiresApproval: false,
+  },
   semanticClick: {
     actionId: "create_semantic_click_task",
     label: "Create a reviewed semantic click task for the current trusted work view target",

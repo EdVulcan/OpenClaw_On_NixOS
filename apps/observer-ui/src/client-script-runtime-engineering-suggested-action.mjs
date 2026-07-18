@@ -41,6 +41,12 @@ export const observerClientRuntimeEngineeringSuggestedActionScript = `const GOVE
     requiresApproval: false,
     run: (recommendationLink) => reviewBoundSystemdIncidentEvidence(recommendationLink),
   },
+  refresh_systemd_incident_observation: {
+    controlId: "refresh-systemd-journal-evidence-button",
+    capabilityId: null,
+    requiresApproval: false,
+    run: (recommendationLink) => refreshBoundSystemdIncidentObservation(recommendationLink),
+  },
   create_semantic_click_task: {
     controlId: "create-semantic-click-task-button",
     capabilityId: "plan.openclaw.browser.semantic_click_task",

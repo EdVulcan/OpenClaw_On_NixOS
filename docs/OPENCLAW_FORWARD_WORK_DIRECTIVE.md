@@ -1590,10 +1590,16 @@ reads only. It creates no task, approval, provider request, command, retry, or
 repair. The contract is documented in
 `docs/plans/OPENCLAW_SYSTEMD_INCIDENT_REVIEWED_ACTION_PLAN.md`.
 
-The next real capability is one separately reviewed, read-only refresh of the
-same bound fixed unit through the existing body-health and bounded journal
-owners. Do not create repair authority, contact a provider, or automatically
-retry the incident.
+That separately reviewed refresh is now complete through
+`docs/plans/OPENCLAW_SYSTEMD_INCIDENT_REVIEWED_REFRESH_PLAN.md`.
+`refresh_systemd_incident_observation` reuses the same provider/source/receipt
+resolver, fixes the journal selector to the verified receipt unit, and refreshes
+only body health, fixed-unit inventory, and bounded journal Observer owners.
+
+The next real capability is one compact hash-bound local receipt for that new
+observation, associated with the provider task and source incident receipt. Do
+not retain journal messages, create automatic provider egress, or authorize
+repair.
 
 ## Operator Identity And Mutation Boundary Checkpoint
 

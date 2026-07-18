@@ -129,7 +129,11 @@ function renderEngineeringRecommendationFromOperatorResult(result) {
 }
 
 function buildEngineeringRecommendationLinkInput(recommendation, control) {
-  if (!["create_semantic_click_task", "review_systemd_incident_evidence"].includes(recommendation.actionId)) {
+  if (![
+    "create_semantic_click_task",
+    "review_systemd_incident_evidence",
+    "refresh_systemd_incident_observation",
+  ].includes(recommendation.actionId)) {
     return null;
   }
   if (!latestEngineeringRecommendationSourceTaskId) {
@@ -151,18 +155,24 @@ function buildEngineeringRecommendationLinkInput(recommendation, control) {
   };
 }
 
-async function reviewBoundSystemdIncidentEvidence(recommendationLink) {
-  if (recommendationLink?.actionId !== "review_systemd_incident_evidence"
+const REVIEWED_SYSTEMD_RECOMMENDATION_CONTROLS = Object.freeze({
+  review_systemd_incident_evidence: "load-selected-task-button",
+  refresh_systemd_incident_observation: "refresh-systemd-journal-evidence-button",
+});
+
+async function resolveBoundSystemdIncidentEvidence(recommendationLink) {
+  const expectedControlId = REVIEWED_SYSTEMD_RECOMMENDATION_CONTROLS[recommendationLink?.actionId];
+  if (!expectedControlId
     || !recommendationLink.sourceTaskId
     || recommendationLink.sourceRegistry !== ENGINEERING_RECOMMENDATION_REGISTRY
     || recommendationLink.contract !== ENGINEERING_RECOMMENDATION_CONTRACT
-    || recommendationLink.expectedObserverControlId !== "load-selected-task-button"
+    || recommendationLink.expectedObserverControlId !== expectedControlId
     || recommendationLink.existingCapabilityId !== null
     || recommendationLink.requiresApproval !== false
     || recommendationLink.createsTaskAutomatically !== false
     || recommendationLink.createsApprovalAutomatically !== false
     || recommendationLink.executesAutomatically !== false) {
-    throw new Error("The systemd incident review is missing its bound provider task.");
+    throw new Error("The reviewed systemd incident action is missing its bound provider task.");
   }
   const providerResult = await fetchJson(
     \`\${observerConfig.coreUrl}/tasks/\${encodeURIComponent(recommendationLink.sourceTaskId)}\`,
@@ -204,6 +214,13 @@ async function reviewBoundSystemdIncidentEvidence(recommendationLink) {
     throw new Error("The bound systemd incident receipt is unavailable or has changed.");
   }
 
+  return { incidentTask, receipt };
+}
+
+async function reviewBoundSystemdIncidentEvidence(recommendationLink) {
+  const { incidentTask } = await resolveBoundSystemdIncidentEvidence(recommendationLink);
+  const incidentTaskId = incidentTask.id;
+
   taskHistoryFocus = "selected-task";
   selectedHistoryTaskId = incidentTaskId;
   latestHistoryTask = incidentTask;
@@ -213,6 +230,16 @@ async function reviewBoundSystemdIncidentEvidence(recommendationLink) {
   renderPlanPanel(currentTaskState ?? incidentTask);
   renderEngineeringVerificationFollowupReadback(incidentTask);
   renderCommandTranscriptFromTask(incidentTask, { source: "reviewed-systemd-incident" });
+}
+
+async function refreshBoundSystemdIncidentObservation(recommendationLink) {
+  const { receipt } = await resolveBoundSystemdIncidentEvidence(recommendationLink);
+  systemdJournalEvidenceUnit.value = receipt.target.unit;
+  await Promise.all([
+    refreshSystemState(),
+    refreshSystemdUnitInventory(),
+    refreshSystemdJournalEvidence(),
+  ]);
 }
 
 async function useEngineeringRecommendation() {

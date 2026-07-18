@@ -59,7 +59,8 @@ different unit is rejected before Observer changes the selected task detail.
 
 ## Next Real Capability
 
-Add one separately reviewed, read-only refresh action for the same bound fixed
-unit. Reuse the existing body-health and bounded journal owners to obtain a new
-observation without creating a repair task, invoking hostd, contacting a
-provider, or automatically retrying the incident.
+The separately reviewed read-only refresh is complete through
+`OPENCLAW_SYSTEMD_INCIDENT_REVIEWED_REFRESH_PLAN.md`. The next capability should
+create a compact hash-bound local receipt for the new observation without
+retaining journal messages, automatically contacting a provider, or authorizing
+repair.

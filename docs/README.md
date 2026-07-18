@@ -14,7 +14,7 @@ paragraph. Reconcile this baseline with the repository and live host first.
 | Layer | Evidence at this checkpoint | Status |
 | --- | --- | --- |
 | Capability source | Current `main` through the Level 3 incident repair loop and bounded Event Hub audit storage | Implemented; commit history is authoritative |
-| Local validation | 828 workspace tests and typecheck pass; body-config and event-audit integration pass; 811 registry entries pass | Validated |
+| Local validation | 830 workspace tests and typecheck pass; body-config and event-audit integration pass; 811 registry entries pass | Validated |
 | Installed system | NixOS `26.05.4808.569d57850992`, generation `/nix/store/735kfj8knq1nn092hq4z57sjlc9di3q5-nixos-system-nixos-26.05.4808.569d57850992` | Running but behind the capability source |
 | Deployed journal probe | `/system/systemd/journal-evidence` returns `404`; `openclaw-system-sense` has no `systemd-journal` supplementary group | Not deployed |
 | Deployed audit store | Installed Event Hub predates streaming tail reads, cached summaries, and rotation | Not deployed |
@@ -67,6 +67,8 @@ The completed bounded frontier is:
   incident diagnosis request, with execution-time drift rejection.
 - One operator-reviewed provider action that opens only the exact bound terminal
   incident receipt and recovery evidence in existing Observer task detail.
+- One operator-reviewed provider action that refreshes body health, fixed-unit
+  inventory, and bounded journal evidence for that exact incident unit.
 
 Real generation activation and rollback remain unproven on a disposable
 mutation environment. Level 4 graphics-stack ownership remains future work.
@@ -94,13 +96,14 @@ body health + bounded journal evidence
 -> local matching-target incident experience recall
 -> approved diagnosis informed by bounded prior outcomes
 -> reviewed opening of the exact bound incident evidence
+-> reviewed same-unit read-only observation refresh
 ```
 
 Do not broaden hostd into arbitrary systemd control or add another provider
-readiness wrapper. The next real capability is one separately reviewed,
-read-only refresh of health and bounded journal observation for the same bound
-fixed unit. It must not add hostd mutation, automatic retry, automatic provider
-calls, or a new response schema.
+readiness wrapper. The next real capability is one compact hash-bound local
+receipt for the reviewed refreshed observation. It must not retain journal
+messages, add hostd mutation, automatic provider calls, or a new response
+schema.
 
 ## Progress Estimate
 
@@ -127,6 +130,7 @@ These figures are capability-maturity estimates, not test coverage:
 | [OPENCLAW_SYSTEMD_INCIDENT_EXPERIENCE_MEMORY_PLAN.md](./plans/OPENCLAW_SYSTEMD_INCIDENT_EXPERIENCE_MEMORY_PLAN.md) | Completed local incident outcome absorption and matching-target advisory recall. |
 | [OPENCLAW_SYSTEMD_INCIDENT_LEARNED_PROVIDER_CONTEXT_PLAN.md](./plans/OPENCLAW_SYSTEMD_INCIDENT_LEARNED_PROVIDER_CONTEXT_PLAN.md) | Completed learned-pattern inclusion in the exact approved incident diagnosis request. |
 | [OPENCLAW_SYSTEMD_INCIDENT_REVIEWED_ACTION_PLAN.md](./plans/OPENCLAW_SYSTEMD_INCIDENT_REVIEWED_ACTION_PLAN.md) | Completed reviewed read-only opening of provider-bound incident evidence. |
+| [OPENCLAW_SYSTEMD_INCIDENT_REVIEWED_REFRESH_PLAN.md](./plans/OPENCLAW_SYSTEMD_INCIDENT_REVIEWED_REFRESH_PLAN.md) | Completed reviewed same-unit health, inventory, and bounded journal refresh. |
 | [OPENCLAW_PHASE_C_KERNEL_PROCESS_EXEC_PLAN.md](./plans/OPENCLAW_PHASE_C_KERNEL_PROCESS_EXEC_PLAN.md) | Completed first bounded read-only kernel event slice. |
 | [OPENCLAW_PHASE_D_DECLARATIVE_EVOLUTION_CANDIDATE_PLAN.md](./plans/OPENCLAW_PHASE_D_DECLARATIVE_EVOLUTION_CANDIDATE_PLAN.md) | Current declarative-evolution evidence and explicitly deferred activation boundary. |
 | [OPENCLAW_MONOLITH_REDUCTION_PLAN.md](./plans/OPENCLAW_MONOLITH_REDUCTION_PLAN.md) | Active coupling and maintainability debt record. |
