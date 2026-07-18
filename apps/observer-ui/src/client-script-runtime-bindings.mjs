@@ -574,6 +574,13 @@ taskListItems.addEventListener("click", (event) => {
     return;
   }
 
+  if (action === "prepare-fixed-unit-incident-repair") {
+    createFixedUnitIncidentRepairTask(taskId).catch((error) => {
+      setControlMessage(\`Request failed: \${formatError(error)}\`);
+    });
+    return;
+  }
+
   if (target.closest(".task-card")) {
     taskHistoryFocus = "selected-task";
     selectedHistoryTaskId = taskId;

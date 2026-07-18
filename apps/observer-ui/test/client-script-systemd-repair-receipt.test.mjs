@@ -34,6 +34,11 @@ test("Observer task detail renders compact systemd repair receipt evidence", () 
     "Fixed Unit Triage Target:",
     "Fixed Unit Triage Boundary:",
     "systemdIncidentTriage",
+    "Fixed Unit Repair Promotion:",
+    "Fixed Unit Repair Source:",
+    "Fixed Unit Repair Target:",
+    "Fixed Unit Repair Gate:",
+    "systemdIncidentRepairPromotion",
     "callsProvider",
     "authorizesRepair",
   ]) {

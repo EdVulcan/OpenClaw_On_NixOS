@@ -60,7 +60,10 @@ function repairDraft() {
   };
 }
 
-function createHarness({ audit = async () => ({ ok: true }) } = {}) {
+function createHarness({
+  audit = async () => ({ ok: true }),
+  beforeRepairCreate = async () => {},
+} = {}) {
   const observation = incidentObservation();
   const sourceTask = {
     id: SOURCE_TASK_ID,
@@ -71,22 +74,46 @@ function createHarness({ audit = async () => ({ ok: true }) } = {}) {
   const tasks = new Map([[sourceTask.id, sourceTask]]);
   const calls = [];
   const events = [];
+  const approvals = new Map();
   let sequence = 0;
-  const builders = createFixedUnitIncidentTriageBuilders({
-    tasks,
-    schedulerState: {
-      units: {
-        [TARGET.unit]: {
-          status: "unhealthy",
-          fingerprint: observation.fingerprint,
-          latestTaskId: sourceTask.id,
-        },
+  const schedulerState = {
+    units: {
+      [TARGET.unit]: {
+        status: "unhealthy",
+        fingerprint: observation.fingerprint,
+        latestTaskId: sourceTask.id,
       },
     },
+  };
+  const builders = createFixedUnitIncidentTriageBuilders({
+    tasks,
+    schedulerState,
     buildSystemdRepairExecutionTaskDraft: async (input) => {
       calls.push({ name: "buildDraft", input });
       return repairDraft();
     },
+    createSystemdNextRepairTaskShell: async (input) => {
+      calls.push({ name: "createRepairTask", input });
+      await beforeRepairCreate({ tasks, schedulerState });
+      await input.validateBeforeCreate();
+      const task = {
+        id: `repair-task-${++sequence}`,
+        type: "systemd_next_repair_task",
+        status: "queued",
+        systemdNextRepair: { target: { unit: input.targetUnit } },
+        systemdIncidentRepairPromotion: input.sourceIncidentRepairPromotion,
+        approval: { requestId: `approval-${sequence}`, status: "pending" },
+      };
+      const approval = { id: `approval-${sequence}`, taskId: task.id, status: "pending" };
+      tasks.set(task.id, task);
+      approvals.set(approval.id, approval);
+      return {
+        task,
+        approval,
+        governance: { executed: false, hostMutation: false },
+      };
+    },
+    approvals,
     evaluatePolicyIntent: (_input, context) => ({
       decision: "audit_only",
       domain: "body_internal",
@@ -111,13 +138,14 @@ function createHarness({ audit = async () => ({ ok: true }) } = {}) {
     persistState: () => calls.push({ name: "persistState" }),
     publishEvent: async (name, payload) => {
       events.push({ name, payload });
-      if (name === "systemd.fixed_unit_incident_triage_recorded") return audit();
+      if (name === "systemd.fixed_unit_incident_triage_recorded"
+        || name === "systemd.fixed_unit_incident_repair_promoted") return audit(name);
       return { ok: true };
     },
     serialiseTask: (task) => task,
     now: () => "2026-07-18T15:00:00.000Z",
   });
-  return { builders, tasks, sourceTask, observation, calls, events };
+  return { builders, tasks, approvals, schedulerState, sourceTask, observation, calls, events };
 }
 
 test("fixed-unit incident triage creates one completed plan-only task without approval", async () => {
@@ -226,4 +254,94 @@ test("fixed-unit incident triage requires explicit confirmation and a current so
     () => harness.builders.createFixedUnitIncidentTriageTask({ sourceTaskId: "missing", confirm: true }),
     /source_not_completed_fixed_unit_incident/u,
   );
+});
+
+test("fixed-unit incident repair promotion creates one pending fixed-target approval without execution", async () => {
+  const harness = createHarness();
+  const triage = await harness.builders.createFixedUnitIncidentTriageTask({
+    sourceTaskId: SOURCE_TASK_ID,
+    confirm: true,
+  });
+
+  const result = await harness.builders.createFixedUnitIncidentRepairTask({
+    triageTaskId: triage.task.id,
+    confirm: true,
+  });
+
+  assert.equal(result.task.type, "systemd_next_repair_task");
+  assert.equal(result.task.systemdNextRepair.target.unit, TARGET.unit);
+  assert.equal(result.approval.status, "pending");
+  assert.equal(result.promotion.triageTaskId, triage.task.id);
+  assert.equal(result.promotion.sourceTaskId, SOURCE_TASK_ID);
+  assert.match(result.promotion.bindingHash, /^sha256:[a-f0-9]{64}$/u);
+  assert.equal(result.governance.createsApproval, true);
+  assert.equal(result.governance.executesRepair, false);
+  assert.equal(result.governance.invokesHostd, false);
+  const createCall = harness.calls.find((call) => call.name === "createRepairTask");
+  assert.equal(createCall.input.execute, true);
+  assert.equal(createCall.input.targetUnit, TARGET.unit);
+  assert.equal(typeof createCall.input.validateBeforeCreate, "function");
+  assert.equal(harness.events.some((event) => event.name === "systemd.fixed_unit_incident_repair_promoted"), true);
+});
+
+test("fixed-unit incident repair promotion reuses the same task across repeated requests", async () => {
+  const harness = createHarness();
+  const triage = await harness.builders.createFixedUnitIncidentTriageTask({ sourceTaskId: SOURCE_TASK_ID, confirm: true });
+  const input = { triageTaskId: triage.task.id, confirm: true };
+
+  const [first, second] = await Promise.all([
+    harness.builders.createFixedUnitIncidentRepairTask(input),
+    harness.builders.createFixedUnitIncidentRepairTask(input),
+  ]);
+  const third = await harness.builders.createFixedUnitIncidentRepairTask(input);
+
+  assert.equal(second.task.id, first.task.id);
+  assert.equal(third.task.id, first.task.id);
+  assert.equal(third.governance.reusedExistingTask, true);
+  assert.equal(harness.calls.filter((call) => call.name === "createRepairTask").length, 1);
+});
+
+test("fixed-unit incident repair promotion rejects changed triage evidence and audit failure", async () => {
+  const tampered = createHarness();
+  const triage = await tampered.builders.createFixedUnitIncidentTriageTask({ sourceTaskId: SOURCE_TASK_ID, confirm: true });
+  triage.task.systemdIncidentTriage.binding.bindingHash = `sha256:${"a".repeat(64)}`;
+  await assert.rejects(
+    () => tampered.builders.createFixedUnitIncidentRepairTask({ triageTaskId: triage.task.id, confirm: true }),
+    /source_triage_hash_mismatch/u,
+  );
+  assert.equal(tampered.calls.some((call) => call.name === "createRepairTask"), false);
+
+  const auditFailure = createHarness({
+    audit: async (name) => {
+      if (name === "systemd.fixed_unit_incident_repair_promoted") throw new Error("event hub unavailable");
+      return { ok: true };
+    },
+  });
+  const validTriage = await auditFailure.builders.createFixedUnitIncidentTriageTask({ sourceTaskId: SOURCE_TASK_ID, confirm: true });
+  await assert.rejects(
+    () => auditFailure.builders.createFixedUnitIncidentRepairTask({ triageTaskId: validTriage.task.id, confirm: true }),
+    /event hub unavailable/u,
+  );
+  assert.equal([...auditFailure.tasks.values()].some((task) => task.type === "systemd_next_repair_task"), false);
+  assert.equal(auditFailure.approvals.size, 0);
+});
+
+test("fixed-unit incident repair promotion rejects recovery during route-gate preparation", async () => {
+  const harness = createHarness({
+    beforeRepairCreate: async ({ schedulerState }) => {
+      schedulerState.units[TARGET.unit] = {
+        status: "healthy",
+        fingerprint: null,
+        latestTaskId: SOURCE_TASK_ID,
+      };
+    },
+  });
+  const triage = await harness.builders.createFixedUnitIncidentTriageTask({ sourceTaskId: SOURCE_TASK_ID, confirm: true });
+
+  await assert.rejects(
+    () => harness.builders.createFixedUnitIncidentRepairTask({ triageTaskId: triage.task.id, confirm: true }),
+    /source changed before task creation: source_incident_not_current/u,
+  );
+  assert.equal([...harness.tasks.values()].some((task) => task.type === "systemd_next_repair_task"), false);
+  assert.equal(harness.approvals.size, 0);
 });

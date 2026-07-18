@@ -286,6 +286,7 @@ function renderTaskSummary(task, { includeRecovery = true, includeOutcome = true
     const scheduledSystemdTriage = task.systemdIncidentTriage
       ?? task.outcome?.details?.systemdIncidentTriage
       ?? null;
+    const scheduledSystemdRepairPromotion = task.systemdIncidentRepairPromotion ?? null;
     const providerContextPacket = task.outcome?.details?.contextPacket ?? null;
     const systemdIncidentObservationReceipt = task.cloudConsciousnessLiveProviderEgressExecution
       ?.systemdIncidentObservationReceipt ?? null;
@@ -332,6 +333,12 @@ function renderTaskSummary(task, { includeRecovery = true, includeOutcome = true
       lines.push(\`Fixed Unit Triage Source: \${scheduledSystemdTriage.source?.taskId ?? "none"} fingerprint=\${scheduledSystemdTriage.source?.fingerprint ?? "none"}\`);
       lines.push(\`Fixed Unit Triage Target: \${scheduledSystemdTriage.target?.unit ?? "unknown"} repairDraft=\${scheduledSystemdTriage.repairPlanningBoundary?.registry ?? "none"}\`);
       lines.push(\`Fixed Unit Triage Boundary: approval=\${Boolean(scheduledSystemdTriage.governance?.createsApproval)} repair=\${Boolean(scheduledSystemdTriage.governance?.executesRepair)} hostd=\${Boolean(scheduledSystemdTriage.governance?.invokesHostd)} provider=\${Boolean(scheduledSystemdTriage.governance?.callsProvider)}\`);
+    }
+    if (scheduledSystemdRepairPromotion) {
+      lines.push(\`Fixed Unit Repair Promotion: \${scheduledSystemdRepairPromotion.registry ?? "unknown"} binding=\${scheduledSystemdRepairPromotion.bindingHash ?? "none"}\`);
+      lines.push(\`Fixed Unit Repair Source: triage=\${scheduledSystemdRepairPromotion.triageTaskId ?? "none"} incident=\${scheduledSystemdRepairPromotion.sourceTaskId ?? "none"}\`);
+      lines.push(\`Fixed Unit Repair Target: \${scheduledSystemdRepairPromotion.targetUnit ?? "unknown"} capability=\${scheduledSystemdRepairPromotion.capabilityId ?? "none"}\`);
+      lines.push(\`Fixed Unit Repair Gate: approval=\${Boolean(scheduledSystemdRepairPromotion.governance?.createsApproval)} executed=\${Boolean(scheduledSystemdRepairPromotion.governance?.executesRepair)} hostd=\${Boolean(scheduledSystemdRepairPromotion.governance?.invokesHostd)}\`);
     }
     if (providerContextPacket?.systemdIncidentContextIncluded === true) {
       lines.push(\`Provider Incident Context: \${providerContextPacket.registry ?? "unknown"} source=\${providerContextPacket.sourceTaskId ?? "none"}\`);

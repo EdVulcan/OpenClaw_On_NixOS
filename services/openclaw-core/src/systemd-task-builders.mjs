@@ -305,7 +305,13 @@ export function createSystemdTaskBuilders(deps) {
     };
   }
 
-  async function createSystemdNextRepairTaskShell({ confirm = false, execute = false, targetUnit: requestedTargetUnit = null } = {}) {
+  async function createSystemdNextRepairTaskShell({
+    confirm = false,
+    execute = false,
+    targetUnit: requestedTargetUnit = null,
+    sourceIncidentRepairPromotion = null,
+    validateBeforeCreate = null,
+  } = {}) {
     if (confirm !== true) {
       throw new Error("Next systemd repair task shell creation requires confirm=true.");
     }
@@ -441,6 +447,9 @@ export function createSystemdTaskBuilders(deps) {
         futureExecutionRequiresSeparateMilestone: execute !== true,
       },
     };
+    if (typeof validateBeforeCreate === "function") {
+      await validateBeforeCreate({ targetUnit, capability, routeGate });
+    }
     const task = createTask({
       goal,
       type: "systemd_next_repair_task",
@@ -448,6 +457,7 @@ export function createSystemdTaskBuilders(deps) {
       plan,
       policy: policyRequest,
       systemdNextRepair,
+      systemdIncidentRepairPromotion: sourceIncidentRepairPromotion,
     }, { skipInitialPolicy: true });
     task.policy = {
       request: policyRequest,

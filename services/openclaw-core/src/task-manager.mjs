@@ -23,6 +23,7 @@ const TASK_EXTENSION_FIELDS = [
   { name: "systemdNextRepair", copyFromCreateInput: true },
   { name: "systemdIncidentObservation", copyFromCreateInput: true },
   { name: "systemdIncidentTriage", copyFromCreateInput: true },
+  { name: "systemdIncidentRepairPromotion", copyFromCreateInput: true },
   { name: "systemdRepairCandidate" },
   { name: "operatorTakeover" },
   { name: "bodyEvidenceLedgerDirectory" },

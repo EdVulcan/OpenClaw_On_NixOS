@@ -1275,6 +1275,37 @@ test("fixed-unit incident triage route forwards only source identity and confirm
   assert.equal(response.body.governance.createsApproval, false);
 });
 
+test("fixed-unit incident repair route forwards only triage identity and confirmation", async () => {
+  let observedInput = null;
+  const deps = createBaseDeps({
+    planBuilder: {
+      createFixedUnitIncidentRepairTask: async (input) => {
+        observedInput = input;
+        return {
+          task: { id: "repair-task-1" },
+          approval: { id: "approval-1", status: "pending" },
+          promotion: { triageTaskId: "triage-task-1" },
+          governance: { createsApproval: true, executesRepair: false },
+        };
+      },
+    },
+  });
+
+  const response = await invokeRoute(deps, "POST", "/system/systemd/fixed-unit-incident-repair-tasks", {
+    triageTaskId: "triage-task-1",
+    confirm: true,
+    targetUnit: "untrusted.service",
+    execute: true,
+    approved: true,
+  });
+
+  assert.equal(response.statusCode, 201, JSON.stringify(response.body));
+  assert.deepEqual(observedInput, { triageTaskId: "triage-task-1", confirm: true });
+  assert.equal(response.body.task.id, "repair-task-1");
+  assert.equal(response.body.approval.status, "pending");
+  assert.equal(response.body.governance.executesRepair, false);
+});
+
 test("control stop route fails current task and emits task failed event", async () => {
   const task = { id: "task-stop", status: "running", updatedAt: "2026-07-08T00:00:00.000Z" };
   const phases = [];

@@ -1,12 +1,15 @@
 import { createHash } from "node:crypto";
 
 import { createEventName } from "../../../packages/shared-events/src/event-factory.mjs";
+import { hostdRestartCapabilityForTarget } from "../../../packages/shared-systemd/src/openclaw-hostd-capabilities.mjs";
 import { validateFixedUnitIncidentTask } from "./fixed-unit-incident-scheduler.mjs";
 
 export const FIXED_UNIT_INCIDENT_TRIAGE_REGISTRY =
   "openclaw-fixed-unit-incident-triage-v0";
 export const FIXED_UNIT_INCIDENT_TRIAGE_TASK_TYPE =
   "systemd_fixed_unit_incident_triage_task";
+export const FIXED_UNIT_INCIDENT_REPAIR_PROMOTION_REGISTRY =
+  "openclaw-fixed-unit-incident-repair-promotion-v0";
 
 function bindingHash(binding) {
   return `sha256:${createHash("sha256").update(JSON.stringify(binding)).digest("hex")}`;
@@ -37,10 +40,69 @@ function assertCurrentSchedulerSource(schedulerState, sourceTask, observation, t
   }
 }
 
+export function validateFixedUnitIncidentTriageTask(task, { tasks, schedulerState }) {
+  const triage = task?.systemdIncidentTriage;
+  if (task?.type !== FIXED_UNIT_INCIDENT_TRIAGE_TASK_TYPE || task?.status !== "completed") {
+    return { ok: false, reason: "source_not_completed_fixed_unit_triage" };
+  }
+  if (triage?.registry !== FIXED_UNIT_INCIDENT_TRIAGE_REGISTRY
+    || triage?.governance?.createsApproval !== false
+    || triage?.governance?.executesRepair !== false
+    || triage?.governance?.invokesHostd !== false
+    || triage?.governance?.callsProvider !== false) {
+    return { ok: false, reason: "source_triage_authority_invalid" };
+  }
+  const sourceTask = tasks.get(triage.source?.taskId);
+  const sourceValidation = validateFixedUnitIncidentTask(sourceTask);
+  if (!sourceValidation.ok) {
+    return { ok: false, reason: sourceValidation.reason };
+  }
+  const { observation, target } = sourceValidation;
+  if (triage.source?.fingerprint !== observation.fingerprint
+    || triage.source?.observedAt !== observation.observedAt
+    || triage.target?.unit !== target.unit
+    || triage.target?.healthServiceKey !== target.healthServiceKey
+    || triage.repairPlanningBoundary?.targetUnit !== target.unit
+    || triage.repairPlanningBoundary?.createsTask !== false
+    || triage.repairPlanningBoundary?.createsApproval !== false
+    || triage.repairPlanningBoundary?.executesRepair !== false) {
+    return { ok: false, reason: "source_triage_binding_invalid" };
+  }
+  const binding = {
+    sourceTaskId: sourceTask.id,
+    sourceFingerprint: observation.fingerprint,
+    sourceObservedAt: observation.observedAt,
+    targetUnit: target.unit,
+    healthServiceKey: target.healthServiceKey,
+    repairDraftRegistry: triage.repairPlanningBoundary.registry,
+    repairSourceRegistry: triage.repairPlanningBoundary.sourceRegistry,
+  };
+  if (triage.binding?.bindingHash !== bindingHash(binding)
+    || Object.entries(binding).some(([key, value]) => triage.binding?.[key] !== value)) {
+    return { ok: false, reason: "source_triage_hash_mismatch" };
+  }
+  try {
+    assertCurrentSchedulerSource(schedulerState, sourceTask, observation, target);
+  } catch {
+    return { ok: false, reason: "source_incident_not_current" };
+  }
+  return { ok: true, reason: null, triage, sourceTask, observation, target };
+}
+
+function findExistingRepairPromotion(tasks, triageTaskId, triageBindingHash) {
+  return [...tasks.values()].find((task) => (
+    task.type === "systemd_next_repair_task"
+    && task.systemdIncidentRepairPromotion?.triageTaskId === triageTaskId
+    && task.systemdIncidentRepairPromotion?.triageBindingHash === triageBindingHash
+  )) ?? null;
+}
+
 export function createFixedUnitIncidentTriageBuilders({
   tasks = new Map(),
   schedulerState = {},
   buildSystemdRepairExecutionTaskDraft,
+  createSystemdNextRepairTaskShell,
+  approvals = new Map(),
   evaluatePolicyIntent,
   createTask,
   completeTask,
@@ -50,6 +112,7 @@ export function createFixedUnitIncidentTriageBuilders({
   now = () => new Date().toISOString(),
 } = {}) {
   const inFlightBySourceTask = new Map();
+  const inFlightRepairPromotionByTriageTask = new Map();
 
   async function performFixedUnitIncidentTriage(sourceId) {
     const sourceTask = tasks.get(sourceId);
@@ -248,5 +311,132 @@ export function createFixedUnitIncidentTriageBuilders({
     }
   }
 
-  return { createFixedUnitIncidentTriageTask };
+  async function performFixedUnitIncidentRepairPromotion(triageTaskId) {
+    const triageTask = tasks.get(triageTaskId);
+    const validation = validateFixedUnitIncidentTriageTask(triageTask, { tasks, schedulerState });
+    if (!validation.ok) {
+      throw new Error(`Fixed-unit incident repair promotion rejected source: ${validation.reason}.`);
+    }
+    const existing = findExistingRepairPromotion(
+      tasks,
+      triageTask.id,
+      validation.triage.binding.bindingHash,
+    );
+    if (existing) {
+      return {
+        registry: FIXED_UNIT_INCIDENT_REPAIR_PROMOTION_REGISTRY,
+        mode: "operator_reviewed_approval_gated_repair_promotion",
+        generatedAt: existing.systemdIncidentRepairPromotion?.createdAt ?? existing.createdAt ?? null,
+        task: existing,
+        approval: approvals.get(existing.approval?.requestId) ?? null,
+        promotion: existing.systemdIncidentRepairPromotion,
+        governance: {
+          createdTask: false,
+          reusedExistingTask: true,
+          createsApproval: true,
+          executesRepair: false,
+          invokesHostd: false,
+          callsProvider: false,
+        },
+      };
+    }
+
+    const capability = hostdRestartCapabilityForTarget(validation.target.unit);
+    if (!capability) {
+      throw new Error("Fixed-unit incident repair promotion requires a hostd fixed target.");
+    }
+    const createdAt = now();
+    const promotionBinding = {
+      triageTaskId: triageTask.id,
+      triageBindingHash: validation.triage.binding.bindingHash,
+      sourceTaskId: validation.sourceTask.id,
+      sourceFingerprint: validation.observation.fingerprint,
+      targetUnit: validation.target.unit,
+      capabilityId: capability.capabilityId,
+    };
+    const promotion = {
+      registry: FIXED_UNIT_INCIDENT_REPAIR_PROMOTION_REGISTRY,
+      mode: "operator_reviewed_approval_gated_repair_task_creation",
+      createdAt,
+      ...promotionBinding,
+      bindingHash: bindingHash(promotionBinding),
+      governance: {
+        risk: "high",
+        requiresApproval: true,
+        createsTask: true,
+        createsApproval: true,
+        executesRepair: false,
+        invokesHostd: false,
+        callsProvider: false,
+      },
+    };
+    const result = await createSystemdNextRepairTaskShell({
+      confirm: true,
+      execute: true,
+      targetUnit: validation.target.unit,
+      sourceIncidentRepairPromotion: promotion,
+      validateBeforeCreate: async () => {
+        const current = validateFixedUnitIncidentTriageTask(triageTask, { tasks, schedulerState });
+        if (!current.ok) {
+          throw new Error(`Fixed-unit incident repair promotion source changed before task creation: ${current.reason}.`);
+        }
+        const audit = await publishEvent("systemd.fixed_unit_incident_repair_promoted", {
+          registry: promotion.registry,
+          triageTaskId: promotion.triageTaskId,
+          sourceTaskId: promotion.sourceTaskId,
+          sourceFingerprint: promotion.sourceFingerprint,
+          targetUnit: promotion.targetUnit,
+          capabilityId: promotion.capabilityId,
+          bindingHash: promotion.bindingHash,
+          governance: promotion.governance,
+        });
+        if (audit?.ok !== true) {
+          throw new Error("Fixed-unit incident repair promotion audit failed before task creation.");
+        }
+      },
+    });
+    if (result.task?.systemdNextRepair?.target?.unit !== validation.target.unit
+      || result.task?.systemdIncidentRepairPromotion?.bindingHash !== promotion.bindingHash
+      || result.approval?.status !== "pending"
+      || result.governance?.executed !== false
+      || result.governance?.hostMutation !== false) {
+      throw new Error("Fixed-unit incident repair promotion crossed its task-creation boundary.");
+    }
+    return {
+      registry: FIXED_UNIT_INCIDENT_REPAIR_PROMOTION_REGISTRY,
+      mode: "operator_reviewed_approval_gated_repair_promotion",
+      generatedAt: createdAt,
+      task: result.task,
+      approval: result.approval,
+      promotion,
+      governance: {
+        createdTask: true,
+        reusedExistingTask: false,
+        createsApproval: true,
+        executesRepair: false,
+        invokesHostd: false,
+        callsProvider: false,
+      },
+    };
+  }
+
+  async function createFixedUnitIncidentRepairTask({ triageTaskId: inputTaskId = null, confirm = false } = {}) {
+    if (confirm !== true) {
+      throw new Error("Fixed-unit incident repair promotion requires confirm=true.");
+    }
+    const taskId = sourceTaskId(inputTaskId);
+    const existingOperation = inFlightRepairPromotionByTriageTask.get(taskId);
+    if (existingOperation) return existingOperation;
+    const operation = performFixedUnitIncidentRepairPromotion(taskId);
+    inFlightRepairPromotionByTriageTask.set(taskId, operation);
+    try {
+      return await operation;
+    } finally {
+      if (inFlightRepairPromotionByTriageTask.get(taskId) === operation) {
+        inFlightRepairPromotionByTriageTask.delete(taskId);
+      }
+    }
+  }
+
+  return { createFixedUnitIncidentTriageTask, createFixedUnitIncidentRepairTask };
 }

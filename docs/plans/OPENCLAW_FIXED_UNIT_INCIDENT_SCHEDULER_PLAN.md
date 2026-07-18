@@ -22,6 +22,10 @@ Core starts with an explicitly configured interval
 -> let the operator explicitly select Triage on the current incident
 -> bind source task, fingerprint, fixed unit, and existing repair draft owner
 -> create one completed local plan/evidence task without approval or execution
+-> let the operator explicitly select Prepare repair on that triage
+-> revalidate the entire source chain against current scheduler state
+-> create one existing fixed-target real repair task and pending approval
+-> stop before Operator execution or hostd invocation
 ```
 
 The NixOS module enables the scheduler by default at a five-minute interval.
@@ -56,16 +60,23 @@ restart does not duplicate an unchanged incident.
 - Triage calls only the existing read-only repair draft owner. It does not add
   capability or command steps, supersede active tasks, create approval, or
   enter the execution queue.
+- Repair promotion is explicit, audit-first, restart-safe through persisted
+  task metadata, and idempotent for one triage binding. It ignores caller
+  target, execution, and approval fields.
+- Promotion reuses the existing hostd fixed-target repair task owner with its
+  real-execution shape, but returns while its approval is still pending. It
+  neither approves the task nor invokes Operator, hostd, activation, rollback,
+  or a provider.
 
 ## Evidence
 
 - healthy, first-failure, duplicate, recovery/regression, single-flight,
   audit-failure, read-failure, timer-stop, fixed-target, restart, and local
-  triage binding tests;
+  triage binding, concurrent promotion, stale-source, and audit-failure tests;
 - real task-manager extension serialization and Core-state restoration tests;
 - generated Observer client syntax, compact task-detail assertions, and the
   explicit Triage action;
-- `864/864` workspace tests and full typecheck;
+- `870/870` workspace tests and full typecheck;
 - 811-entry milestone registry, script audit, and 160-character Windows path
   budget;
 - full `dev-body-config-check.sh`, including exact 221-file Core and 77-file
@@ -78,15 +89,14 @@ or reboot was used for validation.
 
 - automatic provider diagnosis;
 - automatic repair or approval creation;
-- promotion of a triage result into an approval-gated repair task;
 - arbitrary systemd targets;
 - deployment to the current physical-host generation;
 - real activation and rollback validation in a disposable mutation environment.
 
 ## Next Real Capability
 
-Add one explicit promotion from a completed triage result into the existing
-approval-gated fixed-unit repair task. Revalidate the triage, source task,
-fingerprint, current scheduler state, and unit before creating exactly one
-repair task and approval. Do not execute repair, invoke hostd, call a provider,
-or add another readiness lane.
+Deploy the validated source baseline only after explicit physical-host change
+authorization, then run non-mutating service, scheduler, operator-auth, and
+Observer route probes. Keep generation activation/rollback and real hostd
+mutation out of that deployment checkpoint; use a disposable mutation
+environment for a real promoted repair execution receipt.

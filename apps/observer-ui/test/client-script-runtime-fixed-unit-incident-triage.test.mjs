@@ -67,3 +67,32 @@ test("Observer creates one confirmed local triage task and opens its detail", as
   assert.match(fixture.messages[0], /approvalCreated=false repairExecuted=false/u);
   assert.deepEqual(fixture.refreshes, ["tasks", "history", "operator"]);
 });
+
+test("Observer promotes only a completed local triage into a pending repair approval", async () => {
+  const fixture = createContext();
+  fixture.context.fetchJson = async (url, options) => {
+    fixture.calls.push({ url, options });
+    return {
+      task: { id: "repair-task-1", status: "queued" },
+      approval: { id: "approval-1", status: "pending" },
+      governance: { executesRepair: false },
+    };
+  };
+  const triageTask = {
+    id: "triage-task-1",
+    type: "systemd_fixed_unit_incident_triage_task",
+    status: "completed",
+    systemdIncidentTriage: { governance: { createsApproval: false } },
+  };
+
+  assert.match(fixture.context.renderFixedUnitIncidentTriageAction(triageTask), /prepare-fixed-unit-incident-repair/u);
+  await fixture.context.createFixedUnitIncidentRepairTask(triageTask.id);
+
+  assert.equal(fixture.calls[0].url, "http://core.invalid/system/systemd/fixed-unit-incident-repair-tasks");
+  assert.deepEqual(JSON.parse(fixture.calls[0].options.body), {
+    triageTaskId: "triage-task-1",
+    confirm: true,
+  });
+  assert.equal(fixture.context.selectedHistoryTaskId, "repair-task-1");
+  assert.match(fixture.messages[0], /approval=pending repairExecuted=false/u);
+});

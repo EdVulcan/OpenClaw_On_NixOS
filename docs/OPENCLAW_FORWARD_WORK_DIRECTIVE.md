@@ -47,8 +47,8 @@ The risk is local drift:
 The current capability baseline includes bounded journal evidence, the bounded
 Event Hub audit store, the fixed Level 3 incident repair loop, its governed
 DeepSeek diagnosis handoff, and the local fixed-unit incident scheduler and
-triage bridge. All 864 workspace tests and typecheck pass, the body-config and
-event-audit integration checks pass, the 811-entry milestone
+triage/repair-promotion bridge. All 870 workspace tests and typecheck pass, the
+body-config and event-audit integration checks pass, the 811-entry milestone
 registry audit passes, and the Windows path budget has no file over 160
 repository-relative characters.
 
@@ -1620,14 +1620,17 @@ new unhealthy fingerprint, persists dedupe state across restart, and re-arms
 after recovery. Existing Observer history renders the incident and exposes an
 explicit Triage action. Triage revalidates the current source task, fingerprint,
 and fixed unit, reuses the existing read-only repair draft owner, and creates
-one completed local evidence task. It has no provider, approval, repair, hostd,
-activation, or rollback authority.
+one completed local evidence task. An explicit Prepare repair action then
+revalidates the triage, incident, fingerprint, current scheduler state, fixed
+unit, and hostd capability before creating one existing real repair task and
+pending approval. It does not approve, execute, invoke hostd, call a provider,
+activate a generation, or roll one back.
 
-Freeze the scheduler/triage slice and the provider/systemd diagnosis lane. The
-next real capability is explicit promotion of a completed triage into the
-existing approval-gated fixed-unit repair task. Revalidate the triage, source
-task, fingerprint, current scheduler state, and unit; create at most one task
-and approval; stop before execution or hostd invocation.
+Freeze the scheduled incident-to-repair-task slice and the provider/systemd
+diagnosis lane. The next real capability is explicitly authorized deployment
+of this validated source baseline followed by non-mutating service, operator
+auth, scheduler, and Observer probes. Real promoted repair execution and hostd
+mutation require a disposable mutation environment.
 
 ## Operator Identity And Mutation Boundary Checkpoint
 
