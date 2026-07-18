@@ -472,7 +472,7 @@ test("approved incident context returns a guidance-only recommendation and persi
           id: "incident-recommendation-response-1",
           model: "deepseek-chat",
           assistantContent: JSON.stringify({
-            actionId: "review_current_todo",
+            actionId: "review_systemd_incident_evidence",
             reason,
             confidence: 0.91,
             requiresOperatorReview: true,
@@ -485,6 +485,9 @@ test("approved incident context returns a guidance-only recommendation and persi
   });
 
   assert.equal(result.ok, true);
+  assert.equal(result.recommendation.actionId, "review_systemd_incident_evidence");
+  assert.equal(result.recommendation.existingObserverControlId, "load-selected-task-button");
+  assert.equal(result.recommendation.existingCapabilityId, null);
   assert.equal(result.recommendation.reason, reason);
   assert.equal(result.recommendation.createsTaskAutomatically, false);
   assert.equal(result.recommendation.executesAutomatically, false);
@@ -497,6 +500,10 @@ test("approved incident context returns a guidance-only recommendation and persi
   assert.equal(result.contextPacket.systemdIncidentExperienceRecoveryRequiredPatterns, 0);
   assert.equal(result.contextPacket.journalMessagesIncluded, false);
   assert.equal(result.contextPacket.providerOutputIncluded, false);
+  assert.equal(
+    result.task.cloudConsciousnessLiveProviderEgressExecution.recommendation.actionId,
+    "review_systemd_incident_evidence",
+  );
   assert.equal(result.task.cloudConsciousnessLiveProviderEgressExecution.recommendation.reasonIncluded, false);
   const persisted = JSON.stringify(result.task);
   assert.doesNotMatch(persisted, /event-hub application health remained offline/u);

@@ -73,6 +73,7 @@ test("systemd incident provider context projects only bounded receipt evidence",
   assert.equal(context.evidence.contextContentIncluded, false);
   assert.match(context.contextContentHash, /^[a-f0-9]{64}$/u);
   assert.match(context.requestEnvelope.messages[0].content, /engineering_recommendation_v0|Return only a JSON object/u);
+  assert.match(context.requestEnvelope.messages[0].content, /review_systemd_incident_evidence/u);
   const serialized = JSON.stringify({ projection: context.projection, evidence: context.evidence });
   assert.doesNotMatch(serialized, /private-health|private diagnostic|hostd-private-invocation/u);
   assert.doesNotMatch(serialized, /job\/72|kernel_so_peercred/u);

@@ -44,6 +44,13 @@ const ACTIONS = {
     existingCapabilityId: "sense.screen.observe",
     requiresApproval: false,
   },
+  reviewSystemdIncident: {
+    actionId: "review_systemd_incident_evidence",
+    label: "Review the bound systemd incident receipt and recovery evidence",
+    existingObserverControlId: "load-selected-task-button",
+    existingCapabilityId: null,
+    requiresApproval: false,
+  },
   semanticClick: {
     actionId: "create_semantic_click_task",
     label: "Create a reviewed semantic click task for the current trusted work view target",

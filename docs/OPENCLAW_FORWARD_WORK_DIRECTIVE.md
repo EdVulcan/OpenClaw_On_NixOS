@@ -1569,7 +1569,7 @@ peer identity, and raw job paths remain absent. Recall creates no task, approval
 provider request, command, or repair authority. The contract is documented in
 `docs/plans/OPENCLAW_SYSTEMD_INCIDENT_EXPERIENCE_MEMORY_PLAN.md`.
 
-### Next Real Capability
+### Completed Reviewed Incident Evidence Action
 
 The bounded learned provider context is now complete through
 `docs/plans/OPENCLAW_SYSTEMD_INCIDENT_LEARNED_PROVIDER_CONTEXT_PLAN.md`. Up to
@@ -1578,11 +1578,22 @@ current, cross-target, malformed, unbounded, journal-text, lesson-text, and
 provider-output records are excluded. Operator execution recomputes the same
 selection and rejects learned-context drift before provider contact.
 
-The next real capability is one systemd-relevant, read-only reviewed action in
-the existing `engineering_recommendation_v0` allowlist. It should open the
-bound source task's existing incident receipt and recovery evidence in Observer.
-Do not add hostd mutation, automatic retry, automatic provider egress, or a new
-response schema.
+The existing `engineering_recommendation_v0` allowlist now includes
+`review_systemd_incident_evidence`. After explicit operator selection, Observer
+reads the completed provider task, verifies its persisted recommendation and
+systemd context binding, then opens only the exact bound terminal incident task
+in the existing task-history detail panel. Receipt hash, source task, and fixed
+unit must agree before the selected detail changes.
+
+The action has no executable capability id and performs protected Core task
+reads only. It creates no task, approval, provider request, command, retry, or
+repair. The contract is documented in
+`docs/plans/OPENCLAW_SYSTEMD_INCIDENT_REVIEWED_ACTION_PLAN.md`.
+
+The next real capability is one separately reviewed, read-only refresh of the
+same bound fixed unit through the existing body-health and bounded journal
+owners. Do not create repair authority, contact a provider, or automatically
+retry the incident.
 
 ## Operator Identity And Mutation Boundary Checkpoint
 

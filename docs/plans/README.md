@@ -22,6 +22,7 @@ Only these documents should guide current route selection:
 | [`OPENCLAW_SYSTEMD_INCIDENT_AI_HANDOFF_PLAN.md`](./OPENCLAW_SYSTEMD_INCIDENT_AI_HANDOFF_PLAN.md) | Exact request-bound, guidance-only AI diagnosis from a compact terminal repair receipt. |
 | [`OPENCLAW_SYSTEMD_INCIDENT_EXPERIENCE_MEMORY_PLAN.md`](./OPENCLAW_SYSTEMD_INCIDENT_EXPERIENCE_MEMORY_PLAN.md) | Local target-specific outcome absorption and advisory recall from verified incident receipts. |
 | [`OPENCLAW_SYSTEMD_INCIDENT_LEARNED_PROVIDER_CONTEXT_PLAN.md`](./OPENCLAW_SYSTEMD_INCIDENT_LEARNED_PROVIDER_CONTEXT_PLAN.md) | Up to three matching-target learned patterns inside the existing exact approved diagnosis request. |
+| [`OPENCLAW_SYSTEMD_INCIDENT_REVIEWED_ACTION_PLAN.md`](./OPENCLAW_SYSTEMD_INCIDENT_REVIEWED_ACTION_PLAN.md) | Reviewed read-only opening of the exact incident receipt and recovery evidence bound to provider guidance. |
 | [`OPENCLAW_PHASE_D_DECLARATIVE_EVOLUTION_CANDIDATE_PLAN.md`](./OPENCLAW_PHASE_D_DECLARATIVE_EVOLUTION_CANDIDATE_PLAN.md) | Declarative-evolution evidence and deferred activation boundary. |
 | [`OPENCLAW_EXPERT_REVIEW_OPTIMIZATION_PLAN.md`](./OPENCLAW_EXPERT_REVIEW_OPTIMIZATION_PLAN.md) | Measured validation, runtime, and review debt that blocks the mainline. |
 
@@ -44,14 +45,15 @@ bound Event Hub audit-log memory and retention
 -> return one transient structured recommendation
 -> retain and recall one bounded local matching-target incident pattern
 -> bind up to three prior matching patterns into the approved diagnosis request
+-> review provider guidance and open the exact bound incident evidence
 ```
 
 This route advances the Level 3 body loop without widening hostd authority and
 without introducing a new provider response schema. The immediate next real
-capability is one read-only, systemd-relevant reviewed action in the existing
-recommendation schema and Observer task detail. Real generation activation,
-rollback, arbitrary systemd control, desktop-wide capture, and automatic
-provider egress remain deferred.
+capability is one separately reviewed read-only refresh of the same fixed unit's
+health and bounded journal observation. Real generation activation, rollback,
+arbitrary systemd control, desktop-wide capture, and automatic provider egress
+remain deferred.
 
 ## Completed Capability Evidence
 

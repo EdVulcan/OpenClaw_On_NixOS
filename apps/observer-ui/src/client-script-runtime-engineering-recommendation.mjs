@@ -129,11 +129,13 @@ function renderEngineeringRecommendationFromOperatorResult(result) {
 }
 
 function buildEngineeringRecommendationLinkInput(recommendation, control) {
-  if (recommendation.actionId !== "create_semantic_click_task") {
+  if (!["create_semantic_click_task", "review_systemd_incident_evidence"].includes(recommendation.actionId)) {
     return null;
   }
   if (!latestEngineeringRecommendationSourceTaskId) {
-    throw new Error("The semantic-click recommendation is missing its completed provider source task.");
+    throw new Error(recommendation.actionId === "create_semantic_click_task"
+      ? "The semantic-click recommendation is missing its completed provider source task."
+      : "The systemd incident review is missing its completed provider source task.");
   }
   return {
     sourceTaskId: latestEngineeringRecommendationSourceTaskId,
@@ -147,6 +149,70 @@ function buildEngineeringRecommendationLinkInput(recommendation, control) {
     createsApprovalAutomatically: recommendation.createsApprovalAutomatically === true,
     executesAutomatically: recommendation.executesAutomatically === true,
   };
+}
+
+async function reviewBoundSystemdIncidentEvidence(recommendationLink) {
+  if (recommendationLink?.actionId !== "review_systemd_incident_evidence"
+    || !recommendationLink.sourceTaskId
+    || recommendationLink.sourceRegistry !== ENGINEERING_RECOMMENDATION_REGISTRY
+    || recommendationLink.contract !== ENGINEERING_RECOMMENDATION_CONTRACT
+    || recommendationLink.expectedObserverControlId !== "load-selected-task-button"
+    || recommendationLink.existingCapabilityId !== null
+    || recommendationLink.requiresApproval !== false
+    || recommendationLink.createsTaskAutomatically !== false
+    || recommendationLink.createsApprovalAutomatically !== false
+    || recommendationLink.executesAutomatically !== false) {
+    throw new Error("The systemd incident review is missing its bound provider task.");
+  }
+  const providerResult = await fetchJson(
+    \`\${observerConfig.coreUrl}/tasks/\${encodeURIComponent(recommendationLink.sourceTaskId)}\`,
+  );
+  const providerTask = providerResult?.task ?? null;
+  const execution = providerTask?.cloudConsciousnessLiveProviderEgressExecution ?? null;
+  const persistedRecommendation = execution?.recommendation ?? null;
+  const incidentContext = execution?.systemdIncidentContext ?? null;
+  const incidentTaskId = typeof incidentContext?.sourceTaskId === "string"
+    ? incidentContext.sourceTaskId.trim()
+    : "";
+  if (providerTask?.id !== recommendationLink.sourceTaskId
+    || persistedRecommendation?.valid !== true
+    || persistedRecommendation.registry !== ENGINEERING_RECOMMENDATION_REGISTRY
+    || persistedRecommendation.contract !== ENGINEERING_RECOMMENDATION_CONTRACT
+    || persistedRecommendation.actionId !== recommendationLink.actionId
+    || persistedRecommendation.existingObserverControlId !== recommendationLink.expectedObserverControlId
+    || persistedRecommendation.existingCapabilityId !== null
+    || persistedRecommendation.requiresOperatorReview !== true
+    || persistedRecommendation.requiresApproval !== false
+    || execution?.responseContract !== ENGINEERING_RECOMMENDATION_CONTRACT
+    || incidentContext?.registry !== "openclaw-systemd-incident-provider-context-v0"
+    || !incidentTaskId
+    || execution?.contextPacket?.sourceTaskId !== incidentTaskId
+    || execution?.contextPacket?.systemdIncidentReceiptHash !== incidentContext.sourceReceiptHash) {
+    throw new Error("The provider recommendation is not bound to one stored systemd incident context.");
+  }
+
+  const incidentResult = await fetchJson(
+    \`\${observerConfig.coreUrl}/tasks/\${encodeURIComponent(incidentTaskId)}\`,
+  );
+  const incidentTask = incidentResult?.task ?? null;
+  const receipt = incidentTask?.outcome?.details?.incidentReceipt ?? null;
+  if (incidentTask?.id !== incidentTaskId
+    || receipt?.registry !== "openclaw-systemd-repair-incident-receipt-v0"
+    || receipt.taskId !== incidentTaskId
+    || receipt.receiptHash !== incidentContext.sourceReceiptHash
+    || receipt.target?.unit !== incidentContext.target?.unit) {
+    throw new Error("The bound systemd incident receipt is unavailable or has changed.");
+  }
+
+  taskHistoryFocus = "selected-task";
+  selectedHistoryTaskId = incidentTaskId;
+  latestHistoryTask = incidentTask;
+  taskDetailIdInput.value = incidentTaskId;
+  taskHistoryMeta.textContent = formatTaskFocusLabel(taskHistoryFocus, incidentTask);
+  taskHistoryJson.textContent = renderTaskSummary(incidentTask);
+  renderPlanPanel(currentTaskState ?? incidentTask);
+  renderEngineeringVerificationFollowupReadback(incidentTask);
+  renderCommandTranscriptFromTask(incidentTask, { source: "reviewed-systemd-incident" });
 }
 
 async function useEngineeringRecommendation() {

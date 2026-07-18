@@ -79,7 +79,8 @@ change the request.
 
 ## Next Real Capability
 
-Give `engineering_recommendation_v0` one systemd-relevant, read-only reviewed
-action that opens the existing incident receipt/recovery evidence for the bound
-source task. Reuse the existing Observer task detail and operator review owner;
-do not add hostd mutation, automatic retry, or a new provider response schema.
+The read-only reviewed incident evidence action is complete through
+`OPENCLAW_SYSTEMD_INCIDENT_REVIEWED_ACTION_PLAN.md`. The next capability should
+refresh health and bounded journal observation for the same bound fixed unit
+after explicit review, without hostd mutation, provider contact, automatic
+retry, or a new provider response schema.

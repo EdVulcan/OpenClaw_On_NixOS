@@ -26,6 +26,7 @@ test("recommendation instruction derives the existing allowlisted action ids", (
   assert.match(instruction, /create_write_proposal_task/);
   assert.match(instruction, /create_verification_task/);
   assert.match(instruction, /observe_current_screen/);
+  assert.match(instruction, /review_systemd_incident_evidence/);
   assert.match(instruction, /requiresOperatorReview must be true/);
   assert.match(instruction, /Do not include commands, file paths, URLs, credentials/);
 });
@@ -65,6 +66,27 @@ test("screen observation recommendation resolves to the existing read-only Obser
   assert.equal(result.recommendation.existingCapabilityId, "sense.screen.observe");
   assert.equal(result.recommendation.requiresApproval, false);
   assert.equal(result.recommendation.requiresOperatorReview, true);
+});
+
+test("systemd incident review resolves to the existing read-only task detail control", () => {
+  const result = parseCloudLiveProviderEngineeringRecommendation({
+    contract: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_ENGINEERING_RECOMMENDATION_CONTRACT,
+    assistantContent: JSON.stringify(recommendationPayload({
+      actionId: "review_systemd_incident_evidence",
+      reason: "Review the bound incident receipt and recovery evidence before deciding on another action.",
+      confidence: 0.93,
+    })),
+    responseContentHash: "systemd-incident-review-response-hash",
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.recommendation.actionId, "review_systemd_incident_evidence");
+  assert.equal(result.recommendation.existingObserverControlId, "load-selected-task-button");
+  assert.equal(result.recommendation.existingCapabilityId, null);
+  assert.equal(result.recommendation.requiresApproval, false);
+  assert.equal(result.recommendation.requiresOperatorReview, true);
+  assert.equal(result.recommendation.createsTaskAutomatically, false);
+  assert.equal(result.recommendation.executesAutomatically, false);
 });
 
 test("fenced JSON recommendation is accepted without persisting its reason", () => {

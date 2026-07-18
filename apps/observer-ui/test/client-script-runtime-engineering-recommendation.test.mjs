@@ -8,7 +8,7 @@ function element() {
   return { disabled: true, textContent: "" };
 }
 
-function createContext() {
+function createContext({ taskResponses = new Map() } = {}) {
   const nodes = {
     action: element(),
     review: element(),
@@ -19,6 +19,7 @@ function createContext() {
   const calls = [];
   const messages = [];
   const recommendationLinks = [];
+  const fetchCalls = [];
   const context = {
     GOVERNED_PLAN_TODO_SUGGESTION_CONTROLS: {
       create_verification_task: {
@@ -49,9 +50,36 @@ function createContext() {
     setControlMessage: (message) => messages.push(message),
     invokeCapabilityFromUi: async (key) => calls.push(key),
     createOperatorReviewedSemanticClickTask: async (link) => recommendationLinks.push(link),
+    observerConfig: { coreUrl: "http://core.invalid" },
+    fetchJson: async (url) => {
+      fetchCalls.push(url);
+      const taskId = decodeURIComponent(new URL(url).pathname.split("/").at(-1));
+      if (!taskResponses.has(taskId)) {
+        throw new Error(`Task ${taskId} is unavailable.`);
+      }
+      return { task: taskResponses.get(taskId) };
+    },
+    taskHistoryFocus: "latest-finished",
+    selectedHistoryTaskId: null,
+    latestHistoryTask: null,
+    currentTaskState: null,
+    taskDetailIdInput: element(),
+    taskHistoryMeta: element(),
+    taskHistoryJson: element(),
+    formatTaskFocusLabel: (focus, task) => `${focus}:${task?.id ?? "none"}`,
+    renderTaskSummary: (task) => `incident=${task?.outcome?.details?.incidentReceipt?.receiptHash ?? "none"}`,
+    renderPlanPanel: () => {},
+    renderEngineeringVerificationFollowupReadback: () => {},
+    renderCommandTranscriptFromTask: () => {},
+  };
+  context.GOVERNED_PLAN_TODO_SUGGESTION_CONTROLS.review_systemd_incident_evidence = {
+    controlId: "load-selected-task-button",
+    capabilityId: null,
+    requiresApproval: false,
+    run: async (link) => context.reviewBoundSystemdIncidentEvidence(link),
   };
   vm.runInNewContext(observerClientRuntimeEngineeringRecommendationScript, context);
-  return { context, nodes, calls, messages, recommendationLinks };
+  return { context, nodes, calls, messages, recommendationLinks, fetchCalls };
 }
 
 function validRecommendation(overrides = {}) {
@@ -195,4 +223,151 @@ test("Observer blocks a semantic-click recommendation without a provider source 
     /missing its completed provider source task/u,
   );
   assert.deepEqual(fixture.recommendationLinks, []);
+});
+
+function systemdIncidentTasks({ persistedActionId = "review_systemd_incident_evidence" } = {}) {
+  const receiptHash = `sha256:${"a".repeat(64)}`;
+  const incidentTask = {
+    id: "incident-task-17",
+    type: "system_repair_task",
+    outcome: {
+      details: {
+        incidentReceipt: {
+          registry: "openclaw-systemd-repair-incident-receipt-v0",
+          taskId: "incident-task-17",
+          receiptHash,
+          target: { unit: "openclaw-event-hub.service" },
+          restoredHealthy: true,
+        },
+        recoveryEvidence: { status: "restored" },
+      },
+    },
+  };
+  const providerTask = {
+    id: "provider-task-17",
+    cloudConsciousnessLiveProviderEgressExecution: {
+      recommendation: {
+        registry: "openclaw-cloud-consciousness-live-provider-engineering-recommendation-v0",
+        contract: "engineering_recommendation_v0",
+        valid: true,
+        actionId: persistedActionId,
+        existingObserverControlId: "load-selected-task-button",
+        existingCapabilityId: null,
+        requiresOperatorReview: true,
+        requiresApproval: false,
+      },
+      responseContract: "engineering_recommendation_v0",
+      contextPacket: {
+        sourceTaskId: incidentTask.id,
+        systemdIncidentReceiptHash: receiptHash,
+      },
+      systemdIncidentContext: {
+        registry: "openclaw-systemd-incident-provider-context-v0",
+        sourceTaskId: incidentTask.id,
+        sourceReceiptHash: receiptHash,
+        target: { unit: "openclaw-event-hub.service" },
+      },
+    },
+  };
+  return { providerTask, incidentTask };
+}
+
+test("Observer opens only the incident task bound to a reviewed systemd recommendation", async () => {
+  const { providerTask, incidentTask } = systemdIncidentTasks();
+  const fixture = createContext({
+    taskResponses: new Map([
+      [providerTask.id, providerTask],
+      [incidentTask.id, incidentTask],
+    ]),
+  });
+  fixture.context.renderEngineeringRecommendationFromOperatorResult({
+    task: { id: providerTask.id },
+    execution: {
+      recommendation: validRecommendation({
+        actionId: "review_systemd_incident_evidence",
+        label: "Review the bound systemd incident receipt and recovery evidence",
+        reason: "Review the fixed incident evidence before selecting another governed action.",
+        existingObserverControlId: "load-selected-task-button",
+        existingCapabilityId: null,
+        requiresApproval: false,
+      }),
+    },
+  });
+
+  await fixture.context.useEngineeringRecommendation();
+
+  assert.deepEqual(fixture.fetchCalls, [
+    "http://core.invalid/tasks/provider-task-17",
+    "http://core.invalid/tasks/incident-task-17",
+  ]);
+  assert.equal(fixture.context.selectedHistoryTaskId, incidentTask.id);
+  assert.equal(fixture.context.taskDetailIdInput.value, incidentTask.id);
+  assert.match(fixture.context.taskHistoryJson.textContent, /sha256:a{64}/u);
+  assert.equal(fixture.nodes.review.textContent, "operator selected");
+});
+
+test("Observer rejects a mismatched stored systemd recommendation before changing task detail", async () => {
+  const { providerTask, incidentTask } = systemdIncidentTasks({
+    persistedActionId: "create_verification_task",
+  });
+  const fixture = createContext({
+    taskResponses: new Map([
+      [providerTask.id, providerTask],
+      [incidentTask.id, incidentTask],
+    ]),
+  });
+  fixture.context.taskDetailIdInput.value = "previous-task";
+  fixture.context.renderEngineeringRecommendationFromOperatorResult({
+    task: { id: providerTask.id },
+    execution: {
+      recommendation: validRecommendation({
+        actionId: "review_systemd_incident_evidence",
+        existingObserverControlId: "load-selected-task-button",
+        existingCapabilityId: null,
+        requiresApproval: false,
+      }),
+    },
+  });
+
+  await assert.rejects(
+    () => fixture.context.useEngineeringRecommendation(),
+    /not bound to one stored systemd incident context/u,
+  );
+  assert.deepEqual(fixture.fetchCalls, ["http://core.invalid/tasks/provider-task-17"]);
+  assert.equal(fixture.context.taskDetailIdInput.value, "previous-task");
+  assert.equal(fixture.context.selectedHistoryTaskId, null);
+});
+
+test("Observer rejects a changed incident receipt before changing task detail", async () => {
+  const { providerTask, incidentTask } = systemdIncidentTasks();
+  incidentTask.outcome.details.incidentReceipt.receiptHash = `sha256:${"b".repeat(64)}`;
+  const fixture = createContext({
+    taskResponses: new Map([
+      [providerTask.id, providerTask],
+      [incidentTask.id, incidentTask],
+    ]),
+  });
+  fixture.context.taskDetailIdInput.value = "previous-task";
+  fixture.context.renderEngineeringRecommendationFromOperatorResult({
+    task: { id: providerTask.id },
+    execution: {
+      recommendation: validRecommendation({
+        actionId: "review_systemd_incident_evidence",
+        existingObserverControlId: "load-selected-task-button",
+        existingCapabilityId: null,
+        requiresApproval: false,
+      }),
+    },
+  });
+
+  await assert.rejects(
+    () => fixture.context.useEngineeringRecommendation(),
+    /incident receipt is unavailable or has changed/u,
+  );
+  assert.deepEqual(fixture.fetchCalls, [
+    "http://core.invalid/tasks/provider-task-17",
+    "http://core.invalid/tasks/incident-task-17",
+  ]);
+  assert.equal(fixture.context.taskDetailIdInput.value, "previous-task");
+  assert.equal(fixture.context.selectedHistoryTaskId, null);
 });

@@ -35,6 +35,12 @@ export const observerClientRuntimeEngineeringSuggestedActionScript = `const GOVE
     requiresApproval: false,
     run: () => invokeCapabilityFromUi("screenObservation"),
   },
+  review_systemd_incident_evidence: {
+    controlId: "load-selected-task-button",
+    capabilityId: null,
+    requiresApproval: false,
+    run: (recommendationLink) => reviewBoundSystemdIncidentEvidence(recommendationLink),
+  },
   create_semantic_click_task: {
     controlId: "create-semantic-click-task-button",
     capabilityId: "plan.openclaw.browser.semantic_click_task",
