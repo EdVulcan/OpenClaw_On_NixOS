@@ -1241,6 +1241,40 @@ test("next-repair task route forwards the explicit fixed hostd target", async ()
   assert.equal(response.body.task.id, "event-hub-repair-task");
 });
 
+test("fixed-unit incident triage route forwards only source identity and confirmation", async () => {
+  let observedInput = null;
+  const deps = createBaseDeps({
+    planBuilder: {
+      createFixedUnitIncidentTriageTask: async (input) => {
+        observedInput = input;
+        return {
+          registry: "openclaw-fixed-unit-incident-triage-v0",
+          mode: "operator_reviewed_local_triage",
+          generatedAt: "2026-07-18T15:00:00.000Z",
+          task: { id: "triage-task-1" },
+          triage: { source: { taskId: "scheduled-task-1" } },
+          governance: { createsApproval: false, executesRepair: false },
+        };
+      },
+    },
+  });
+
+  const response = await invokeRoute(deps, "POST", "/system/systemd/fixed-unit-incident-triage-tasks", {
+    sourceTaskId: "scheduled-task-1",
+    confirm: true,
+    targetUnit: "untrusted.service",
+    execute: true,
+  });
+
+  assert.equal(response.statusCode, 201, JSON.stringify(response.body));
+  assert.deepEqual(observedInput, {
+    sourceTaskId: "scheduled-task-1",
+    confirm: true,
+  });
+  assert.equal(response.body.task.id, "triage-task-1");
+  assert.equal(response.body.governance.createsApproval, false);
+});
+
 test("control stop route fails current task and emits task failed event", async () => {
   const task = { id: "task-stop", status: "running", updatedAt: "2026-07-08T00:00:00.000Z" };
   const phases = [];

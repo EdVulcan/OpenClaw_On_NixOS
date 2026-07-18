@@ -567,6 +567,13 @@ taskListItems.addEventListener("click", (event) => {
     return;
   }
 
+  if (action === "triage-fixed-unit-incident") {
+    createFixedUnitIncidentTriageTask(taskId).catch((error) => {
+      setControlMessage(\`Request failed: \${formatError(error)}\`);
+    });
+    return;
+  }
+
   if (target.closest(".task-card")) {
     taskHistoryFocus = "selected-task";
     selectedHistoryTaskId = taskId;

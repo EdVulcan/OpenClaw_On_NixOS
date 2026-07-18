@@ -23,6 +23,7 @@ import { createPhase5MvpPhase6ReadinessBuilders } from "./phase5-mvp-phase6-read
 import { createRuntimeProfiler } from "./runtime-diagnostics.mjs";
 import { createRulePlanBuilders } from "./rule-plan-builders.mjs";
 import { createSystemdTaskBuilders } from "./systemd-task-builders.mjs";
+import { createFixedUnitIncidentTriageBuilders } from "./fixed-unit-incident-triage.mjs";
 
 export function createPlanBuilder(deps) {
   const profiler = createRuntimeProfiler("plan-builder");
@@ -335,6 +336,17 @@ export function createPlanBuilder(deps) {
     createSystemdRepairCandidateTaskShell,
     createSystemdNextRepairTaskShell,
   } = systemdTaskBuilders;
+  const { createFixedUnitIncidentTriageTask } = createFixedUnitIncidentTriageBuilders({
+    tasks,
+    schedulerState: state.fixedUnitIncidentSchedulerState,
+    buildSystemdRepairExecutionTaskDraft,
+    evaluatePolicyIntent,
+    createTask,
+    completeTask,
+    persistState,
+    publishEvent,
+    serialiseTask,
+  });
 
   const bodyEvidenceTaskBuilders = createBodyEvidenceTaskBuilders({
     fetchJson,
@@ -810,6 +822,7 @@ function compactCloudConsciousnessEvidenceRef(evidence) {
     createSystemdRepairExecutionTask,
     createSystemdRepairCandidateTaskShell,
     createSystemdNextRepairTaskShell,
+    createFixedUnitIncidentTriageTask,
     createBodyEvidenceLedgerDirectoryTaskShell,
     createBodyEvidenceLedgerFirstRecordTaskShell,
     createBodyEvidenceLedgerFollowupRecordTaskShell,

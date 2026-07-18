@@ -63,7 +63,7 @@ function observationHealthy(unit, service) {
     && service.ok === true;
 }
 
-function hashObservation(observation) {
+export function hashFixedUnitIncidentObservation(observation) {
   return `sha256:${createHash("sha256").update(JSON.stringify(observation)).digest("hex")}`;
 }
 
@@ -81,7 +81,7 @@ function buildObservation({ target, health, inventory, observedAt }) {
     service,
     healthy: observationHealthy(unit, service),
   };
-  const fingerprint = hashObservation({ target, health: healthState });
+  const fingerprint = hashFixedUnitIncidentObservation({ target, health: healthState });
   return {
     registry: FIXED_UNIT_INCIDENT_OBSERVATION_REGISTRY,
     mode: "automatic_local_read_only",
@@ -160,6 +160,37 @@ function nextDueAt(nowMs, intervalMs) {
 
 export function listFixedUnitIncidentTargets() {
   return FIXED_TARGETS.map((target) => ({ ...target }));
+}
+
+export function validateFixedUnitIncidentTask(task) {
+  const observation = task?.systemdIncidentObservation;
+  if (task?.type !== FIXED_UNIT_INCIDENT_TASK_TYPE || task?.status !== "completed") {
+    return { ok: false, reason: "source_not_completed_fixed_unit_incident" };
+  }
+  if (observation?.registry !== FIXED_UNIT_INCIDENT_OBSERVATION_REGISTRY
+    || observation?.health?.healthy !== false) {
+    return { ok: false, reason: "source_incident_observation_invalid" };
+  }
+  const target = FIXED_TARGETS.find((candidate) => candidate.unit === observation.target?.unit);
+  if (!target
+    || target.healthServiceKey !== observation.target?.healthServiceKey
+    || observation.health?.unit?.unit !== target.unit
+    || observation.health?.service?.key !== target.healthServiceKey) {
+    return { ok: false, reason: "source_incident_target_not_fixed" };
+  }
+  const expectedFingerprint = hashFixedUnitIncidentObservation({
+    target: observation.target,
+    health: observation.health,
+  });
+  if (observation.fingerprint !== expectedFingerprint) {
+    return { ok: false, reason: "source_incident_fingerprint_mismatch" };
+  }
+  if (observation.governance?.callsProvider !== false
+    || observation.governance?.authorizesRepair !== false
+    || observation.governance?.invokesHostd !== false) {
+    return { ok: false, reason: "source_incident_authority_invalid" };
+  }
+  return { ok: true, reason: null, observation, target };
 }
 
 export function createFixedUnitIncidentScheduler({

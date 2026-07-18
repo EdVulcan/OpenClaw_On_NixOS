@@ -54,6 +54,15 @@ const DOMAIN_TASK_ROUTES = [
     fields: ["sourceRegistry", "routeGate", "task", "approval", "governance"],
   },
   {
+    path: "/system/systemd/fixed-unit-incident-triage-tasks",
+    builder: "createFixedUnitIncidentTriageTask",
+    input: (body) => ({
+      sourceTaskId: typeof body.sourceTaskId === "string" ? body.sourceTaskId : null,
+      confirm: body.confirm === true,
+    }),
+    fields: ["task", "triage", "governance"],
+  },
+  {
     path: "/body/evidence-ledger/directory-tasks",
     builder: "createBodyEvidenceLedgerDirectoryTaskShell",
     input: confirmInput,

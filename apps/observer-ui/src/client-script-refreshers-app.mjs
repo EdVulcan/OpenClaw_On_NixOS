@@ -283,6 +283,9 @@ function renderTaskSummary(task, { includeRecovery = true, includeOutcome = true
     const scheduledSystemdIncident = task.systemdIncidentObservation
       ?? task.outcome?.details?.systemdIncidentObservation
       ?? null;
+    const scheduledSystemdTriage = task.systemdIncidentTriage
+      ?? task.outcome?.details?.systemdIncidentTriage
+      ?? null;
     const providerContextPacket = task.outcome?.details?.contextPacket ?? null;
     const systemdIncidentObservationReceipt = task.cloudConsciousnessLiveProviderEgressExecution
       ?.systemdIncidentObservationReceipt ?? null;
@@ -323,6 +326,12 @@ function renderTaskSummary(task, { includeRecovery = true, includeOutcome = true
       lines.push(\`Scheduled Systemd Target: \${scheduledSystemdIncident.target?.unit ?? "unknown"} healthKey=\${scheduledSystemdIncident.target?.healthServiceKey ?? "unknown"}\`);
       lines.push(\`Scheduled Systemd Health: service=\${scheduledSystemdIncident.health?.service?.status ?? "unknown"} unit=\${scheduledSystemdIncident.health?.unit?.activeState ?? "unknown"}/\${scheduledSystemdIncident.health?.unit?.subState ?? "unknown"}\`);
       lines.push(\`Scheduled Systemd Boundary: provider=\${Boolean(scheduledSystemdIncident.governance?.callsProvider)} repair=\${Boolean(scheduledSystemdIncident.governance?.authorizesRepair)} hostd=\${Boolean(scheduledSystemdIncident.governance?.invokesHostd)} approval=\${Boolean(scheduledSystemdIncident.governance?.approvalRequired)}\`);
+    }
+    if (scheduledSystemdTriage) {
+      lines.push(\`Fixed Unit Incident Triage: \${scheduledSystemdTriage.registry ?? "unknown"} binding=\${scheduledSystemdTriage.binding?.bindingHash ?? "none"}\`);
+      lines.push(\`Fixed Unit Triage Source: \${scheduledSystemdTriage.source?.taskId ?? "none"} fingerprint=\${scheduledSystemdTriage.source?.fingerprint ?? "none"}\`);
+      lines.push(\`Fixed Unit Triage Target: \${scheduledSystemdTriage.target?.unit ?? "unknown"} repairDraft=\${scheduledSystemdTriage.repairPlanningBoundary?.registry ?? "none"}\`);
+      lines.push(\`Fixed Unit Triage Boundary: approval=\${Boolean(scheduledSystemdTriage.governance?.createsApproval)} repair=\${Boolean(scheduledSystemdTriage.governance?.executesRepair)} hostd=\${Boolean(scheduledSystemdTriage.governance?.invokesHostd)} provider=\${Boolean(scheduledSystemdTriage.governance?.callsProvider)}\`);
     }
     if (providerContextPacket?.systemdIncidentContextIncluded === true) {
       lines.push(\`Provider Incident Context: \${providerContextPacket.registry ?? "unknown"} source=\${providerContextPacket.sourceTaskId ?? "none"}\`);

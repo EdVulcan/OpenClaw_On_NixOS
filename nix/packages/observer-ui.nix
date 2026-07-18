@@ -62,6 +62,7 @@ mkOpenClawSourceClosure {
     ../../apps/observer-ui/src/client-script-runtime-engineering-plan.mjs
     ../../apps/observer-ui/src/client-script-runtime-engineering-recommendation.mjs
     ../../apps/observer-ui/src/client-script-runtime-engineering-suggested-action.mjs
+    ../../apps/observer-ui/src/client-script-runtime-fixed-unit-incident-triage.mjs
     ../../apps/observer-ui/src/client-script-runtime-native-runtime-refresh.mjs
     ../../apps/observer-ui/src/client-script-runtime-semantic-target-task.mjs
     ../../apps/observer-ui/src/client-script-runtime-screen-observation.mjs

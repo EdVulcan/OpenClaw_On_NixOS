@@ -6,6 +6,7 @@ import { observerClientRuntimeEngineeringRecommendationScript } from "./client-s
 import { observerClientRuntimeEngineeringPlanScript } from "./client-script-runtime-engineering-plan.mjs";
 import { observerClientRuntimeSystemBodyTasksScript } from "./client-script-runtime-system-body-tasks.mjs";
 import { observerClientRuntimeSystemHealScript } from "./client-script-runtime-system-heal.mjs";
+import { observerClientRuntimeFixedUnitIncidentTriageScript } from "./client-script-runtime-fixed-unit-incident-triage.mjs";
 import { observerClientRuntimeScreenObservationScript } from "./client-script-runtime-screen-observation.mjs";
 import { observerClientRuntimeSemanticTargetTaskScript } from "./client-script-runtime-semantic-target-task.mjs";
 import { observerClientRuntimeWorkViewControlsScript } from "./client-script-runtime-work-view-controls.mjs";
@@ -270,6 +271,7 @@ function renderTaskCard(task) {
       <button class="secondary" data-task-action="inspect" data-task-id="\${task.id}">Inspect</button>
       <button class="secondary" data-task-action="use-url" data-task-id="\${task.id}" data-task-url="\${escapedUrl}" \${taskUrl ? "" : "disabled"}>Use URL</button>
       <button class="secondary" data-task-action="recover" data-task-id="\${task.id}" \${task.restorable ? "" : "disabled"}>Recover</button>
+      \${renderFixedUnitIncidentTriageAction(task)}
     </div>
   </article>\`;
 }
@@ -512,7 +514,7 @@ async function runKeyboardTypeCapability(text) {
   await refreshWorkView();
 }
 
-${observerClientRuntimeSystemBodyTasksScript}async function completeCurrentTask() {
+${observerClientRuntimeSystemBodyTasksScript}${observerClientRuntimeFixedUnitIncidentTriageScript}async function completeCurrentTask() {
   if (!currentTaskState?.id) {
     throw new Error("No active task to complete.");
   }

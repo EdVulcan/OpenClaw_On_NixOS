@@ -19,6 +19,9 @@ Core starts with an explicitly configured interval
 -> create one completed local incident task
 -> show the compact task through existing Observer history/detail
 -> suppress the same fingerprint until recovery or a changed failure
+-> let the operator explicitly select Triage on the current incident
+-> bind source task, fingerprint, fixed unit, and existing repair draft owner
+-> create one completed local plan/evidence task without approval or execution
 ```
 
 The NixOS module enables the scheduler by default at a five-minute interval.
@@ -47,17 +50,26 @@ restart does not duplicate an unchanged incident.
   commands, hostd receipts, and private paths.
 - The scheduler cannot call a provider, create provider approval, invoke hostd,
   execute repair, activate a generation, or roll one back.
+- Triage revalidates the source fingerprint against current scheduler state,
+  coalesces concurrent requests, and reuses a completed triage for the same
+  source evidence.
+- Triage calls only the existing read-only repair draft owner. It does not add
+  capability or command steps, supersede active tasks, create approval, or
+  enter the execution queue.
 
 ## Evidence
 
 - healthy, first-failure, duplicate, recovery/regression, single-flight,
-  audit-failure, read-failure, timer-stop, fixed-target, and restart tests;
+  audit-failure, read-failure, timer-stop, fixed-target, restart, and local
+  triage binding tests;
 - real task-manager extension serialization and Core-state restoration tests;
-- generated Observer client syntax and compact task-detail assertions;
-- `855/855` workspace tests and full typecheck;
+- generated Observer client syntax, compact task-detail assertions, and the
+  explicit Triage action;
+- `864/864` workspace tests and full typecheck;
 - 811-entry milestone registry, script audit, and 160-character Windows path
   budget;
-- full `dev-body-config-check.sh`, including an exact 220-file Core Nix closure.
+- full `dev-body-config-check.sh`, including exact 221-file Core and 77-file
+  Observer Nix closures.
 
 No real provider request, hostd mutation, system switch, activation, rollback,
 or reboot was used for validation.
@@ -66,13 +78,15 @@ or reboot was used for validation.
 
 - automatic provider diagnosis;
 - automatic repair or approval creation;
+- promotion of a triage result into an approval-gated repair task;
 - arbitrary systemd targets;
 - deployment to the current physical-host generation;
 - real activation and rollback validation in a disposable mutation environment.
 
 ## Next Real Capability
 
-Add one operator-reviewed local triage bridge from a scheduler-created incident
-to the existing fixed-unit repair planning boundary. It should bind the source
-task, fingerprint, and unit, reuse existing repair owners, and stop before
-approval or execution. Do not add another provider receipt or readiness lane.
+Add one explicit promotion from a completed triage result into the existing
+approval-gated fixed-unit repair task. Revalidate the triage, source task,
+fingerprint, current scheduler state, and unit before creating exactly one
+repair task and approval. Do not execute repair, invoke hostd, call a provider,
+or add another readiness lane.

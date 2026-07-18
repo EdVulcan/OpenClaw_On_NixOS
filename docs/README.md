@@ -13,8 +13,8 @@ paragraph. Reconcile this baseline with the repository and live host first.
 
 | Layer | Evidence at this checkpoint | Status |
 | --- | --- | --- |
-| Capability source | Current `main` through the Level 3 fixed-unit incident scheduler and governed repair/diagnosis loop | Implemented; commit history is authoritative |
-| Local validation | 855 workspace tests and typecheck pass; body-config and event-audit integration pass; 811 registry entries pass | Validated |
+| Capability source | Current `main` through the Level 3 fixed-unit incident scheduler, local triage bridge, and governed repair/diagnosis loop | Implemented; commit history is authoritative |
+| Local validation | 864 workspace tests and typecheck pass; body-config and event-audit integration pass; 811 registry entries pass | Validated |
 | Installed system | NixOS `26.05.4808.569d57850992`, generation `/nix/store/735kfj8knq1nn092hq4z57sjlc9di3q5-nixos-system-nixos-26.05.4808.569d57850992` | Running but behind the capability source |
 | Deployed journal probe | `/system/systemd/journal-evidence` returns `404`; `openclaw-system-sense` has no `systemd-journal` supplementary group | Not deployed |
 | Deployed audit store | Installed Event Hub predates streaming tail reads, cached summaries, and rotation | Not deployed |
@@ -76,6 +76,9 @@ The completed bounded frontier is:
 - One five-minute local scheduler for the three fixed hostd targets, with
   compact audited incident tasks, restart-safe dedupe, recovery re-arming, and
   existing Observer task-detail visibility.
+- One explicit local Triage action that binds the scheduler's current source
+  task, fingerprint, and fixed unit to the existing read-only repair draft and
+  creates a completed evidence task without approval or execution.
 
 Real generation activation and rollback remain unproven on a disposable
 mutation environment. Level 4 graphics-stack ownership remains future work.
@@ -109,13 +112,15 @@ body health + bounded journal evidence
 -> reviewed opening of the exact observation task
 -> periodic local fixed-unit observation
 -> deduplicated completed incident task in Observer
+-> explicit local triage bound to the current repair draft
 ```
 
 Do not broaden hostd into arbitrary systemd control or add another provider
-readiness wrapper. Freeze the completed provider/systemd and scheduler lanes.
-The next real capability is one operator-reviewed local triage bridge from a
-scheduler incident into the existing fixed-unit repair planning boundary. It
-must bind the source fingerprint and unit and stop before approval or execution.
+readiness wrapper. Freeze the completed provider/systemd, scheduler, and local
+triage lanes. The next real capability is explicit promotion of a completed
+triage into the existing approval-gated fixed-unit repair task. It must
+revalidate source, fingerprint, current scheduler state, and unit, create at
+most one task and approval, and stop before execution.
 
 ## Progress Estimate
 
