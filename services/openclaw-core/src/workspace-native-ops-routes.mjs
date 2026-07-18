@@ -54,7 +54,7 @@ function serialiseWorkspaceTaskResponse(result, extraFields, { serialiseTask, se
     payload[field] = result[field];
   }
   payload.task = serialiseTask(result.task);
-  payload.approval = serialiseApproval(result.approval);
+  payload.approval = result.approval ? serialiseApproval(result.approval) : null;
   payload.governance = result.governance;
   payload.summary = buildTaskSummary();
   return payload;

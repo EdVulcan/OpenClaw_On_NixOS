@@ -1,4 +1,9 @@
 import { randomUUID } from "node:crypto";
+import { buildCapabilityRequestBindingHash } from "./capability-runtime-approval-binding.mjs";
+import {
+  assessWorkspaceCommandAutonomy,
+  buildWorkspaceCommandAutonomousGrant,
+} from "./workspace-command-autonomy.mjs";
 
 export function createWorkspaceCommandPlanBuilders({
   buildWorkspaceCommandProposals,
@@ -29,13 +34,6 @@ export function createWorkspaceCommandPlanBuilders({
 
     const now = new Date().toISOString();
     const goal = `Review execution plan for ${proposal.workspaceName}:${proposal.scriptName}`;
-    const policyRequest = {
-      intent: "system.command.execute",
-      domain: "body_internal",
-      risk: proposal.risk,
-      requiresApproval: true,
-      tags: ["workspace_command", "explicit_approval_required"],
-    };
     const action = {
       kind: "system.command.execute",
       intent: "system.command.execute",
@@ -45,6 +43,23 @@ export function createWorkspaceCommandPlanBuilders({
         cwd: proposal.cwd,
         timeoutMs: proposal.risk === "medium" ? 300000 : 120000,
       },
+    };
+    const requestHash = buildCapabilityRequestBindingHash({
+      capabilityId: "act.system.command.execute",
+      intent: action.intent,
+      params: action.params,
+    });
+    const autonomyAuthorization = assessWorkspaceCommandAutonomy({ proposal, autonomyMode });
+    const autonomousGrant = autonomyAuthorization.authorized
+      ? buildWorkspaceCommandAutonomousGrant({ proposal, requestHash })
+      : null;
+    const autonomous = autonomousGrant !== null;
+    const policyRequest = {
+      intent: "system.command.execute",
+      domain: "body_internal",
+      risk: proposal.risk,
+      requiresApproval: !autonomous,
+      tags: ["workspace_command", ...(autonomous ? ["sovereign_body_audit_only"] : ["explicit_approval_required"])],
     };
     const plan = buildRulePlan({
       goal,
@@ -68,12 +83,28 @@ export function createWorkspaceCommandPlanBuilders({
       },
       domain: "body_internal",
       risk: proposal.risk,
-      decision: "require_approval",
-      reason: "workspace_command_requires_explicit_user_approval",
+      decision: autonomous ? "audit_only" : "require_approval",
+      reason: autonomyAuthorization.reason,
       approved: false,
       autonomyMode,
-      autonomous: false,
+      autonomous,
+      requiresApproval: !autonomous,
     };
+    const planWithAutonomy = autonomous
+      ? {
+          ...plan,
+          steps: plan.steps.map((step) => step.capabilityId === "act.system.command.execute"
+            && step.phase === "acting_on_target"
+            ? {
+                ...step,
+                requiresApproval: false,
+                governance: "audit_only",
+                baseRequiresApproval: true,
+                autonomousExecution: autonomousGrant,
+              }
+            : step),
+        }
+      : plan;
 
     return {
       registry: "workspace-command-plan-draft-v0",
@@ -85,7 +116,7 @@ export function createWorkspaceCommandPlanBuilders({
         goal,
         type: "system_task",
         action,
-        plan,
+        plan: planWithAutonomy,
         policy: {
           request: policyRequest,
           decision: policyDecision,
@@ -94,7 +125,11 @@ export function createWorkspaceCommandPlanBuilders({
           createsTask: false,
           createsApproval: false,
           canExecute: false,
-          requiresExplicitApproval: true,
+          canExecuteWithoutApproval: autonomous,
+          autoAuthorized: autonomous,
+          autonomous,
+          autonomyAuthorization,
+          requiresExplicitApproval: !autonomous,
           exposesScriptBody: false,
         },
       },
@@ -164,6 +199,7 @@ export function createWorkspaceCommandPlanBuilders({
       sourceCommandProposal: proposal,
       sourceCommandSignals: proposals.sourceCommandSignals,
       sourceCommandPlan,
+      autonomyAuthorization: draft.autonomyAuthorization,
       draft: {
         ...draft.draft,
         governance: {
@@ -174,7 +210,11 @@ export function createWorkspaceCommandPlanBuilders({
           createsApproval: false,
           canExecute: false,
           canMutate: false,
-          requiresExplicitApproval: true,
+          requiresExplicitApproval: draft.draft?.governance?.requiresExplicitApproval === true,
+          canExecuteWithoutApproval: draft.draft?.governance?.canExecuteWithoutApproval === true,
+          autoAuthorized: draft.draft?.governance?.autoAuthorized === true,
+          autonomous: draft.draft?.governance?.autonomous === true,
+          autonomyAuthorization: draft.autonomyAuthorization,
           exposesScriptBody: false,
           exposesPromptContent: false,
           exposesSourceFileContent: false,
@@ -191,7 +231,11 @@ export function createWorkspaceCommandPlanBuilders({
         exposesScriptBodies: false,
         exposesPromptContent: false,
         exposesSourceFileContent: false,
-        requiresExplicitApprovalBeforeExecution: true,
+        requiresExplicitApprovalBeforeExecution: draft.draft?.governance?.requiresExplicitApproval === true,
+        canExecuteWithoutApproval: draft.draft?.governance?.canExecuteWithoutApproval === true,
+        autoAuthorized: draft.draft?.governance?.autoAuthorized === true,
+        autonomous: draft.draft?.governance?.autonomous === true,
+        autonomyAuthorization: draft.autonomyAuthorization,
       },
     };
   }

@@ -21,6 +21,9 @@ export OPENCLAW_SYSTEM_HEAL_PORT="${OPENCLAW_SYSTEM_HEAL_PORT:-9827}"
 export OBSERVER_UI_PORT="${OBSERVER_UI_PORT:-9890}"
 export OPENCLAW_WORKSPACE_ROOTS="$WORKSPACE_DIR"
 export OPENCLAW_SYSTEM_ALLOWED_ROOTS="$WORKSPACE_DIR"
+export OPENCLAW_AUTONOMY_MODE="${OPENCLAW_AUTONOMY_MODE:-guardian}"
+export OPENCLAW_SYSTEM_COMMAND_ALLOWLIST="${OPENCLAW_SYSTEM_COMMAND_ALLOWLIST:-npm}"
+export OPENCLAW_SYSTEM_COMMAND_TIMEOUT_MS="${OPENCLAW_SYSTEM_COMMAND_TIMEOUT_MS:-15000}"
 export OPENCLAW_CORE_STATE_FILE="${OPENCLAW_CORE_STATE_FILE:-$REPO_ROOT/.artifacts/openclaw-core-source-command-task-check.json}"
 export OPENCLAW_EVENT_LOG_FILE="${OPENCLAW_EVENT_LOG_FILE:-$REPO_ROOT/.artifacts/openclaw-source-command-task-check-events.jsonl}"
 
@@ -42,10 +45,26 @@ cat > "$WORKSPACE_DIR/package.json" <<'JSON'
   }
 }
 JSON
+if [[ "$OPENCLAW_AUTONOMY_MODE" == "sovereign_body" ]]; then
+cat > "$WORKSPACE_DIR/package-lock.json" <<'JSON'
+{
+  "name": "openclaw",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "openclaw",
+      "private": true
+    }
+  }
+}
+JSON
+else
 cat > "$WORKSPACE_DIR/pnpm-workspace.yaml" <<'YAML'
 packages:
   - "packages/*"
 YAML
+fi
 cat > "$WORKSPACE_DIR/TOOLS.md" <<EOF
 # Tools
 Source command tasks must create a pending approval before any shell or process execution.
@@ -110,10 +129,7 @@ COMMANDS_AFTER_FILE="$(mktemp)"
 curl --silent --fail "$CORE_URL/tasks/summary" > "$TASKS_BEFORE_FILE"
 curl --silent --fail "$CORE_URL/approvals/summary" > "$APPROVALS_BEFORE_FILE"
 curl --silent --fail "$CORE_URL/commands/transcripts/summary" > "$COMMANDS_BEFORE_FILE"
-curl --silent --output "$REJECTED_FILE" --write-out "%{http_code}" \
-  -X POST "$CORE_URL/plugins/native-adapter/source-command-proposals/tasks" \
-  -H 'content-type: application/json' \
-  -d '{"proposalId":"openclaw:typecheck"}' | grep -qx "400"
+OPENCLAW_POST_JSON_FAILURE=allow post_json "$CORE_URL/plugins/native-adapter/source-command-proposals/tasks" '{"proposalId":"openclaw:typecheck"}' > "$REJECTED_FILE"
 post_json "$CORE_URL/plugins/native-adapter/source-command-proposals/tasks" '{"proposalId":"openclaw:typecheck","query":"command","confirm":true}' > "$TASK_FILE"
 post_json "$CORE_URL/operator/step" '{}' > "$BLOCKED_STEP_FILE"
 curl --silent --fail "$CORE_URL/approvals?status=pending&limit=10" > "$PENDING_FILE"
@@ -121,7 +137,7 @@ curl --silent --fail "$CORE_URL/tasks/summary" > "$TASKS_AFTER_FILE"
 curl --silent --fail "$CORE_URL/approvals/summary" > "$APPROVALS_AFTER_FILE"
 curl --silent --fail "$CORE_URL/commands/transcripts/summary" > "$COMMANDS_AFTER_FILE"
 
-node - <<'EOF' "$TASKS_BEFORE_FILE" "$APPROVALS_BEFORE_FILE" "$COMMANDS_BEFORE_FILE" "$REJECTED_FILE" "$TASK_FILE" "$BLOCKED_STEP_FILE" "$PENDING_FILE" "$TASKS_AFTER_FILE" "$APPROVALS_AFTER_FILE" "$COMMANDS_AFTER_FILE" "$WORKSPACE_DIR" "$PROMPT_SECRET"
+node - <<'EOF' "$TASKS_BEFORE_FILE" "$APPROVALS_BEFORE_FILE" "$COMMANDS_BEFORE_FILE" "$REJECTED_FILE" "$TASK_FILE" "$BLOCKED_STEP_FILE" "$PENDING_FILE" "$TASKS_AFTER_FILE" "$APPROVALS_AFTER_FILE" "$COMMANDS_AFTER_FILE" "$WORKSPACE_DIR" "$PROMPT_SECRET" "$OPENCLAW_AUTONOMY_MODE"
 const fs = require("node:fs");
 const readJson = (index) => JSON.parse(fs.readFileSync(process.argv[index], "utf8"));
 
@@ -137,13 +153,21 @@ const approvalsAfter = readJson(10);
 const commandsAfter = readJson(11);
 const workspaceDir = process.argv[12];
 const promptSecret = process.argv[13];
+const autonomyMode = process.argv[14];
 const rawTask = JSON.stringify(taskResponse);
+const autonomous = autonomyMode === "sovereign_body";
 
 if (rejected.ok !== false || !String(rejected.error ?? "").includes("confirm=true")) {
   throw new Error(`source command task creation should require explicit confirmation: ${JSON.stringify(rejected)}`);
 }
-if (!taskResponse.ok || taskResponse.registry !== "openclaw-source-command-task-v0" || taskResponse.mode !== "approval-gated-source-command") {
-  throw new Error(`source command task should expose approval-gated source mode: ${JSON.stringify(taskResponse)}`);
+if (!taskResponse.ok || taskResponse.registry !== "openclaw-source-command-task-v0") {
+  throw new Error(`source command task envelope should be valid: ${JSON.stringify(taskResponse)}`);
+}
+if (autonomous && taskResponse.mode !== "audit-only-autonomous-source-command") {
+  throw new Error(`sovereign body source command task should expose audit-only mode: ${JSON.stringify(taskResponse)}`);
+}
+if (!autonomous && taskResponse.mode !== "approval-gated-source-command") {
+  throw new Error(`guardian source command task should expose approval-gated mode: ${JSON.stringify(taskResponse)}`);
 }
 if (
   taskResponse.sourceRegistry !== "openclaw-source-command-plan-draft-v0"
@@ -157,13 +181,13 @@ if (
 }
 if (
   taskResponse.sourceCommandProposal?.id !== "openclaw:typecheck"
-  || taskResponse.sourceCommandProposal?.command !== "pnpm"
+  || taskResponse.sourceCommandProposal?.command !== (autonomous ? "npm" : "pnpm")
   || taskResponse.sourceCommandProposal?.args?.join(" ") !== "run typecheck"
   || taskResponse.sourceCommandProposal?.workspacePath !== workspaceDir
 ) {
   throw new Error(`source command task should reference selected source proposal: ${JSON.stringify(taskResponse.sourceCommandProposal)}`);
 }
-if (
+if (!autonomous && (
   taskResponse.governance?.createsTask !== true
   || taskResponse.governance?.createsApproval !== true
   || taskResponse.governance?.canExecuteWithoutApproval !== false
@@ -172,44 +196,75 @@ if (
   || taskResponse.governance?.exposesScriptBodies !== false
   || taskResponse.governance?.exposesPromptContent !== false
   || taskResponse.governance?.exposesSourceFileContent !== false
-) {
+)) {
   throw new Error(`source command task governance mismatch: ${JSON.stringify(taskResponse.governance)}`);
 }
+if (autonomous && (
+  taskResponse.governance?.createsTask !== true
+  || taskResponse.governance?.createsApproval !== false
+  || taskResponse.governance?.canExecuteWithoutApproval !== true
+  || taskResponse.governance?.autoAuthorized !== true
+  || taskResponse.governance?.autonomous !== true
+  || taskResponse.governance?.requiresExplicitApproval !== false
+  || taskResponse.approval !== null
+)) {
+  throw new Error(`sovereign body source command governance mismatch: ${JSON.stringify(taskResponse.governance)}`);
+}
 const task = taskResponse.task ?? {};
-if (
+if (!autonomous && (
   task.status !== "queued"
   || task.policy?.decision?.decision !== "require_approval"
   || task.policy?.decision?.reason !== "workspace_command_requires_explicit_user_approval"
   || task.approval?.required !== true
   || task.plan?.capabilitySummary?.ids?.includes("act.system.command.execute") !== true
-) {
+)) {
   throw new Error(`source command task should be queued behind explicit approval: ${JSON.stringify(task)}`);
 }
-if (!taskResponse.approval?.id || taskResponse.approval?.status !== "pending" || taskResponse.approval?.taskId !== task.id) {
+if (autonomous && (
+  task.status !== "queued"
+  || task.policy?.decision?.decision !== "audit_only"
+  || task.policy?.decision?.autonomous !== true
+  || task.approval !== null
+)) {
+  throw new Error(`sovereign body source command task should be queued as audit-only without approval: ${JSON.stringify(task)}`);
+}
+if (!autonomous && (!taskResponse.approval?.id || taskResponse.approval?.status !== "pending" || taskResponse.approval?.taskId !== task.id)) {
   throw new Error(`source command task should create a linked pending approval: ${JSON.stringify(taskResponse.approval)}`);
 }
-if (taskResponse.sourceCommandTask?.taskId !== task.id || taskResponse.sourceCommandTask?.approvalId !== taskResponse.approval.id) {
+if (taskResponse.sourceCommandTask?.taskId !== task.id || (!autonomous && taskResponse.sourceCommandTask?.approvalId !== taskResponse.approval.id) || (autonomous && taskResponse.sourceCommandTask?.approvalId !== null)) {
   throw new Error(`source command task metadata should link task and approval: ${JSON.stringify(taskResponse.sourceCommandTask)}`);
 }
-if (!blockedStep.ok || blockedStep.ran !== false || blockedStep.blocked !== true || blockedStep.reason !== "policy_requires_approval") {
+if (!autonomous && (!blockedStep.ok || blockedStep.ran !== false || blockedStep.blocked !== true || blockedStep.reason !== "policy_requires_approval")) {
   throw new Error(`operator should block instead of executing source command task: ${JSON.stringify(blockedStep)}`);
 }
-if (blockedStep.task?.id !== task.id || blockedStep.approval?.id !== taskResponse.approval.id) {
+if (!autonomous && (blockedStep.task?.id !== task.id || blockedStep.approval?.id !== taskResponse.approval.id)) {
   throw new Error(`blocked operator step should point at source command task approval: ${JSON.stringify(blockedStep)}`);
 }
-if (pending.items?.length !== 1 || pending.items[0].id !== taskResponse.approval.id) {
+if (autonomous && (!blockedStep.ok || blockedStep.ran !== true || blockedStep.blocked === true || blockedStep.task?.status !== "completed")) {
+  throw new Error(`sovereign body validation should execute without approval: ${JSON.stringify(blockedStep)}`);
+}
+if (!autonomous && (pending.items?.length !== 1 || pending.items[0].id !== taskResponse.approval.id)) {
   throw new Error(`approval inbox should contain source command pending approval: ${JSON.stringify(pending.items)}`);
+}
+if (autonomous && pending.items?.length !== 0) {
+  throw new Error(`sovereign body validation should not create a pending approval: ${JSON.stringify(pending.items)}`);
 }
 if (tasksAfter.summary?.counts?.total !== (tasksBefore.summary?.counts?.total ?? 0) + 1) {
   throw new Error(`source command task should create one task: ${JSON.stringify({ before: tasksBefore.summary, after: tasksAfter.summary })}`);
 }
-if (
+if (!autonomous && (
   approvalsAfter.summary?.counts?.total !== (approvalsBefore.summary?.counts?.total ?? 0) + 1
   || approvalsAfter.summary?.counts?.pending !== (approvalsBefore.summary?.counts?.pending ?? 0) + 1
-) {
+)) {
   throw new Error(`source command task should create one pending approval: ${JSON.stringify({ before: approvalsBefore.summary, after: approvalsAfter.summary })}`);
 }
-if (commandsAfter.summary?.total !== commandsBefore.summary?.total) {
+if (autonomous && (
+  approvalsAfter.summary?.counts?.total !== approvalsBefore.summary?.counts?.total
+  || approvalsAfter.summary?.counts?.pending !== approvalsBefore.summary?.counts?.pending
+)) {
+  throw new Error(`sovereign body source command task should not create an approval: ${JSON.stringify({ before: approvalsBefore.summary, after: approvalsAfter.summary })}`);
+}
+if ((!autonomous && commandsAfter.summary?.total !== commandsBefore.summary?.total) || (autonomous && commandsAfter.summary?.total !== (commandsBefore.summary?.total ?? 0) + 1)) {
   throw new Error(`source command task must not execute command before approval: ${JSON.stringify({ before: commandsBefore.summary, after: commandsAfter.summary })}`);
 }
 for (const secret of [
@@ -238,15 +293,16 @@ console.log(JSON.stringify({
       capabilitySummary: task.plan.capabilitySummary,
     },
     approval: {
-      id: taskResponse.approval.id,
-      status: taskResponse.approval.status,
-      reason: taskResponse.approval.reason,
+      id: taskResponse.approval?.id ?? null,
+      status: taskResponse.approval?.status ?? null,
+      reason: taskResponse.approval?.reason ?? null,
     },
     operatorGate: {
       blocked: blockedStep.blocked,
       reason: blockedStep.reason,
+      autonomyMode,
     },
-    unchangedCommandLedger: commandsAfter.summary,
+    commandLedger: commandsAfter.summary,
     endpoints: [
       "POST /plugins/native-adapter/source-command-proposals/tasks",
     ],

@@ -383,7 +383,7 @@ export function buildBaseCapabilities({
       domains: ["body_internal"],
       risk: "high",
       governance: "allow",
-      description: "Create a bounded source-command verification task and its approval through the existing workspace command owner; command execution remains separately approval-gated.",
+      description: "Create a bounded source-command verification task through the existing workspace command owner; guardian mode keeps execution approval-gated, while sovereign_body may grant only registered low-risk validation commands through the task-bound audit-only path.",
     },
     {
       id: "act.openclaw.engineering_tool.edit_proposal",

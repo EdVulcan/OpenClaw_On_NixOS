@@ -148,7 +148,7 @@ governed by the existing local policy, invocation ledger, and audit event path.
 | `cc_glob` | `sense.openclaw.engineering_tool.glob` | `read_only_path_search` | low | no approval for bounded metadata search | absorbed through bounded native route and capability-runtime invoke |
 | `cc_grep` | `sense.openclaw.engineering_tool.grep` | `read_only_content_search` | low | no approval for bounded search; snippets require budget and audit | absorbed through bounded native route and capability-runtime invoke |
 | `cc_lsp` | `sense.openclaw.engineering_tool.lsp_evidence` / `act.openclaw.engineering_tool.lsp_lifecycle_task` / `sense.openclaw.engineering_tool.lsp_lifecycle_state` / `plan.openclaw.engineering_tool.lsp_source_transfer` / `act.openclaw.engineering_tool.lsp_source_transfer_task` / `plan.openclaw.engineering_tool.lsp_symbol_request` / `act.openclaw.engineering_tool.lsp_symbol_request_task` / `sense.openclaw.engineering_tool.lsp_selected_target_read_bridge` / `plan.openclaw.engineering_tool.lsp_selected_target_edit_proposal_seed` | `language_intelligence_evidence_governed_lifecycle_source_transfer_symbol_boundary_read_bridge_edit_seed_approved_edit_verification_recovery_and_rerun_proof` | medium | no approval for evidence/state/proposal/read-bridge/edit-seed/recovery-evidence readback; approval required before lifecycle/source-transfer/symbol execution, edit mutation, verification command execution, or recovery rerun | partially absorbed as evidence, lifecycle draft, approval-gated binary gate, bounded process supervision probe, lifecycle state readback, initialize/shutdown handshake, didOpen source-transfer proposal, approval-gated didOpen task, symbol request proposal, approval-gated single symbol request task, bounded response target selection, selected-target native read bridge, selected-target edit proposal seed, selected-target approved edit closed-loop proof, selected-target verification handoff, selected-target recovery recommendation handoff, and selected-target recovered verification rerun proof |
-| `cc_verify` | `sense.openclaw.engineering_tool.verify_evidence` / `act.openclaw.engineering_tool.verify` | `verification_command_evidence_and_task_materialization` | medium | evidence readback is audit-only; explicit confirmation may create a queued approval-gated task; command execution remains on the existing approval-gated task path | absorbed through bounded evidence route, common capability-runtime invoke, and the existing source-command task owner; command execution remains separately approval-gated |
+| `cc_verify` | `sense.openclaw.engineering_tool.verify_evidence` / `act.openclaw.engineering_tool.verify` | `verification_command_evidence_and_task_materialization` | medium | evidence readback is audit-only; explicit confirmation may create a queued task; guardian keeps command execution approval-gated, while `sovereign_body` may use a task-bound audit-only grant only for registered low-risk `typecheck`, `test`, or `lint` commands | absorbed through bounded evidence route, common capability-runtime invoke, the existing source-command owner, and risk-tiered standing authorization; build/runtime/provider/mutation paths remain approval-gated |
 | `cc_plan_enter` | `plan.openclaw.engineering_tool.plan_enter` / `act.openclaw.engineering_context.plan_todo_workbench_state` | `planning_state` | low | no hidden mode switch; explicit operator confirmation for core-state workbench storage | absorbed as evidence plus governed workbench storage |
 | `cc_plan_exit` | `plan.openclaw.engineering_tool.plan_exit` / `act.openclaw.engineering_context.plan_todo_workbench_state` | `planning_state` | low | no hidden execution transition; explicit operator confirmation for stored confirmed-plan readback | absorbed as evidence plus governed workbench storage |
 | `cc_todo_write` | `plan.openclaw.engineering_tool.todo_write` / `act.openclaw.engineering_context.plan_todo_workbench_state` | `planning_state` | low | explicit operator confirmation for bounded core-state todo storage; no `.openclaw/cc-todo.md` write | absorbed as evidence plus governed workbench storage |
@@ -239,7 +239,7 @@ The following remain intentionally deferred:
 ```text
 unbounded/raw file reads outside the native read/search surface
 raw enhanced glob/grep execution outside native bounds
-automatic edit approval, automatic recovery task creation, and unapproved verification command execution
+automatic edit approval, automatic recovery task creation, and verification command execution outside the task-bound `sovereign_body` allowlist
 automatic write approval, automatic recovery task creation, and post-write
 verification command execution
 long-lived LSP process pool and multi-request symbol navigation sessions;
@@ -303,10 +303,16 @@ OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_VERIFICATION_EVIDENCE_PLAN.md
 
 The matching `act.openclaw.engineering_tool.verify` capability now provides a
 common-runtime task-materialization bridge for the existing source-command
-owner. With explicit operator confirmation it creates only a queued task and
-pending approval; it does not execute a command, approve the task, retry,
-mutate the workspace, or call a provider. Approval and operator execution stay
-on the existing task path.
+owner. With explicit operator confirmation it creates only a queued task. In
+the default `guardian` mode the task carries a pending approval; in
+`sovereign_body`, only a registered low-risk `typecheck`, `test`, or `lint`
+proposal with a fixed shell-free command shape receives a task/step/parameter
+bound `audit_only` grant and no approval record. The grant is checked again by
+the existing capability execution binding before `system-sense` is called and
+cannot authorize `build`, `dev`, `start`, mutation, provider, or network work.
+Actual execution still stays on the existing Operator Step path, and every
+automatic execution records policy, invocation, audit, and command-transcript
+evidence.
 
 The corresponding failed-verification recovery readback is now available as
 `sense.openclaw.engineering_tool.recovery_evidence`. It reuses the existing

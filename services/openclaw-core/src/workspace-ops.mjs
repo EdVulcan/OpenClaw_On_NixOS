@@ -1247,7 +1247,10 @@ async function createWorkspaceCommandTask({
     engineeringPlanTodoSuggestionLink,
   }, { skipInitialPolicy: true });
   task.policy = draft.policy;
-  const approval = createApprovalRequestForTask(task, draft.policy.decision);
+  const requiresApproval = draft.policy.decision?.decision === "require_approval";
+  const approval = requiresApproval
+    ? createApprovalRequestForTask(task, draft.policy.decision)
+    : null;
   const reclaimedTasks = supersedeOtherActiveTasks(task.id);
   reconcileRuntimeState();
   persistState();
@@ -1261,7 +1264,7 @@ async function createWorkspaceCommandTask({
 
   return {
     registry: "workspace-command-task-v0",
-    mode: "approval-gated",
+    mode: draft.governance?.autoAuthorized === true ? "audit-only-autonomous" : "approval-gated",
     generatedAt: new Date().toISOString(),
     sourceRegistry: draftEnvelope.registry,
     proposal: draftEnvelope.proposal,
@@ -1269,10 +1272,12 @@ async function createWorkspaceCommandTask({
     approval,
     governance: {
       createsTask: true,
-      createsApproval: true,
-      canExecuteWithoutApproval: false,
+      createsApproval: Boolean(approval),
+      canExecuteWithoutApproval: draft.governance?.canExecuteWithoutApproval === true,
+      autoAuthorized: draft.governance?.autoAuthorized === true,
+      autonomous: draft.governance?.autonomous === true,
       executed: false,
-      requiresExplicitApproval: true,
+      requiresExplicitApproval: requiresApproval,
       exposesScriptBody: false,
     },
   };
@@ -1326,7 +1331,7 @@ async function createOpenClawSourceCommandTask({
 
   return {
     registry: "openclaw-source-command-task-v0",
-    mode: "approval-gated-source-command",
+    mode: workspaceTask.mode === "audit-only-autonomous" ? "audit-only-autonomous-source-command" : "approval-gated-source-command",
     generatedAt: new Date().toISOString(),
     sourceRegistry: sourceDraft.registry,
     sourceMode: sourceDraft.mode,
@@ -1335,11 +1340,12 @@ async function createOpenClawSourceCommandTask({
     sourceCommandPlan: sourceDraft.sourceCommandPlan,
     sourceCommandTask: {
       registry: "openclaw-source-command-task-v0",
-      mode: "approval-gated-source-command",
+      mode: workspaceTask.mode === "audit-only-autonomous" ? "audit-only-autonomous-source-command" : "approval-gated-source-command",
       workspaceTaskRegistry: workspaceTask.registry,
       proposalId: sourceProposal.id,
       approvalId: workspaceTask.approval?.id ?? null,
       taskId: workspaceTask.task?.id ?? null,
+      autoAuthorized: workspaceTask.governance?.autoAuthorized === true,
       executed: false,
       contentExposed: false,
     },
@@ -1351,16 +1357,20 @@ async function createOpenClawSourceCommandTask({
     task: workspaceTask.task,
     approval: workspaceTask.approval,
     governance: {
-      mode: "source_command_task_approval_gated",
+      mode: workspaceTask.governance?.autoAuthorized === true
+        ? "source_command_task_audit_only_autonomous"
+        : "source_command_task_approval_gated",
       runtimeOwner: "openclaw_on_nixos",
       createsTask: true,
-      createsApproval: true,
-      canExecuteWithoutApproval: false,
+      createsApproval: workspaceTask.governance?.createsApproval === true,
+      canExecuteWithoutApproval: workspaceTask.governance?.canExecuteWithoutApproval === true,
+      autoAuthorized: workspaceTask.governance?.autoAuthorized === true,
+      autonomous: workspaceTask.governance?.autonomous === true,
       canExecute: false,
       canMutate: false,
       executed: false,
-      requiresExplicitApproval: true,
-      requiresExplicitApprovalBeforeExecution: true,
+      requiresExplicitApproval: workspaceTask.governance?.requiresExplicitApproval === true,
+      requiresExplicitApprovalBeforeExecution: workspaceTask.governance?.requiresExplicitApproval === true,
       delegatesExecutionTo: "workspace-command-task-v0",
       exposesScriptBodies: false,
       exposesPromptContent: false,

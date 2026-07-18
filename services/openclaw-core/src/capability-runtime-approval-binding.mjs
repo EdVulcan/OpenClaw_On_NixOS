@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import { validateWorkspaceCommandAutonomousGrant } from "./workspace-command-autonomy.mjs";
 
 export const EXECUTION_RESERVATION_REGISTRY = "openclaw-capability-execution-reservation-v1";
 export const DEFAULT_EXECUTION_RESERVATION_TTL_MS = 5 * 60 * 1000;
@@ -110,6 +111,28 @@ function authorityResult({ required, approved = false, reason = null, task = nul
   };
 }
 
+function validateAutonomousExecution({ capability, request, task } = {}) {
+  if (!request?.stepId || !task) {
+    return { ok: false, reason: "autonomous_execution_task_required" };
+  }
+  const currentStep = (Array.isArray(task.plan?.steps) ? task.plan.steps : [])
+    .find((step) => step?.id === request.stepId);
+  if (!currentStep || currentStep.phase !== "acting_on_target") {
+    return { ok: false, reason: "autonomous_execution_step_required" };
+  }
+  const requestedHash = buildCapabilityRequestBindingHash({
+    capabilityId: capability?.id,
+    intent: request.intent ?? capability?.intents?.[0] ?? null,
+    params: request.params ?? {},
+  });
+  return validateWorkspaceCommandAutonomousGrant({
+    task,
+    step: currentStep,
+    capability,
+    requestHash: requestedHash,
+  });
+}
+
 function updatePlanAfterReservation(task, at) {
   if (task?.plan) {
     task.plan.status = "running";
@@ -179,6 +202,27 @@ export function validateCapabilityExecutionApproval({
   reservationTtlMs = DEFAULT_EXECUTION_RESERVATION_TTL_MS,
 } = {}) {
   const required = isCapabilityApprovalRequired(capability);
+  if (required) {
+    const task = request?.taskId ? getById(tasks, request.taskId) : null;
+    const autonomous = validateAutonomousExecution({ capability, request, task });
+    const currentStep = (Array.isArray(task?.plan?.steps) ? task.plan.steps : [])
+      .find((step) => step?.id === request?.stepId);
+    if (currentStep?.autonomousExecution && !autonomous.ok) {
+      return authorityResult({
+        required,
+        reason: autonomous.reason,
+        task,
+      });
+    }
+    if (autonomous.ok) {
+      return authorityResult({
+        required: false,
+        approved: true,
+        task,
+        bindingHash: task?.plan?.steps?.find((step) => step?.id === request.stepId)?.autonomousExecution?.requestHash ?? null,
+      });
+    }
+  }
   if (!required) {
     return authorityResult({ required, approved: request?.approved === true });
   }

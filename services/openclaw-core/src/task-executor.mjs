@@ -33,6 +33,8 @@ import {
   materialiseCloudLiveProviderContextPacketExecution,
 } from "./cloud-live-provider-runtime-context-packet.mjs";
 import { readNativeEngineeringWorkViewState } from "./native-engineering-work-view-association.mjs";
+import { buildCapabilityRequestBindingHash } from "./capability-runtime-approval-binding.mjs";
+import { validateWorkspaceCommandAutonomousGrant } from "./workspace-command-autonomy.mjs";
 
 export function createTaskExecutor(deps) {
   const {
@@ -487,6 +489,14 @@ function isTaskPolicyApproved(task) {
   return approval?.taskId === task?.id && approval?.status === "approved";
 }
 
+function buildCapabilityRequestBindingHashForStep(step) {
+  return buildCapabilityRequestBindingHash({
+    capabilityId: step?.capabilityId,
+    intent: step?.intent ?? step?.kind ?? null,
+    params: step?.params ?? {},
+  });
+}
+
 function buildCapabilityApprovalGate(task, actionSteps) {
   if (isTaskPolicyApproved(task)) {
     return null;
@@ -494,6 +504,14 @@ function buildCapabilityApprovalGate(task, actionSteps) {
 
   for (const step of actionSteps) {
     const capability = capabilityById(step.capabilityId);
+    if (capability && validateWorkspaceCommandAutonomousGrant({
+      task,
+      step,
+      capability,
+      requestHash: buildCapabilityRequestBindingHashForStep(step),
+    }).ok) {
+      continue;
+    }
     const requiresApproval = step.requiresApproval === true
       || capability?.requiresApproval === true
       || capability?.governance === "require_approval";

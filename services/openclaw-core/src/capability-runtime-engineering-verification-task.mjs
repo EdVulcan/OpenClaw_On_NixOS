@@ -32,7 +32,7 @@ function publicTaskResult(result, { serialiseTask, serialiseApproval } = {}) {
   return {
     ...result,
     task: typeof serialiseTask === "function" ? serialiseTask(result.task) : compactTask(result.task),
-    approval: typeof serialiseApproval === "function"
+    approval: result.approval && typeof serialiseApproval === "function"
       ? serialiseApproval(result.approval)
       : result.approval
         ? {

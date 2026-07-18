@@ -6,7 +6,11 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { createTaskExecutor } from "../src/task-executor.mjs";
-import { buildCapabilityApprovalBinding } from "../src/capability-runtime-approval-binding.mjs";
+import {
+  buildCapabilityApprovalBinding,
+  buildCapabilityRequestBindingHash,
+} from "../src/capability-runtime-approval-binding.mjs";
+import { buildWorkspaceCommandAutonomousGrant } from "../src/workspace-command-autonomy.mjs";
 import { buildBrowserTaskExecutionBinding } from "../src/browser-task-execution-binding.mjs";
 import { DELEGATED_PLAN_TASK_HANDLER_DESCRIPTORS } from "../src/task-executor-delegated-plan-handlers.mjs";
 import { CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CONTEXT_PACKET_EVIDENCE } from "../src/cloud-live-provider-runtime-context-packet.mjs";
@@ -1151,6 +1155,94 @@ test("capability plan task dispatches to capability invocation handler", async (
   assert.deepEqual(invocationBodies.map((body) => body.capabilityId), ["act.system.command.execute"]);
   assert.equal(invocationBodies[0].approved, true);
   assert(events.some((event) => event.name === "task.completed"));
+});
+
+test("sovereign validation task executes through the existing capability plan without an approval", async () => {
+  const params = {
+    command: "npm",
+    args: ["run", "typecheck"],
+    cwd: "/repo",
+    timeoutMs: 120000,
+  };
+  const step = {
+    id: "autonomous-command-step-1",
+    phase: "acting_on_target",
+    kind: "system.command.execute",
+    capabilityId: "act.system.command.execute",
+    intent: "system.command.execute",
+    params,
+    requiresApproval: false,
+    governance: "audit_only",
+  };
+  step.autonomousExecution = buildWorkspaceCommandAutonomousGrant({
+    proposal: {
+      workspaceId: "openclaw",
+      workspacePath: "/repo",
+      scriptName: "typecheck",
+      category: "validation",
+      packageManager: "npm",
+      command: "npm",
+      args: ["run", "typecheck"],
+      cwd: "/repo",
+      risk: "low",
+      usesShell: false,
+    },
+    requestHash: buildCapabilityRequestBindingHash({
+      capabilityId: step.capabilityId,
+      intent: step.intent,
+      params,
+    }),
+  });
+  const task = {
+    id: "autonomous-command-task-1",
+    type: "system_task",
+    goal: "Run bounded validation",
+    status: "queued",
+    workViewStrategy: "workspace-command",
+    policy: {
+      request: { intent: "system.command.execute", domain: "body_internal", risk: "low", requiresApproval: false },
+      decision: {
+        decision: "audit_only",
+        reason: "bounded_sovereign_body_validation_audit_only",
+        domain: "body_internal",
+        risk: "low",
+        autonomyMode: "sovereign_body",
+        autonomous: true,
+      },
+    },
+    plan: {
+      strategy: "rule-v1",
+      steps: [step],
+    },
+  };
+  const invocationBodies = [];
+  const { executor, events } = createExecutorHarness({
+    planBuilder: {
+      capabilityById: (id) => ({ id, requiresApproval: true, governance: "require_approval" }),
+      invokeCapability: async (body) => {
+        invocationBodies.push(body);
+        return {
+          response: {
+            capability: { id: body.capabilityId },
+            invoked: true,
+            blocked: false,
+            invocation: { id: "autonomous-command-invocation-1", request: body.params },
+            summary: { exitCode: 0, timedOut: false, stdout: "ok\n", stderr: "" },
+            policy: { decision: "audit_only" },
+          },
+        };
+      },
+    },
+  });
+
+  const result = await executor.executeTaskWithRecovery(task, { autoRecover: false });
+
+  assert.notEqual(result.finalExecution.blocked, true);
+  assert.equal(result.finalExecution.task.status, "completed");
+  assert.equal(invocationBodies.length, 1);
+  assert.equal(invocationBodies[0].approved, false);
+  assert.equal(invocationBodies[0].params.command, "npm");
+  assert.equal(events.some((event) => event.name === "task.completed"), true);
 });
 
 test("approved native engineering LSP lifecycle task records missing binary recovery evidence", async () => {

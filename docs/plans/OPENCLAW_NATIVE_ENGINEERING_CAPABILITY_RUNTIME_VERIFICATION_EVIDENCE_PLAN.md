@@ -69,9 +69,13 @@ observer-openclaw-native-engineering-verification-evidence
 
 ## Deferred
 
-Actual command execution remains on the existing approval-gated source-command
-task path. This slice does not create a verification task, approve one, run a
-shell, retry a command, or expand provider/root authority.
+Actual command execution remains on the existing source-command task path. In
+the default `guardian` mode it remains approval-gated. The bounded follow-up
+also supports `sovereign_body` standing authorization for only registered
+low-risk `typecheck`, `test`, and `lint` proposals with a task/step/parameter
+binding; it does not authorize build/runtime scripts, mutation, provider/root
+authority, or arbitrary shell execution. This evidence slice itself still does
+not create a verification task, approve one, or run a command.
 
 ## Next Smallest Capability
 

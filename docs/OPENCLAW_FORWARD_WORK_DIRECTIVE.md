@@ -394,9 +394,16 @@ provider egress disabled. This bridge is documented in
 
 The matching `act.openclaw.engineering_tool.verify` capability is also wired
 through the common `/capabilities/invoke` runtime. With explicit confirmation
-it materializes the existing source-command verification task and pending
-approval; it does not execute commands or approve them. Actual execution
-remains on the existing approval-gated owner and its operator step.
+it materializes the existing source-command verification task. In the default
+`guardian` mode this remains a pending-approval task. In `sovereign_body`, only
+the registered low-risk `typecheck`, `test`, and `lint` command proposals can
+receive a task/step/parameter-bound `audit_only` grant; `build`, `dev`, `start`,
+workspace mutation, provider egress, and network work remain approval-gated.
+The grant is revalidated by the existing capability execution binding before
+the actuator call, is single-task/single-step scoped, and records normal
+policy, invocation, audit, and command-transcript evidence. Actual execution
+still remains on the existing Operator Step owner; the capability never
+auto-approves arbitrary tasks or executes provider work.
 
 The matching failed-verification recovery readback is now also available as
 `sense.openclaw.engineering_tool.recovery_evidence`. It reuses the existing

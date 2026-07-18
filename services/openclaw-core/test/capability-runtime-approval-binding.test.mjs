@@ -4,11 +4,15 @@ import assert from "node:assert/strict";
 import {
   abortCapabilityExecutionReservation,
   buildCapabilityApprovalBinding,
+  buildCapabilityRequestBindingHash,
   commitCapabilityExecutionReservation,
   recoverCapabilityExecutionReservations,
   startCapabilityExecutionReservation,
   validateCapabilityExecutionApproval,
 } from "../src/capability-runtime-approval-binding.mjs";
+import {
+  buildWorkspaceCommandAutonomousGrant,
+} from "../src/workspace-command-autonomy.mjs";
 
 const capability = {
   id: "act.system.command.execute",
@@ -68,6 +72,141 @@ test("approved flag alone cannot authorize a server capability", () => {
 
   assert.equal(result.ok, false);
   assert.equal(result.reason, "approval_task_required");
+});
+
+test("a bounded sovereign validation grant authorizes the exact command without an approval record", () => {
+  const params = {
+    command: "npm",
+    args: ["run", "typecheck"],
+    cwd: "/repo",
+    timeoutMs: 120000,
+  };
+  const task = {
+    id: "task-autonomous-validation-1",
+    type: "system_task",
+    workViewStrategy: "workspace-command",
+    policy: {
+      decision: {
+        decision: "audit_only",
+        domain: "body_internal",
+        risk: "low",
+        autonomyMode: "sovereign_body",
+        autonomous: true,
+      },
+      request: { requiresApproval: false },
+    },
+    plan: {
+      planId: "plan-autonomous-validation-1",
+      steps: [{
+        id: "step-autonomous-validation-1",
+        phase: "acting_on_target",
+        status: "pending",
+        capabilityId: capability.id,
+        intent: "system.command.execute",
+        params,
+      }],
+    },
+  };
+  const requestHash = buildCapabilityRequestBindingHash({
+    capabilityId: capability.id,
+    intent: "system.command.execute",
+    params,
+  });
+  task.plan.steps[0].autonomousExecution = buildWorkspaceCommandAutonomousGrant({
+    proposal: {
+      workspaceId: "openclaw",
+      workspacePath: "/repo",
+      scriptName: "typecheck",
+      category: "validation",
+      packageManager: "npm",
+      command: "npm",
+      args: ["run", "typecheck"],
+      cwd: "/repo",
+      risk: "low",
+      usesShell: false,
+    },
+    requestHash,
+  });
+  const state = {
+    tasks: new Map([[task.id, task]]),
+    approvals: new Map(),
+  };
+
+  const result = validateCapabilityExecutionApproval({
+    capability,
+    request: {
+      taskId: task.id,
+      stepId: task.plan.steps[0].id,
+      intent: "system.command.execute",
+      params,
+      approved: false,
+    },
+    ...state,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.required, false);
+  assert.equal(result.approved, true);
+  assert.equal(result.bindingHash, requestHash);
+});
+
+test("a sovereign validation grant fails closed when command parameters change", () => {
+  const params = {
+    command: "npm",
+    args: ["run", "typecheck"],
+    cwd: "/repo",
+    timeoutMs: 120000,
+  };
+  const task = {
+    id: "task-autonomous-validation-2",
+    type: "system_task",
+    workViewStrategy: "workspace-command",
+    policy: {
+      request: { requiresApproval: false },
+      decision: { decision: "audit_only", domain: "body_internal", risk: "low", autonomyMode: "sovereign_body", autonomous: true },
+    },
+    plan: {
+      planId: "plan-autonomous-validation-2",
+      steps: [{
+        id: "step-autonomous-validation-2",
+        phase: "acting_on_target",
+        status: "pending",
+        capabilityId: capability.id,
+        intent: "system.command.execute",
+        params,
+        autonomousExecution: {
+          registry: "openclaw-workspace-command-autonomous-execution-v0",
+          mode: "sovereign_body_audit_only",
+          owner: "workspace-command-task-v0",
+          capabilityId: capability.id,
+          requestHash: "bound-to-typecheck",
+          workspaceId: "openclaw",
+          workspacePath: "/repo",
+          scriptName: "typecheck",
+          packageManager: "npm",
+          command: "npm",
+          args: ["run", "typecheck"],
+          cwd: "/repo",
+          usesShell: false,
+        },
+      }],
+    },
+  };
+  const result = validateCapabilityExecutionApproval({
+    capability,
+    request: {
+      taskId: task.id,
+      stepId: task.plan.steps[0].id,
+      intent: "system.command.execute",
+      params: { ...params, args: ["run", "lint"] },
+      approved: false,
+    },
+    tasks: new Map([[task.id, task]]),
+    approvals: new Map(),
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, "autonomous_execution_request_mismatch");
 });
 
 test("pending approval cannot authorize a capability step", () => {
