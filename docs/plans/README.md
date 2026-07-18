@@ -489,10 +489,11 @@ binding and record only a future activation decision; they do not install
 config, switch generations, activate, or roll back. The fixed hostd/systemd
 Level 3 contract is present but physical activation remains disabled by
 default. Health, activation, and rollback owners are explicit in readback; the
-next route is a physical-host-safe injected activation/health-failure
-rehearsal through the user-space executor and Observer readback. Real hostd,
-`/etc/nixos`, generation switching, and rollback remain disabled. The common
-actuator path already has Core-issued grants plus reservation commit/abort/recovery.
+physical-host-safe injected activation/health-failure rehearsal now dispatches
+through the user-space executor and Observer readback. Real hostd, `/etc/nixos`,
+generation switching, and rollback remain disabled. Phase D local evidence is
+complete; do not add another activation wrapper. The common actuator path
+already has Core-issued grants plus reservation commit/abort/recovery.
 
 ## Historical Phase Plans
 

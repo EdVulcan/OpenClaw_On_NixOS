@@ -95,9 +95,11 @@ deriver/NAR metadata, and emits a stable task-bound closure-integrity receipt.
 The explicit NixOS host lane now proves the receipt, healthy-host review, and
 future activation decision; the normal dry-run lane still fails closed without
 materialization. The manual rollback evidence path binds receipt and health
-hashes without executing rollback. The next proof is a physical-host-safe
-injected health-failure rehearsal; it does not write `/etc/nixos`, run
-`nixos-rebuild`, switch generations, or roll back. The active plan is
+hashes without executing rollback. The physical-host-safe injected
+health-failure rehearsal now also covers production task-executor dispatch and
+Observer readback; it does not write `/etc/nixos`, run `nixos-rebuild`, switch
+generations, or roll back. Phase D local evidence is complete; the active plan
+now returns to the next concrete user-space capability:
 [OPENCLAW_PHASE_D_DECLARATIVE_EVOLUTION_CANDIDATE_PLAN.md](./plans/OPENCLAW_PHASE_D_DECLARATIVE_EVOLUTION_CANDIDATE_PLAN.md).
 
 ## Windows Checkout Path Policy

@@ -160,6 +160,7 @@ services/openclaw-core/test/native-declarative-evolution-task-routes.test.mjs
 services/openclaw-core/test/native-declarative-evolution-activation-decision.test.mjs
 services/openclaw-core/test/task-executor-native-declarative-evolution-activation-handlers.test.mjs
 services/openclaw-core/test/task-executor-native-declarative-evolution-activation-execution-handlers.test.mjs
+services/openclaw-core/test/native-declarative-evolution-physical-host-rehearsal.test.mjs
 services/openclaw-core/test/task-executor-native-declarative-evolution-staging-handlers.test.mjs
 services/openclaw-core/test/native-declarative-evolution-activation.test.mjs
 services/openclaw-core/test/capability-runtime.test.mjs
@@ -202,12 +203,12 @@ evaluates fresh bounded system-sense facts and emits the authority split used
 by the activation decision and post-action readback: health is owned by the
 oracle, activation by fixed `openclaw-hostd`, and rollback by a manual operator.
 This is an independent decision module, not a separate privileged daemon. The
-Core manual rollback evidence contract is now also complete for the
-post-activation health-failure path. The next mainline slice is a
-physical-host-safe activation/health-failure rehearsal: inject a validated
-hostd receipt and degraded/unavailable oracle result through the existing
-user-space executor/test boundary, then prove the task and Observer readback.
-It must not connect to the real hostd socket, write `/etc/nixos`, run
-`nixos-rebuild`, switch a generation, or execute rollback. A disposable VM may
-be a later release gate if one is provisioned; it is not a current workspace
-precondition.
+Core manual rollback evidence contract and its physical-host-safe
+activation/health-failure rehearsal are now complete. The rehearsal dispatches
+through the production task executor with an injected validated hostd receipt
+and degraded oracle result, then renders the failed task through the existing
+Observer execution readback. It does not connect to the real hostd socket,
+write `/etc/nixos`, run `nixos-rebuild`, switch a generation, or execute
+rollback. A disposable VM may be a later release gate if one is provisioned;
+it is not a current workspace precondition. Do not add another Phase D
+readiness/evidence wrapper; select the next concrete user-space capability.

@@ -1410,12 +1410,14 @@ and Core/Observer checks now pass. The pinned flake remains the default outside
 that host optimization and its cold materialization remains a long-running
 resource check. No lane writes `/etc/nixos`, switches a generation, activates a
 system, or rolls back. The local manual rollback evidence contract is complete;
-the next real slice is a physical-host-safe activation/health-failure rehearsal
-using injected receipt/oracle inputs through the existing user-space boundary.
-It must not connect to real hostd, write `/etc/nixos`, run `nixos-rebuild`,
-switch a generation, or execute rollback. Do not turn a future disposable-VM
-release gate into a current workspace assumption or add another generic
-readiness wrapper.
+the physical-host-safe activation/health-failure rehearsal now dispatches
+through the production executor with injected receipt/oracle inputs and renders
+the failed task through the existing Observer readback. It does not connect to
+real hostd, write `/etc/nixos`, run `nixos-rebuild`, switch a generation, or
+execute rollback. Phase D local evidence is complete; do not add another
+activation readiness/evidence wrapper. Select the next concrete user-space
+capability, while treating any disposable-VM mutation test as a future release
+gate rather than a current workspace assumption.
 
 ## Operator Identity And Mutation Boundary Checkpoint
 

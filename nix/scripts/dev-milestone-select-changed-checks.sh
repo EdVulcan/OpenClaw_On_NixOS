@@ -683,6 +683,7 @@ function selectSourceHeuristics(file) {
     ["services/openclaw-core/test/native-declarative-evolution-activation-decision.test.mjs", ["openclaw-core-service-unit-tests", nativeDeclarativeEvolutionCoreCheck, nativeDeclarativeEvolutionObserverCheck]],
     ["services/openclaw-core/test/native-declarative-evolution-host-health-oracle.test.mjs", ["openclaw-core-service-unit-tests", nativeDeclarativeEvolutionCoreCheck, nativeDeclarativeEvolutionObserverCheck]],
     ["services/openclaw-core/test/native-declarative-evolution-rollback-evidence.test.mjs", ["openclaw-core-service-unit-tests", nativeDeclarativeEvolutionCoreCheck, nativeDeclarativeEvolutionObserverCheck]],
+    ["services/openclaw-core/test/native-declarative-evolution-physical-host-rehearsal.test.mjs", ["openclaw-core-service-unit-tests", nativeDeclarativeEvolutionCoreCheck, nativeDeclarativeEvolutionObserverCheck]],
     ["services/openclaw-core/test/task-executor-native-declarative-evolution-activation-handlers.test.mjs", ["openclaw-core-service-unit-tests", nativeDeclarativeEvolutionCoreCheck, nativeDeclarativeEvolutionObserverCheck]],
     ["services/openclaw-core/test/task-executor-native-declarative-evolution-activation-execution-handlers.test.mjs", ["openclaw-core-service-unit-tests", nativeDeclarativeEvolutionCoreCheck, nativeDeclarativeEvolutionObserverCheck]],
     ["services/openclaw-core/test/task-executor-native-declarative-evolution-staging-handlers.test.mjs", ["openclaw-core-service-unit-tests", nativeDeclarativeEvolutionCoreCheck, nativeDeclarativeEvolutionObserverCheck]],
