@@ -1340,14 +1340,24 @@ The explicit activation-decision and host-health boundary is now complete
 through `act.openclaw.declarative_evolution.activation_decision`,
 `GET /plugins/native-adapter/declarative-evolution/activation-decision?taskId=...`,
 and `POST /plugins/native-adapter/declarative-evolution/activation-decisions`.
-Core reads `openclaw-system-sense:/system/health`, requires a healthy host for
-an approval of future activation, and binds the staging task, candidate hash,
+Core passes the raw read-only `openclaw-system-sense:/system/health` evidence
+through the Core-owned `openclaw-native-declarative-evolution-host-health-oracle-v0`.
+That oracle independently evaluates freshness, service completeness, service
+state, alerts, and network state; it does not trust a source-provided health
+status. It requires a healthy host for an approval of future activation and binds the staging task, candidate hash,
 staged-file hash, closure-integrity receipt, evaluated output/deriver/NAR
 metadata, and host-health hash. The approved task
 revalidates every binding before recording `approved_for_future_activation` or
 `rejected`; a changed health fingerprint fails closed. The Core and Observer
 staging milestone pair proves the served panel, confirmation gate, real
 approval, revalidation, and zero activation.
+
+The authority split is explicit in both review and post-action readback: the
+Core host-health oracle owns health assessment, fixed `openclaw-hostd` owns
+activation, and `deferred_manual_operator` owns rollback. The oracle is an
+independent decision module inside the Core control plane, not a separate
+privileged daemon; process isolation and physical generation rehearsal remain
+deferred to the NixOS VM activation slice.
 
 This remains a decision boundary, not physical activation. It does not write
 `/etc/nixos`, run `nixos-rebuild`, switch a generation, activate a system, or
@@ -1363,7 +1373,8 @@ staging path, evaluated closure, pre-activation health hash, task lineage, and
 bounded expiry. The activation executor revalidates the binding, requires the
 generic `planId + stepId + requestHash` approval contract, calls hostd through
 the peer-verified Unix socket, validates the immutable receipt, and reads
-post-action health from `openclaw-system-sense`; rollback remains manual-only.
+post-action health through the Core-owned host-health oracle; rollback remains
+manual-only.
 
 Hostd exposes only `hostd.activate_managed_config`, fixed to
 `/etc/nixos/openclaw-managed.nix` and a configured flake rebuild command.
@@ -1390,8 +1401,9 @@ real closure receipt, healthy-host review, approved future activation decision,
 and Core/Observer checks now pass. The pinned flake remains the default outside
 that host optimization and its cold materialization remains a long-running
 resource check. No lane writes `/etc/nixos`, switches a generation, activates a
-system, or rolls back. The next real slice is an independent health oracle and
-separate activation/health/rollback authorities; do not add another generic
+system, or rolls back. The next real slice is a NixOS-VM-only
+activation/health-failure rehearsal with manual rollback evidence; do not
+enable physical activation on the development host or add another generic
 readiness wrapper.
 
 ## Operator Identity And Mutation Boundary Checkpoint

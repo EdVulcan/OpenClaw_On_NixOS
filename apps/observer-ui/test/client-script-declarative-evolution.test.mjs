@@ -27,6 +27,7 @@ function createRendererContext() {
     declarativeEvolutionActivationRegistry: element(),
     declarativeEvolutionHealthGateStatus: element(),
     declarativeEvolutionHostHealthStatus: element(),
+    declarativeEvolutionHostHealthOracle: element(),
     declarativeEvolutionActivationReady: element(),
     declarativeEvolutionReviewJson: element(),
     declarativeEvolutionActivationTaskId: element(),
@@ -49,6 +50,7 @@ test("Observer exposes the declarative-evolution activation decision panel", () 
     "declarative-evolution-refresh-button",
     "declarative-evolution-decision-button",
     "declarative-evolution-activation-button",
+    "declarative-evolution-host-health-oracle",
     "declarative-evolution-review-json",
     "declarative-evolution-decision-json",
     "declarative-evolution-execution-json",
@@ -76,7 +78,12 @@ test("Observer renders a compact host-health-bound activation review", () => {
       stagedFileHash: "b".repeat(64),
       evaluatedClosurePath: "/nix/store/example-system",
     },
-    hostHealth: { status: "healthy", hostHealthHash: "c".repeat(64) },
+    hostHealth: {
+      status: "healthy",
+      hostHealthHash: "c".repeat(64),
+      registry: "openclaw-native-declarative-evolution-host-health-oracle-v0",
+      owner: "openclaw-core-host-health-oracle",
+    },
     activationReady: true,
     binding: {
       sourceStagingTaskId: "staging-task-1",
@@ -91,9 +98,11 @@ test("Observer renders a compact host-health-bound activation review", () => {
   assert.equal(context.declarativeEvolutionActivationRegistry.textContent, "openclaw-native-declarative-evolution-activation-decision-v0");
   assert.equal(context.declarativeEvolutionHealthGateStatus.textContent, "eligible_for_activation_review");
   assert.equal(context.declarativeEvolutionHostHealthStatus.textContent, "healthy");
+  assert.equal(context.declarativeEvolutionHostHealthOracle.textContent, "openclaw-core-host-health-oracle");
   assert.equal(context.declarativeEvolutionActivationReady.textContent, "true");
   assert.match(context.declarativeEvolutionReviewJson.textContent, /staging-task-1/u);
   assert.match(context.declarativeEvolutionReviewJson.textContent, /hostHealthHash/u);
+  assert.match(context.declarativeEvolutionReviewJson.textContent, /hostHealthOracle/u);
   assert.match(context.declarativeEvolutionReviewJson.textContent, /closureIntegrityReceiptHash/u);
   assert.doesNotMatch(context.declarativeEvolutionReviewJson.textContent, /services\.openclaw\.components/u);
 });

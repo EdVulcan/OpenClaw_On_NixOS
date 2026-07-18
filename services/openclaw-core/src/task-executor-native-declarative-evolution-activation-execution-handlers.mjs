@@ -72,6 +72,8 @@ function reviewMatchesBinding(review, expected) {
 
 function compactHealth(health) {
   return {
+    registry: health?.registry ?? null,
+    owner: health?.owner ?? null,
     status: health?.status ?? null,
     observedAt: health?.observedAt ?? null,
     hostHealthHash: health?.hostHealthHash ?? null,
@@ -80,6 +82,8 @@ function compactHealth(health) {
     degradedServiceCount: health?.degradedServiceCount ?? null,
     alertCount: health?.alertCount ?? null,
     networkOnline: health?.networkOnline ?? null,
+    failedChecks: Array.isArray(health?.failedChecks) ? health.failedChecks.slice(0, 16) : [],
+    authority: health?.authority ?? null,
   };
 }
 
@@ -317,7 +321,10 @@ export function createNativeDeclarativeEvolutionActivationTaskHandlers({
         executesRollback: false,
         automaticActivation: false,
         automaticRollback: false,
-        healthOracle: "openclaw-system-sense",
+        healthOracle: postActivationHealth?.registry ?? null,
+        healthOracleOwner: postActivationHealth?.owner ?? null,
+        activationAuthority: "openclaw-hostd",
+        rollbackAuthority: "deferred_manual_operator",
       },
     };
     task.nativeDeclarativeEvolution.execution = execution;

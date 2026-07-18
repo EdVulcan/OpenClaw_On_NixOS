@@ -1,17 +1,18 @@
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 
 import { createEventName } from "../../../packages/shared-events/src/event-factory.mjs";
 import {
   NATIVE_DECLARATIVE_EVOLUTION_STAGING_TASK_TYPE,
 } from "./native-declarative-evolution-task-builders.mjs";
+import {
+  createNativeDeclarativeEvolutionHostHealthOracle,
+} from "./native-declarative-evolution-host-health-oracle.mjs";
 
 export const NATIVE_DECLARATIVE_EVOLUTION_ACTIVATION_DECISION_REGISTRY = "openclaw-native-declarative-evolution-activation-decision-v0";
 export const NATIVE_DECLARATIVE_EVOLUTION_ACTIVATION_DECISION_CAPABILITY_ID = "act.openclaw.declarative_evolution.activation_decision";
 export const NATIVE_DECLARATIVE_EVOLUTION_ACTIVATION_DECISION_TASK_TYPE = "native_declarative_evolution_activation_decision";
 
 const MAX_TASK_ID_CHARS = 160;
-const MAX_SERVICE_STATES = 32;
-const MAX_ALERT_CODES = 32;
 const ACTIVATION_DECISIONS = new Set(["approve_activation_review", "reject_activation"]);
 
 function normaliseTaskId(value) {
@@ -28,10 +29,6 @@ function findTask(tasks, taskId) {
   if (tasks instanceof Map) return tasks.get(taskId) ?? null;
   if (Array.isArray(tasks)) return tasks.find((task) => task?.id === taskId) ?? null;
   return null;
-}
-
-function sha256Json(value) {
-  return createHash("sha256").update(JSON.stringify(value), "utf8").digest("hex");
 }
 
 function blockedReview(sourceTaskId, reason) {
@@ -55,56 +52,6 @@ function blockedReview(sourceTaskId, reason) {
       automaticRollback: false,
       networkEgress: false,
       candidateTextExposed: false,
-    },
-  };
-}
-
-function projectHostHealth(health, now) {
-  const system = health?.system && typeof health.system === "object" ? health.system : null;
-  const serviceEntries = Object.entries(system?.services ?? {})
-    .sort(([left], [right]) => left.localeCompare(right))
-    .slice(0, MAX_SERVICE_STATES);
-  const serviceStates = serviceEntries.map(([name, service]) => ({
-    name,
-    ok: service?.ok === true,
-    status: typeof service?.status === "string" ? service.status : null,
-  }));
-  const alertCodes = (Array.isArray(system?.alerts) ? system.alerts : [])
-    .map((alert) => typeof alert?.code === "string" ? alert.code : "unknown")
-    .slice(0, MAX_ALERT_CODES)
-    .sort();
-  const alertCount = Array.isArray(system?.alerts) ? system.alerts.length : 0;
-  const onlineServiceCount = serviceStates.filter((service) => service.ok).length;
-  const degradedServiceCount = serviceStates.length - onlineServiceCount;
-  const networkOnline = system?.network?.online === true;
-  const healthFingerprint = {
-    healthOk: health?.ok === true,
-    networkOnline,
-    serviceStates,
-    alertCodes,
-    alertCount,
-  };
-  const status = health?.ok !== true || !system
-    ? "unavailable"
-    : serviceStates.length === 0
-      ? "unknown"
-      : alertCount === 0 && degradedServiceCount === 0
-        ? "healthy"
-        : "degraded";
-
-  return {
-    status,
-    observedAt: system?.timestamp ?? now(),
-    serviceCount: serviceStates.length,
-    onlineServiceCount,
-    degradedServiceCount,
-    alertCount,
-    networkOnline,
-    hostHealthHash: sha256Json(healthFingerprint),
-    source: {
-      service: "openclaw-system-sense",
-      endpoint: "/system/health",
-      readOnly: true,
     },
   };
 }
@@ -163,17 +110,21 @@ export function createNativeDeclarativeEvolutionActivationDecisionBuilders({
   publishTaskApprovalIfPending,
   serialiseTask,
   serialisePlanForPublic,
+  hostHealthOracle = null,
   now = () => new Date().toISOString(),
 } = {}) {
+  const healthOracle = hostHealthOracle ?? createNativeDeclarativeEvolutionHostHealthOracle({
+    readHealth: async () => {
+      if (typeof fetchJson !== "function" || typeof systemSenseUrl !== "string" || !systemSenseUrl) {
+        throw new Error("Host health source is not configured.");
+      }
+      return fetchJson(`${systemSenseUrl}/system/health`);
+    },
+    now,
+  });
+
   async function readHostHealth() {
-    if (typeof fetchJson !== "function" || typeof systemSenseUrl !== "string" || !systemSenseUrl) {
-      return projectHostHealth({ ok: false }, now);
-    }
-    try {
-      return projectHostHealth(await fetchJson(`${systemSenseUrl}/system/health`), now);
-    } catch {
-      return projectHostHealth({ ok: false }, now);
-    }
+    return healthOracle.readHostHealth();
   }
 
   async function buildNativeDeclarativeEvolutionActivationDecisionReview({ taskId } = {}) {

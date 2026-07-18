@@ -19,6 +19,7 @@ export function observerDeclarativeEvolutionPanels() {
           <div class="metric"><span>Registry</span><span id="declarative-evolution-activation-registry">unknown</span></div>
           <div class="metric"><span>Health Gate</span><span id="declarative-evolution-health-gate-status">unknown</span></div>
           <div class="metric"><span>Host Health</span><span id="declarative-evolution-host-health-status">unknown</span></div>
+          <div class="metric"><span>Health Oracle</span><span id="declarative-evolution-host-health-oracle">unknown</span></div>
           <div class="metric"><span>Activation Ready</span><span id="declarative-evolution-activation-ready">false</span></div>
           <div class="metric"><span>Decision Task</span><span id="declarative-evolution-activation-task-id">none</span></div>
           <div class="metric"><span>Approval</span><span id="declarative-evolution-activation-approval-id">none</span></div>

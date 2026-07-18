@@ -9,6 +9,7 @@ export const observerClientDeclarativeEvolutionRenderersScript = `function rende
     ? (review.reason ?? "blocked")
     : healthGate.assessment ?? "unknown";
   declarativeEvolutionHostHealthStatus.textContent = hostHealth.status ?? "unknown";
+  declarativeEvolutionHostHealthOracle.textContent = hostHealth.owner ?? hostHealth.registry ?? "unknown";
   declarativeEvolutionActivationReady.textContent = String(review.activationReady === true);
   declarativeEvolutionReviewJson.textContent = JSON.stringify({
     ok: review.ok === true,
@@ -25,6 +26,9 @@ export const observerClientDeclarativeEvolutionRenderersScript = `function rende
     approvalRecordHash: binding.approvalRecordHash ?? healthGate.approvalRecordHash ?? null,
     hostHealthHash: binding.hostHealthHash ?? hostHealth.hostHealthHash ?? null,
     hostHealthStatus: hostHealth.status ?? null,
+    hostHealthOracle: hostHealth.registry ?? null,
+    hostHealthOracleOwner: hostHealth.owner ?? null,
+    authority: hostHealth.authority ?? null,
     activationReady: review.activationReady === true,
     next: review.next?.recommendedAction ?? null,
     governance: review.governance ?? null,

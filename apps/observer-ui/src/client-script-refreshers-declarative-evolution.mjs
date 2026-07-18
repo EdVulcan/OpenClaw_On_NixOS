@@ -2,6 +2,7 @@ export const observerClientDeclarativeEvolutionRefreshersScript = `function clea
   declarativeEvolutionActivationRegistry.textContent = "unknown";
   declarativeEvolutionHealthGateStatus.textContent = "not selected";
   declarativeEvolutionHostHealthStatus.textContent = "not selected";
+  declarativeEvolutionHostHealthOracle.textContent = "not selected";
   declarativeEvolutionActivationReady.textContent = "false";
   declarativeEvolutionReviewJson.textContent = message;
 }
@@ -23,6 +24,7 @@ async function refreshDeclarativeEvolutionActivationDecision() {
   } catch (error) {
     declarativeEvolutionHealthGateStatus.textContent = "offline";
     declarativeEvolutionHostHealthStatus.textContent = "unknown";
+    declarativeEvolutionHostHealthOracle.textContent = "unknown";
     declarativeEvolutionActivationReady.textContent = "false";
     declarativeEvolutionReviewJson.textContent = \`Unable to read the activation decision review: \${formatError(error)}\`;
   }

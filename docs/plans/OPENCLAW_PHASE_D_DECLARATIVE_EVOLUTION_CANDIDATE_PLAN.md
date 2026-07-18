@@ -134,6 +134,7 @@ services/openclaw-core/src/capability-runtime-declarative-evolution.mjs
 services/openclaw-core/src/native-declarative-evolution-execution.mjs
 services/openclaw-core/src/native-declarative-evolution-closure-integrity.mjs
 services/openclaw-core/src/native-declarative-evolution-health-gate.mjs
+services/openclaw-core/src/native-declarative-evolution-host-health-oracle.mjs
 services/openclaw-core/src/native-declarative-evolution-paths.mjs
 services/openclaw-core/src/native-declarative-evolution-task-builders.mjs
 services/openclaw-core/src/native-declarative-evolution-task-routes.mjs
@@ -186,8 +187,13 @@ switch, activation, or rollback is performed.
 ## Next Real Slice
 
 The closure-integrity receipt contract, positive real-output materialization
-proof, and fail-closed daily lane are complete. The next mainline slice is an
-independent host-health oracle followed by separate activation, health, and
-rollback authorities. Until those owners are isolated, managed-config
+proof, and fail-closed daily lane are complete. The Core-owned
+`openclaw-native-declarative-evolution-host-health-oracle-v0` now independently
+evaluates fresh bounded system-sense facts and emits the authority split used
+by the activation decision and post-action readback: health is owned by the
+oracle, activation by fixed `openclaw-hostd`, and rollback by a manual operator.
+This is an independent decision module, not a separate privileged daemon.
+The next mainline slice is a NixOS-VM-only activation/health-failure rehearsal
+with manual rollback evidence. Until that rehearsal is complete, managed-config
 installation, `nixos-rebuild`, generation switching, and physical rollback
-remain deferred.
+remain deferred on the development host.

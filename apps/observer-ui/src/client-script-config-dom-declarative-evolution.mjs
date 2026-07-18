@@ -4,6 +4,7 @@ const declarativeEvolutionDecision = document.querySelector("#declarative-evolut
 const declarativeEvolutionActivationRegistry = document.querySelector("#declarative-evolution-activation-registry");
 const declarativeEvolutionHealthGateStatus = document.querySelector("#declarative-evolution-health-gate-status");
 const declarativeEvolutionHostHealthStatus = document.querySelector("#declarative-evolution-host-health-status");
+const declarativeEvolutionHostHealthOracle = document.querySelector("#declarative-evolution-host-health-oracle");
 const declarativeEvolutionActivationReady = document.querySelector("#declarative-evolution-activation-ready");
 const declarativeEvolutionActivationTaskId = document.querySelector("#declarative-evolution-activation-task-id");
 const declarativeEvolutionActivationApprovalId = document.querySelector("#declarative-evolution-activation-approval-id");

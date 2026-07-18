@@ -63,7 +63,7 @@ function createHarness({ health = null } = {}) {
       return health ?? {
         ok: true,
         system: {
-          timestamp: "2026-07-17T00:00:00.000Z",
+          timestamp: "2026-07-17T00:00:30.000Z",
           services: {
             core: { ok: true, status: "healthy" },
             systemSense: { ok: true, status: "healthy" },
@@ -98,7 +98,7 @@ function createHarness({ health = null } = {}) {
     publishTaskApprovalIfPending: async () => {},
     serialiseTask: (task) => task,
     serialisePlanForPublic: (plan) => plan,
-    now: () => "2026-07-17T00:01:00.000Z",
+    now: () => "2026-07-17T00:00:31.000Z",
   });
   return { builders, tasks, events, calls, sourceTask };
 }
@@ -128,7 +128,7 @@ test("activation decision blocks approval creation when host health is degraded"
     health: {
       ok: true,
       system: {
-        timestamp: "2026-07-17T00:00:00.000Z",
+        timestamp: "2026-07-17T00:00:30.000Z",
         services: { core: { ok: false, status: "failed" } },
         alerts: [{ code: "service.offline" }],
         network: { online: true },

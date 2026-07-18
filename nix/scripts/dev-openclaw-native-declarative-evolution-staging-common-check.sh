@@ -139,6 +139,7 @@ for (const token of [
   "declarative-evolution-source-task-id",
   "declarative-evolution-refresh-button",
   "declarative-evolution-decision-button",
+  "declarative-evolution-host-health-oracle",
 ]) {
   if (!html.includes(token)) throw new Error(`Observer HTML missing generic capability token: ${token}`);
 }
@@ -150,6 +151,7 @@ for (const token of [
   "refreshCapabilityHistory",
   "refreshDeclarativeEvolutionActivationDecision",
   "renderDeclarativeEvolutionActivationReview",
+  "declarativeEvolutionHostHealthOracle",
   "/plugins/native-adapter/declarative-evolution/activation-decisions",
 ]) {
   if (!client.includes(token)) throw new Error(`Observer client missing generic capability token: ${token}`);
@@ -567,6 +569,11 @@ const activationChecks = {
     && activationReview.activationReady === true
     && activationReview.healthGate?.assessment === "eligible_for_activation_review"
     && activationReview.hostHealth?.status === "healthy"
+    && activationReview.hostHealth?.registry === "openclaw-native-declarative-evolution-host-health-oracle-v0"
+    && activationReview.hostHealth?.owner === "openclaw-core-host-health-oracle"
+    && activationReview.hostHealth?.authority?.activation?.owner === "openclaw-hostd"
+    && activationReview.hostHealth?.authority?.rollback?.owner === "deferred_manual_operator"
+    && activationReview.hostHealth?.authority?.rollback?.automatic === false
     && activationReview.binding?.candidateHash === candidateHash
     && activationReview.binding?.sourceStagingTaskId === taskId
     && activationReview.binding?.derivationPath === healthGate.result.evaluatedClosure.derivationPath
@@ -603,6 +610,10 @@ const activationChecks = {
     && activationExecution?.narHash === activationReview.binding?.narHash
     && activationExecution?.hostHealthHash === activationReview.binding?.hostHealthHash
     && activationExecution?.hostHealthStatus === "healthy"
+    && activationExecution?.governance?.healthOracle === "openclaw-native-declarative-evolution-host-health-oracle-v0"
+    && activationExecution?.governance?.healthOracleOwner === "openclaw-core-host-health-oracle"
+    && activationExecution?.governance?.activationAuthority === "openclaw-hostd"
+    && activationExecution?.governance?.rollbackAuthority === "deferred_manual_operator"
     && activationTask?.nativeDeclarativeEvolution?.governance?.hostHealthRevalidated === true,
   zeroActivation: activationExecution?.governance?.writesManagedConfig === false
     && activationExecution?.governance?.switchesGeneration === false
