@@ -1,8 +1,7 @@
 import http from "node:http";
 import { randomUUID } from "node:crypto";
-import fs from "node:fs";
-import { promises as fsPromises } from "node:fs";
 import path from "node:path";
+import { createAuditLogStore } from "./audit-log-store.mjs";
 import { createEventIngress } from "./event-ingress.mjs";
 
 const host = process.env.OPENCLAW_EVENT_HUB_HOST ?? "127.0.0.1";
@@ -13,6 +12,12 @@ const auditLogFile =
   process.env.OPENCLAW_EVENT_LOG_FILE
   ?? (bodyStateDir ? path.join(bodyStateDir, "openclaw-events.jsonl") : path.resolve(".artifacts", "openclaw-events.jsonl"));
 const maxAuditQueryLimit = Number.parseInt(process.env.OPENCLAW_EVENT_AUDIT_MAX_LIMIT ?? "1000", 10);
+const auditLogStore = createAuditLogStore({
+  filePath: auditLogFile,
+  maxQueryLimit: maxAuditQueryLimit,
+  maxSegmentBytes: process.env.OPENCLAW_EVENT_AUDIT_MAX_SEGMENT_BYTES,
+  maxRotatedSegments: process.env.OPENCLAW_EVENT_AUDIT_MAX_ROTATED_SEGMENTS,
+});
 const eventIngress = createEventIngress({
   token: process.env.OPENCLAW_EVENT_HUB_TOKEN,
   tokenMapFilePath: process.env.OPENCLAW_EVENT_HUB_TOKEN_MAP_FILE,
@@ -27,124 +32,16 @@ const serviceRegistry = new Map();
 import { corsHeaders, sendJson, readJsonBody } from "../../../packages/shared-utils/src/http.mjs";
 
 
-// M-6 Fix: Converted from sync I/O (mkdirSync, existsSync, writeFileSync) to
-// async fs.promises API to avoid blocking the event loop during audit setup.
-let auditLogReady = false;
-let auditLogReadyPromise = null;
-async function ensureAuditLogReady() {
-  if (auditLogReady) return;
-  if (!auditLogReadyPromise) {
-    auditLogReadyPromise = (async () => {
-      await fs.promises.mkdir(path.dirname(auditLogFile), { recursive: true });
-      try {
-        await fs.promises.access(auditLogFile);
-      } catch {
-        await fs.promises.writeFile(auditLogFile, "", "utf8");
-      }
-      auditLogReady = true;
-    })();
-  }
-  try {
-    await auditLogReadyPromise;
-  } catch (error) {
-    auditLogReadyPromise = null;
-    throw error;
-  }
-}
-
-function safeParseAuditLine(line) {
-  if (!line.trim()) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(line);
-    if (!parsed || typeof parsed !== "object" || typeof parsed.type !== "string") {
-      return null;
-    }
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-// H-3 Fix: Async file read to avoid blocking the event loop on large log files.
 async function readAuditEvents({ type = null, source = null, limit = 100 } = {}) {
-  await ensureAuditLogReady();
-  const safeLimit = Math.max(1, Math.min(limit, maxAuditQueryLimit));
-  const text = await fsPromises.readFile(auditLogFile, "utf8");
-  const items = [];
-
-  for (const line of text.split(/\r?\n/)) {
-    const event = safeParseAuditLine(line);
-    if (!event) {
-      continue;
-    }
-    if (type && event.type !== type) {
-      continue;
-    }
-    if (source && event.source !== source) {
-      continue;
-    }
-    items.push(event);
-  }
-
-  return items.slice(-safeLimit);
+  return auditLogStore.readEvents({ type, source, limit });
 }
 
-// H-3 Fix: Async file read to avoid blocking the event loop on large log files.
 async function buildAuditSummary() {
-  await ensureAuditLogReady();
-  const text = await fsPromises.readFile(auditLogFile, "utf8");
-  const byType = {};
-  const bySource = {};
-  let total = 0;
-  let malformed = 0;
-  let earliestTimestamp = null;
-  let latestTimestamp = null;
-
-  for (const line of text.split(/\r?\n/)) {
-    if (!line.trim()) {
-      continue;
-    }
-
-    const event = safeParseAuditLine(line);
-    if (!event) {
-      malformed += 1;
-      continue;
-    }
-
-    total += 1;
-    byType[event.type] = (byType[event.type] ?? 0) + 1;
-    bySource[event.source] = (bySource[event.source] ?? 0) + 1;
-
-    if (typeof event.timestamp === "string" && event.timestamp) {
-      earliestTimestamp = earliestTimestamp ?? event.timestamp;
-      // M-2 Fix: Compare timestamps lexicographically instead of always taking
-      // the last one, so that out-of-order entries don't produce a wrong result.
-      latestTimestamp = latestTimestamp === null || event.timestamp > latestTimestamp
-        ? event.timestamp
-        : latestTimestamp;
-    }
-  }
-
-  return {
-    logFile: auditLogFile,
-    total,
-    malformed,
-    byType,
-    bySource,
-    earliestTimestamp,
-    latestTimestamp,
-    recentEventCount: recentEvents.length,
-    maxQueryLimit: maxAuditQueryLimit,
-  };
+  return auditLogStore.buildSummary({ recentEventCount: recentEvents.length });
 }
 
-// H-3 Fix: Async append to avoid blocking the event loop during log writes.
 async function appendAuditEvent(event) {
-  await ensureAuditLogReady();
-  await fsPromises.appendFile(auditLogFile, `${JSON.stringify(event)}\n`, "utf8");
+  await auditLogStore.append(event);
 }
 
 // H-3 Fix: Now async since readAuditEvents is async.
@@ -243,6 +140,7 @@ const server = http.createServer(async (req, res) => {
       recentEventCount: recentEvents.length,
       streamClientCount: streamClients.size,
       auditLogFile,
+      auditRetention: auditLogStore.retentionPolicy(),
     });
     return;
   }
@@ -307,7 +205,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 async function startEventHub() {
-  await ensureAuditLogReady();
+  await auditLogStore.ensureReady();
   await hydrateRecentEventsFromAuditLog();
   server.listen(port, host, () => {
     console.log(`openclaw-event-hub listening on http://${host}:${port}`);

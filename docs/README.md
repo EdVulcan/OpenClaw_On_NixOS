@@ -13,10 +13,11 @@ paragraph. Reconcile this baseline with the repository and live host first.
 
 | Layer | Evidence at this checkpoint | Status |
 | --- | --- | --- |
-| Capability source | `1be83c4d` through bounded systemd journal evidence | Implemented and pushed |
-| Local validation | Workspace tests and typecheck pass; 811 registry entries pass; Windows path budget passes | Validated |
+| Capability source | Current `main` through bounded systemd journal evidence and bounded Event Hub audit storage | Implemented; commit history is authoritative |
+| Local validation | 807 workspace tests and typecheck pass; body-config and event-audit integration pass; 811 registry entries pass | Validated |
 | Installed system | NixOS `26.05.4808.569d57850992`, generation `/nix/store/735kfj8knq1nn092hq4z57sjlc9di3q5-nixos-system-nixos-26.05.4808.569d57850992` | Running but behind the capability source |
 | Deployed journal probe | `/system/systemd/journal-evidence` returns `404`; `openclaw-system-sense` has no `systemd-journal` supplementary group | Not deployed |
+| Deployed audit store | Installed Event Hub predates streaming tail reads, cached summaries, and rotation | Not deployed |
 | Privileged actions | Real hostd activation, generation switch, and rollback | Deferred unless a separate mutation environment is explicitly authorized |
 
 The current checkout is on the only available physical host
@@ -62,10 +63,13 @@ mutation environment. Level 4 graphics-stack ownership remains future work.
 
 ## Active Route
 
-The immediate engineering blocker is the Event Hub development audit log. The
-default log has grown to hundreds of MiB while audit query and summary paths
-still read and split the whole file. Close that memory-risk boundary with a
-bounded streaming/index/retention design before expanding another capability.
+The Event Hub development-log blocker is closed in validated source. Tail
+queries read fixed-size blocks newest-first, summaries stream once and then
+update incrementally, writes rotate at 64 MiB, and eight rotated segments are
+retained by default. A legacy oversized segment is preserved on first rotation
+instead of being silently truncated. Against the current 438 MiB development
+log, a 200-event tail query took about 41 ms and the first full summary about
+1.9 s with roughly 20 MiB heap; a cached repeat took 0 ms.
 
 The next real Level 3 capability is one cohesive incident loop:
 

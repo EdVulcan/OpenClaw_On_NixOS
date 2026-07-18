@@ -13,14 +13,18 @@ export OPENCLAW_SCREEN_ACT_PORT="${OPENCLAW_SCREEN_ACT_PORT:-6305}"
 export OPENCLAW_SYSTEM_SENSE_PORT="${OPENCLAW_SYSTEM_SENSE_PORT:-6306}"
 export OPENCLAW_SYSTEM_HEAL_PORT="${OPENCLAW_SYSTEM_HEAL_PORT:-6307}"
 export OBSERVER_UI_PORT="${OBSERVER_UI_PORT:-6370}"
+export OPENCLAW_DEV_RUN_ID="${OPENCLAW_DEV_RUN_ID:-event-audit-$$}"
 export OPENCLAW_CORE_STATE_FILE="${OPENCLAW_CORE_STATE_FILE:-$REPO_ROOT/.artifacts/openclaw-core-event-audit-check.json}"
 export OPENCLAW_EVENT_LOG_FILE="${OPENCLAW_EVENT_LOG_FILE:-$REPO_ROOT/.artifacts/openclaw-event-audit-check.jsonl}"
+export OPENCLAW_EVENT_HUB_CREDENTIAL_DIR="${OPENCLAW_EVENT_HUB_CREDENTIAL_DIR:-$REPO_ROOT/.artifacts/openclaw-event-hub-credentials-$OPENCLAW_DEV_RUN_ID}"
 
 EVENT_HUB_URL="http://127.0.0.1:$OPENCLAW_EVENT_HUB_PORT"
 OBSERVER_URL="http://127.0.0.1:$OBSERVER_UI_PORT"
+EVENT_SOURCE="openclaw-event-hub"
+EVENT_TOKEN_FILE="$OPENCLAW_EVENT_HUB_CREDENTIAL_DIR/$EVENT_SOURCE"
 
 "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
-rm -f "$OPENCLAW_CORE_STATE_FILE" "$OPENCLAW_CORE_STATE_FILE.tmp" "$OPENCLAW_EVENT_LOG_FILE"
+rm -f "$OPENCLAW_CORE_STATE_FILE" "$OPENCLAW_CORE_STATE_FILE.tmp" "$OPENCLAW_EVENT_LOG_FILE" "$OPENCLAW_EVENT_LOG_FILE".*
 
 cleanup() {
   rm -f "${HTML_FILE:-}" "${CLIENT_FILE:-}" "${BODY_FILE:-}"
@@ -30,9 +34,16 @@ trap cleanup EXIT
 
 post_event() {
   local body="$1"
+  local token
+  token="$(tr -d '\r\n' < "$EVENT_TOKEN_FILE")"
   BODY_FILE="$(mktemp)"
   printf '%s' "$body" > "$BODY_FILE"
-  curl --silent --fail -X POST "$EVENT_HUB_URL/events" -H 'content-type: application/json' --data-binary "@$BODY_FILE" >/dev/null
+  curl --silent --fail -X POST "$EVENT_HUB_URL/events" \
+    -H 'content-type: application/json' \
+    -H "authorization: Bearer $token" \
+    -H "x-openclaw-event-source: $EVENT_SOURCE" \
+    -H "x-openclaw-service-caller: $EVENT_SOURCE" \
+    --data-binary "@$BODY_FILE" >/dev/null
   rm -f "$BODY_FILE"
   BODY_FILE=""
 }
@@ -61,14 +72,14 @@ for (const token of ["/events/audit/summary", "refreshAuditState"]) {
 }
 EOF
 
-post_event '{"type":"task.created","source":"event-audit-check","payload":{"taskId":"audit-task-1","goal":"audit ledger check"}}'
-post_event '{"type":"task.completed","source":"event-audit-check","payload":{"taskId":"audit-task-1","status":"completed"}}'
-post_event '{"type":"policy.evaluated","source":"event-audit-check","payload":{"domain":"cross_boundary","decision":"require_approval"}}'
-post_event '{"type":"system.updated","source":"event-audit-check","payload":{"alerts":0}}'
-post_event '{"type":"heal.completed","source":"event-audit-check","payload":{"action":"restart-service","service":"browserRuntime"}}'
+post_event '{"type":"task.created","source":"forged-source","payload":{"taskId":"audit-task-1","goal":"audit ledger check"}}'
+post_event '{"type":"task.completed","source":"forged-source","payload":{"taskId":"audit-task-1","status":"completed"}}'
+post_event '{"type":"policy.evaluated","source":"forged-source","payload":{"domain":"cross_boundary","decision":"require_approval"}}'
+post_event '{"type":"system.updated","source":"forged-source","payload":{"alerts":0}}'
+post_event '{"type":"heal.completed","source":"forged-source","payload":{"action":"restart-service","service":"browserRuntime"}}'
 
-audit_all="$(curl --silent --fail "$EVENT_HUB_URL/events/audit?source=event-audit-check&limit=5")"
-audit_policy="$(curl --silent --fail "$EVENT_HUB_URL/events/audit?type=policy.evaluated&source=event-audit-check&limit=10")"
+audit_all="$(curl --silent --fail "$EVENT_HUB_URL/events/audit?source=$EVENT_SOURCE&limit=5")"
+audit_policy="$(curl --silent --fail "$EVENT_HUB_URL/events/audit?type=policy.evaluated&source=$EVENT_SOURCE&limit=10")"
 audit_summary="$(curl --silent --fail "$EVENT_HUB_URL/events/audit/summary")"
 
 node - <<'EOF' "$OPENCLAW_EVENT_LOG_FILE" "$audit_all" "$audit_policy" "$audit_summary"
@@ -105,7 +116,7 @@ for (const type of ["task.created", "task.completed", "policy.evaluated", "syste
     throw new Error(`Audit summary missing type ${type}`);
   }
 }
-if (auditSummary.audit.bySource?.["event-audit-check"] !== 5) {
+if (auditSummary.audit.bySource?.["openclaw-event-hub"] !== 5) {
   throw new Error("Audit summary should group the synthetic check source.");
 }
 EOF
@@ -113,7 +124,7 @@ EOF
 "$SCRIPT_DIR/dev-down.sh" >/dev/null 2>&1 || true
 "$SCRIPT_DIR/dev-up.sh" >/dev/null
 
-restored_policy="$(curl --silent --fail "$EVENT_HUB_URL/events/audit?type=policy.evaluated&source=event-audit-check&limit=10")"
+restored_policy="$(curl --silent --fail "$EVENT_HUB_URL/events/audit?type=policy.evaluated&source=$EVENT_SOURCE&limit=10")"
 restored_summary="$(curl --silent --fail "$EVENT_HUB_URL/events/audit/summary")"
 
 node - <<'EOF' "$restored_policy" "$restored_summary" "$OPENCLAW_EVENT_LOG_FILE"

@@ -44,10 +44,11 @@ The risk is local drift:
 
 ## Current Validated Frontier
 
-The capability baseline through `1be83c4d` is pushed and locally validated.
-Workspace tests and typecheck pass, the 811-entry milestone registry audit
-passes, and the Windows path budget has no file over 160 repository-relative
-characters.
+The current capability baseline includes bounded journal evidence and the
+bounded Event Hub audit store. All 807 workspace tests and typecheck pass, the
+body-config and event-audit integration checks pass, the 811-entry milestone
+registry audit passes, and the Windows path budget has no file over 160
+repository-relative characters.
 
 The running physical-host generation is older than that capability baseline.
 Its services are healthy, but the new systemd journal-evidence endpoint returns
@@ -57,10 +58,11 @@ validated, not deployed. Do not run `nixos-rebuild switch`, real hostd
 activation, generation rollback, or other privileged mutation without a
 separately authorized mutation environment.
 
-The immediate maintenance blocker is bounded Event Hub audit-log memory use.
-The next real Level 3 capability is the post-repair diagnosis loop defined under
-`Completed Level 3 Bounded Journal Evidence`; do not select work from an older
-phase number or historical `Next Slice` paragraph.
+The Event Hub audit-log blocker is closed in source through reverse bounded tail
+reads, streaming cached summaries, serialized rotation, and a fixed retained
+segment policy. The next real Level 3 capability is the post-repair diagnosis
+loop defined under `Completed Level 3 Bounded Journal Evidence`; do not select
+work from an older phase number or historical `Next Slice` paragraph.
 
 ## Governing Vision
 
@@ -1517,11 +1519,12 @@ body health + bounded journal evidence
 -> task and Observer evidence
 ```
 
-Before that feature slice, remove the measured Event Hub development-log memory
-hazard: audit query and summary must not read and split a hundreds-of-MiB log as
-one string. This is a blocking correction, not a new capability phase. The
-incident loop must not add arbitrary journal queries, arbitrary systemd units,
-automatic restart, or a new provider contract.
+The measured Event Hub development-log memory hazard is now closed. The
+production store has no whole-file `readFile` path, retains fixed 64 MiB
+segments, preserves an oversized legacy segment on first rotation, and caches a
+streamed summary for Observer refreshes. The incident loop must not add
+arbitrary journal queries, arbitrary systemd units, automatic restart, or a new
+provider contract.
 
 ## Operator Identity And Mutation Boundary Checkpoint
 
