@@ -7,6 +7,7 @@ import { observerClientEngineeringMicrocompactRenderersScript } from "./client-s
 import { observerClientEngineeringPlanTodoRenderersScript } from "./client-script-renderers-engineering-plan-todo.mjs";
 import { observerClientEngineeringRecoveryRenderersScript } from "./client-script-renderers-engineering-recovery.mjs";
 import { observerClientEngineeringVerificationRenderersScript } from "./client-script-renderers-engineering-verification.mjs";
+import { observerClientEngineeringVerificationFollowupRenderersScript } from "./client-script-renderers-engineering-verification-followup.mjs";
 import { observerClientNativeRuntimeRefreshRenderersScript } from "./client-script-renderers-native-runtime-refresh.mjs";
 import { observerClientAcpxCodexBridgeRenderersScript } from "./client-script-renderers-acpx-codex-bridge.mjs";
 import { observerClientEngineeringContextRenderersScript } from "./client-script-renderers-engineering-context.mjs";
@@ -373,7 +374,7 @@ function renderFilesystemReadLedger(data) {
   ].join("\\n");
 }
 
-${observerClientWorkspaceSourceRenderersScript}${observerClientEngineeringEditRenderersScript}${observerClientEngineeringWriteRenderersScript}${observerClientEngineeringWriteExecutionRenderersScript}${observerClientEngineeringLspRenderersScript}${observerClientEngineeringVerificationRenderersScript}${observerClientEngineeringRecoveryRenderersScript}${observerClientEngineeringMicrocompactRenderersScript}${observerClientEngineeringPlanTodoRenderersScript}${observerClientEngineeringContextRenderersScript}${observerClientEngineeringProviderHandoffRenderersScript}${observerClientNativeRuntimeRefreshRenderersScript}${observerClientAcpxCodexBridgeRenderersScript}${observerClientDeclarativeEvolutionRenderersScript}function renderNativePluginContract(data) {
+${observerClientWorkspaceSourceRenderersScript}${observerClientEngineeringEditRenderersScript}${observerClientEngineeringWriteRenderersScript}${observerClientEngineeringWriteExecutionRenderersScript}${observerClientEngineeringLspRenderersScript}${observerClientEngineeringVerificationRenderersScript}${observerClientEngineeringVerificationFollowupRenderersScript}${observerClientEngineeringRecoveryRenderersScript}${observerClientEngineeringMicrocompactRenderersScript}${observerClientEngineeringPlanTodoRenderersScript}${observerClientEngineeringContextRenderersScript}${observerClientEngineeringProviderHandoffRenderersScript}${observerClientNativeRuntimeRefreshRenderersScript}${observerClientAcpxCodexBridgeRenderersScript}${observerClientDeclarativeEvolutionRenderersScript}function renderNativePluginContract(data) {
   const summary = data?.summary ?? {};
   const contract = data?.contract ?? {};
   const governance = summary.governance ?? contract.governance ?? {};

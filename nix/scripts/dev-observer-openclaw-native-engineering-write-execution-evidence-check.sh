@@ -22,6 +22,9 @@ export OPENCLAW_SYSTEM_HEAL_PORT="${OPENCLAW_SYSTEM_HEAL_PORT:-10387}"
 export OBSERVER_UI_PORT="${OBSERVER_UI_PORT:-10388}"
 export OPENCLAW_WORKSPACE_ROOTS="$WORKSPACE_DIR"
 export OPENCLAW_SYSTEM_ALLOWED_ROOTS="$WORKSPACE_DIR"
+export OPENCLAW_AUTONOMY_MODE="${OPENCLAW_AUTONOMY_MODE:-sovereign_body}"
+export OPENCLAW_SYSTEM_COMMAND_ALLOWLIST="${OPENCLAW_SYSTEM_COMMAND_ALLOWLIST:-npm}"
+export OPENCLAW_SYSTEM_COMMAND_TIMEOUT_MS="${OPENCLAW_SYSTEM_COMMAND_TIMEOUT_MS:-15000}"
 export OPENCLAW_CORE_STATE_FILE="${OPENCLAW_CORE_STATE_FILE:-$REPO_ROOT/.artifacts/openclaw-core-observer-engineering-write-execution-evidence-check.json}"
 export OPENCLAW_EVENT_LOG_FILE="${OPENCLAW_EVENT_LOG_FILE:-$REPO_ROOT/.artifacts/observer-engineering-write-execution-evidence-check-events.jsonl}"
 
@@ -32,6 +35,7 @@ OBSERVER_URL="http://127.0.0.1:$OBSERVER_UI_PORT"
 rm -rf "$FIXTURE_DIR"
 mkdir -p "$FIXTURE_DIR"
 prepare_engineering_read_search_fixture "$WORKSPACE_DIR" "OBSERVER_ENGINEERING_WRITE_EXECUTION_EVIDENCE"
+printf '%s\n' '{"name":"observer-engineering-write-execution-fixture","private":true,"scripts":{"typecheck":"test -f src/observer-write-execution.txt && grep -q OBSERVER_ENGINEERING_WRITE_EXECUTION src/observer-write-execution.txt && printf observer-engineering-verification-followup-ok"}}' > "$WORKSPACE_DIR/package.json"
 rm -f "$OPENCLAW_CORE_STATE_FILE" "$OPENCLAW_CORE_STATE_FILE.tmp" "$OPENCLAW_EVENT_LOG_FILE"
 
 cleanup() {
@@ -118,6 +122,11 @@ for (const token of [
   "engineering-write-execution-proposal",
   "engineering-write-execution-mutation",
   "engineering-write-execution-json",
+  "Verification Follow-up",
+  "engineering-loop-state-followup",
+  "engineering-loop-state-followup-source",
+  "engineering-loop-state-followup-binding",
+  "engineering-loop-state-followup-execution",
 ]) {
   if (!html.includes(token)) {
     throw new Error(`Observer HTML missing engineering write execution token: ${token}`);
@@ -130,6 +139,9 @@ for (const token of [
   "Native engineering write execution evidence",
   "sense.openclaw.engineering_tool.write_execution_evidence",
   "approved-workspace-text-write-execution-evidence",
+  "renderEngineeringVerificationFollowupReadback",
+  "formatEngineeringVerificationFollowupLines",
+  "Sovereign Verification Follow-up",
 ]) {
   if (!client.includes(token)) {
     throw new Error(`Observer client missing engineering write execution token: ${token}`);
@@ -140,6 +152,20 @@ if (client.includes("observerConfig.coreUrl}/plugins/native-adapter/engineering-
 }
 if (!fs.existsSync(targetFile) || fs.readFileSync(targetFile, "utf8") !== secret) {
   throw new Error("observer approved engineering write did not create the expected file content");
+}
+const followup = step.task?.outcome?.details?.verificationFollowup;
+if (
+  process.env.OPENCLAW_AUTONOMY_MODE === "sovereign_body"
+  && (
+    followup?.triggered !== true
+    || followup?.executed !== true
+    || followup?.ok !== true
+    || followup?.sourceTaskId !== step.task?.id
+    || followup?.scriptName !== "typecheck"
+    || followup?.verificationTask?.status !== "completed"
+  )
+) {
+  throw new Error(`Observer sovereign verification follow-up mismatch: ${JSON.stringify(followup)}`);
 }
 if (
   !evidence.ok

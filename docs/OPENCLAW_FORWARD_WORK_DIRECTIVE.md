@@ -1,6 +1,6 @@
 # NixSoma Forward Work Directive
 
-Updated: 2026-07-17
+Updated: 2026-07-18
 
 This is the active guidance document for continuing NixSoma development after
 the Phase 136 checkpoint and the discovery that the locally optimized
@@ -242,6 +242,15 @@ reruns, provider calls, network egress, and host/system mutation remain outside
 this standing authorization. A lookup, creation, or execution failure is
 recorded as compact follow-up evidence and does not rewrite the completed
 mutation result.
+
+The completed Sovereign follow-up is now visible in the existing Observer
+Engineering Loop State and Task History readback. Observer shows the source
+task, mutation-binding status, validation task/status, autonomy mode, and
+pass/fail result from `task.outcome.details.verificationFollowup`; it does not
+create a route, approval, task, command, retry, or mutation. This closes the
+operator visibility gap for the bounded write-validation loop. Do not add
+another verification/readiness mirror; select the next concrete capability from
+the active identity route.
 
 The first Hermes-inspired experience-memory slice is now also implemented. Core
 records a bounded advisory lesson automatically at task completion or failure,

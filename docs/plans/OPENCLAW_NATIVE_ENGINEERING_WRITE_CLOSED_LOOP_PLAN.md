@@ -39,6 +39,8 @@ checks recovery readback reports no failures for the successful verification
 in `guardian`, keeps verification approval-gated
 in `sovereign_body`, creates and executes at most one bound low-risk validation
   follow-up after the completed mutation
+renders the completed follow-up in the existing Observer Engineering Loop State
+and Task History without a new route or execution owner
 ```
 
 No new endpoint, provider egress, credential read, root daemon, or hidden
@@ -117,6 +119,11 @@ services/openclaw-core/test/task-executor-verification-followup.test.mjs
 The real check runs both `guardian` and `sovereign_body` branches through the
 same user-space service lifecycle.
 
+The Observer readback follow-up is now also closed. It reads the existing task
+outcome and displays the source task, mutation-hash binding status, validation
+task, autonomy mode, and result. It adds no command, approval, retry, recovery,
+provider, or workspace authority.
+
 ## Next Slice
 
 The operator ergonomics follow-up was completed as:
@@ -125,7 +132,7 @@ The operator ergonomics follow-up was completed as:
 OPENCLAW_NATIVE_ENGINEERING_LOOP_OPERATOR_CONTROLS_PLAN.md
 ```
 
-The next highest-density capability slice is `Native governed engineering loop
-parameterized workbench inputs`, so the Observer controls can use
-operator-selected bounded edit/write/verification values while preserving
-approval.
+The parameterized workbench-input slice is already implemented. The Observer
+follow-up readback is also complete; select the next real capability from the
+active forward-work directive instead of extending this loop with another
+readiness or mirror surface.

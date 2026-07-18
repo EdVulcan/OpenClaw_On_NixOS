@@ -53,6 +53,33 @@ egress, or mutates the host. Follow-up lookup/creation/execution failure is
 attached as compact source-task evidence and does not change a completed write
 to a different result.
 
+## Observer Follow-up Readback
+
+The existing Observer Engineering Loop State and Task History now render the
+bounded follow-up from `task.outcome.details.verificationFollowup`. The readback
+shows only compact metadata:
+
+```text
+follow-up status
+source task id
+source-task and mutation-hash binding status
+validation proposal/task status
+execution result and autonomy mode
+```
+
+The renderer is read-only. It does not fetch a new endpoint, create a task or
+approval, execute a command, retry validation, mutate the workspace, call a
+provider, or expose write content. The task summary and Engineering Loop State
+reuse the existing task read model.
+
+Focused Observer evidence includes:
+
+```text
+apps/observer-ui/src/client-script-renderers-engineering-verification-followup.mjs
+apps/observer-ui/test/client-script-engineering-verification-followup.test.mjs
+nix/scripts/dev-observer-openclaw-native-engineering-write-execution-evidence-check.sh
+```
+
 ## Governance
 
 ```text
@@ -112,7 +139,8 @@ automatic verification and no verification approval.
 
 ## Next Smallest Capability
 
-The common Level 1 verification entry-point gap is closed. Do not add another
-verification/readiness wrapper; continue with the smallest concrete Level 2
-trusted work-view/session-helper capability while preserving local workspace,
-provider, root, and desktop-wide capture boundaries.
+The common Level 1 verification entry-point and its bounded write follow-up
+readback are closed. Do not add another verification/readiness wrapper; return
+to the active directive and identity route for the next concrete capability
+while preserving local workspace, provider, root, and desktop-wide capture
+boundaries.

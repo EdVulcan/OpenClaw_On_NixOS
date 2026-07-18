@@ -1,6 +1,6 @@
 # OpenClaw Native Engineering Loop Parameterized Inputs Plan
 
-Updated: 2026-07-09
+Updated: 2026-07-18
 
 ## Active Slice
 
@@ -38,6 +38,13 @@ POST /plugins/native-adapter/source-command-proposals/tasks
 Client-side limits are ergonomic guardrails only. Core bounded workspace
 builders, proposal validation, approval policy, filesystem ledgering, and
 verification/recovery evidence remain the authoritative controls.
+
+The completed-outcome follow-up is also closed in the existing read models.
+Observer Task History and Engineering Loop State now show the bounded
+post-write verification follow-up metadata when a write completed in
+`sovereign_body`, including source-task binding status and the validation result.
+This remains read-only and does not add task, approval, command, retry, or
+mutation authority.
 
 ## Evidence
 
@@ -83,5 +90,12 @@ The loop-state guidance follow-up was completed as:
 OPENCLAW_NATIVE_ENGINEERING_LOOP_STATE_GUIDANCE_PLAN.md
 ```
 
-The next slice should make completed loop outcomes easier to inspect after
-manual approval and operator execution, without auto-approving or auto-running.
+The completed-outcome readback follow-up was completed as part of the bounded
+write closed-loop lane:
+
+```text
+OPENCLAW_NATIVE_ENGINEERING_WRITE_CLOSED_LOOP_PLAN.md
+```
+
+Route the next slice from the active forward-work directive. Do not keep adding
+Observer mirrors to this completed loop unless a concrete operator gap appears.

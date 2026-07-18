@@ -876,6 +876,13 @@ operator execution, and mutation on their existing explicit owners. Its
 common-path closure is recorded in
 `OPENCLAW_NATIVE_ENGINEERING_CAPABILITY_RUNTIME_EXECUTION_EVIDENCE_PLAN.md`.
 
+The same existing Observer Engineering Loop State and Task History now render
+the bounded Sovereign post-write verification follow-up from the task outcome.
+The readback includes source-task identity, mutation-hash binding status,
+validation task/status, autonomy mode, and result while preserving the existing
+no-new-route/no-new-authority boundary. It is covered by the Observer write
+execution evidence check and the focused follow-up renderer test.
+
 The existing Observer Edit Target Selection refresh now uses
 `sense.openclaw.workspace_edit_target_select` through `/capabilities/invoke`.
 It preserves the existing selected-target renderer and keeps proposal creation,

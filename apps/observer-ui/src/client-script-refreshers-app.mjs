@@ -279,6 +279,7 @@ function renderTaskSummary(task, { includeRecovery = true, includeOutcome = true
     const taskActionEvidence = task.outcome?.details?.actionEvidence ?? taskVerification?.actionEvidence ?? null;
     const taskRecoveryEvidence = task.outcome?.details?.recoveryEvidence ?? task.recovery?.recoveryEvidence ?? null;
     const taskPostExecutionVerification = task.outcome?.details?.postExecutionVerification ?? null;
+    lines.push(...formatEngineeringVerificationFollowupLines(task));
     if (taskVerification) {
       lines.push(\`Verification: \${taskVerification.ok === true ? "passed" : taskVerification.ok === false ? "failed" : "unknown"}\`);
     }

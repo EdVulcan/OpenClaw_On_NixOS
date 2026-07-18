@@ -16,12 +16,14 @@ export const observerClientRuntimeRefreshersScript = `async function refreshRunt
       ? renderTaskSummary(currentTask, { includeRecovery: false, includeOutcome: false })
       : "No active task.";
     renderPlanPanel(currentTask ?? latestHistoryTask);
+    renderEngineeringVerificationFollowupReadback(currentTask ?? latestHistoryTask);
     renderCommandTranscriptFromTask(currentTask ?? latestHistoryTask, { source: currentTask ? "current-task" : "latest-history" });
   } catch {
     currentTaskState = null;
     runtimeStatus.textContent = "offline";
     taskJson.textContent = "Unable to read runtime state.";
     renderPlanPanel(latestHistoryTask);
+    renderEngineeringVerificationFollowupReadback(null);
     renderCommandTranscriptFromTask(latestHistoryTask, { source: "latest-history" });
   }
 }
@@ -108,6 +110,7 @@ async function refreshTaskHistoryDetail() {
           ? "No active task selected."
           : "No finished task recorded yet.";
     renderPlanPanel(currentTaskState ?? historyTask);
+    renderEngineeringVerificationFollowupReadback(historyTask ?? currentTaskState);
     renderCommandTranscriptFromTask(historyTask ?? currentTaskState, { source: taskHistoryFocus });
   } catch {
     taskHistoryMeta.textContent = formatTaskFocusLabel(taskHistoryFocus, latestHistoryTask);
@@ -115,6 +118,7 @@ async function refreshTaskHistoryDetail() {
       ? renderTaskSummary(latestHistoryTask)
       : "Unable to read task history detail.";
     renderPlanPanel(currentTaskState ?? latestHistoryTask);
+    renderEngineeringVerificationFollowupReadback(latestHistoryTask ?? currentTaskState);
     renderCommandTranscriptFromTask(latestHistoryTask ?? currentTaskState, { source: "latest-history" });
   }
 }

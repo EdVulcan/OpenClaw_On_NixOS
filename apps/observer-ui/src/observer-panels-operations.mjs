@@ -143,6 +143,10 @@ export function observerOperationsPanels() {
           <div class="metric"><span>AI Recommendation</span><span id="engineering-loop-state-recommendation">none</span></div>
           <div class="metric"><span>AI Review</span><span id="engineering-loop-state-recommendation-review">not available</span></div>
           <div class="metric"><span>AI Control</span><span id="engineering-loop-state-recommendation-control">none</span></div>
+          <div class="metric"><span>Verification Follow-up</span><span id="engineering-loop-state-followup">none</span></div>
+          <div class="metric"><span>Follow-up Source</span><span id="engineering-loop-state-followup-source">none</span></div>
+          <div class="metric"><span>Mutation Binding</span><span id="engineering-loop-state-followup-binding">none</span></div>
+          <div class="metric"><span>Follow-up Execution</span><span id="engineering-loop-state-followup-execution">none</span></div>
           <div class="actions tight">
             <button id="engineering-loop-completion-button" class="secondary" type="button">Refresh Completion</button>
             <button id="engineering-loop-selected-target-read-button" class="secondary" type="button">Read Selected Target</button>
