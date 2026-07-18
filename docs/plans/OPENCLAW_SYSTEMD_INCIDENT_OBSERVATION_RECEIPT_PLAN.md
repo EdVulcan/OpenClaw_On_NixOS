@@ -57,10 +57,10 @@ content, hostd receipts, and repair authority.
 - generated client syntax and task-detail readback assertions;
 - Nix Core closure membership and exact file-count validation.
 
-## Next Real Capability
+## Delivered Follow-up
 
-Allow an operator to create a fresh, exact-bound diagnosis task from this
-compact observation receipt through the existing provider handoff owner. The
-new request must bind the observation receipt hash, source incident hash, unit,
-model, endpoint fingerprint, and request/context hash; it must still require
-explicit approval before egress and must not execute or authorize repair.
+The fresh exact-bound diagnosis task is complete in
+`OPENCLAW_SYSTEMD_OBSERVATION_AI_HANDOFF_PLAN.md`. It binds the observation
+receipt hash, source incident hash, unit, model, endpoint fingerprint, and
+request/context hash while retaining explicit approval before egress and no
+repair authority.

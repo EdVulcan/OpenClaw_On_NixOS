@@ -7,7 +7,10 @@ import {
   DEEPSEEK_CREDENTIAL_REFERENCE,
 } from "../src/cloud-live-provider-network-sender.mjs";
 import { createTaskLifecycleHarness } from "./task-builder-harness.mjs";
-import { createSystemdIncidentRepairTask } from "./systemd-incident-fixture.mjs";
+import {
+  createSystemdIncidentObservationTaskFixture,
+  createSystemdIncidentRepairTask,
+} from "./systemd-incident-fixture.mjs";
 
 const REAL_LAUNCH_TASK_REGISTRY =
   "openclaw-cloud-consciousness-live-provider-real-launch-task-v0";
@@ -376,6 +379,63 @@ test("credential egress task binds and persists only the safe systemd incident p
   assert.doesNotMatch(persisted, /private experience lesson/u);
   assert.equal(shell.endpointContacted, false);
   assert.equal(shell.networkEgress, false);
+});
+
+test("credential egress task binds the reviewed observation receipt without provider contact", async () => {
+  const preflightTask = createEgressRouteTaskPreflightTask();
+  const { sourceTask, providerTask } = await createSystemdIncidentObservationTaskFixture();
+  const observationReceipt = providerTask.cloudConsciousnessLiveProviderEgressExecution
+    .systemdIncidentObservationReceipt;
+  const { deps } = createCredentialEgressHarness({
+    tasks: [preflightTask, sourceTask, providerTask],
+  });
+  const builders = createCloudLiveProviderRuntimeCredentialEgressGateBuilders(deps);
+
+  const taskShell = await builders.createCloudConsciousnessLiveProviderEgressExecutionTask({
+    confirm: true,
+    liveProviderExecution: {
+      requested: true,
+      credentialReference: DEEPSEEK_CREDENTIAL_REFERENCE,
+      responseContract: "engineering_recommendation_v0",
+      contextPacket: {
+        requested: true,
+        sourceTaskId: providerTask.id,
+        includeSystemdIncidentObservationReceipt: true,
+      },
+    },
+  });
+
+  const shell = taskShell.task.cloudConsciousnessLiveProviderEgressExecution;
+  const binding = shell.requestBinding;
+  assert.equal(binding.provider, "deepseek");
+  assert.equal(binding.model, "deepseek-chat");
+  assert.equal(binding.credentialReference, DEEPSEEK_CREDENTIAL_REFERENCE);
+  assert.equal(binding.sourceTaskId, providerTask.id);
+  assert.equal(binding.responseContract, "engineering_recommendation_v0");
+  assert.match(binding.endpointFingerprint, /^[a-f0-9]{64}$/u);
+  assert.match(binding.requestContentHash, /^[a-f0-9]{64}$/u);
+  assert.match(binding.contextContentHash, /^[a-f0-9]{64}$/u);
+  assert.match(binding.bindingHash, /^[a-f0-9]{64}$/u);
+  assert.deepEqual(taskShell.task.plan.approvalBinding, binding);
+  assert.equal(
+    shell.systemdIncidentContext.registry,
+    "openclaw-systemd-incident-observation-provider-context-v0",
+  );
+  assert.equal(
+    shell.systemdIncidentContext.sourceObservationReceiptHash,
+    observationReceipt.receiptHash,
+  );
+  assert.equal(
+    shell.systemdIncidentContext.incident.sourceReceiptHash,
+    sourceTask.outcome.details.incidentReceipt.receiptHash,
+  );
+  assert.equal(shell.incidentContextContentHash, binding.contextContentHash);
+  assert.equal(taskShell.approval.status, "pending");
+  assert.equal(shell.endpointContacted, false);
+  assert.equal(shell.networkEgress, false);
+  const persisted = JSON.stringify(taskShell.task);
+  assert.doesNotMatch(persisted, /private\.invalid|private journal message/u);
+  assert.doesNotMatch(persisted, /reviewed systemd observation context/u);
 });
 
 test("credential egress execution dispatches an explicitly bound live request", async () => {

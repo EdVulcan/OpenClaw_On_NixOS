@@ -38,6 +38,10 @@ export function observerEngineeringContextPanels() {
               <input id="engineering-provider-handoff-include-systemd-incident" type="checkbox" />
               Include systemd incident receipt
             </label>
+            <label for="engineering-provider-handoff-include-systemd-observation">
+              <input id="engineering-provider-handoff-include-systemd-observation" type="checkbox" />
+              Include reviewed systemd observation
+            </label>
           </div>
           <div class="actions tight">
             <button id="engineering-context-packet-build-button" class="secondary" type="button">Build Context Packet</button>

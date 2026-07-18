@@ -41,6 +41,12 @@ export const observerClientRuntimeEngineeringSuggestedActionScript = `const GOVE
     requiresApproval: false,
     run: (recommendationLink) => reviewBoundSystemdIncidentEvidence(recommendationLink),
   },
+  review_systemd_incident_observation: {
+    controlId: "load-selected-task-button",
+    capabilityId: null,
+    requiresApproval: false,
+    run: (recommendationLink) => reviewBoundSystemdIncidentEvidence(recommendationLink),
+  },
   refresh_systemd_incident_observation: {
     controlId: "refresh-systemd-journal-evidence-button",
     capabilityId: "act.openclaw.systemd_incident.observation_receipt",

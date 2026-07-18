@@ -1,5 +1,6 @@
 export const observerClientEngineeringProviderHandoffRefreshersScript = `function syncEngineeringProviderIncidentMode() {
-  const incidentMode = engineeringProviderHandoffIncludeSystemdIncident?.checked === true;
+  const incidentMode = engineeringProviderHandoffIncludeSystemdIncident?.checked === true
+    || engineeringProviderHandoffIncludeSystemdObservation?.checked === true;
   if (engineeringProviderHandoffPromptInput) {
     engineeringProviderHandoffPromptInput.disabled = incidentMode;
   }
@@ -19,17 +20,23 @@ async function createEngineeringProviderHandoffTask() {
   const prompt = engineeringProviderHandoffPromptInput.value.trim();
   const sourceTaskId = engineeringProviderHandoffSourceTaskIdInput?.value.trim() ?? "";
   const includeSystemdIncidentReceipt = engineeringProviderHandoffIncludeSystemdIncident?.checked === true;
-  const responseContract = !includeSystemdIncidentReceipt
+  const includeSystemdIncidentObservationReceipt =
+    engineeringProviderHandoffIncludeSystemdObservation?.checked === true;
+  const includeBoundSystemdContext =
+    includeSystemdIncidentReceipt || includeSystemdIncidentObservationReceipt;
+  const responseContract = !includeBoundSystemdContext
     && engineeringProviderHandoffResponseContract?.value === "engineering_plan_v0"
     ? "engineering_plan_v0"
     : "engineering_recommendation_v0";
-  if (!includeSystemdIncidentReceipt && !prompt) {
+  if (!includeBoundSystemdContext && !prompt) {
     setControlMessage("Enter a bounded provider request before creating the handoff task.");
     engineeringProviderHandoffPromptInput.focus();
     return;
   }
-  if (includeSystemdIncidentReceipt && !sourceTaskId) {
-    setControlMessage("Select a completed systemd repair task before creating the incident handoff.");
+  if (includeBoundSystemdContext && !sourceTaskId) {
+    setControlMessage(includeSystemdIncidentObservationReceipt
+      ? "Select the completed provider task containing the reviewed observation receipt."
+      : "Select a completed systemd repair task before creating the incident handoff.");
     engineeringProviderHandoffSourceTaskIdInput?.focus();
     return;
   }
@@ -46,7 +53,7 @@ async function createEngineeringProviderHandoffTask() {
           confirm: true,
           liveProviderExecution: {
             credentialReference: "openclaw://credential/deepseek-api-key",
-            ...(!includeSystemdIncidentReceipt
+            ...(!includeBoundSystemdContext
               ? {
                   requestEnvelope: {
                     model: "deepseek-chat",
@@ -55,13 +62,16 @@ async function createEngineeringProviderHandoffTask() {
                 }
               : {}),
             responseContract,
-            ...((sourceTaskId || responseContract === "engineering_plan_v0" || includeSystemdIncidentReceipt)
+            ...((sourceTaskId || responseContract === "engineering_plan_v0" || includeBoundSystemdContext)
               ? {
                   contextPacket: {
                     requested: true,
                     ...(sourceTaskId ? { sourceTaskId } : {}),
                     ...(responseContract === "engineering_plan_v0" ? { includePlanTodo: true } : {}),
                     ...(includeSystemdIncidentReceipt ? { includeSystemdIncidentReceipt: true } : {}),
+                    ...(includeSystemdIncidentObservationReceipt
+                      ? { includeSystemdIncidentObservationReceipt: true }
+                      : {}),
                   },
                 }
               : {}),
@@ -71,8 +81,8 @@ async function createEngineeringProviderHandoffTask() {
     });
     renderEngineeringProviderHandoff(data);
     const taskId = data?.result?.task?.id ?? "unknown";
-    setControlMessage(includeSystemdIncidentReceipt
-      ? \`Created pending systemd incident diagnosis task \${taskId}; approval remains required before provider contact.\`
+    setControlMessage(includeBoundSystemdContext
+      ? \`Created pending systemd \${includeSystemdIncidentObservationReceipt ? "observation" : "incident"} diagnosis task \${taskId}; approval remains required before provider contact.\`
       : \`Created pending DeepSeek handoff task \${taskId}; approval and operator execution remain separate.\`);
   } catch (error) {
     engineeringProviderHandoffStatus.textContent = "blocked";
@@ -86,7 +96,20 @@ async function createEngineeringProviderHandoffTask() {
 engineeringProviderHandoffCreateButton?.addEventListener("click", () => {
   void createEngineeringProviderHandoffTask();
 });
-engineeringProviderHandoffIncludeSystemdIncident?.addEventListener("change", syncEngineeringProviderIncidentMode);
+engineeringProviderHandoffIncludeSystemdIncident?.addEventListener("change", () => {
+  if (engineeringProviderHandoffIncludeSystemdIncident.checked
+    && engineeringProviderHandoffIncludeSystemdObservation) {
+    engineeringProviderHandoffIncludeSystemdObservation.checked = false;
+  }
+  syncEngineeringProviderIncidentMode();
+});
+engineeringProviderHandoffIncludeSystemdObservation?.addEventListener("change", () => {
+  if (engineeringProviderHandoffIncludeSystemdObservation.checked
+    && engineeringProviderHandoffIncludeSystemdIncident) {
+    engineeringProviderHandoffIncludeSystemdIncident.checked = false;
+  }
+  syncEngineeringProviderIncidentMode();
+});
 syncEngineeringProviderIncidentMode();
 
 `;

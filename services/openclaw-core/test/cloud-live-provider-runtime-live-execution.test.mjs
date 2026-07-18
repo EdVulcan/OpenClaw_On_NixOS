@@ -15,9 +15,13 @@ import { CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_ENGINEERING_RECOMMENDATION_CONTRACT }
 import { CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_ENGINEERING_PLAN_CONTRACT } from "../src/cloud-live-provider-runtime-engineering-plan-contract.mjs";
 import {
   buildSystemdIncidentProviderContext,
+  materialiseSystemdIncidentProviderHandoff,
   materialiseStoredSystemdIncidentProviderExecution,
 } from "../src/systemd-incident-provider-context.mjs";
-import { createSystemdIncidentRepairTask } from "./systemd-incident-fixture.mjs";
+import {
+  createSystemdIncidentObservationTaskFixture,
+  createSystemdIncidentRepairTask,
+} from "./systemd-incident-fixture.mjs";
 
 const LIVE_PROVIDER_TEST_ENV = {
   OPENCLAW_CLOUD_PROVIDER_ENDPOINT: "https://api.deepseek.com",
@@ -508,6 +512,187 @@ test("approved incident context returns a guidance-only recommendation and persi
   const persisted = JSON.stringify(result.task);
   assert.doesNotMatch(persisted, /event-hub application health remained offline/u);
   assert.doesNotMatch(persisted, /private-health|private diagnostic/u);
+});
+
+test("approved reviewed observation context returns only its bound review action", async () => {
+  const harness = createHarness();
+  const { sourceTask, providerTask, tasks } = await createSystemdIncidentObservationTaskFixture();
+  const observationReceipt = providerTask.cloudConsciousnessLiveProviderEgressExecution
+    .systemdIncidentObservationReceipt;
+  const handoff = materialiseSystemdIncidentProviderHandoff({
+    tasks,
+    liveProviderExecution: {
+      requested: true,
+      contextPacket: {
+        requested: true,
+        sourceTaskId: providerTask.id,
+        includeSystemdIncidentObservationReceipt: true,
+      },
+    },
+  });
+  assert.equal(handoff.ok, true, handoff.reason);
+  const task = createTask();
+  task.cloudConsciousnessLiveProviderEgressExecution.systemdIncidentContext = handoff.incidentContext;
+  task.cloudConsciousnessLiveProviderEgressExecution.incidentContextContentHash =
+    handoff.contextContentHash ?? handoff.evidence.contextContentHash;
+  tasks.set(task.id, task);
+  const materialised = materialiseStoredSystemdIncidentProviderExecution({
+    handoffTask: task,
+    tasks,
+  });
+  assert.equal(materialised.ok, true, materialised.reason);
+  const request = materialised.liveProviderExecution;
+  const binding = buildLiveProviderRequestBinding({
+    requestEnvelope: request.requestEnvelope,
+    credentialReference: request.credentialReference,
+    responseContract: request.responseContract,
+    contextContentHash: materialised.evidence.contextContentHash,
+    sourceTaskId: request.contextPacket.sourceTaskId,
+    env: LIVE_PROVIDER_TEST_ENV,
+  });
+  assert.equal(binding.ok, true, binding.reason);
+  task.cloudConsciousnessLiveProviderEgressExecution.requestBinding = binding.binding;
+  const options = { liveProviderExecution: request };
+  options[CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CONTEXT_PACKET_EVIDENCE] = materialised.evidence;
+  const reason = "The reviewed observation remains healthy; inspect the bound receipt before another operator decision.";
+
+  const result = await executeCloudConsciousnessLiveProviderRequest({
+    ...harness.deps,
+    task,
+    options,
+    env: LIVE_PROVIDER_TEST_ENV,
+    sendLiveProviderRequestImpl: async ({ providerRequest }) => {
+      const content = providerRequest.request.body.messages[0].content;
+      assert.match(content, new RegExp(observationReceipt.receiptHash, "u"));
+      assert.match(content, new RegExp(sourceTask.outcome.details.incidentReceipt.receiptHash, "u"));
+      assert.match(content, /review_systemd_incident_observation/u);
+      assert.doesNotMatch(content, /private\.invalid|private journal message/u);
+      return {
+        ok: true,
+        audit: {
+          responseContentHash: "observation-recommendation-response-hash",
+          providerResponseCreated: true,
+          endpointContacted: true,
+          networkEgress: true,
+          transmitsExternally: true,
+        },
+        governance: {
+          providerCredentialRead: true,
+          credentialValueRead: true,
+          providerResponseCreated: true,
+          endpointContacted: true,
+          networkEgress: true,
+          transmitsExternally: true,
+          liveProviderCallEnabled: true,
+        },
+        response: {
+          id: "observation-recommendation-response-1",
+          model: "deepseek-chat",
+          assistantContent: JSON.stringify({
+            actionId: "review_systemd_incident_observation",
+            reason,
+            confidence: 0.94,
+            requiresOperatorReview: true,
+          }),
+          responseContentHash: "observation-recommendation-response-hash",
+          usage: { total_tokens: 32 },
+        },
+      };
+    },
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.recommendation.actionId, "review_systemd_incident_observation");
+  assert.equal(result.recommendation.existingObserverControlId, "load-selected-task-button");
+  assert.equal(result.recommendation.existingCapabilityId, null);
+  assert.equal(result.contextPacket.systemdIncidentObservationContextIncluded, true);
+  assert.equal(
+    result.contextPacket.systemdIncidentObservationReceiptHash,
+    observationReceipt.receiptHash,
+  );
+  assert.equal(
+    result.contextPacket.systemdIncidentReceiptHash,
+    sourceTask.outcome.details.incidentReceipt.receiptHash,
+  );
+  assert.equal(result.contextPacket.journalMessagesIncluded, false);
+  assert.equal(result.contextPacket.providerOutputIncluded, false);
+  assert.equal(
+    result.task.cloudConsciousnessLiveProviderEgressExecution.recommendation.reasonIncluded,
+    false,
+  );
+  assert.doesNotMatch(JSON.stringify(result.task), /private\.invalid|private journal message/u);
+  assert.doesNotMatch(JSON.stringify(result.task), /reviewed observation remains healthy/u);
+});
+
+test("reviewed observation context rejects a different otherwise valid recommendation action", async () => {
+  const harness = createHarness();
+  const contextContentHash = "7".repeat(64);
+  const options = liveOptions({
+    responseContract: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_ENGINEERING_RECOMMENDATION_CONTRACT,
+    contextPacket: {
+      requested: true,
+      taskId: "task-1",
+      sourceTaskId: "provider-observation-source-1",
+      responseContract: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_ENGINEERING_RECOMMENDATION_CONTRACT,
+      includeSystemdIncidentObservationReceipt: true,
+    },
+  });
+  const task = createBoundTask(options, LIVE_PROVIDER_TEST_ENV, contextContentHash);
+  options[CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_CONTEXT_PACKET_EVIDENCE] = {
+    registry: "openclaw-systemd-incident-observation-provider-context-v0",
+    sourceTaskId: "provider-observation-source-1",
+    responseContract: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_ENGINEERING_RECOMMENDATION_CONTRACT,
+    contextContentHash,
+    systemdIncidentContextIncluded: true,
+    systemdIncidentObservationContextIncluded: true,
+    systemdIncidentObservationReceiptHash: `sha256:${"b".repeat(64)}`,
+    journalMessagesIncluded: false,
+    providerOutputIncluded: false,
+  };
+
+  const result = await executeCloudConsciousnessLiveProviderRequest({
+    ...harness.deps,
+    task,
+    options,
+    env: LIVE_PROVIDER_TEST_ENV,
+    sendLiveProviderRequestImpl: async () => ({
+      ok: true,
+      audit: {
+        responseContentHash: "wrong-observation-action-response-hash",
+        providerResponseCreated: true,
+        endpointContacted: true,
+        networkEgress: true,
+        transmitsExternally: true,
+      },
+      governance: {
+        providerCredentialRead: true,
+        credentialValueRead: true,
+        providerResponseCreated: true,
+        endpointContacted: true,
+        networkEgress: true,
+        transmitsExternally: true,
+        liveProviderCallEnabled: true,
+      },
+      response: {
+        id: "wrong-observation-action-response",
+        model: "deepseek-chat",
+        assistantContent: JSON.stringify({
+          actionId: "refresh_systemd_incident_observation",
+          reason: "This valid global action is not valid for the reviewed observation context.",
+          confidence: 0.7,
+          requiresOperatorReview: true,
+        }),
+        responseContentHash: "wrong-observation-action-response-hash",
+      },
+    }),
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.status, "live_provider_response_contract_failed");
+  assert.equal(result.reason, "provider_observation_recommendation_action_mismatch");
+  assert.equal(task.status, "failed");
+  assert.equal(result.liveProvider.assistantContent, undefined);
+  assert.doesNotMatch(JSON.stringify(task), /valid global action is not valid/u);
 });
 
 test("valid engineering plan is transient while task state keeps compact plan evidence", async () => {

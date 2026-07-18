@@ -1602,10 +1602,20 @@ publication must succeed before the provider task is updated, and the receipt
 excludes journal messages, provider output, commands, URLs, hostd evidence, and
 repair authority.
 
-The next real capability is an operator-created fresh diagnosis task that binds
-this observation receipt hash to the existing incident evidence and provider
-request contract. Keep explicit approval before egress; do not create automatic
-provider requests, execute guidance, or authorize repair.
+That fresh diagnosis is now complete through
+`docs/plans/OPENCLAW_SYSTEMD_OBSERVATION_AI_HANDOFF_PLAN.md`. It reuses the
+existing provider handoff and binds the observation receipt hash, original
+incident hash, fixed unit, model, endpoint fingerprint, credential reference,
+request hash, and context hash into one pending approval. Execution rebuilds the
+same projection and rejects drift. Its structured result accepts only
+`review_systemd_incident_observation`, which opens the exact provider task
+containing the receipt and cannot recursively refresh or record another receipt.
+
+Freeze this provider/systemd diagnosis lane. The next real capability is a
+bounded automatic incident scheduler for fixed OpenClaw units: periodic local
+observation plus deduplicated incident creation, with no provider egress,
+repair, hostd, activation, or rollback authority. Keep human approval at those
+high-risk boundaries rather than every read-only observation.
 
 ## Operator Identity And Mutation Boundary Checkpoint
 

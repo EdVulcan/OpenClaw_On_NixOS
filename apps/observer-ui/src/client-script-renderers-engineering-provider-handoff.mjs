@@ -5,6 +5,8 @@ export const observerClientEngineeringProviderHandoffRenderersScript = `function
   const approval = result?.approval ?? null;
   const binding = task?.cloudConsciousnessLiveProviderEgressExecution?.requestBinding ?? {};
   const incidentContext = task?.cloudConsciousnessLiveProviderEgressExecution?.systemdIncidentContext ?? null;
+  const observationContext = incidentContext?.registry
+    === "openclaw-systemd-incident-observation-provider-context-v0";
   const blocked = data?.blocked === true || result?.blocked === true;
   engineeringProviderHandoffStatus.textContent = blocked
     ? (data?.reason ?? result?.reason ?? "blocked")
@@ -24,6 +26,7 @@ export const observerClientEngineeringProviderHandoffRenderersScript = `function
     \`Governance: createsTask=\${Boolean(result?.governance?.createsTask ?? summary.createsTask)} createsApproval=\${Boolean(result?.governance?.createsApproval ?? summary.createsApproval)} endpointContacted=\${Boolean(result?.governance?.endpointContacted ?? summary.endpointContacted)} networkEgress=\${Boolean(result?.governance?.networkEgress ?? summary.networkEgress)} providerCall=\${Boolean(result?.governance?.providerCall ?? false)}\`,
     \`Response: \${responseContract}\`,
     \`Systemd incident: included=\${Boolean(incidentContext) || summary.systemdIncidentContextIncluded === true} target=\${incidentContext?.target?.unit ?? summary.systemdIncidentTargetUnit ?? "none"} restored=\${incidentContext?.restoredHealthy ?? summary.systemdIncidentRestoredHealthy ?? "unknown"} experience=\${incidentContext?.priorIncidentExperience?.matchedPatterns ?? summary.systemdIncidentExperiencePatterns ?? 0}\`,
+    \`Systemd observation: included=\${observationContext || summary.systemdIncidentObservationContextIncluded === true} receipt=\${incidentContext?.sourceObservationReceiptHash ?? summary.systemdIncidentObservationReceiptHash ?? "none"}\`,
     "Request text and credential values are not shown or persisted in this readback.",
   ].join("\\n");
 }

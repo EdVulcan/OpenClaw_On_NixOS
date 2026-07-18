@@ -97,6 +97,12 @@ function createContext({
     requiresApproval: false,
     run: async (link) => context.reviewBoundSystemdIncidentEvidence(link),
   };
+  context.GOVERNED_PLAN_TODO_SUGGESTION_CONTROLS.review_systemd_incident_observation = {
+    controlId: "load-selected-task-button",
+    capabilityId: null,
+    requiresApproval: false,
+    run: async (link) => context.reviewBoundSystemdIncidentEvidence(link),
+  };
   context.GOVERNED_PLAN_TODO_SUGGESTION_CONTROLS.refresh_systemd_incident_observation = {
     controlId: "refresh-systemd-journal-evidence-button",
     capabilityId: "act.openclaw.systemd_incident.observation_receipt",
@@ -492,4 +498,82 @@ test("Observer does not refresh observation panels when receipt recording fails"
   assert.deepEqual(fixture.refreshCalls, []);
   assert.equal(fixture.renderedCapabilities.length, 0);
   assert.equal(fixture.context.systemdJournalEvidenceUnit.value, "openclaw-system-sense.service");
+});
+
+test("Observer opens only the provider task bound to a reviewed observation recommendation", async () => {
+  const { providerTask: observationTask, incidentTask } = systemdIncidentTasks({
+    persistedActionId: "refresh_systemd_incident_observation",
+    persistedControlId: "refresh-systemd-journal-evidence-button",
+    persistedCapabilityId: "act.openclaw.systemd_incident.observation_receipt",
+  });
+  const incidentHash = incidentTask.outcome.details.incidentReceipt.receiptHash;
+  const observationHash = `sha256:${"b".repeat(64)}`;
+  observationTask.cloudConsciousnessLiveProviderEgressExecution
+    .systemdIncidentObservationReceipt = {
+      registry: "openclaw-systemd-incident-observation-receipt-v0",
+      providerTaskId: observationTask.id,
+      sourceTaskId: incidentTask.id,
+      sourceReceiptHash: incidentHash,
+      receiptHash: observationHash,
+      target: { unit: "openclaw-event-hub.service", healthServiceKey: "eventHub" },
+    };
+  const diagnosisTask = {
+    id: "provider-observation-diagnosis-17",
+    cloudConsciousnessLiveProviderEgressExecution: {
+      recommendation: {
+        registry: "openclaw-cloud-consciousness-live-provider-engineering-recommendation-v0",
+        contract: "engineering_recommendation_v0",
+        valid: true,
+        actionId: "review_systemd_incident_observation",
+        existingObserverControlId: "load-selected-task-button",
+        existingCapabilityId: null,
+        requiresOperatorReview: true,
+        requiresApproval: false,
+      },
+      responseContract: "engineering_recommendation_v0",
+      contextPacket: {
+        sourceTaskId: observationTask.id,
+        systemdIncidentReceiptHash: incidentHash,
+        systemdIncidentObservationReceiptHash: observationHash,
+      },
+      systemdIncidentContext: {
+        registry: "openclaw-systemd-incident-observation-provider-context-v0",
+        sourceTaskId: observationTask.id,
+        sourceObservationReceiptHash: observationHash,
+        incident: { sourceTaskId: incidentTask.id, sourceReceiptHash: incidentHash },
+        target: { unit: "openclaw-event-hub.service", healthServiceKey: "eventHub" },
+      },
+    },
+  };
+  const fixture = createContext({
+    taskResponses: new Map([
+      [diagnosisTask.id, diagnosisTask],
+      [observationTask.id, observationTask],
+    ]),
+  });
+  fixture.context.renderEngineeringRecommendationFromOperatorResult({
+    task: { id: diagnosisTask.id },
+    execution: {
+      recommendation: validRecommendation({
+        actionId: "review_systemd_incident_observation",
+        label: "Review the bound systemd observation receipt",
+        reason: "Review the exact observation evidence before another decision.",
+        existingObserverControlId: "load-selected-task-button",
+        existingCapabilityId: null,
+        requiresApproval: false,
+      }),
+    },
+  });
+
+  await fixture.context.useEngineeringRecommendation();
+
+  assert.deepEqual(fixture.fetchCalls, [
+    "http://core.invalid/tasks/provider-observation-diagnosis-17",
+    "http://core.invalid/tasks/provider-task-17",
+  ]);
+  assert.equal(fixture.context.selectedHistoryTaskId, observationTask.id);
+  assert.equal(fixture.context.taskDetailIdInput.value, observationTask.id);
+  assert.deepEqual(fixture.capabilityCalls, []);
+  assert.deepEqual(fixture.refreshCalls, []);
+  assert.equal(fixture.nodes.review.textContent, "operator selected");
 });

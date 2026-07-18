@@ -3,11 +3,15 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 
 import {
+  buildSystemdIncidentObservationProviderContext,
   buildSystemdIncidentProviderContext,
   materialiseStoredSystemdIncidentProviderExecution,
   materialiseSystemdIncidentProviderHandoff,
 } from "../src/systemd-incident-provider-context.mjs";
-import { createSystemdIncidentRepairTask } from "./systemd-incident-fixture.mjs";
+import {
+  createSystemdIncidentObservationTaskFixture,
+  createSystemdIncidentRepairTask,
+} from "./systemd-incident-fixture.mjs";
 
 function rehashReceipt(receipt) {
   const { receiptHash: _receiptHash, ...content } = receipt;
@@ -129,6 +133,104 @@ test("incident handoff materializes and later reconstructs one deterministic app
   );
   assert.equal(execution.evidence.executionTaskId, handoffTask.id);
   assert.equal(execution.evidence.systemdIncidentExperiencePatterns, 1);
+});
+
+test("reviewed observation context binds the compact receipt into one deterministic request", async () => {
+  const { sourceTask, providerTask, tasks } = await createSystemdIncidentObservationTaskFixture();
+  const receipt = providerTask.cloudConsciousnessLiveProviderEgressExecution
+    .systemdIncidentObservationReceipt;
+  const context = buildSystemdIncidentObservationProviderContext({ providerTask, tasks });
+
+  assert.equal(context.ok, true, context.reason);
+  assert.equal(context.projection.sourceTaskId, providerTask.id);
+  assert.equal(context.projection.sourceObservationReceiptHash, receipt.receiptHash);
+  assert.equal(context.projection.incident.sourceTaskId, sourceTask.id);
+  assert.equal(
+    context.projection.incident.sourceReceiptHash,
+    sourceTask.outcome.details.incidentReceipt.receiptHash,
+  );
+  assert.equal(context.projection.target.unit, "openclaw-event-hub.service");
+  assert.equal(context.projection.observation.health.serviceHealthy, true);
+  assert.equal(context.projection.observation.health.unitRunning, true);
+  assert.equal(context.projection.observation.journal.returned, 2);
+  assert.equal(context.projection.observation.journal.messagesIncluded, false);
+  assert.equal(context.evidence.systemdIncidentObservationContextIncluded, true);
+  assert.equal(context.evidence.systemdIncidentObservationReceiptHash, receipt.receiptHash);
+  assert.match(context.contextContentHash, /^[a-f0-9]{64}$/u);
+  assert.match(context.requestEnvelope.messages[0].content, /reviewed systemd observation context/u);
+  assert.doesNotMatch(
+    JSON.stringify({ projection: context.projection, evidence: context.evidence }),
+    /private\.invalid|private journal message/u,
+  );
+
+  const handoff = materialiseSystemdIncidentProviderHandoff({
+    tasks,
+    liveProviderExecution: {
+      requested: true,
+      contextPacket: {
+        requested: true,
+        sourceTaskId: providerTask.id,
+        includeSystemdIncidentObservationReceipt: true,
+      },
+    },
+  });
+  assert.equal(handoff.ok, true, handoff.reason);
+  assert.equal(
+    handoff.liveProviderExecution.contextPacket.includeSystemdIncidentObservationReceipt,
+    true,
+  );
+  assert.equal(handoff.evidence.contextContentHash, context.contextContentHash);
+
+  const handoffTask = {
+    id: "provider-observation-diagnosis-1",
+    cloudConsciousnessLiveProviderEgressExecution: {
+      systemdIncidentContext: handoff.incidentContext,
+      incidentContextContentHash: handoff.evidence.contextContentHash,
+    },
+  };
+  tasks.set(handoffTask.id, handoffTask);
+  const execution = materialiseStoredSystemdIncidentProviderExecution({ handoffTask, tasks });
+  assert.equal(execution.handled, true);
+  assert.equal(execution.ok, true, execution.reason);
+  assert.equal(
+    execution.liveProviderExecution.contextPacket.includeSystemdIncidentObservationReceipt,
+    true,
+  );
+  assert.equal(execution.evidence.executionTaskId, handoffTask.id);
+  assert.equal(
+    execution.liveProviderExecution.requestEnvelope.messages[0].content,
+    handoff.liveProviderExecution.requestEnvelope.messages[0].content,
+  );
+});
+
+test("reviewed observation execution fails closed when its receipt changes after approval", async () => {
+  const { providerTask, tasks } = await createSystemdIncidentObservationTaskFixture();
+  const handoff = materialiseSystemdIncidentProviderHandoff({
+    tasks,
+    liveProviderExecution: {
+      requested: true,
+      contextPacket: {
+        requested: true,
+        sourceTaskId: providerTask.id,
+        includeSystemdIncidentObservationReceipt: true,
+      },
+    },
+  });
+  const handoffTask = {
+    id: "provider-observation-drift",
+    cloudConsciousnessLiveProviderEgressExecution: {
+      systemdIncidentContext: handoff.incidentContext,
+      incidentContextContentHash: handoff.evidence.contextContentHash,
+    },
+  };
+  providerTask.cloudConsciousnessLiveProviderEgressExecution
+    .systemdIncidentObservationReceipt.health.unitRunning = false;
+
+  const execution = materialiseStoredSystemdIncidentProviderExecution({ handoffTask, tasks });
+
+  assert.equal(execution.handled, true);
+  assert.equal(execution.ok, false);
+  assert.equal(execution.reason, "systemd_incident_observation_receipt_invalid");
 });
 
 test("incident execution fails closed when matching experience changes after approval", () => {

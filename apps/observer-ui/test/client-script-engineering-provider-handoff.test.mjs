@@ -29,7 +29,9 @@ test("Observer exposes the explicit pending provider handoff task control", asyn
     "engineering-provider-handoff-status",
     "engineering-provider-handoff-json",
     "engineering-provider-handoff-include-systemd-incident",
+    "engineering-provider-handoff-include-systemd-observation",
     "Include systemd incident receipt",
+    "Include reviewed systemd observation",
     "Create Pending DeepSeek Handoff",
   ]) {
     assert.equal(panel.includes(token), true, `panel is missing ${token}`);
@@ -37,6 +39,7 @@ test("Observer exposes the explicit pending provider handoff task control", asyn
   assert.match(observerClientConfigDomEngineeringProviderHandoffScript, /engineeringProviderHandoffPromptInput/);
   assert.match(observerClientConfigDomEngineeringProviderHandoffScript, /engineeringProviderHandoffSourceTaskIdInput/);
   assert.match(observerClientConfigDomEngineeringProviderHandoffScript, /engineeringProviderHandoffIncludeSystemdIncident/);
+  assert.match(observerClientConfigDomEngineeringProviderHandoffScript, /engineeringProviderHandoffIncludeSystemdObservation/);
   assert.match(observerClientEngineeringProviderHandoffRefreshersScript, /confirm: true/);
   assert.match(observerClientEngineeringProviderHandoffRenderersScript, /renderEngineeringProviderHandoff/);
 
@@ -46,6 +49,7 @@ test("Observer exposes the explicit pending provider handoff task control", asyn
     engineeringProviderHandoffSourceTaskIdInput: element({ value: "source-task-1" }),
     engineeringProviderHandoffResponseContract: element({ value: "engineering_recommendation_v0" }),
     engineeringProviderHandoffIncludeSystemdIncident: element({ checked: false }),
+    engineeringProviderHandoffIncludeSystemdObservation: element({ checked: false }),
     engineeringProviderHandoffCreateButton: element(),
     engineeringProviderHandoffStatus: element(),
     engineeringProviderHandoffTask: element(),
@@ -129,6 +133,7 @@ test("Observer creates a fixed systemd incident handoff without caller request t
     engineeringProviderHandoffSourceTaskIdInput: element({ value: "systemd-repair-task-1" }),
     engineeringProviderHandoffResponseContract: element({ value: "engineering_plan_v0" }),
     engineeringProviderHandoffIncludeSystemdIncident: element({ checked: true }),
+    engineeringProviderHandoffIncludeSystemdObservation: element({ checked: false }),
     engineeringProviderHandoffCreateButton: element(),
     engineeringProviderHandoffStatus: element(),
     engineeringProviderHandoffTask: element(),
@@ -191,4 +196,85 @@ test("Observer creates a fixed systemd incident handoff without caller request t
   assert.match(context.engineeringProviderHandoffJson.textContent, /experience=2/u);
   assert.doesNotMatch(context.engineeringProviderHandoffJson.textContent, /private|journal message/u);
   assert.match(calls.at(-1)[1], /pending systemd incident diagnosis task provider-incident-task-1/u);
+});
+
+test("Observer creates an approval-gated diagnosis from the reviewed observation receipt", async () => {
+  const calls = [];
+  const observationHash = `sha256:${"b".repeat(64)}`;
+  const context = {
+    engineeringProviderHandoffPromptInput: element({ value: "caller text must be ignored" }),
+    engineeringProviderHandoffSourceTaskIdInput: element({ value: "provider-observation-source-1" }),
+    engineeringProviderHandoffResponseContract: element({ value: "engineering_plan_v0" }),
+    engineeringProviderHandoffIncludeSystemdIncident: element({ checked: false }),
+    engineeringProviderHandoffIncludeSystemdObservation: element({ checked: true }),
+    engineeringProviderHandoffCreateButton: element(),
+    engineeringProviderHandoffStatus: element(),
+    engineeringProviderHandoffTask: element(),
+    engineeringProviderHandoffApproval: element(),
+    engineeringProviderHandoffJson: element(),
+    observerConfig: { coreUrl: "http://core.invalid" },
+    formatError: (error) => String(error?.message ?? error),
+    setControlMessage: (message) => calls.push(["message", message]),
+    fetchJson: async (url, options) => {
+      calls.push(["fetch", url, options]);
+      return {
+        ok: true,
+        invoked: true,
+        capability: { id: "act.openclaw.engineering_context.provider_handoff_task" },
+        result: {
+          task: {
+            id: "provider-observation-diagnosis-1",
+            status: "queued",
+            cloudConsciousnessLiveProviderEgressExecution: {
+              requestBinding: {
+                provider: "deepseek",
+                model: "deepseek-chat",
+                sourceTaskId: "provider-observation-source-1",
+                requestContentHash: "r".repeat(64),
+              },
+              systemdIncidentContext: {
+                registry: "openclaw-systemd-incident-observation-provider-context-v0",
+                sourceObservationReceiptHash: observationHash,
+                target: { unit: "openclaw-event-hub.service", healthServiceKey: "eventHub" },
+                observation: { health: { serviceHealthy: true, unitRunning: true } },
+              },
+            },
+          },
+          approval: { id: "provider-observation-approval-1", status: "pending" },
+          governance: {
+            createsTask: true,
+            createsApproval: true,
+            endpointContacted: false,
+            networkEgress: false,
+            providerCall: false,
+          },
+        },
+        summary: {
+          systemdIncidentObservationContextIncluded: true,
+          systemdIncidentObservationReceiptHash: observationHash,
+        },
+      };
+    },
+  };
+
+  vm.runInNewContext(observerClientEngineeringProviderHandoffRenderersScript, context);
+  vm.runInNewContext(observerClientEngineeringProviderHandoffRefreshersScript, context);
+  assert.equal(context.engineeringProviderHandoffPromptInput.disabled, true);
+  assert.equal(context.engineeringProviderHandoffResponseContract.disabled, true);
+  assert.equal(context.engineeringProviderHandoffResponseContract.value, "engineering_recommendation_v0");
+  await context.createEngineeringProviderHandoffTask();
+
+  const request = JSON.parse(calls[0][2].body);
+  const execution = request.params.liveProviderExecution;
+  assert.equal(execution.requestEnvelope, undefined);
+  assert.equal(execution.responseContract, "engineering_recommendation_v0");
+  assert.deepEqual(execution.contextPacket, {
+    requested: true,
+    sourceTaskId: "provider-observation-source-1",
+    includeSystemdIncidentObservationReceipt: true,
+  });
+  assert.equal(JSON.stringify(request).includes("caller text must be ignored"), false);
+  assert.match(context.engineeringProviderHandoffJson.textContent, /Systemd observation: included=true/u);
+  assert.match(context.engineeringProviderHandoffJson.textContent, new RegExp(observationHash, "u"));
+  assert.match(calls.at(-1)[1], /pending systemd observation diagnosis task/u);
 });

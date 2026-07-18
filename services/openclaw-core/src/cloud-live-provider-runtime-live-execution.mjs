@@ -106,6 +106,8 @@ function compactContextPacketEvidence(evidence) {
     contextContentIncluded: false,
     requestEnvelopeMaterialized: evidence.requestEnvelopeMaterialized === true,
     systemdIncidentContextIncluded: evidence.systemdIncidentContextIncluded === true,
+    systemdIncidentObservationContextIncluded:
+      evidence.systemdIncidentObservationContextIncluded === true,
     systemdIncidentTargetUnit: evidence.systemdIncidentTargetUnit ?? null,
     systemdIncidentHealthServiceKey: evidence.systemdIncidentHealthServiceKey ?? null,
     systemdIncidentRestoredHealthy: evidence.systemdIncidentRestoredHealthy ?? null,
@@ -114,6 +116,8 @@ function compactContextPacketEvidence(evidence) {
       ? evidence.systemdIncidentJournalEntries
       : 0,
     systemdIncidentReceiptHash: evidence.systemdIncidentReceiptHash ?? null,
+    systemdIncidentObservationReceiptHash:
+      evidence.systemdIncidentObservationReceiptHash ?? null,
     systemdIncidentExperiencePatterns: Number.isInteger(evidence.systemdIncidentExperiencePatterns)
       ? evidence.systemdIncidentExperiencePatterns
       : 0,
@@ -399,7 +403,12 @@ export async function executeCloudConsciousnessLiveProviderRequest({
     === CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_ENGINEERING_PLAN_CONTRACT
     ? responseContractEvidence
     : null;
-  const responseContractFailed = result.ok === true && responseContractResult.ok === false;
+  const observationRecommendationMismatch = result.ok === true
+    && contextPacketEvidence?.systemdIncidentObservationContextIncluded === true
+    && responseContractResult.ok === true
+    && responseContractResult.recommendation?.actionId !== "review_systemd_incident_observation";
+  const responseContractFailed = result.ok === true
+    && (responseContractResult.ok === false || observationRecommendationMismatch);
   const taskState = buildTaskExecutionState(
     result,
     authorization,
@@ -456,7 +465,9 @@ export async function executeCloudConsciousnessLiveProviderRequest({
     ? "cloud_consciousness_live_provider_response_contract_failed"
     : "cloud_consciousness_live_provider_call_failed";
   const failureReason = responseContractFailed
-    ? responseContractResult.reason
+    ? observationRecommendationMismatch
+      ? "provider_observation_recommendation_action_mismatch"
+      : responseContractResult.reason
     : result.reason ?? "live_provider_request_failed";
   appendTaskPhase(task, failurePhase, {
     liveProvider: evidence,

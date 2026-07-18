@@ -51,6 +51,13 @@ const ACTIONS = {
     existingCapabilityId: null,
     requiresApproval: false,
   },
+  reviewSystemdObservation: {
+    actionId: "review_systemd_incident_observation",
+    label: "Review the bound systemd observation receipt",
+    existingObserverControlId: "load-selected-task-button",
+    existingCapabilityId: null,
+    requiresApproval: false,
+  },
   refreshSystemdIncident: {
     actionId: "refresh_systemd_incident_observation",
     label: "Refresh read-only health and journal observation for the bound systemd incident",

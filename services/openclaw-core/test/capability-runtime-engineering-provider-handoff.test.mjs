@@ -54,6 +54,8 @@ function createHarness({ policyDecision = {} } = {}) {
       createCloudConsciousnessLiveProviderEgressExecutionTask: async (input) => {
         calls.push(input);
         const incidentRequested = input.liveProviderExecution.contextPacket?.includeSystemdIncidentReceipt === true;
+        const observationRequested = input.liveProviderExecution.contextPacket
+          ?.includeSystemdIncidentObservationReceipt === true;
         return {
           ok: true,
           registry: "openclaw-cloud-consciousness-live-provider-egress-execution-task-v0",
@@ -61,12 +63,22 @@ function createHarness({ policyDecision = {} } = {}) {
             id: "provider-handoff-task-1",
             status: "queued",
             cloudConsciousnessLiveProviderEgressExecution: {
-              ...(incidentRequested
+              ...(incidentRequested || observationRequested
                 ? {
                     systemdIncidentContext: {
-                      registry: "openclaw-systemd-incident-provider-context-v0",
+                      registry: observationRequested
+                        ? "openclaw-systemd-incident-observation-provider-context-v0"
+                        : "openclaw-systemd-incident-provider-context-v0",
                       sourceTaskId: "source-task-1",
-                      sourceReceiptHash: `sha256:${"a".repeat(64)}`,
+                      ...(observationRequested
+                        ? {
+                            sourceObservationReceiptHash: `sha256:${"b".repeat(64)}`,
+                            incident: { sourceReceiptHash: `sha256:${"a".repeat(64)}` },
+                            observation: {
+                              health: { serviceHealthy: true, unitRunning: true },
+                            },
+                          }
+                        : { sourceReceiptHash: `sha256:${"a".repeat(64)}` }),
                       target: { unit: "openclaw-event-hub.service", healthServiceKey: "eventHub" },
                       restoredHealthy: false,
                     },
@@ -246,6 +258,41 @@ test("provider handoff capability delegates systemd incident projection to the a
   assert.equal(invalid.statusCode, 400);
   assert.match(invalid.response.error, /builds its fixed request envelope internally/u);
   assert.equal(calls.length, 1);
+});
+
+test("provider handoff capability delegates reviewed observation projection without request text", async () => {
+  const { runtime, calls } = createHarness();
+  const created = await runtime.invokeCapability({
+    capabilityId: CAPABILITY_ID,
+    approved: true,
+    params: {
+      confirm: true,
+      liveProviderExecution: {
+        credentialReference: CREDENTIAL_REFERENCE,
+        responseContract: "engineering_recommendation_v0",
+        contextPacket: {
+          requested: true,
+          sourceTaskId: "source-task-1",
+          includeSystemdIncidentObservationReceipt: true,
+        },
+      },
+    },
+  });
+
+  assert.equal(created.response.invoked, true);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].liveProviderExecution.requestEnvelope, undefined);
+  assert.equal(
+    calls[0].liveProviderExecution.contextPacket.includeSystemdIncidentObservationReceipt,
+    true,
+  );
+  assert.equal(created.response.summary.systemdIncidentObservationContextIncluded, true);
+  assert.equal(
+    created.response.summary.systemdIncidentObservationReceiptHash,
+    `sha256:${"b".repeat(64)}`,
+  );
+  assert.equal(created.response.summary.systemdIncidentRestoredHealthy, true);
+  assert.equal(created.response.summary.noProviderCall, true);
 });
 
 test("provider handoff capability rejects non-DeepSeek or malformed request bindings", async () => {

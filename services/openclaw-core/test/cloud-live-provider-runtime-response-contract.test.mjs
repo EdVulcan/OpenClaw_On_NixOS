@@ -27,6 +27,7 @@ test("recommendation instruction derives the existing allowlisted action ids", (
   assert.match(instruction, /create_verification_task/);
   assert.match(instruction, /observe_current_screen/);
   assert.match(instruction, /review_systemd_incident_evidence/);
+  assert.match(instruction, /review_systemd_incident_observation/);
   assert.match(instruction, /refresh_systemd_incident_observation/);
   assert.match(instruction, /requiresOperatorReview must be true/);
   assert.match(instruction, /Do not include commands, file paths, URLs, credentials/);
@@ -111,6 +112,27 @@ test("systemd incident refresh resolves to the existing bounded journal control"
     result.recommendation.existingCapabilityId,
     "act.openclaw.systemd_incident.observation_receipt",
   );
+  assert.equal(result.recommendation.requiresApproval, false);
+  assert.equal(result.recommendation.requiresOperatorReview, true);
+  assert.equal(result.recommendation.createsTaskAutomatically, false);
+  assert.equal(result.recommendation.executesAutomatically, false);
+});
+
+test("systemd observation review resolves to the existing task detail control", () => {
+  const result = parseCloudLiveProviderEngineeringRecommendation({
+    contract: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_ENGINEERING_RECOMMENDATION_CONTRACT,
+    assistantContent: JSON.stringify(recommendationPayload({
+      actionId: "review_systemd_incident_observation",
+      reason: "Review the bound observation receipt before another governed decision.",
+      confidence: 0.92,
+    })),
+    responseContentHash: "systemd-observation-review-response-hash",
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.recommendation.actionId, "review_systemd_incident_observation");
+  assert.equal(result.recommendation.existingObserverControlId, "load-selected-task-button");
+  assert.equal(result.recommendation.existingCapabilityId, null);
   assert.equal(result.recommendation.requiresApproval, false);
   assert.equal(result.recommendation.requiresOperatorReview, true);
   assert.equal(result.recommendation.createsTaskAutomatically, false);

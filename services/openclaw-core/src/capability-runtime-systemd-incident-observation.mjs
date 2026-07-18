@@ -70,6 +70,61 @@ function validateProviderBinding({ providerTask, sourceTask }) {
   return { execution, context, sourceValidation };
 }
 
+export function validateSystemdIncidentObservationReceiptTask({
+  providerTask,
+  tasks = new Map(),
+} = {}) {
+  const receipt = providerTask?.cloudConsciousnessLiveProviderEgressExecution
+    ?.systemdIncidentObservationReceipt ?? null;
+  const context = providerTask?.cloudConsciousnessLiveProviderEgressExecution
+    ?.systemdIncidentContext ?? null;
+  const sourceTask = taskForId(tasks, context?.sourceTaskId);
+  let sourceValidation;
+  try {
+    ({ sourceValidation } = validateProviderBinding({ providerTask, sourceTask }));
+  } catch {
+    return { ok: false, reason: "systemd_incident_observation_source_binding_invalid" };
+  }
+  if (!receipt || receipt.registry !== SYSTEMD_INCIDENT_OBSERVATION_RECEIPT_REGISTRY) {
+    return { ok: false, reason: "systemd_incident_observation_receipt_missing" };
+  }
+  const { receiptHash, ...receiptContent } = receipt;
+  if (receiptHash !== hashReceipt(receiptContent)
+    || receipt.providerTaskId !== providerTask.id
+    || receipt.sourceTaskId !== sourceTask.id
+    || receipt.sourceReceiptHash !== sourceValidation.receipt.receiptHash
+    || receipt.target?.unit !== sourceValidation.targetUnit
+    || receipt.target?.healthServiceKey !== sourceValidation.healthServiceKey
+    || !Number.isFinite(Date.parse(receipt.observedAt ?? ""))
+    || Object.values(receipt.health ?? {}).some((value) => typeof value !== "boolean")
+    || Object.keys(receipt.health ?? {}).length !== 7
+    || receipt.journal?.available === undefined
+    || typeof receipt.journal.available !== "boolean"
+    || receipt.journal.requestedLines !== JOURNAL_LINES
+    || boundedCount(receipt.journal.returned) !== receipt.journal.returned
+    || boundedCount(receipt.journal.parseErrors) !== receipt.journal.parseErrors
+    || receipt.journal.messagesIncluded !== false
+    || receipt.governance?.readOnlyObservation !== true
+    || receipt.governance?.createsTask !== false
+    || receipt.governance?.createsApproval !== false
+    || receipt.governance?.callsProvider !== false
+    || receipt.governance?.networkEgress !== false
+    || receipt.governance?.executesCommand !== false
+    || receipt.governance?.invokesHostd !== false
+    || receipt.governance?.authorizesRepair !== false
+    || receipt.governance?.journalMessagesIncluded !== false
+    || receipt.governance?.providerOutputIncluded !== false) {
+    return { ok: false, reason: "systemd_incident_observation_receipt_invalid" };
+  }
+  return {
+    ok: true,
+    providerTask,
+    sourceTask,
+    sourceValidation,
+    receipt,
+  };
+}
+
 function buildObservationReceipt({
   providerTask,
   sourceTask,

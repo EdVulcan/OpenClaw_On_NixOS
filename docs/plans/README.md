@@ -25,6 +25,7 @@ Only these documents should guide current route selection:
 | [`OPENCLAW_SYSTEMD_INCIDENT_REVIEWED_ACTION_PLAN.md`](./OPENCLAW_SYSTEMD_INCIDENT_REVIEWED_ACTION_PLAN.md) | Reviewed read-only opening of the exact incident receipt and recovery evidence bound to provider guidance. |
 | [`OPENCLAW_SYSTEMD_INCIDENT_REVIEWED_REFRESH_PLAN.md`](./OPENCLAW_SYSTEMD_INCIDENT_REVIEWED_REFRESH_PLAN.md) | Reviewed same-unit refresh of existing health, fixed-unit inventory, and bounded journal evidence. |
 | [`OPENCLAW_SYSTEMD_INCIDENT_OBSERVATION_RECEIPT_PLAN.md`](./OPENCLAW_SYSTEMD_INCIDENT_OBSERVATION_RECEIPT_PLAN.md) | Compact hash-bound evidence from the reviewed same-unit observation refresh. |
+| [`OPENCLAW_SYSTEMD_OBSERVATION_AI_HANDOFF_PLAN.md`](./OPENCLAW_SYSTEMD_OBSERVATION_AI_HANDOFF_PLAN.md) | Exact approval-bound AI diagnosis and reviewed readback from the compact observation receipt. |
 | [`OPENCLAW_PHASE_D_DECLARATIVE_EVOLUTION_CANDIDATE_PLAN.md`](./OPENCLAW_PHASE_D_DECLARATIVE_EVOLUTION_CANDIDATE_PLAN.md) | Declarative-evolution evidence and deferred activation boundary. |
 | [`OPENCLAW_EXPERT_REVIEW_OPTIMIZATION_PLAN.md`](./OPENCLAW_EXPERT_REVIEW_OPTIMIZATION_PLAN.md) | Measured validation, runtime, and review debt that blocks the mainline. |
 
@@ -50,14 +51,17 @@ bound Event Hub audit-log memory and retention
 -> review provider guidance and open the exact bound incident evidence
 -> review provider guidance and refresh same-unit read-only observation
 -> persist one compact hash-bound local observation receipt
+-> create one exact approval-bound diagnosis from that receipt
+-> review the exact observation task without recursive refresh
 ```
 
 This route advances the Level 3 body loop without widening hostd authority and
-without introducing a new provider response schema. The immediate next real
-capability is an operator-created, explicitly approved fresh diagnosis task
-bound to that observation receipt. Real generation activation, rollback,
-arbitrary systemd control, desktop-wide capture, and automatic provider egress
-remain deferred.
+without introducing a new provider response schema. This provider/systemd lane
+is now frozen. The immediate next real capability is a bounded automatic
+incident scheduler for fixed OpenClaw units, limited to local observation and
+deduplicated incident creation. Real generation activation, rollback, arbitrary
+systemd control, desktop-wide capture, and automatic provider egress remain
+deferred.
 
 ## Completed Capability Evidence
 

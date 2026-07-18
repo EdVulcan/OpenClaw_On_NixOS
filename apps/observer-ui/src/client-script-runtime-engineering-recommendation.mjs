@@ -132,6 +132,7 @@ function buildEngineeringRecommendationLinkInput(recommendation, control) {
   if (![
     "create_semantic_click_task",
     "review_systemd_incident_evidence",
+    "review_systemd_incident_observation",
     "refresh_systemd_incident_observation",
   ].includes(recommendation.actionId)) {
     return null;
@@ -157,6 +158,10 @@ function buildEngineeringRecommendationLinkInput(recommendation, control) {
 
 const REVIEWED_SYSTEMD_RECOMMENDATION_CONTROLS = Object.freeze({
   review_systemd_incident_evidence: {
+    controlId: "load-selected-task-button",
+    capabilityId: null,
+  },
+  review_systemd_incident_observation: {
     controlId: "load-selected-task-button",
     capabilityId: null,
   },
@@ -190,6 +195,8 @@ async function resolveBoundSystemdIncidentEvidence(recommendationLink) {
   const incidentTaskId = typeof incidentContext?.sourceTaskId === "string"
     ? incidentContext.sourceTaskId.trim()
     : "";
+  const observationReview = recommendationLink.actionId
+    === "review_systemd_incident_observation";
   if (providerTask?.id !== recommendationLink.sourceTaskId
     || persistedRecommendation?.valid !== true
     || persistedRecommendation.registry !== ENGINEERING_RECOMMENDATION_REGISTRY
@@ -200,11 +207,42 @@ async function resolveBoundSystemdIncidentEvidence(recommendationLink) {
     || persistedRecommendation.requiresOperatorReview !== true
     || persistedRecommendation.requiresApproval !== false
     || execution?.responseContract !== ENGINEERING_RECOMMENDATION_CONTRACT
-    || incidentContext?.registry !== "openclaw-systemd-incident-provider-context-v0"
     || !incidentTaskId
     || execution?.contextPacket?.sourceTaskId !== incidentTaskId
-    || execution?.contextPacket?.systemdIncidentReceiptHash !== incidentContext.sourceReceiptHash) {
+    || (observationReview
+      ? incidentContext?.registry !== "openclaw-systemd-incident-observation-provider-context-v0"
+        || execution?.contextPacket?.systemdIncidentObservationReceiptHash
+          !== incidentContext.sourceObservationReceiptHash
+        || execution?.contextPacket?.systemdIncidentReceiptHash
+          !== incidentContext.incident?.sourceReceiptHash
+      : incidentContext?.registry !== "openclaw-systemd-incident-provider-context-v0"
+        || execution?.contextPacket?.systemdIncidentReceiptHash !== incidentContext.sourceReceiptHash)) {
     throw new Error("The provider recommendation is not bound to one stored systemd incident context.");
+  }
+
+  if (observationReview) {
+    const observationResult = await fetchJson(
+      \`\${observerConfig.coreUrl}/tasks/\${encodeURIComponent(incidentTaskId)}\`,
+    );
+    const observationTask = observationResult?.task ?? null;
+    const observationExecution = observationTask
+      ?.cloudConsciousnessLiveProviderEgressExecution ?? null;
+    const observationReceipt = observationExecution?.systemdIncidentObservationReceipt ?? null;
+    const sourceIncidentContext = observationExecution?.systemdIncidentContext ?? null;
+    if (observationTask?.id !== incidentTaskId
+      || observationReceipt?.registry !== "openclaw-systemd-incident-observation-receipt-v0"
+      || observationReceipt.providerTaskId !== observationTask.id
+      || observationReceipt.receiptHash !== incidentContext.sourceObservationReceiptHash
+      || observationReceipt.sourceTaskId !== incidentContext.incident?.sourceTaskId
+      || observationReceipt.sourceReceiptHash !== incidentContext.incident?.sourceReceiptHash
+      || observationReceipt.target?.unit !== incidentContext.target?.unit
+      || sourceIncidentContext?.registry !== "openclaw-systemd-incident-provider-context-v0"
+      || sourceIncidentContext.sourceTaskId !== observationReceipt.sourceTaskId
+      || sourceIncidentContext.sourceReceiptHash !== observationReceipt.sourceReceiptHash
+      || sourceIncidentContext.target?.unit !== observationReceipt.target?.unit) {
+      throw new Error("The bound systemd observation receipt is unavailable or has changed.");
+    }
+    return { observationTask, receipt: observationReceipt };
   }
 
   const incidentResult = await fetchJson(
@@ -224,18 +262,21 @@ async function resolveBoundSystemdIncidentEvidence(recommendationLink) {
 }
 
 async function reviewBoundSystemdIncidentEvidence(recommendationLink) {
-  const { incidentTask } = await resolveBoundSystemdIncidentEvidence(recommendationLink);
-  const incidentTaskId = incidentTask.id;
+  const { incidentTask, observationTask } = await resolveBoundSystemdIncidentEvidence(recommendationLink);
+  const selectedTask = observationTask ?? incidentTask;
+  const incidentTaskId = selectedTask.id;
 
   taskHistoryFocus = "selected-task";
   selectedHistoryTaskId = incidentTaskId;
-  latestHistoryTask = incidentTask;
+  latestHistoryTask = selectedTask;
   taskDetailIdInput.value = incidentTaskId;
-  taskHistoryMeta.textContent = formatTaskFocusLabel(taskHistoryFocus, incidentTask);
-  taskHistoryJson.textContent = renderTaskSummary(incidentTask);
-  renderPlanPanel(currentTaskState ?? incidentTask);
-  renderEngineeringVerificationFollowupReadback(incidentTask);
-  renderCommandTranscriptFromTask(incidentTask, { source: "reviewed-systemd-incident" });
+  taskHistoryMeta.textContent = formatTaskFocusLabel(taskHistoryFocus, selectedTask);
+  taskHistoryJson.textContent = renderTaskSummary(selectedTask);
+  renderPlanPanel(currentTaskState ?? selectedTask);
+  renderEngineeringVerificationFollowupReadback(selectedTask);
+  renderCommandTranscriptFromTask(selectedTask, {
+    source: observationTask ? "reviewed-systemd-observation" : "reviewed-systemd-incident",
+  });
 }
 
 async function refreshBoundSystemdIncidentObservation(recommendationLink) {

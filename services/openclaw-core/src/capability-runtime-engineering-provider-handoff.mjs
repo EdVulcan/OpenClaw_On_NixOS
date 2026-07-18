@@ -48,6 +48,8 @@ function buildLiveProviderExecution(params) {
   const includeWorkViewObservation = contextPacket?.includeWorkViewObservation === true;
   const includePlanTodo = contextPacket?.includePlanTodo === true;
   const includeSystemdIncidentReceipt = contextPacket?.includeSystemdIncidentReceipt === true;
+  const includeSystemdIncidentObservationReceipt =
+    contextPacket?.includeSystemdIncidentObservationReceipt === true;
   return {
     requested: true,
     credentialReference: input.credentialReference,
@@ -63,6 +65,9 @@ function buildLiveProviderExecution(params) {
             ...(includeWorkViewObservation ? { includeWorkViewObservation: true } : {}),
             ...(includePlanTodo ? { includePlanTodo: true } : {}),
             ...(includeSystemdIncidentReceipt ? { includeSystemdIncidentReceipt: true } : {}),
+            ...(includeSystemdIncidentObservationReceipt
+              ? { includeSystemdIncidentObservationReceipt: true }
+              : {}),
           },
         }
       : {}),
@@ -113,6 +118,8 @@ export function createEngineeringProviderHandoffCapabilityHandlers({
     const binding = bindingSummary(task);
     const governance = result?.governance ?? {};
     const incidentContext = task?.cloudConsciousnessLiveProviderEgressExecution?.systemdIncidentContext ?? null;
+    const observationContext = incidentContext?.registry
+      === "openclaw-systemd-incident-observation-provider-context-v0";
     return {
       kind: "engineering.provider_handoff_task",
       ok: result?.ok === true,
@@ -129,10 +136,20 @@ export function createEngineeringProviderHandoffCapabilityHandlers({
       credentialReference: binding.credentialReference,
       requestContentIncluded: binding.requestContentIncluded,
       credentialValueIncluded: binding.credentialValueIncluded,
-      systemdIncidentContextIncluded: incidentContext?.registry === "openclaw-systemd-incident-provider-context-v0",
+      systemdIncidentContextIncluded: incidentContext?.registry === "openclaw-systemd-incident-provider-context-v0"
+        || observationContext,
+      systemdIncidentObservationContextIncluded: observationContext,
       systemdIncidentTargetUnit: incidentContext?.target?.unit ?? null,
-      systemdIncidentRestoredHealthy: incidentContext?.restoredHealthy ?? null,
-      systemdIncidentReceiptHash: incidentContext?.sourceReceiptHash ?? null,
+      systemdIncidentRestoredHealthy: observationContext
+        ? incidentContext?.observation?.health?.serviceHealthy === true
+          && incidentContext?.observation?.health?.unitRunning === true
+        : incidentContext?.restoredHealthy ?? null,
+      systemdIncidentReceiptHash: observationContext
+        ? incidentContext?.incident?.sourceReceiptHash ?? null
+        : incidentContext?.sourceReceiptHash ?? null,
+      systemdIncidentObservationReceiptHash: observationContext
+        ? incidentContext?.sourceObservationReceiptHash ?? null
+        : null,
       systemdIncidentExperiencePatterns: incidentContext?.priorIncidentExperience?.matchedPatterns ?? 0,
       systemdIncidentExperienceRestoredPatterns:
         incidentContext?.priorIncidentExperience?.restoredPatterns ?? 0,
@@ -177,6 +194,7 @@ export function createEngineeringProviderHandoffCapabilityHandlers({
       "includeWorkViewObservation",
       "includePlanTodo",
       "includeSystemdIncidentReceipt",
+      "includeSystemdIncidentObservationReceipt",
     ]) {
       if (contextPacket?.[key] !== undefined && typeof contextPacket[key] !== "boolean") {
         return `Provider handoff contextPacket.${key} must be a boolean.`;
@@ -189,7 +207,14 @@ export function createEngineeringProviderHandoffCapabilityHandlers({
       return error instanceof Error ? error.message : "Invalid provider handoff sourceTaskId.";
     }
     const includeSystemdIncidentReceipt = contextPacket?.includeSystemdIncidentReceipt === true;
-    if (includeSystemdIncidentReceipt) {
+    const includeSystemdIncidentObservationReceipt =
+      contextPacket?.includeSystemdIncidentObservationReceipt === true;
+    const includeBoundSystemdContext =
+      includeSystemdIncidentReceipt || includeSystemdIncidentObservationReceipt;
+    if (includeSystemdIncidentReceipt && includeSystemdIncidentObservationReceipt) {
+      return "Provider handoff systemd incident context selectors are mutually exclusive.";
+    }
+    if (includeBoundSystemdContext) {
       if (!sourceTaskId) {
         return "Provider handoff systemd incident context requires sourceTaskId.";
       }
