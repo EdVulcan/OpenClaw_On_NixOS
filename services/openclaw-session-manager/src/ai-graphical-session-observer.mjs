@@ -5,6 +5,7 @@ export const AI_GRAPHICAL_SESSION_REGISTRY =
   "nixsoma-ai-graphical-session-observation-v0";
 
 const EXPECTED_MODE = "nested_headless_wayland";
+const EXPECTED_RUNTIME_DIRECTORY = "nixsoma-ai-graphical-session";
 const EXPECTED_SOCKET_NAME = "nixsoma-ai-0";
 
 function enabled(value) {
@@ -68,7 +69,10 @@ export function buildAiGraphicalSessionConfig({ env = process.env } = {}) {
     socketName: typeof env.OPENCLAW_AI_GRAPHICAL_SESSION_SOCKET_NAME === "string"
       ? env.OPENCLAW_AI_GRAPHICAL_SESSION_SOCKET_NAME.trim()
       : EXPECTED_SOCKET_NAME,
-    runtimeDir: typeof env.XDG_RUNTIME_DIR === "string" ? env.XDG_RUNTIME_DIR.trim() : "",
+    runtimeDirectory: typeof env.OPENCLAW_AI_GRAPHICAL_SESSION_RUNTIME_DIRECTORY === "string"
+      ? env.OPENCLAW_AI_GRAPHICAL_SESSION_RUNTIME_DIRECTORY.trim()
+      : EXPECTED_RUNTIME_DIRECTORY,
+    runtimeBaseDir: typeof env.XDG_RUNTIME_DIR === "string" ? env.XDG_RUNTIME_DIR.trim() : "",
     width: boundedDimension(env.OPENCLAW_AI_GRAPHICAL_SESSION_WIDTH, 1280, 640, 3840),
     height: boundedDimension(env.OPENCLAW_AI_GRAPHICAL_SESSION_HEIGHT, 720, 480, 2160),
   };
@@ -85,14 +89,17 @@ export function createAiGraphicalSessionObserver({
     const evidence = baseEvidence(config);
     if (!config.enabled) return evidence;
     if (config.mode !== EXPECTED_MODE
+      || config.runtimeDirectory !== EXPECTED_RUNTIME_DIRECTORY
       || config.socketName !== EXPECTED_SOCKET_NAME
-      || !path.isAbsolute(config.runtimeDir)) {
+      || !path.isAbsolute(config.runtimeBaseDir)) {
       return { ...evidence, status: "configuration_invalid" };
     }
 
+    const runtimeDir = path.join(config.runtimeBaseDir, EXPECTED_RUNTIME_DIRECTORY);
+
     let runtimeStats;
     try {
-      runtimeStats = stat(config.runtimeDir);
+      runtimeStats = stat(runtimeDir);
     } catch {
       return { ...evidence, status: "runtime_directory_missing" };
     }
@@ -103,7 +110,7 @@ export function createAiGraphicalSessionObserver({
       return { ...evidence, status: "runtime_directory_untrusted" };
     }
 
-    const socketPath = path.join(config.runtimeDir, EXPECTED_SOCKET_NAME);
+    const socketPath = path.join(runtimeDir, EXPECTED_SOCKET_NAME);
     let socketStats;
     try {
       socketStats = stat(socketPath);

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
@@ -39,7 +39,9 @@ async function waitForJson(url, attempts = 80) {
 
 test("session-manager exposes ready graphical-session evidence without its runtime path", async (t) => {
   const runtimeDir = mkdtempSync(path.join(os.tmpdir(), "nixsoma-ai-server-"));
-  const socketPath = path.join(runtimeDir, "nixsoma-ai-0");
+  const sessionRuntimeDir = path.join(runtimeDir, "nixsoma-ai-graphical-session");
+  mkdirSync(sessionRuntimeDir, { mode: 0o700 });
+  const socketPath = path.join(sessionRuntimeDir, "nixsoma-ai-0");
   const waylandServer = net.createServer();
   await new Promise((resolve, reject) => {
     waylandServer.once("error", reject);
@@ -58,6 +60,7 @@ test("session-manager exposes ready graphical-session evidence without its runti
       OPENCLAW_SESSION_MANAGER_STATE_FILE: path.join(runtimeDir, "session-state.json"),
       OPENCLAW_AI_GRAPHICAL_SESSION_ENABLED: "1",
       OPENCLAW_AI_GRAPHICAL_SESSION_MODE: "nested_headless_wayland",
+      OPENCLAW_AI_GRAPHICAL_SESSION_RUNTIME_DIRECTORY: "nixsoma-ai-graphical-session",
       OPENCLAW_AI_GRAPHICAL_SESSION_SOCKET_NAME: "nixsoma-ai-0",
       OPENCLAW_AI_GRAPHICAL_SESSION_WIDTH: "1280",
       OPENCLAW_AI_GRAPHICAL_SESSION_HEIGHT: "720",

@@ -55,6 +55,7 @@ in
       before = [ "openclaw-session-manager.service" ];
       environment = {
         XCURSOR_THEME = "Adwaita";
+        XDG_RUNTIME_DIR = "%t/${runtimeDirectory}";
       };
       serviceConfig = {
         Type = "simple";
@@ -103,6 +104,7 @@ in
       environment = {
         OPENCLAW_AI_GRAPHICAL_SESSION_ENABLED = "1";
         OPENCLAW_AI_GRAPHICAL_SESSION_MODE = "nested_headless_wayland";
+        OPENCLAW_AI_GRAPHICAL_SESSION_RUNTIME_DIRECTORY = runtimeDirectory;
         OPENCLAW_AI_GRAPHICAL_SESSION_SOCKET_NAME = socketName;
         OPENCLAW_AI_GRAPHICAL_SESSION_WIDTH = toString sessionCfg.width;
         OPENCLAW_AI_GRAPHICAL_SESSION_HEIGHT = toString sessionCfg.height;
