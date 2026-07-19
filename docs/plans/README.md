@@ -85,13 +85,14 @@ telemetry and four-sample trend. The desktop Nix profile adds independent
 `MemoryHigh`, 3 GiB `MemoryMax`, and `TasksMax=1024`; hostd and credential
 initializers remain excluded. Physical-host generation `9bbc00da...` is now
 deployed and read-only probed. It also preconfigures the fixed DeepSeek
-endpoint/model with live egress disabled and no secret dependency; the module's
-positive flake check proves that a later API key file is delivered only through
-Core `LoadCredential`. Both slices and all assigned services are active with
-their declared limits; health, restart-count, auth, failed-unit, and warning
-journal probes passed. Freeze implementation of the resource lane. Do not
-synthesize memory pressure on the only physical host. Next prove one explicitly
-approved real provider advisory call instead of opening another readiness phase.
+endpoint/model with live egress disabled and no secret dependency. Current
+generation `6dm12j7...` delivers the root-only API key through Core
+`LoadCredential` and has completed one request-bound, explicitly approved real
+advisory call. Both slices and all assigned services remain active; health,
+restart-count, auth, failed-unit, and warning journal probes passed. Freeze the
+resource and provider-transport lanes. Do not synthesize memory pressure on the
+only physical host. Next implement a bounded standing advisory policy instead
+of opening another readiness phase or one-off call surface.
 
 ## Completed Capability Evidence
 

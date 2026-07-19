@@ -457,7 +457,9 @@ observed. No memory pressure was synthesized.
 ## Next Slice
 
 Freeze the cgroup implementation. Do not deliberately consume memory or force
-OOM on the sole physical host. The next real capability is secure provisioning
-of the already-supported DeepSeek credential file followed by one explicitly
-approved advisory call; do not add another resource-envelope or provider
-readiness wrapper.
+OOM on the sole physical host. Secure DeepSeek credential provisioning and one
+explicitly approved advisory call are now complete in generation `6dm12j7...`.
+Freeze provider transport as well. The next real capability is a budgeted,
+allowlisted standing advisory policy with no automatic task, approval, command,
+repair, or host-mutation authority; do not add another resource-envelope or
+provider-readiness wrapper.

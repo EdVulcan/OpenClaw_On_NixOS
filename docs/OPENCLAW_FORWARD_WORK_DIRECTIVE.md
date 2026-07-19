@@ -55,15 +55,23 @@ workspace tests, milestone registry/script audit, and the same path budget on
 pushes and pull requests; Nix closure and physical-host checks remain local.
 
 The physical host now runs generation
-`/nix/store/9bbc00da4qg5n7v6n05x37azd491dxpn-nixos-system-nixos-26.05.4808.569d57850992`.
+`/nix/store/6dm12j7y7mj7chwaqq13nkwgd0v91v8c-nixos-system-nixos-26.05.4808.569d57850992`.
 It includes the automatic triage/promotion/approved-dispatch baseline, the
-resource-pressure owner, both declarative cgroup slices, and disabled-by-default
-DeepSeek service configuration. The switch restarted the seven body-slice
-system services and two user services but left hostd running. All eight system
-services and both user services are active with zero failure restarts, all nine
-HTTP health probes returned 200, and anonymous task, approval, triage, and
-repair requests returned 401. No failed unit or warning-level Core/system-sense
+resource-pressure owner, both declarative cgroup slices, and the governed
+DeepSeek system-service credential and live sender. The final switch changed
+only the Core package path. Core remained active with zero failure restarts,
+all nine HTTP health probes returned 200, and anonymous task, approval,
+operator-step, and provider-task requests returned 401. No warning-level Core
 journal entry was observed.
+
+One real request-bound DeepSeek advisory call completed through task
+`62ba696a-945e-4f37-b65e-8a6783316386` and approval
+`483e6913-9857-4b1d-9f7e-f4f283fcf5a6`. The request used the configured
+`deepseek-chat` alias; the provider reported `deepseek-v4-flash` and 252 total
+tokens. The validated recommendation selected `observe_current_screen`,
+required operator review, and could not create a task, approval, or execution.
+Durable state contains request/response hashes, usage, and the action id but
+contains neither prompt text, recommendation reason, nor credential value.
 
 The Event Hub audit-log blocker is closed in source through reverse bounded tail
 reads, streaming cached summaries, serialized rotation, and a fixed retained
@@ -90,15 +98,17 @@ closure comparison before switching. Runtime inspection now proves
 `openclaw-session.slice` at about 50 MiB and 14 tasks at the deployment sample;
 both report the declared 1.5 GiB soft limit, 3 GiB hard limit, and 1024 task
 limit. Core has the fixed DeepSeek endpoint and model with
-`OPENCLAW_CLOUD_PROVIDER_LIVE_EGRESS=0`. It contains no API key environment
-value and no DeepSeek credential dependency. The module now supports an
-operator-provided key file through systemd `LoadCredential`, but enabling that
-credential and live egress requires a later explicit host configuration.
+`OPENCLAW_CLOUD_PROVIDER_LIVE_EGRESS=1`. The API key source remains outside the
+Nix store in a root-only directory and Core receives only the systemd credential
+copy; no key value is present in its environment, unit, repository, or task
+state.
 Do not deliberately create memory pressure on the sole physical host to prove
 the limits, and do not claim these service slices contain ordinary terminal or
-build processes. The next real AI capability is one explicitly approved
-DeepSeek advisory call from the system service using the file credential; do
-not add another provider readiness wrapper.
+build processes. Freeze provider transport and request-binding work. The next
+real AI capability is a narrowly allowlisted standing advisory policy with
+explicit token/rate budgets, bounded non-secret contexts, local fallback, and
+no authority to create approvals or execute actions. Do not add another
+provider readiness wrapper or another one-off call surface.
 
 ## Governing Vision
 

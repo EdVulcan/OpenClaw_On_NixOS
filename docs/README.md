@@ -16,14 +16,14 @@ paragraph. Reconcile this baseline with the repository and live host first.
 | Capability source | Current `main` through the Level 3 fixed-unit incident loop, resource-pressure observation, and declarative cgroup envelope | Implemented; commit history is authoritative |
 | Local validation | 893 workspace tests and typecheck pass; body-config, provider flake check, native inventory, and event-audit integration pass; 811 registry entries pass | Validated |
 | Continuous integration | GitHub CI runs Node 22 install, typecheck, workspace tests, milestone registry/script audit, and Windows path budget on pushes and pull requests | Configured in source |
-| Installed system | NixOS `26.05.4808.569d57850992`, generation `/nix/store/9bbc00da4qg5n7v6n05x37azd491dxpn-nixos-system-nixos-26.05.4808.569d57850992` | Resource envelopes and disabled provider configuration deployed and probed 2026-07-19 |
-| Previous generation | `/nix/store/yzjwwp67apgv4rrzpm3g2gz12bqkq7vj-nixos-system-nixos-26.05.4808.569d57850992` | Superseded without rollback or reboot |
+| Installed system | NixOS `26.05.4808.569d57850992`, generation `/nix/store/6dm12j7y7mj7chwaqq13nkwgd0v91v8c-nixos-system-nixos-26.05.4808.569d57850992` | Resource envelopes and governed DeepSeek sender deployed and probed 2026-07-19 |
+| Previous generation | `/nix/store/j5zj2b2z9yf3d7wkmmbwy9qf5m3dv1bj-nixos-system-nixos-26.05.4808.569d57850992` | Superseded without rollback or reboot |
 | Deployed resource envelopes | System body: 1.5/3 GiB and 1024 tasks; user session: 1.5/3 GiB and 1024 tasks; all assigned services active | Deployed and probed without pressure injection |
-| Provider runtime | Fixed DeepSeek endpoint/model; `LIVE_EGRESS=0`; no API key environment or runtime credential | Safely disabled pending credential provisioning |
+| Provider runtime | Fixed DeepSeek endpoint/model; root-only source delivered by `LoadCredential`; `LIVE_EGRESS=1`; one 252-token request-bound advisory completed | Deployed and proven without prompt, reason, or credential persistence |
 | Deployed journal probe | Bounded `/system/systemd/journal-evidence` returns live read-only JSON; `openclaw-system-sense` has the `systemd-journal` supplementary group | Deployed and probed |
 | Deployed scheduler | First five-minute tick recorded all three fixed targets healthy with no incident task | Deployed and probed |
 | Deployed audit store | Current Event Hub package is active; retention and rotation remain source-validated without destructive live rehearsal | Deployed |
-| Privileged actions | Physical-host generation switch is proven; real repair, hostd activation, and rollback | Deferred to explicit/disposable mutation checks |
+| Privileged actions | Physical-host generation switch and governed provider egress are proven; real repair, hostd activation, and rollback | Remaining mutations deferred to explicit/disposable checks |
 
 The current checkout is on the only available physical host
 (`systemd-detect-virt=none`). Historical VM results remain acceptance evidence,
@@ -162,14 +162,14 @@ sidecars use `openclaw-session.slice`. Each has 1.5 GiB `MemoryHigh`, 3 GiB
 outside the envelopes. Generation `9bbc00da...` passed generated-unit and
 closure review before activation, then runtime slice, service, health,
 restart-count, auth, failed-unit, and journal probes after activation. Its Core
-unit fixes the DeepSeek endpoint and model
-but keeps live egress disabled and contains no provider secret. The Nix module
-can now load a separately provisioned API key with systemd `LoadCredential`;
-the legacy environment value remains only a development fallback. A deliberate
-memory-pressure test on the sole physical host is out of scope, and these slices
-do not include ordinary terminal or build processes. The next operational step
-is to configure the file credential and prove one exact approval-bound advisory
-call before considering standing low-risk AI policy or Level 4 work.
+unit established the disabled provider baseline. Current generation `6dm12j7...`
+now loads the separately provisioned root-only key through systemd
+`LoadCredential` and has completed one exact approval-bound advisory call. The
+call persisted only hashes, usage, and compact recommendation evidence; prompt,
+reason, and credential content remained transient. A deliberate memory-pressure
+test on the sole physical host remains out of scope. Freeze both the resource
+and provider-transport lanes. Next design the smallest budgeted standing
+advisory policy that cannot create approvals or execute actions automatically.
 
 ## Progress Estimate
 

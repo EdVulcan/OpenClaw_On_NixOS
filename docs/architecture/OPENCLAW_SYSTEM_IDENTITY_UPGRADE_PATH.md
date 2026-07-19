@@ -320,11 +320,13 @@ Phase B 的固定 D-Bus 控制切片、bounded journal diagnosis、incident loop
 显式批准的 DeepSeek diagnosis handoff、目标相关经验召回、自动本地分诊和
 审批后一次性 repair dispatch 均已形成。当前物理机已部署到 approved-dispatch
 baseline；资源观测、趋势告警和 system/user cgroup envelope 已随
-`9bbc00da...` generation 部署并通过无压力探测。该 generation 同时只预配置
-固定 DeepSeek endpoint/model，并保持 live egress 关闭、无 provider secret。不要把 hostd
-扩展成任意 systemd API，也不要重做已经完成的 AI handoff。下一步通过
-systemd `LoadCredential` 配置 provider key，证明
-一次显式批准、只返回建议且不自动修复的真实 DeepSeek 调用。
+`9bbc00da...` generation 部署并通过无压力探测。当前 `6dm12j7...`
+generation 已通过 systemd `LoadCredential` 接入 root-only DeepSeek key，并完成
+一次 request-hash/approval 绑定、只返回建议且不自动执行的真实调用；prompt、
+建议理由和 credential value 均未进入持久状态。不要把 hostd 扩展成任意
+systemd API，也不要重做已经完成的 provider transport。下一步建立有 token/
+速率预算、上下文 allowlist、本地 fallback 且无动作执行权的低风险 standing
+advisory policy，以减少每次建议都要求人工批准。
 
 ---
 
