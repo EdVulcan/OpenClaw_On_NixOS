@@ -1,6 +1,6 @@
 # NixSoma Plans Directory
 
-Updated: 2026-07-18
+Updated: 2026-07-19
 
 This directory contains current decision records and historical milestone
 evidence. It is not a queue ordered by phase number. Use
@@ -69,11 +69,14 @@ This route advances the Level 3 body loop without widening hostd authority and
 without introducing a new provider response schema. The deployed baseline is
 proven through non-mutating health, auth, scheduler, and Observer probes, and
 automatic local triage, pending repair promotion, approval-triggered one-shot
-dispatch, and fail-closed restart reconciliation are complete in source. The
-immediate next gate is an explicitly authorized physical-host deployment plus
-non-mutating health/auth/scheduler/Observer probes. Real hostd mutation,
-generation activation/rollback, arbitrary systemd control, desktop-wide
-capture, and automatic provider egress remain deferred.
+dispatch, and fail-closed restart reconciliation are deployed in generation
+`/nix/store/yzjwwp67apgv4rrzpm3g2gz12bqkq7vj-nixos-system-nixos-26.05.4808.569d57850992`.
+Non-mutating health, auth, scheduler, live-closure, and Observer probes passed;
+the first post-switch tick observed all fixed targets healthy without changing
+task or approval counts. Freeze this lane and select a distinct concrete
+whitepaper capability. Real hostd mutation, generation rollback, arbitrary
+systemd control, desktop-wide capture, and automatic provider egress remain
+deferred.
 
 ## Completed Capability Evidence
 

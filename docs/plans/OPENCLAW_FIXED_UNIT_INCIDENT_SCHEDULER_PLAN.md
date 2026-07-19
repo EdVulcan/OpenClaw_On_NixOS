@@ -1,6 +1,6 @@
 # NixSoma Fixed-Unit Incident Scheduler Plan
 
-Updated: 2026-07-18
+Updated: 2026-07-19
 
 ## Purpose
 
@@ -107,30 +107,27 @@ failed closed.
 - full `dev-body-config-check.sh`, including exact 222-file Core and 77-file
   Observer Nix closures.
 
-The validated source baseline was switched onto the physical host as generation
-`/nix/store/gb72w3qavm6b0vv114ml723g7y8jv5qh-nixos-system-nixos-26.05.4808.569d57850992`.
-Post-deployment probes covered service health, operator-auth rejection, live
-bounded journal evidence, Observer controls, and one healthy scheduler tick.
-No provider request, repair execution, hostd mutation, rollback, or reboot was
-used.
-
 The completed automatic triage, promotion, approved one-shot dispatch, and
-startup fail-closed source is prebuilt as
+startup fail-closed source is deployed on the physical host as
 `/nix/store/yzjwwp67apgv4rrzpm3g2gz12bqkq7vj-nixos-system-nixos-26.05.4808.569d57850992`.
-The closure diff from the installed generation is only `openclaw-core`. This
-candidate has not been switched or live-probed.
+The closure diff from the preceding generation contained only `openclaw-core`,
+and the switch restarted only that service. Post-deployment probes proved all
+eight system and both user services active with `NRestarts=0`, seven health
+responses at HTTP 200, anonymous task/approval/triage/repair rejection at HTTP
+401, the exact live Core store closure, both Observer incident controls, and a
+healthy post-switch scheduler tick with unchanged task and approval counts. No
+provider request, repair execution, hostd mutation, rollback, or reboot was
+used.
 
 ## Deferred
 
 - automatic provider diagnosis;
 - automatic approval resolution;
 - arbitrary systemd targets;
-- deployment of this source baseline to the physical host;
 - real activation and rollback validation in a disposable mutation environment.
 
 ## Next Real Capability
 
-With explicit physical-host authorization, build and switch the validated
-source baseline, then run non-mutating service health, authentication, scheduler
-and Observer probes. Do not create an incident, approve a repair, invoke hostd,
-activate another generation, or test rollback during that deployment check.
+Freeze the completed fixed-unit incident lane. Select the next distinct
+operator-visible capability from the identity route and kernel whitepaper; do
+not add another incident readiness, dispatch, retry, or evidence wrapper.

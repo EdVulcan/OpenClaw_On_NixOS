@@ -1,6 +1,6 @@
 # NixSoma Forward Work Directive
 
-Updated: 2026-07-18
+Updated: 2026-07-19
 
 This is the active guidance document for continuing NixSoma development. The
 enhanced source preservation and governed capability migration that originally
@@ -53,19 +53,19 @@ registry audit passes, and the Windows path budget has no file over 160
 repository-relative characters.
 
 The physical host now runs generation
-`/nix/store/gb72w3qavm6b0vv114ml723g7y8jv5qh-nixos-system-nixos-26.05.4808.569d57850992`.
-All system and user services restarted without a loop, seven HTTP health probes
-returned 200, anonymous protected task/triage/repair routes returned 401, the
-bounded journal endpoint returned live read-only evidence, and the first
-five-minute scheduler tick recorded all three fixed targets healthy without an
-incident. This proves deployment and observation, not real repair, hostd
-activation, or rollback.
-
-The automatic triage/promotion/approved-dispatch source through `1d00eea9` is
-prebuilt as
-`/nix/store/yzjwwp67apgv4rrzpm3g2gz12bqkq7vj-nixos-system-nixos-26.05.4808.569d57850992`
-but is not switched. Its closure diff against `/run/current-system` contains
-only `openclaw-core`; activation remains an explicit physical-host decision.
+`/nix/store/yzjwwp67apgv4rrzpm3g2gz12bqkq7vj-nixos-system-nixos-26.05.4808.569d57850992`,
+which includes the automatic triage/promotion/approved-dispatch source through
+`1d00eea9`. Its closure diff from the preceding generation contained only
+`openclaw-core`, and the switch therefore restarted only that service. All eight
+system services and both user services remained active with zero restarts,
+seven HTTP health probes returned 200, and anonymous task, approval, triage,
+and repair requests returned 401. The live Core unit resolves to the expected
+`cjf36kmxla1qam738jj7sgv934bwbsmm-openclaw-core-0.1.0` store closure, and the
+first post-switch five-minute scheduler tick recorded all three fixed targets
+healthy without changing the existing 17 tasks or 16 approvals. Observer
+served both fixed-unit incident controls. This proves deployment and healthy
+observation, not a real repair, provider request, hostd mutation, generation
+rollback, or reboot.
 
 The Event Hub audit-log blocker is closed in source through reverse bounded tail
 reads, streaming cached summaries, serialized rotation, and a fixed retained
