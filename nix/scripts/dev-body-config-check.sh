@@ -227,7 +227,7 @@ requireIncludes("AI graphical session module", aiGraphicalSessionModule, [
   "--renderer=pixman",
   "--shell=kiosk",
   "--socket=${socketName}",
-  "XDG_RUNTIME_DIR = \"%t/${runtimeDirectory}\"",
+  "XDG_RUNTIME_DIR=%t/${runtimeDirectory}",
   "RuntimeDirectoryMode = \"0700\"",
   "UMask = \"0077\"",
   "UnsetEnvironment",
@@ -481,7 +481,7 @@ if (!ownership.aiGraphicalSession.wantedBy?.includes("graphical-session.target")
   || !ownership.aiGraphicalSession.partOf?.includes("graphical-session.target")
   || !ownership.aiGraphicalSession.before?.includes("openclaw-session-manager.service")
   || ownership.aiGraphicalSession.serviceConfig?.User != null
-  || ownership.aiGraphicalSession.environment?.XDG_RUNTIME_DIR !== "%t/nixsoma-ai-graphical-session"
+  || !String(ownership.aiGraphicalSession.serviceConfig?.ExecStart ?? "").includes("/bin/env XDG_RUNTIME_DIR=%t/nixsoma-ai-graphical-session")
   || !String(ownership.aiGraphicalSession.serviceConfig?.ExecStart ?? "").includes("/bin/weston --backend=headless --renderer=pixman --shell=kiosk --socket=nixsoma-ai-0")
   || ownership.aiGraphicalSession.serviceConfig?.RuntimeDirectory !== "nixsoma-ai-graphical-session"
   || ownership.aiGraphicalSession.serviceConfig?.RuntimeDirectoryMode !== "0700"

@@ -9,7 +9,8 @@ let
   socketName = "nixsoma-ai-0";
   cleanupScript = pkgs.writeShellScript "nixsoma-ai-graphical-session-cleanup" ''
     set -euo pipefail
-    runtime_dir="''${XDG_RUNTIME_DIR:?XDG_RUNTIME_DIR is required}"
+    runtime_base="''${XDG_RUNTIME_DIR:?XDG_RUNTIME_DIR is required}"
+    runtime_dir="$runtime_base/${runtimeDirectory}"
     ${pkgs.coreutils}/bin/rm -f \
       "$runtime_dir/${socketName}" \
       "$runtime_dir/${socketName}.lock"
@@ -55,12 +56,13 @@ in
       before = [ "openclaw-session-manager.service" ];
       environment = {
         XCURSOR_THEME = "Adwaita";
-        XDG_RUNTIME_DIR = "%t/${runtimeDirectory}";
       };
       serviceConfig = {
         Type = "simple";
         ExecStartPre = cleanupScript;
         ExecStart = lib.concatStringsSep " " [
+          "${pkgs.coreutils}/bin/env"
+          "XDG_RUNTIME_DIR=%t/${runtimeDirectory}"
           "${sessionCfg.package}/bin/weston"
           "--backend=headless"
           "--renderer=pixman"
