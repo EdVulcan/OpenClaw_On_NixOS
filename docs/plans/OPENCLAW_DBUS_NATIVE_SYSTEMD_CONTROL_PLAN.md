@@ -69,7 +69,7 @@ fixed restart slice has its own hostd, approval, Polkit, audit, and VM evidence.
   a real `loaded/active/running` core unit through `dbus_native` transport.
 - `dev-observer-openclaw-systemd-unit-inventory-check.sh` proves the same native
   evidence remains visible through the existing Observer panel.
-- The system-sense Nix closure contains 23 reviewed runtime source files plus
+- The system-sense Nix closure contains 24 reviewed runtime source files plus
   the lockfile-pinned production D-Bus dependency and excludes Puppeteer and
   workspace development packages.
 
@@ -392,11 +392,39 @@ memory value, explicit `MemoryMax` unlimited state, and zero managed OOM kills;
 these are point-in-time observations, not a health guarantee or configured
 resource policy.
 
+## Eleventh Slice: Bounded Resource Trend And Warning
+
+Repeated reads of the existing inventory now retain at most four in-memory
+samples per configured unit. Reads closer than one second are deduplicated so
+the dependency-map builder cannot manufacture a trend. A first observation or
+post-restart observation establishes only a baseline. Later samples report a
+warning when memory grows by at least 64 MiB and 25%, or reaches 80% of the
+configured/effective limit; 95% utilization or an increased managed OOM kill
+count is critical. Fixed reason codes and compact per-unit deltas are returned,
+while the history array remains private.
+
+Observer's existing five-second inventory refresh drives the sampling and shows
+aggregate status and warning count in the existing panel. The trend is not
+persisted, paged, scheduled by Core, or converted into a task, approval,
+provider request, process signal, resource limit, or hostd action. An
+unavailable observation clears that unit's history, so recovery starts from a
+new baseline instead of comparing unrelated processes across an outage.
+
+Focused baseline/growth/limit/OOM/deduplication tests plus the existing Core and
+Observer inventory milestones prove the warning behavior and its
+`persisted=false`, `hostMutation=false` boundary.
+
+The final store-native package
+`/nix/store/igbf34mn19vcmrsnyz7lm07f3kyj7b2v-openclaw-system-sense-0.1.0`
+started with the complete trend owner, observed seven system-manager units,
+moved from seven baseline samples to a normal second sample, and reported zero
+warning/critical units without mutation.
+
 ## Next Slice
 
-The smallest next Level 3 behavior is a bounded local resource-pressure trend
-and warning derived from repeated observations of the same fixed units. It may
-surface rising memory or a changed managed-OOM count through existing body
-health and Observer ownership, but must remain read-only, restart-safe, and
-non-paging. Do not set cgroup limits, signal processes, create repair approval,
-contact a provider, or add hostd authority in that warning slice.
+Freeze the completed resource sensing layer. The next real Level 3 capability
+is a declarative fixed-unit cgroup resource envelope in the Nix body module,
+with explicit memory and task limits visible in generated unit evidence. Build
+and validate a candidate without runtime `SetUnitProperties`, process signals,
+hostd expansion, or automatic activation; switching the physical host remains
+a separate explicit decision.

@@ -83,8 +83,11 @@ existing native systemd inventory. Current/peak memory, configured memory-limit
 state, task counts, CPU usage, and managed OOM evidence are read from a fixed
 D-Bus property allowlist and rendered in the existing Observer panel. This
 adds no cgroup mutation, process signal, task, approval, scheduler, provider
-request, or hostd authority. The next real behavior is a bounded local trend
-and warning for rising pressure on the same fixed units.
+request, or hostd authority. A four-sample in-memory trend now emits fixed
+baseline, growth, limit, and managed-OOM warning states through the same
+Observer refresh. Freeze the sensing layer. The next real behavior is a
+declarative fixed-unit cgroup resource envelope in the Nix body module, built
+and validated before any separately authorized switch.
 
 ## Completed Capability Evidence
 

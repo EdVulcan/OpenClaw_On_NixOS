@@ -47,7 +47,7 @@ The risk is local drift:
 The current capability baseline includes bounded journal evidence, the bounded
 Event Hub audit store, the fixed Level 3 incident repair loop, its governed
 DeepSeek diagnosis handoff, and the local fixed-unit incident scheduler and
-triage/repair-promotion bridge. All 886 workspace tests and typecheck pass, the
+triage/repair-promotion bridge. All 889 workspace tests and typecheck pass, the
 body-config and event-audit integration checks pass, the 811-entry milestone
 registry audit passes, and the Windows path budget has no file over 160
 repository-relative characters.
@@ -77,11 +77,14 @@ The next Level 3 mainline has started with bounded resource-pressure sensing in
 the existing native systemd inventory. A fixed D-Bus property allowlist now
 projects current/peak memory, configured memory-limit state, cumulative CPU,
 task counts, and managed OOM evidence for configured system-manager body units;
-Observer renders the compact values in its existing inventory panel. This is
-read-only source evidence and is not yet in the installed generation. It adds
-no cgroup mutation, process signal, task, approval, scheduler, provider request,
-or hostd authority. The next real behavior is a bounded local pressure trend
-and warning for those same fixed units.
+Observer renders the compact values in its existing inventory panel. The same
+owner now retains four in-memory samples and emits fixed baseline, rising,
+limit, and managed-OOM warning states through Observer's existing five-second
+refresh. This read-only source evidence is not yet in the installed generation
+and adds no process signal, task, approval, scheduler, provider request, or
+hostd authority. Freeze this sensing layer. The next real behavior is a
+declarative fixed-unit cgroup resource envelope in the Nix body module; build
+and validate it without automatic physical-host activation.
 
 ## Governing Vision
 

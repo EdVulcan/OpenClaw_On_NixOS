@@ -413,6 +413,7 @@ async function refreshSystemdUnitInventory() {
     const governance = data.governance ?? {};
     const units = Array.isArray(data.units) ? data.units : [];
     const resources = summary.resources ?? {};
+    const resourceTrend = summary.resourceTrend ?? {};
     systemdUnitTotal.textContent = String(summary.total ?? units.length);
     systemdUnitActive.textContent = String(summary.active ?? 0);
     systemdUnitObserved.textContent = String(summary.observed ?? 0);
@@ -421,6 +422,10 @@ async function refreshSystemdUnitInventory() {
     systemdUnitTasksCurrent.textContent = Number.isSafeInteger(resources.tasksCurrent)
       ? String(resources.tasksCurrent)
       : "unavailable";
+    systemdUnitResourceStatus.textContent = resourceTrend.status ?? "unavailable";
+    systemdUnitResourceWarnings.textContent = String(
+      (resourceTrend.warningUnits ?? 0) + (resourceTrend.criticalUnits ?? 0),
+    );
     systemdUnitMode.textContent = data.mode ?? "read_only";
     systemdUnitJson.textContent = [
       \`Registry: \${data.registry ?? "unknown"}\`,
@@ -439,7 +444,14 @@ async function refreshSystemdUnitInventory() {
         + " managedOomKills=" + String(resources.managedOomKills ?? "unavailable")
         + " memoryHighLimitedUnits=" + String(resources.memoryHighLimitedUnits ?? 0)
         + " memoryMaxLimitedUnits=" + String(resources.memoryMaxLimitedUnits ?? 0),
-      \`Units: \${units.map((unit) => \`\${unit.unit}:\${unit.activeState ?? unit.status ?? "unknown"}:memory=\${formatSystemdResourceMib(unit.resources?.memory?.currentBytes)}\`).join(", ")}\`,
+      "Resource trend: registry=" + String(resourceTrend.registry ?? "unavailable")
+        + " status=" + String(resourceTrend.status ?? "unavailable")
+        + " baseline=" + String(resourceTrend.baselineUnits ?? 0)
+        + " warning=" + String(resourceTrend.warningUnits ?? 0)
+        + " critical=" + String(resourceTrend.criticalUnits ?? 0)
+        + " persisted=" + String(Boolean(resourceTrend.persisted))
+        + " hostMutation=" + String(Boolean(resourceTrend.hostMutation)),
+      \`Units: \${units.map((unit) => \`\${unit.unit}:\${unit.activeState ?? unit.status ?? "unknown"}:memory=\${formatSystemdResourceMib(unit.resources?.memory?.currentBytes)}:trend=\${unit.resourceTrend?.status ?? "unavailable"}\`).join(", ")}\`,
       \`Next: \${data.next?.recommendedSlice ?? "plan-only repair proposal"}\`,
     ].join("\\n");
   } catch {
@@ -449,6 +461,8 @@ async function refreshSystemdUnitInventory() {
     systemdUnitMemoryCurrent.textContent = "unavailable";
     systemdUnitMemoryPeak.textContent = "unavailable";
     systemdUnitTasksCurrent.textContent = "unavailable";
+    systemdUnitResourceStatus.textContent = "unavailable";
+    systemdUnitResourceWarnings.textContent = "0";
     systemdUnitMode.textContent = "offline";
     systemdUnitJson.textContent = "Unable to read OpenClaw systemd unit inventory.";
   }

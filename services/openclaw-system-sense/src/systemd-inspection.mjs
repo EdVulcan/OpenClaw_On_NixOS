@@ -2,12 +2,15 @@ import {
   createSystemdUnitResourceObservation,
   summarizeSystemdUnitResources,
 } from "./systemd-resource-observation.mjs";
+import { createSystemdResourceTrend } from "./systemd-resource-trend.mjs";
 
 export function createSystemdInspection({
   systemdAdapter,
   openClawSystemdUnitSpecs = [],
   platform = process.platform,
   registries = {},
+  now = () => new Date(),
+  systemdResourceTrend = createSystemdResourceTrend(),
 } = {}) {
   const SYSTEMD_UNIT_INVENTORY_REGISTRY = registries.systemdUnitInventory ?? "openclaw-systemd-unit-inventory-v0";
   const SYSTEMD_DEPENDENCY_MAP_REGISTRY = registries.systemdDependencyMap ?? "openclaw-systemd-dependency-map-v0";
@@ -149,9 +152,11 @@ function inspectSystemdUnit(spec, systemd) {
 }
 
 async function buildSystemdUnitInventory() {
-  const observedAt = new Date().toISOString();
+  const observedAt = now().toISOString();
   const systemd = await detectSystemdAvailability();
-  const units = await Promise.all(openClawSystemdUnitSpecs.map((spec) => inspectSystemdUnit(spec, systemd)));
+  const observedUnits = await Promise.all(openClawSystemdUnitSpecs.map((spec) => inspectSystemdUnit(spec, systemd)));
+  const resourceTrend = systemdResourceTrend.observe(observedUnits, observedAt);
+  const units = resourceTrend.units;
   const active = units.filter((unit) => unit.activeState === "active").length;
   const failed = units.filter((unit) => unit.activeState === "failed" || unit.subState === "failed").length;
   const inactive = units.filter((unit) => unit.activeState === "inactive").length;
@@ -218,6 +223,7 @@ async function buildSystemdUnitInventory() {
       mutationEndpoints: 0,
       restartEndpoints: 0,
       resources: resourceObservation,
+      resourceTrend: resourceTrend.summary,
     },
     units,
     next: {

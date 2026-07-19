@@ -151,6 +151,20 @@ if (inventory.summary?.resources?.registry !== "openclaw-systemd-unit-resource-o
   || !Number.isSafeInteger(inventory.summary.resources.tasksCurrent)) {
   throw new Error(`native inventory should summarize bounded resource observation: ${JSON.stringify(inventory.summary?.resources)}`);
 }
+if (inventory.summary?.resourceTrend?.registry !== "openclaw-systemd-unit-resource-trend-v0"
+  || !["baseline", "normal", "warning", "critical"].includes(inventory.summary.resourceTrend.status)
+  || inventory.summary.resourceTrend.sampleLimit !== 4
+  || inventory.summary.resourceTrend.persisted !== false
+  || inventory.summary.resourceTrend.hostMutation !== false
+  || !Array.isArray(inventory.summary.resourceTrend.warnings)
+  || coreUnit.resourceTrend?.registry !== "openclaw-systemd-unit-resource-trend-v0"
+  || coreUnit.resourceTrend?.readOnly !== true
+  || coreUnit.resourceTrend?.persisted !== false) {
+  throw new Error(`native inventory should expose bounded restart-safe resource trend: ${JSON.stringify({
+    summary: inventory.summary?.resourceTrend,
+    core: coreUnit.resourceTrend,
+  })}`);
+}
 
 const coreDependency = dependencyMap.nodes?.find((node) => node.unit === "openclaw-core.service");
 if (!coreDependency?.observedUpstream?.includes("openclaw-event-hub.service")

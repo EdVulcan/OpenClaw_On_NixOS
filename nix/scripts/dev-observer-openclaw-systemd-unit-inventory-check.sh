@@ -58,6 +58,8 @@ const requiredHtml = [
   "systemd-unit-memory-current",
   "systemd-unit-memory-peak",
   "systemd-unit-tasks-current",
+  "systemd-unit-resource-status",
+  "systemd-unit-resource-warnings",
   "systemd-unit-mode",
   "systemd-unit-json",
 ];
@@ -70,6 +72,8 @@ const requiredClient = [
   "systemdUnitMemoryCurrent",
   "systemdUnitMemoryPeak",
   "systemdUnitTasksCurrent",
+  "systemdUnitResourceStatus",
+  "systemdUnitResourceWarnings",
   "systemdUnitMode",
   "systemdUnitJson",
   "canMutate",
@@ -145,6 +149,17 @@ if (coreUnit.resources?.registry !== "openclaw-systemd-unit-resource-observation
     core: coreUnit.resources,
     summary: inventory.summary?.resources,
     governance: inventory.governance,
+  })}`);
+}
+if (inventory.summary?.resourceTrend?.registry !== "openclaw-systemd-unit-resource-trend-v0"
+  || !["baseline", "normal", "warning", "critical"].includes(inventory.summary.resourceTrend.status)
+  || inventory.summary.resourceTrend.persisted !== false
+  || inventory.summary.resourceTrend.hostMutation !== false
+  || coreUnit.resourceTrend?.readOnly !== true
+  || coreUnit.resourceTrend?.persisted !== false) {
+  throw new Error(`Observer-facing inventory should expose bounded resource trend: ${JSON.stringify({
+    summary: inventory.summary?.resourceTrend,
+    core: coreUnit.resourceTrend,
   })}`);
 }
 
