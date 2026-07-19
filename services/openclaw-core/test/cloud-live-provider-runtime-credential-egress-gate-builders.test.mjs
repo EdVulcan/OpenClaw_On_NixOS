@@ -281,6 +281,44 @@ test("credential egress gate builders create and execute Phase 63 egress executi
   assert.equal(approvedHarness.calls.filter((call) => call.name === "completeTask").length, 1);
 });
 
+test("bound live provider request creates an approval task without historical phase preflight state", async () => {
+  const { deps } = createCredentialEgressHarness();
+  const builders = createCloudLiveProviderRuntimeCredentialEgressGateBuilders(deps);
+  const prompt = "Review the deployed provider boundary and return advice only.";
+
+  const taskShell = await builders.createCloudConsciousnessLiveProviderEgressExecutionTask({
+    confirm: true,
+    liveProviderExecution: {
+      requested: true,
+      credentialReference: DEEPSEEK_CREDENTIAL_REFERENCE,
+      requestEnvelope: {
+        model: "deepseek-chat",
+        messages: [{ role: "user", content: prompt }],
+      },
+    },
+  });
+
+  const binding = taskShell.task.cloudConsciousnessLiveProviderEgressExecution.requestBinding;
+  assert.equal(taskShell.approval.status, "pending");
+  assert.equal(taskShell.preflight.status, "request_binding_validated");
+  assert.equal(taskShell.preflight.summary.requestBound, true);
+  assert.equal(taskShell.sourceRegistry, binding.registry);
+  assert.equal(taskShell.sourceTaskId, null);
+  assert.equal(taskShell.task.cloudConsciousnessLiveProviderEgressExecution.sourceRegistry, binding.registry);
+  assert.equal(taskShell.task.plan.steps[0].phase, "review_live_provider_request_binding");
+  assert.doesNotMatch(JSON.stringify(taskShell.task), /Review the deployed provider boundary/u);
+});
+
+test("legacy unbound egress task shell still requires historical phase preflight state", async () => {
+  const { deps } = createCredentialEgressHarness();
+  const builders = createCloudLiveProviderRuntimeCredentialEgressGateBuilders(deps);
+
+  await assert.rejects(
+    () => builders.createCloudConsciousnessLiveProviderEgressExecutionTask({ confirm: true }),
+    /requires a ready Phase 62 route\/task preflight/u,
+  );
+});
+
 test("credential egress task binds the approved request without persisting its content", async () => {
   const sourceTask = createEgressRouteTaskPreflightTask();
   const { deps } = createCredentialEgressHarness({ tasks: [sourceTask] });

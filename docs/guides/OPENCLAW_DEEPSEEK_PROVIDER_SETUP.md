@@ -123,6 +123,11 @@ POST that body to `/cloud-consciousness/live-provider-egress-execution-tasks`,
 then wait for the returned task approval. Execute only the same bound request
 on `/operator/step`:
 
+An explicit bound request can create this pending approval task on a clean
+deployment. It does not require replaying the historical Phase 59-62 readiness
+records. The older unbound task-shell route retains those compatibility
+prerequisites and cannot contact the provider.
+
 ```json
 {
   "liveProviderExecution": {

@@ -14,7 +14,7 @@ paragraph. Reconcile this baseline with the repository and live host first.
 | Layer | Evidence at this checkpoint | Status |
 | --- | --- | --- |
 | Capability source | Current `main` through the Level 3 fixed-unit incident loop, resource-pressure observation, and declarative cgroup envelope | Implemented; commit history is authoritative |
-| Local validation | 891 workspace tests and typecheck pass; body-config, provider flake check, native inventory, and event-audit integration pass; 811 registry entries pass | Validated |
+| Local validation | 893 workspace tests and typecheck pass; body-config, provider flake check, native inventory, and event-audit integration pass; 811 registry entries pass | Validated |
 | Continuous integration | GitHub CI runs Node 22 install, typecheck, workspace tests, milestone registry/script audit, and Windows path budget on pushes and pull requests | Configured in source |
 | Installed system | NixOS `26.05.4808.569d57850992`, generation `/nix/store/9bbc00da4qg5n7v6n05x37azd491dxpn-nixos-system-nixos-26.05.4808.569d57850992` | Resource envelopes and disabled provider configuration deployed and probed 2026-07-19 |
 | Previous generation | `/nix/store/yzjwwp67apgv4rrzpm3g2gz12bqkq7vj-nixos-system-nixos-26.05.4808.569d57850992` | Superseded without rollback or reboot |

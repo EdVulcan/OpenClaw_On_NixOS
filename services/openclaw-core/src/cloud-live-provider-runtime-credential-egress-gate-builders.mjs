@@ -870,15 +870,16 @@ export function createCloudLiveProviderRuntimeCredentialEgressGateBuilders(deps)
       throw new Error("Cloud consciousness live provider egress execution task creation requires confirm=true.");
     }
 
-    const preflight = await buildCloudConsciousnessLiveProviderEgressExecutionRouteTaskPreflight();
-    if (preflight.summary?.ready !== true
-      || preflight.summary?.endpointNetworkEgressGateFound !== true
-      || preflight.next?.recommendedSlice !== "openclaw-cloud-consciousness-live-provider-egress-execution-task-shell") {
+    const boundExecutionRequested = liveProviderExecution?.requested === true;
+    const legacyPreflight = await buildCloudConsciousnessLiveProviderEgressExecutionRouteTaskPreflight();
+    if (!boundExecutionRequested && (legacyPreflight.summary?.ready !== true
+      || legacyPreflight.summary?.endpointNetworkEgressGateFound !== true
+      || legacyPreflight.next?.recommendedSlice !== "openclaw-cloud-consciousness-live-provider-egress-execution-task-shell")) {
       throw new Error("Cloud consciousness live provider egress execution task requires a ready Phase 62 route/task preflight.");
     }
 
     const sourceTask = findLatestEgressExecutionRouteTaskPreflightTask();
-    if (!sourceTask) {
+    if (!boundExecutionRequested && !sourceTask) {
       throw new Error("Unable to locate Phase 62 egress execution route/task preflight evidence.");
     }
     const incidentMaterialisation = materialiseSystemdIncidentProviderHandoff({
@@ -919,6 +920,28 @@ export function createCloudLiveProviderRuntimeCredentialEgressGateBuilders(deps)
         throw new Error("Live provider egress task creation requires a redacted request binding summary.");
       }
     }
+    if (boundExecutionRequested && !requestBinding) {
+      throw new Error("Live provider egress task creation requires a validated request binding.");
+    }
+
+    const sourceRegistry = boundExecutionRequested
+      ? requestBinding.registry
+      : CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_EGRESS_EXECUTION_ROUTE_TASK_PREFLIGHT_REGISTRY;
+    const sourceTaskId = boundExecutionRequested
+      ? requestBinding.sourceTaskId ?? null
+      : sourceTask.id;
+    const preflight = boundExecutionRequested
+      ? {
+          registry: requestBinding.registry,
+          status: "request_binding_validated",
+          summary: {
+            ready: true,
+            requestBound: true,
+            requestContentIncluded: false,
+            credentialValueIncluded: false,
+          },
+        }
+      : legacyPreflight;
 
     const policyRequest = {
       intent: "cloud_consciousness.live_provider_call.egress_execution_task",
@@ -952,9 +975,13 @@ export function createCloudLiveProviderRuntimeCredentialEgressGateBuilders(deps)
         governance: liveProviderPhaseGovernance.phase63Governance({ createsTask: true, createsApproval: true, egressExecutionTaskCreated: true }),
         steps: [
           {
-            id: "review-egress-route-task-preflight",
-            phase: "review_live_provider_egress_execution_route_task_preflight",
-            title: "Review Phase 62 route/task preflight evidence",
+            id: boundExecutionRequested ? "review-provider-request-binding" : "review-egress-route-task-preflight",
+            phase: boundExecutionRequested
+              ? "review_live_provider_request_binding"
+              : "review_live_provider_egress_execution_route_task_preflight",
+            title: boundExecutionRequested
+              ? "Review the immutable live provider request binding"
+              : "Review Phase 62 route/task preflight evidence",
             status: "pending",
             requiresApproval: false,
           },
@@ -985,8 +1012,8 @@ export function createCloudLiveProviderRuntimeCredentialEgressGateBuilders(deps)
     };
     task.cloudConsciousnessLiveProviderEgressExecution = {
       registry: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_EGRESS_EXECUTION_TASK_REGISTRY,
-      sourceTaskId: sourceTask.id,
-      sourceRegistry: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_EGRESS_EXECUTION_ROUTE_TASK_PREFLIGHT_REGISTRY,
+      sourceTaskId,
+      sourceRegistry,
       implementationStatus: "task_shell_only",
       requestBinding,
       requestBindingRequired: effectiveLiveProviderExecution?.requested === true,
@@ -1039,8 +1066,8 @@ export function createCloudLiveProviderRuntimeCredentialEgressGateBuilders(deps)
       registry: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_EGRESS_EXECUTION_TASK_REGISTRY,
       mode: "approval-gated-cloud-consciousness-live-provider-egress-execution-task",
       generatedAt: new Date().toISOString(),
-      sourceRegistry: CLOUD_CONSCIOUSNESS_LIVE_PROVIDER_EGRESS_EXECUTION_ROUTE_TASK_PREFLIGHT_REGISTRY,
-      sourceTaskId: sourceTask.id,
+      sourceRegistry,
+      sourceTaskId,
       preflight,
       task,
       approval,

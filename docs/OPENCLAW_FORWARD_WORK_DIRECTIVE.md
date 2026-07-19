@@ -47,7 +47,7 @@ The risk is local drift:
 The current capability baseline includes bounded journal evidence, the bounded
 Event Hub audit store, the fixed Level 3 incident repair loop, its governed
 DeepSeek diagnosis handoff, and the local fixed-unit incident scheduler and
-triage/repair-promotion bridge. All 891 workspace tests and typecheck pass, the
+triage/repair-promotion bridge. All 893 workspace tests and typecheck pass, the
 body-config and event-audit integration checks pass, the 811-entry milestone
 registry audit passes, and the Windows path budget has no file over 160
 repository-relative characters. GitHub CI now enforces Node 22 typecheck,
@@ -349,7 +349,10 @@ authorization flags. `/operator/step` rebuilds that binding and rejects any
 mismatch before the credential or network sender runs. The sender rejects
 non-DeepSeek credential references and HTTP redirects. Recommendations remain
 review-only and cannot create a task, approval, execution, or provider egress
-automatically.
+automatically. A complete bound request can create its pending approval task on
+a clean deployment without replaying historical provider phase evidence; the
+legacy unbound shell remains compatibility-only and retains its old preflight
+requirements.
 
 The 2026-07-17 security review also closed the main control-plane bypasses that
 must remain part of the active contract: capability execution now requires a
