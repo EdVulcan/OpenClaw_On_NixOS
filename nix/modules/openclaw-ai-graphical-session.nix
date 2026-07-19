@@ -92,7 +92,7 @@ in
         PrivateTmp = true;
         PrivateDevices = true;
         ProtectSystem = "strict";
-        ProtectHome = true;
+        ProtectHome = "read-only";
         DevicePolicy = "closed";
         RestrictAddressFamilies = [ "AF_UNIX" ];
         RestrictRealtime = true;

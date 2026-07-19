@@ -490,7 +490,7 @@ if (!ownership.aiGraphicalSession.wantedBy?.includes("graphical-session.target")
   || ownership.aiGraphicalSession.serviceConfig?.Slice !== "openclaw-session.slice"
   || ownership.aiGraphicalSession.serviceConfig?.PrivateDevices !== true
   || ownership.aiGraphicalSession.serviceConfig?.ProtectSystem !== "strict"
-  || ownership.aiGraphicalSession.serviceConfig?.ProtectHome !== true
+  || ownership.aiGraphicalSession.serviceConfig?.ProtectHome !== "read-only"
   || ownership.aiGraphicalSession.serviceConfig?.DevicePolicy !== "closed"
   || JSON.stringify(ownership.aiGraphicalSession.serviceConfig?.RestrictAddressFamilies) !== JSON.stringify(["AF_UNIX"])) {
   throw new Error(`AI graphical session must be an isolated user-owned headless Weston service: ${JSON.stringify(ownership.aiGraphicalSession)}`);
