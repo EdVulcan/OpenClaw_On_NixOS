@@ -13,7 +13,7 @@ projection, desktop-wide capture, root, host-mutation, or network authority.
 
 Physical-host generation `kxv2ypwp...` now proves the nested compositor
 coexists with unchanged GNOME `wayland-0`, no parent display environment or DRM
-handle, and bounded runtime resources. The next real capability is to place only
+handle, and bounded runtime resources. The selected next capability was to place only
 the existing AI-owned browser inside that nested session while reusing this
 plan's lease, capture, action, audit, recovery, and Observer contracts. The
 historical `Active Slice`, `Deferred`, and `Next Slice` sections below describe
@@ -25,9 +25,17 @@ starts Nix Firefox headed with a non-sensitive environment allowlist, and
 returns compact `ready`/`attached` evidence. Session-manager projects attachment
 only when the exact registry, mode, owner, socket, headed state, and negative
 authority contract match. A real isolated Puppeteer probe opened a local page
-inside the compositor and shut down without affecting GNOME. The remaining
-slice gate is physical generation deployment plus regression proof of this
-plan's existing capture, semantic action, lease, audit, and recovery chain.
+inside the compositor and shut down without affecting GNOME. Physical generation
+deployment then supplied regression proof of this plan's existing capture,
+semantic action, lease, audit, and recovery chain.
+
+Generation `pkhlbmqx...` closes that gate. Production prepare launched the
+headed Firefox client, screen-sense returned a fresh bounded visual frame and
+semantic inventory, and an existing lease-bound new-tab changed the post-action
+page identity while attachment stayed active. Parent display/session bus and
+OpenClaw variables remained absent from Firefox; GNOME remained on `wayland-0`.
+The next Level 4 continuation is read-only compositor-native frame acquisition,
+while this Level 2 lease/action/recovery contract remains the governing chain.
 
 ## Active Slice
 

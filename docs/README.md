@@ -13,16 +13,16 @@ paragraph. Reconcile this baseline with the repository and live host first.
 
 | Layer | Evidence at this checkpoint | Status |
 | --- | --- | --- |
-| Capability source | Current worktree through the Level 4 isolated compositor and headed AI-owned Firefox attachment, plus the completed Level 3 baseline | Browser attachment source candidate validated; commit history remains authoritative after merge |
+| Capability source | Current `main` through the Level 4 isolated compositor and headed AI-owned Firefox attachment, plus the completed Level 3 baseline | Implemented; commit history is authoritative |
 | Local validation | 921 workspace tests and typecheck pass; body-config, provider flake check, native inventory, and event-audit integration pass; 811 registry entries pass | Validated |
 | Continuous integration | GitHub CI runs Node 22 install, typecheck, workspace tests, milestone registry/script audit, and Windows path budget on pushes and pull requests | Configured in source |
-| Installed system | NixOS `26.05.4808.569d57850992`, generation `/nix/store/kxv2ypwp69kvanp09px49ciak7r157dv-nixos-system-nixos-26.05.4808.569d57850992` | First Level 4 compositor owner deployed and probed 2026-07-19 |
-| Previous generation | `/nix/store/czq8arvh56zwhwa9yxalr6587qwk9d3d-nixos-system-nixos-26.05.4808.569d57850992` | Superseded without rollback or reboot |
+| Installed system | NixOS `26.05.4808.569d57850992`, generation `/nix/store/pkhlbmqx94gsn5kbhq2njp0prdab2klp-nixos-system-nixos-26.05.4808.569d57850992` | Level 4 compositor and headed AI-owned Firefox attachment deployed and probed 2026-07-19 |
+| Previous generation | `/nix/store/lm2fq1w70w36kcapcmxb81mn84prwk9s-nixos-system-nixos-26.05.4808.569d57850992` | Superseded by evidence-semantics correction without rollback or reboot |
 | Deployed resource envelopes | System body: 1.5/3 GiB and 1024 tasks; user session: 1.5/3 GiB and 1024 tasks; all assigned services active | Deployed and probed without pressure injection |
 | Provider runtime | Fixed DeepSeek endpoint/model; root-only source delivered by `LoadCredential`; `LIVE_EGRESS=1`; one 252-token approval-bound call and one 459-token standing call completed | Deployed and proven without prompt, reason, or credential persistence |
 | Standing advisory | Fixed three-unit context, required pre-egress audit, one-call single flight, 15-minute cooldown, 3-call/4096-token daily defaults, structured transient recommendation, and local fallback | Deployed; returned `observe_current_screen` without creating a task, approval, or execution |
 | Level 4 graphical session | Fixed `nixsoma-ai-0` Weston headless compositor in a hardened, resource-bounded user unit; session-manager and Observer expose read-only ownership/health evidence | Deployed; coexists with GNOME `wayland-0` |
-| Level 4 browser attachment | Existing AI-owned Nix Firefox launches headed on the fixed nested socket, preserves Level 2 lease/capture/action ownership, and exposes compact attachment evidence | Source and isolated real probe validated; generation deployment pending |
+| Level 4 browser attachment | Existing AI-owned Nix Firefox launches headed on the fixed nested socket, preserves Level 2 lease/capture/action ownership, and exposes compact attachment evidence | Deployed and proven through capture plus lease-bound action |
 | Deployed journal probe | Bounded `/system/systemd/journal-evidence` returns live read-only JSON; `openclaw-system-sense` has the `systemd-journal` supplementary group | Deployed and probed |
 | Deployed scheduler | First five-minute tick recorded all three fixed targets healthy with no incident task | Deployed and probed |
 | Deployed audit store | Current Event Hub package is active; retention and rotation remain source-validated without destructive live rehearsal | Deployed |
@@ -207,9 +207,9 @@ its runtime directory and socket are current-user `0700`, it has no parent
 display environment or DRM file descriptor, and GNOME retained the same PID on
 `wayland-0`. Session-manager reports `ready`, all existing service health checks
 pass, and Observer serves the Level 4 session/socket/boundary readback. The next
-real step is moving only the AI-owned browser into the nested session.
+selected step was moving only the AI-owned browser into the nested session.
 
-That browser attachment is now complete in source. A fixed binding validates the
+That browser attachment is now complete and deployed. A fixed binding validates the
 current-user `0700` runtime and `nixsoma-ai-0` socket before every real Firefox
 launch, switches Puppeteer from headless to headed only when that binding is
 ready, and gives the child a non-sensitive environment allowlist containing the
@@ -219,8 +219,14 @@ real isolated server/Puppeteer/Nix-Firefox probe opened a local page, reported
 `attached/headed`, established a nested Wayland connection, left GNOME unchanged,
 and removed the child plus ephemeral profile through the existing SIGTERM path.
 Session-manager accepts only the exact compact attachment contract and Observer
-renders it through the existing Level 4 boundary line. Physical generation
-deployment remains the final gate for this slice.
+renders it through the existing Level 4 boundary line. Generation `pkhlbmqx...`
+now runs this path. A production prepare opened `Example Domain`, exposed a
+fresh non-persisted 960x540 AI-owned visual frame and bounded semantic inventory,
+then an existing lease-bound new-tab action changed the observed page identity
+while attachment remained active. Firefox inherited no parent display/session
+bus or OpenClaw control environment; GNOME retained its PID and `wayland-0`.
+Evidence now distinguishes the networkless compositor from Firefox's existing
+browser network scope and records that network authority was not expanded.
 
 ## Progress Estimate
 
@@ -231,7 +237,7 @@ These figures are capability-maturity estimates, not test coverage:
 | Level 1 user-space control plane | about 90% |
 | Level 2 bounded trusted work view | 95-100% |
 | Level 3 controlled system body | about 60% |
-| Level 4 graphics-stack-native body | about 15% in source; compositor deployed, browser attachment pending deployment |
+| Level 4 graphics-stack-native body | about 15%; compositor and browser attachment deployed |
 | Current bounded product scope | 75-80% |
 | Final whitepaper vision | 45-55% |
 

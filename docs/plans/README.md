@@ -122,17 +122,25 @@ Generation `kxv2ypwp...` completed the coexistence proof with a current-user
 `0700` nested runtime/socket, no parent display environment or DRM handle, about
 14 MiB memory, one task, zero restarts, unchanged GNOME PID, and unchanged
 `wayland-0`. Session-manager reports `ready` and Observer serves the bounded
-Level 4 readback. Browser attachment is now the active missing vertical step.
+Level 4 readback. Browser attachment was selected as the next vertical step.
 
-The attachment implementation is now source-validated. Browser-runtime owns a
+The attachment implementation was source-validated before deployment. Browser-runtime owns a
 fixed nested-Wayland binding, validates the compositor socket before launch,
 starts the existing Nix Firefox headed with a credential-free child environment,
 and returns compact attachment through existing state. Session-manager and
 Observer reuse the existing Level 4 readback. A real isolated Puppeteer probe
-opened and closed a nested page without changing GNOME. The remaining gate is a
-reviewed generation switch and live proof through the existing Level 2 capture,
-lease, action, audit, and recovery path; do not open another graphics evidence
-wrapper before that proof.
+opened and closed a nested page without changing GNOME. A reviewed generation
+switch and live proof then exercised the existing Level 2 capture, lease, action,
+audit, and recovery path.
+
+Generation `pkhlbmqx...` completed the deployment proof: headed Firefox is a
+client of `nixsoma-ai-0`, screen-sense retained fresh bounded visual/semantic
+evidence, and a lease-bound new-tab produced a new observed page identity.
+GNOME stayed on `wayland-0`, no parent/control environment reached Firefox, and
+the existing browser network scope was not widened. Freeze this lane. The next
+missing vertical behavior is bounded read-only compositor-native frame
+acquisition for the AI-owned output, not another browser action or evidence
+wrapper.
 
 ## Completed Capability Evidence
 

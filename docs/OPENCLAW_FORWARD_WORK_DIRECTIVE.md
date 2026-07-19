@@ -1829,9 +1829,9 @@ checks are active; session-manager reports the compositor `ready`, and Observer
 serves the Level 4 session/socket/boundary lines. No reboot, rollback, browser
 attachment, pixel read, input action, or desktop takeover occurred.
 
-## Active Level 4 Browser Attachment
+## Completed Level 4 Browser Attachment
 
-The next vertical slice is complete in source and pending generation deployment.
+The next vertical slice is complete and deployed.
 The existing browser-runtime now has one fixed nested-Wayland binding owner. It
 revalidates the current-user `0700` compositor runtime and `nixsoma-ai-0` socket
 immediately before Puppeteer launches Firefox. The disabled/default path remains
@@ -1853,9 +1853,26 @@ closure validation, and all 921 workspace tests pass. A real isolated
 browser-runtime/Puppeteer/Nix-Firefox probe opened a local fixture as a headed
 nested client, reported `attached`, inherited no OpenClaw variables or session
 bus, preserved GNOME's PID and `wayland-0`, and cleaned the browser/profile on
-SIGTERM. Build and inspect the physical candidate before switching; after
-deployment prove the Firefox PID environment, socket peer, existing visual
-capture, session-manager attachment, Observer readback, and unchanged GNOME.
+SIGTERM. The physical candidate was then built and inspected before switching;
+the deployment check covered the Firefox PID environment, socket peer, existing
+visual capture, session-manager attachment, Observer readback, and unchanged
+GNOME.
+
+Generation `pkhlbmqx...` completed that proof. Production prepare launched Nix
+Firefox on `nixsoma-ai-0`, session-manager reported `browserAttached=true`, and
+screen-sense returned a fresh non-persisted 960x540 frame plus bounded semantic
+inventory. The Firefox PID carried only the nested Wayland identity and the
+non-sensitive allowlist; socket inspection showed the compositor/client path,
+and GNOME retained its PID and `wayland-0`. An existing lease-bound new-tab
+action changed the observed page id/URL while attachment remained active. The
+compositor remains networkless; Firefox keeps only browser-runtime's existing
+network scope, with `networkAuthorityExpanded=false`. All 921 tests, services,
+failed-unit checks, and warning journals remain green.
+
+Freeze browser attachment and action variants. The next real Level 4 slice is a
+bounded read-only compositor-native frame for the AI-owned output, reusing the
+existing visual-frame limits and Observer path without adding input, projection,
+desktop-wide capture, provider authority, or host mutation.
 
 ## Identity-Upgrade Alignment
 
