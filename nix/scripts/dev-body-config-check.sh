@@ -228,6 +228,9 @@ requireIncludes("AI graphical session module", aiGraphicalSessionModule, [
   "--socket=${socketName}",
   "RuntimeDirectoryMode = \"0700\"",
   "UMask = \"0077\"",
+  "UnsetEnvironment",
+  "WAYLAND_DISPLAY",
+  "DBUS_SESSION_BUS_ADDRESS",
   "PrivateDevices = true",
   "DevicePolicy = \"closed\"",
   "RestrictAddressFamilies = [ \"AF_UNIX\" ]",
@@ -343,6 +346,7 @@ if command -v nix >/dev/null 2>&1; then
           ExecStopPost = unit.serviceConfig.ExecStopPost or null;
           RuntimeDirectory = unit.serviceConfig.RuntimeDirectory or null;
           RuntimeDirectoryMode = unit.serviceConfig.RuntimeDirectoryMode or null;
+          UnsetEnvironment = unit.serviceConfig.UnsetEnvironment or [ ];
           PrivateDevices = unit.serviceConfig.PrivateDevices or null;
           ProtectSystem = unit.serviceConfig.ProtectSystem or null;
           ProtectHome = unit.serviceConfig.ProtectHome or null;
@@ -479,6 +483,7 @@ if (!ownership.aiGraphicalSession.wantedBy?.includes("graphical-session.target")
   || ownership.aiGraphicalSession.serviceConfig?.RuntimeDirectory !== "nixsoma-ai-graphical-session"
   || ownership.aiGraphicalSession.serviceConfig?.RuntimeDirectoryMode !== "0700"
   || ownership.aiGraphicalSession.serviceConfig?.UMask !== "0077"
+  || JSON.stringify(ownership.aiGraphicalSession.serviceConfig?.UnsetEnvironment) !== JSON.stringify(["DISPLAY", "WAYLAND_DISPLAY", "WAYLAND_SOCKET", "DBUS_SESSION_BUS_ADDRESS"])
   || ownership.aiGraphicalSession.serviceConfig?.Slice !== "openclaw-session.slice"
   || ownership.aiGraphicalSession.serviceConfig?.PrivateDevices !== true
   || ownership.aiGraphicalSession.serviceConfig?.ProtectSystem !== "strict"

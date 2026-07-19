@@ -78,6 +78,12 @@ in
         RuntimeDirectory = runtimeDirectory;
         RuntimeDirectoryMode = "0700";
         UMask = "0077";
+        UnsetEnvironment = [
+          "DISPLAY"
+          "WAYLAND_DISPLAY"
+          "WAYLAND_SOCKET"
+          "DBUS_SESSION_BUS_ADDRESS"
+        ];
         Slice = "openclaw-session.slice";
         NoNewPrivileges = true;
         PrivateTmp = true;
