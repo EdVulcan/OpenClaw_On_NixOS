@@ -5,7 +5,8 @@
 Advance kernel-whitepaper Phase B by replacing command-line `systemctl`
 wrappers with a native Node.js D-Bus boundary. Start with real read-only systemd
 unit inventory from the local system bus, then prove fixed Polkit-authorized
-restarts through the existing governed repair lifecycle.
+restarts through the existing governed repair lifecycle and expose bounded
+resource-pressure evidence for the same fixed body units.
 
 The fixed restarts are now owned by a dedicated `openclaw-hostd` system service.
 Core reaches it through a bounded Unix socket protocol, and hostd accepts only
@@ -68,7 +69,7 @@ fixed restart slice has its own hostd, approval, Polkit, audit, and VM evidence.
   a real `loaded/active/running` core unit through `dbus_native` transport.
 - `dev-observer-openclaw-systemd-unit-inventory-check.sh` proves the same native
   evidence remains visible through the existing Observer panel.
-- The system-sense Nix closure contains 22 reviewed runtime source files plus
+- The system-sense Nix closure contains 23 reviewed runtime source files plus
   the lockfile-pinned production D-Bus dependency and excludes Puppeteer and
   workspace development packages.
 
@@ -76,8 +77,8 @@ fixed restart slice has its own hostd, approval, Polkit, audit, and VM evidence.
 
 The read-only native inventory slice is complete. System-sense now uses only
 `org.freedesktop.systemd1.Manager.GetUnit` and
-`org.freedesktop.DBus.Properties.GetAll`, retains only eight allowlisted unit
-properties, and closes the bus after each inventory. The public route and
+`org.freedesktop.DBus.Properties.GetAll`, retains only a fixed property
+allowlist, and closes the bus after each inventory. The public route and
 Observer contract are unchanged, while response evidence identifies
 `source.transport = "dbus_native"` and contains no read-only command evidence.
 If the system bus is unavailable, inventory remains planned and unobserved; it
@@ -355,13 +356,47 @@ host. The recommendation remains transient and cannot create or approve a
 repair task, invoke hostd, retry a restart, activate a generation, or roll back
 the host. No real provider contact was executed on the sole physical host.
 
+## Tenth Slice: Resource Pressure Observation
+
+The physical host previously experienced a near-exhausted-memory event that
+terminated a terminal process, while the body inventory could report only
+service state and PID. The existing native D-Bus owner now projects a fixed
+`org.freedesktop.systemd1.Service` property allowlist into
+`openclaw-systemd-unit-resource-observation-v0` for each configured body unit.
+It reports bounded current/peak/available/effective-limit memory values,
+configured `MemoryHigh`/`MemoryMax` state, cumulative CPU use, current/effective
+task counts, OOM policy, managed OOM modes, and managed OOM kill count. Unsafe
+64-bit values are never serialized as imprecise counters; systemd's unlimited
+sentinel becomes an explicit `limited=false` state.
+
+The existing `/system/systemd/units` response owns the per-unit values and a
+compact aggregate of current/peak memory, CPU, tasks, configured-limit counts,
+and managed OOM kills. User-manager units remain explicitly unobserved from the
+system bus. Observer adds current memory, peak memory, and task metrics to the
+existing inventory panel and lists each observed unit's current memory without
+adding another route or panel family.
+
+This is a Level 3 sensing capability only. It reads no environment, command
+line, file content, arbitrary cgroup path, or caller-selected unit; it creates
+no task, approval, scheduler, alert, resource limit, process signal, hostd
+operation, provider request, or host mutation. Focused projection/adapter/
+inspection tests and the existing Core and Observer unit-inventory milestones
+prove the fixed allowlist, safe numeric boundary, live D-Bus values, visible
+metrics, and `resourceMutation=false` contract.
+
+The final store-native package
+`/nix/store/rgg1kz4j6zydwm4cfqgxcd19y0d8n9kr-openclaw-system-sense-0.1.0`
+started from its read-only closure and observed resource evidence for all seven
+system-manager body units. Its live Core sample had a positive bounded current
+memory value, explicit `MemoryMax` unlimited state, and zero managed OOM kills;
+these are point-in-time observations, not a health guarantee or configured
+resource policy.
+
 ## Next Slice
 
-The bounded local incident-memory slice is complete through
-`OPENCLAW_SYSTEMD_INCIDENT_EXPERIENCE_MEMORY_PLAN.md`. Next, include only a
-small bounded matching-target pattern summary in the existing approved incident
-AI handoff. That learned context is now complete through
-`OPENCLAW_SYSTEMD_INCIDENT_LEARNED_PROVIDER_CONTEXT_PLAN.md`. The next gap is a
-read-only systemd incident-review action in the existing recommendation schema;
-do not retain or send journal text/provider output, add hostd authority,
-automatically contact a provider, or authorize repair.
+The smallest next Level 3 behavior is a bounded local resource-pressure trend
+and warning derived from repeated observations of the same fixed units. It may
+surface rising memory or a changed managed-OOM count through existing body
+health and Observer ownership, but must remain read-only, restart-safe, and
+non-paging. Do not set cgroup limits, signal processes, create repair approval,
+contact a provider, or add hostd authority in that warning slice.

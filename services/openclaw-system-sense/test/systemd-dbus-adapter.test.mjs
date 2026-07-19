@@ -39,6 +39,20 @@ test("native systemd adapter reads fixed unit properties without mutation method
       callback(null, [
         ["MainPID", variant(1234)],
         ["ExecMainStatus", variant(0)],
+        ["MemoryCurrent", variant(50_000_000)],
+        ["MemoryPeak", variant(75_000_000)],
+        ["MemoryAvailable", variant(500_000_000)],
+        ["MemoryHigh", variant(800_000_000)],
+        ["MemoryMax", variant(1_000_000_000)],
+        ["EffectiveMemoryMax", variant(1_000_000_000)],
+        ["CPUUsageNSec", variant(250_000_000)],
+        ["TasksCurrent", variant(8)],
+        ["EffectiveTasksMax", variant(100)],
+        ["OOMPolicy", variant("stop")],
+        ["ManagedOOMKills", variant(0)],
+        ["ManagedOOMMemoryPressure", variant("auto")],
+        ["ManagedOOMSwap", variant("auto")],
+        ["Environment", variant("SECRET_MUST_NOT_ESCAPE=hidden")],
       ]);
     },
   };
@@ -52,6 +66,9 @@ test("native systemd adapter reads fixed unit properties without mutation method
   assert.equal(unit.found, true);
   assert.equal(unit.properties.ActiveState, "active");
   assert.equal(unit.properties.MainPID, 1234);
+  assert.equal(unit.properties.MemoryCurrent, 50_000_000);
+  assert.equal(unit.properties.TasksCurrent, 8);
+  assert.equal(unit.properties.OOMPolicy, "stop");
   assert.equal("Environment" in unit.properties, false);
   assert.deepEqual(result.nativeDependencies.get("openclaw-core.service"), ["openclaw-event-hub.service"]);
   assert.deepEqual(result.nativeDependencyObservedUnits, ["openclaw-core.service", "openclaw-event-hub.service"]);

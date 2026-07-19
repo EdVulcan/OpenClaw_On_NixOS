@@ -1,3 +1,8 @@
+import {
+  createSystemdUnitResourceObservation,
+  summarizeSystemdUnitResources,
+} from "./systemd-resource-observation.mjs";
+
 export function createSystemdInspection({
   systemdAdapter,
   openClawSystemdUnitSpecs = [],
@@ -80,6 +85,7 @@ function buildBaseUnit(spec) {
     mainPid: null,
     fragmentPath: null,
     systemdObserved: false,
+    resources: createSystemdUnitResourceObservation(),
   };
 }
 
@@ -124,6 +130,7 @@ function inspectNativeSystemdUnit(spec, systemd) {
       ? "matched"
       : spec.expectedManager === "user" ? "unexpected_system_unit" : "observed_system_manager",
     observation: "dbus_properties_read_only",
+    resources: createSystemdUnitResourceObservation(properties),
   };
 }
 
@@ -150,6 +157,7 @@ async function buildSystemdUnitInventory() {
   const inactive = units.filter((unit) => unit.activeState === "inactive").length;
   const observed = units.filter((unit) => unit.systemdObserved).length;
   const managerScopeConfigured = units.filter((unit) => unit.expectedManager !== "unknown");
+  const resourceObservation = summarizeSystemdUnitResources(units);
 
   return attachNativeDependencyEvidence({
     ok: true,
@@ -169,6 +177,7 @@ async function buildSystemdUnitInventory() {
       nativeUnavailableReason: systemd.nativeFailureReason ?? null,
       plannedFrom: "nix/modules/openclaw-body.nix serviceSpecs",
       managerScopeTransport: systemd.available ? "system_bus_only" : "unavailable",
+      resourceEvidence: systemd.available ? "dbus_native_service_properties" : "unavailable",
       expectedUserManagerUnits: units
         .filter((unit) => unit.expectedManager === "user")
         .map((unit) => unit.unit)
@@ -180,6 +189,7 @@ async function buildSystemdUnitInventory() {
       autonomy: "observe_only",
       approvalRequired: false,
       hostMutation: false,
+      resourceMutation: false,
       readOnlyDbusMethods: systemd.transport === "dbus_native" ? systemd.readOnlyMethods : [],
       readOnlyCommands: [],
       forbiddenActions: ["start", "stop", "restart", "reload", "enable", "disable"],
@@ -207,6 +217,7 @@ async function buildSystemdUnitInventory() {
       ].includes(unit.managerScopeStatus)).length,
       mutationEndpoints: 0,
       restartEndpoints: 0,
+      resources: resourceObservation,
     },
     units,
     next: {

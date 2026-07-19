@@ -13,8 +13,8 @@ paragraph. Reconcile this baseline with the repository and live host first.
 
 | Layer | Evidence at this checkpoint | Status |
 | --- | --- | --- |
-| Capability source | Current `main` through the Level 3 fixed-unit incident scheduler, automatic local triage/promotion, and approval-triggered one-shot repair dispatch | Implemented; commit history is authoritative |
-| Local validation | 884 workspace tests and typecheck pass; body-config and event-audit integration pass; 811 registry entries pass | Validated |
+| Capability source | Current `main` through the Level 3 fixed-unit incident loop and native resource-pressure observation | Implemented; commit history is authoritative |
+| Local validation | 886 workspace tests and typecheck pass; body-config and event-audit integration pass; 811 registry entries pass | Validated |
 | Installed system | NixOS `26.05.4808.569d57850992`, generation `/nix/store/yzjwwp67apgv4rrzpm3g2gz12bqkq7vj-nixos-system-nixos-26.05.4808.569d57850992` | Approved-dispatch baseline deployed and probed 2026-07-19 |
 | Previous generation | `/nix/store/gb72w3qavm6b0vv114ml723g7y8jv5qh-nixos-system-nixos-26.05.4808.569d57850992`; closure diff was only `openclaw-core` | Superseded without rollback or reboot |
 | Deployed journal probe | Bounded `/system/systemd/journal-evidence` returns live read-only JSON; `openclaw-system-sense` has the `systemd-journal` supplementary group | Deployed and probed |
@@ -146,6 +146,13 @@ first new scheduler tick left all three targets healthy with no task or
 approval change. Real repair, provider egress, hostd mutation, and generation
 rollback remain deferred to an explicit or disposable mutation check. Freeze
 this completed lane and select the next concrete whitepaper capability.
+
+The next Level 3 capability is implemented in the source checkout but is not
+yet deployed: the existing native systemd inventory now reports bounded
+current/peak memory, configured memory-limit state, CPU use, task counts, and
+managed OOM evidence for fixed body units, and the existing Observer panel
+renders that read-only telemetry. It performs no cgroup or host mutation. The
+next smallest behavior is a bounded local resource-pressure trend and warning.
 
 ## Progress Estimate
 

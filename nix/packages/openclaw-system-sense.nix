@@ -29,6 +29,7 @@ mkOpenClawNpmRuntimeClosure {
     ../../services/openclaw-system-sense/src/systemd-dbus-adapter.mjs
     ../../services/openclaw-system-sense/src/systemd-dbus-transport.mjs
     ../../services/openclaw-system-sense/src/systemd-inspection.mjs
+    ../../services/openclaw-system-sense/src/systemd-resource-observation.mjs
     ../../services/openclaw-system-sense/src/systemd-next-repair-planning.mjs
     ../../services/openclaw-system-sense/src/systemd-repair-candidate-planning.mjs
     ../../services/openclaw-system-sense/src/systemd-repair-proposals.mjs

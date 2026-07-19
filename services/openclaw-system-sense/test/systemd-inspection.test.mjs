@@ -79,6 +79,19 @@ test("systemd inspection prefers native D-Bus without invoking commands", async 
               MainPID: 123,
               ExecMainStatus: 0,
               FragmentPath: "/nix/store/openclaw.service",
+              MemoryCurrent: 50_000_000,
+              MemoryPeak: 75_000_000,
+              MemoryAvailable: 500_000_000,
+              MemoryHigh: 800_000_000,
+              MemoryMax: 1_000_000_000,
+              EffectiveMemoryMax: 1_000_000_000,
+              CPUUsageNSec: 250_000_000,
+              TasksCurrent: 8,
+              EffectiveTasksMax: 100,
+              OOMPolicy: "stop",
+              ManagedOOMKills: 0,
+              ManagedOOMMemoryPressure: "auto",
+              ManagedOOMSwap: "auto",
             },
           }])),
           nativeDependencies: new Map([
@@ -103,6 +116,17 @@ test("systemd inspection prefers native D-Bus without invoking commands", async 
   assert.equal(inventory.units.find((unit) => unit.unit === "observer-ui.service").managerScopeStatus, "unexpected_system_unit");
   assert.equal(JSON.stringify(inventory).includes("nativeDependencies"), false);
   assert.equal(inventory.units[0].observation, "dbus_properties_read_only");
+  assert.equal(inventory.units[0].resources.registry, "openclaw-systemd-unit-resource-observation-v0");
+  assert.equal(inventory.units[0].resources.memory.currentBytes, 50_000_000);
+  assert.equal(inventory.units[0].resources.memory.highLimited, true);
+  assert.equal(inventory.units[0].resources.memory.maxLimited, true);
+  assert.equal(inventory.units[0].resources.oom.policy, "stop");
+  assert.equal(inventory.summary.resources.observedUnits, 3);
+  assert.equal(inventory.summary.resources.memoryCurrentBytes, 150_000_000);
+  assert.equal(inventory.summary.resources.memoryHighLimitedUnits, 3);
+  assert.equal(inventory.summary.resources.memoryMaxLimitedUnits, 3);
+  assert.equal(inventory.summary.resources.tasksCurrent, 24);
+  assert.equal(inventory.governance.resourceMutation, false);
   assert.deepEqual(inventory.governance.readOnlyCommands, []);
   assert.deepEqual(inventory.governance.readOnlyDbusMethods, [
     "org.freedesktop.systemd1.Manager.GetUnit",
@@ -146,6 +170,8 @@ test("systemd inspection fails closed without command fallback when native D-Bus
   assert.equal(inventory.summary.active, 0);
   assert.equal(inventory.units[0].systemdObserved, false);
   assert.equal(inventory.units[0].observation, "planned_inventory_only");
+  assert.equal(inventory.units[0].resources.observed, false);
+  assert.equal(inventory.summary.resources.observedUnits, 0);
   assert.equal(inventory.governance.hostMutation, false);
   assert.equal(dependencyMap.summary.nodes, specs.length);
   assert.equal(dependencyMap.summary.edges, 3);

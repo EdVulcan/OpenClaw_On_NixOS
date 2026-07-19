@@ -316,6 +316,9 @@ export function observerSystemPanels() {
           <div class="metric"><span>Total Units</span><span id="systemd-unit-total">0</span></div>
           <div class="metric"><span>Active</span><span id="systemd-unit-active">0</span></div>
           <div class="metric"><span>Observed</span><span id="systemd-unit-observed">0</span></div>
+          <div class="metric"><span>Current Memory</span><span id="systemd-unit-memory-current">unavailable</span></div>
+          <div class="metric"><span>Peak Memory</span><span id="systemd-unit-memory-peak">unavailable</span></div>
+          <div class="metric"><span>Tasks</span><span id="systemd-unit-tasks-current">unavailable</span></div>
           <div class="metric"><span>Mode</span><span id="systemd-unit-mode">read_only</span></div>
           <pre id="systemd-unit-json">Loading read-only OpenClaw systemd unit inventory...</pre>
         </section>

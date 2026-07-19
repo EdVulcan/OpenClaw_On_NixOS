@@ -399,6 +399,12 @@ async function refreshSystemdNextRepairTaskShell() {
   }
 }
 
+function formatSystemdResourceMib(value) {
+  return Number.isSafeInteger(value) && value >= 0
+    ? (value / (1024 * 1024)).toFixed(1) + " MiB"
+    : "unavailable";
+}
+
 async function refreshSystemdUnitInventory() {
   try {
     const data = await fetchJson(\`\${observerConfig.systemSenseUrl}/system/systemd/units\`);
@@ -406,9 +412,15 @@ async function refreshSystemdUnitInventory() {
     const source = data.source ?? {};
     const governance = data.governance ?? {};
     const units = Array.isArray(data.units) ? data.units : [];
+    const resources = summary.resources ?? {};
     systemdUnitTotal.textContent = String(summary.total ?? units.length);
     systemdUnitActive.textContent = String(summary.active ?? 0);
     systemdUnitObserved.textContent = String(summary.observed ?? 0);
+    systemdUnitMemoryCurrent.textContent = formatSystemdResourceMib(resources.memoryCurrentBytes);
+    systemdUnitMemoryPeak.textContent = formatSystemdResourceMib(resources.memoryPeakBytes);
+    systemdUnitTasksCurrent.textContent = Number.isSafeInteger(resources.tasksCurrent)
+      ? String(resources.tasksCurrent)
+      : "unavailable";
     systemdUnitMode.textContent = data.mode ?? "read_only";
     systemdUnitJson.textContent = [
       \`Registry: \${data.registry ?? "unknown"}\`,
@@ -419,13 +431,24 @@ async function refreshSystemdUnitInventory() {
         + " matched=" + String(summary.managerScopeMatched ?? 0)
         + " mismatches=" + String(summary.managerScopeMismatches ?? 0)
         + " unresolved=" + String(summary.managerScopeUnresolved ?? 0),
-      \`Units: \${units.map((unit) => \`\${unit.unit}:\${unit.activeState ?? unit.status ?? "unknown"}\`).join(", ")}\`,
+      "Resources: registry=" + String(resources.registry ?? "unavailable")
+        + " observed=" + String(resources.observedUnits ?? 0)
+        + " memoryCurrent=" + formatSystemdResourceMib(resources.memoryCurrentBytes)
+        + " memoryPeak=" + formatSystemdResourceMib(resources.memoryPeakBytes)
+        + " tasks=" + String(resources.tasksCurrent ?? "unavailable")
+        + " managedOomKills=" + String(resources.managedOomKills ?? "unavailable")
+        + " memoryHighLimitedUnits=" + String(resources.memoryHighLimitedUnits ?? 0)
+        + " memoryMaxLimitedUnits=" + String(resources.memoryMaxLimitedUnits ?? 0),
+      \`Units: \${units.map((unit) => \`\${unit.unit}:\${unit.activeState ?? unit.status ?? "unknown"}:memory=\${formatSystemdResourceMib(unit.resources?.memory?.currentBytes)}\`).join(", ")}\`,
       \`Next: \${data.next?.recommendedSlice ?? "plan-only repair proposal"}\`,
     ].join("\\n");
   } catch {
     systemdUnitTotal.textContent = "0";
     systemdUnitActive.textContent = "0";
     systemdUnitObserved.textContent = "0";
+    systemdUnitMemoryCurrent.textContent = "unavailable";
+    systemdUnitMemoryPeak.textContent = "unavailable";
+    systemdUnitTasksCurrent.textContent = "unavailable";
     systemdUnitMode.textContent = "offline";
     systemdUnitJson.textContent = "Unable to read OpenClaw systemd unit inventory.";
   }

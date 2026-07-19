@@ -96,6 +96,13 @@ if (inventory.source?.managerScopeTransport !== "system_bus_only"
 if (inventory.governance?.hostMutation !== false || inventory.governance?.autonomy !== "observe_only") {
   throw new Error(`systemd unit inventory governance should stay observe-only: ${JSON.stringify(inventory.governance)}`);
 }
+if (inventory.governance?.resourceMutation !== false
+  || inventory.source?.resourceEvidence !== "dbus_native_service_properties") {
+  throw new Error(`systemd resource observation must remain D-Bus read-only: ${JSON.stringify({
+    source: inventory.source,
+    governance: inventory.governance,
+  })}`);
+}
 if (inventory.governance?.readOnlyCommands?.length !== 0
   || !inventory.governance?.readOnlyDbusMethods?.includes("org.freedesktop.systemd1.Manager.GetUnit")
   || !inventory.governance?.readOnlyDbusMethods?.includes("org.freedesktop.DBus.Properties.GetAll")) {
@@ -125,6 +132,24 @@ if (coreUnit?.observation !== "dbus_properties_read_only"
 }
 if (coreUnit.managerScopeStatus !== "matched" || coreUnit.observedManager !== "system") {
   throw new Error(`core should be observed in its declared system manager: ${JSON.stringify(coreUnit)}`);
+}
+if (coreUnit.resources?.registry !== "openclaw-systemd-unit-resource-observation-v0"
+  || coreUnit.resources?.observed !== true
+  || !Number.isSafeInteger(coreUnit.resources?.memory?.currentBytes)
+  || coreUnit.resources.memory.currentBytes <= 0
+  || typeof coreUnit.resources?.memory?.highLimited !== "boolean"
+  || typeof coreUnit.resources?.memory?.maxLimited !== "boolean"
+  || !Number.isSafeInteger(coreUnit.resources?.tasks?.current)
+  || coreUnit.resources?.readOnly !== true) {
+  throw new Error(`native inventory should expose bounded Core resource observation: ${JSON.stringify(coreUnit.resources)}`);
+}
+if (inventory.summary?.resources?.registry !== "openclaw-systemd-unit-resource-observation-v0"
+  || inventory.summary.resources.observedUnits < 1
+  || !Number.isSafeInteger(inventory.summary.resources.memoryCurrentBytes)
+  || !Number.isSafeInteger(inventory.summary.resources.memoryHighLimitedUnits)
+  || !Number.isSafeInteger(inventory.summary.resources.memoryMaxLimitedUnits)
+  || !Number.isSafeInteger(inventory.summary.resources.tasksCurrent)) {
+  throw new Error(`native inventory should summarize bounded resource observation: ${JSON.stringify(inventory.summary?.resources)}`);
 }
 
 const coreDependency = dependencyMap.nodes?.find((node) => node.unit === "openclaw-core.service");

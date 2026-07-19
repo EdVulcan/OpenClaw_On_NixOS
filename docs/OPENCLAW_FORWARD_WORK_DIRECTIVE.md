@@ -47,7 +47,7 @@ The risk is local drift:
 The current capability baseline includes bounded journal evidence, the bounded
 Event Hub audit store, the fixed Level 3 incident repair loop, its governed
 DeepSeek diagnosis handoff, and the local fixed-unit incident scheduler and
-triage/repair-promotion bridge. All 884 workspace tests and typecheck pass, the
+triage/repair-promotion bridge. All 886 workspace tests and typecheck pass, the
 body-config and event-audit integration checks pass, the 811-entry milestone
 registry audit passes, and the Windows path budget has no file over 160
 repository-relative characters.
@@ -72,6 +72,16 @@ reads, streaming cached summaries, serialized rotation, and a fixed retained
 segment policy. The post-repair diagnosis loop and its exact request-bound AI
 guidance handoff defined below are also complete in source; do not select work
 from an older phase number or historical `Next Slice` paragraph.
+
+The next Level 3 mainline has started with bounded resource-pressure sensing in
+the existing native systemd inventory. A fixed D-Bus property allowlist now
+projects current/peak memory, configured memory-limit state, cumulative CPU,
+task counts, and managed OOM evidence for configured system-manager body units;
+Observer renders the compact values in its existing inventory panel. This is
+read-only source evidence and is not yet in the installed generation. It adds
+no cgroup mutation, process signal, task, approval, scheduler, provider request,
+or hostd authority. The next real behavior is a bounded local pressure trend
+and warning for those same fixed units.
 
 ## Governing Vision
 

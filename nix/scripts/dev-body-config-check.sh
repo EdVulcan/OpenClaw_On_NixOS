@@ -1238,6 +1238,7 @@ EOF
     || ! -f "$system_sense_out/share/openclaw/services/openclaw-system-sense/src/system-kernel-event-routes.mjs"
     || ! -f "$system_sense_out/share/openclaw/services/openclaw-system-sense/src/system-health-governance.mjs"
     || ! -f "$system_sense_out/share/openclaw/services/openclaw-system-sense/src/systemd-dbus-adapter.mjs"
+    || ! -f "$system_sense_out/share/openclaw/services/openclaw-system-sense/src/systemd-resource-observation.mjs"
     || ! -f "$system_sense_out/share/openclaw/services/openclaw-system-sense/src/systemd-routes.mjs"
     || ! -f "$system_sense_out/share/openclaw/packages/shared-events/src/event-names.mjs"
     || ! -f "$system_sense_out/share/openclaw/packages/shared-utils/src/execution-grants.mjs"
@@ -1249,7 +1250,7 @@ EOF
     || -e "$system_sense_working_dir/node_modules/typescript"
     || ! -f "$system_sense_out/share/openclaw/services/openclaw-system-sense/src/systemd-dbus-transport.mjs"
     || ! -f "$system_sense_out/share/openclaw/packages/shared-systemd/src/systemd-dbus-transport.mjs"
-    || "$system_sense_source_count" -ne 28 ]]; then
+    || "$system_sense_source_count" -ne 29 ]]; then
     echo "system-sense Nix closure is not exact, production-only, and read-only: $system_sense_out" >&2
     exit 1
   fi

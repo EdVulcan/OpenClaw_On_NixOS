@@ -55,6 +55,9 @@ const requiredHtml = [
   "systemd-unit-total",
   "systemd-unit-active",
   "systemd-unit-observed",
+  "systemd-unit-memory-current",
+  "systemd-unit-memory-peak",
+  "systemd-unit-tasks-current",
   "systemd-unit-mode",
   "systemd-unit-json",
 ];
@@ -64,6 +67,9 @@ const requiredClient = [
   "systemdUnitTotal",
   "systemdUnitActive",
   "systemdUnitObserved",
+  "systemdUnitMemoryCurrent",
+  "systemdUnitMemoryPeak",
+  "systemdUnitTasksCurrent",
   "systemdUnitMode",
   "systemdUnitJson",
   "canMutate",
@@ -126,6 +132,20 @@ if (coreUnit?.observation !== "dbus_properties_read_only"
 }
 if (coreUnit.managerScopeStatus !== "matched" || coreUnit.observedManager !== "system") {
   throw new Error(`Observer-facing inventory should show core in its declared system manager: ${JSON.stringify(coreUnit)}`);
+}
+if (coreUnit.resources?.registry !== "openclaw-systemd-unit-resource-observation-v0"
+  || coreUnit.resources?.observed !== true
+  || !Number.isSafeInteger(coreUnit.resources?.memory?.currentBytes)
+  || coreUnit.resources.memory.currentBytes <= 0
+  || typeof coreUnit.resources?.memory?.highLimited !== "boolean"
+  || typeof coreUnit.resources?.memory?.maxLimited !== "boolean"
+  || inventory.summary?.resources?.observedUnits < 1
+  || inventory.governance?.resourceMutation !== false) {
+  throw new Error(`Observer-facing inventory should expose read-only resource evidence: ${JSON.stringify({
+    core: coreUnit.resources,
+    summary: inventory.summary?.resources,
+    governance: inventory.governance,
+  })}`);
 }
 
 console.log(JSON.stringify({

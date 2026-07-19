@@ -13,7 +13,23 @@ const UNIT_PROPERTY_NAMES = [
   "FragmentPath",
   "After",
 ];
-const SERVICE_PROPERTY_NAMES = ["MainPID", "ExecMainStatus"];
+const SERVICE_PROPERTY_NAMES = [
+  "MainPID",
+  "ExecMainStatus",
+  "MemoryCurrent",
+  "MemoryPeak",
+  "MemoryAvailable",
+  "MemoryHigh",
+  "MemoryMax",
+  "EffectiveMemoryMax",
+  "CPUUsageNSec",
+  "TasksCurrent",
+  "EffectiveTasksMax",
+  "OOMPolicy",
+  "ManagedOOMKills",
+  "ManagedOOMMemoryPressure",
+  "ManagedOOMSwap",
+];
 
 function selectProperties(properties, names) {
   return Object.fromEntries(names.filter((name) => name in properties).map((name) => [name, properties[name]]));
